@@ -1,0 +1,13 @@
+source_service,source_type,target_service,target_type,protocol,operation,latency_ms,call_count,error_rate
+ClaimsAPI,api,ClaimsService,service,http,POST /claims,45,1520,0.02
+ClaimsAPI,api,PolicyService,service,http,GET /policies/:id,32,890,0.01
+ClaimsAPI,api,AuthService,service,grpc,ValidateToken,12,2400,0.00
+ClaimsService,service,ClaimsDB,database,postgresql,INSERT claims,12,1500,0.00
+ClaimsService,service,ClaimsDB,database,postgresql,SELECT claims,8,3200,0.01
+ClaimsService,service,EventQueue,queue,kafka,claim-events,5,1500,0.00
+PolicyService,service,PolicyDB,database,mongodb,QUERY policies,15,890,0.02
+PolicyService,service,CacheService,service,redis,GET policy:,2,4500,0.00
+AuthService,service,UserDB,database,postgresql,SELECT users,5,2400,0.00
+EventQueue,queue,NotificationService,service,kafka,claim-events,3,1500,0.00
+NotificationService,service,EmailService,service,http,POST /send,250,1200,0.05
+NotificationService,service,SMSAPI,service,http,POST /sms,180,300,0.03

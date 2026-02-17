@@ -1,0 +1,13 @@
+service.name,span.kind,peer.service,http.url,http.method,db.system,db.statement,messaging.system,messaging.destination
+ClaimsAPI,CLIENT,ClaimsService,/claims,POST,,,,
+ClaimsAPI,CLIENT,PolicyService,/policies/:id,GET,,,,
+ClaimsAPI,CLIENT,AuthService,,POST,grpc,ValidateToken,,
+ClaimsService,CLIENT,,INSERT claims,,postgresql,claims,,
+ClaimsService,CLIENT,,SELECT claims,,postgresql,claims,,
+ClaimsService,PRODUCER,,,,,,kafka,claim-events
+PolicyService,CLIENT,,QUERY policies,,mongodb,policies,,
+PolicyService,CLIENT,,GET policy:,,redis,policies,,
+AuthService,CLIENT,,SELECT users,,postgresql,users,,
+NotificationService,CONSUMER,,,,,,kafka,claim-events
+NotificationService,CLIENT,EmailService,/send,POST,,,,
+NotificationService,CLIENT,SMSAPI,/sms,POST,,,,

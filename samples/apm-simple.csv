@@ -1,0 +1,13 @@
+source_service,target_service,protocol,operation,details
+ClaimsAPI,ClaimsService,http,POST /claims,REST API
+ClaimsAPI,PolicyService,http,GET /policies/:id,REST API
+ClaimsAPI,AuthService,grpc,ValidateToken,Internal RPC
+ClaimsService,ClaimsDB,postgresql,INSERT claims,SQL Database
+ClaimsService,ClaimsDB,postgresql,SELECT claims,SQL Database
+ClaimsService,EventQueue,kafka,claim-events,Message Queue
+PolicyService,PolicyDB,mongodb,QUERY policies,NoSQL Database
+PolicyService,CacheService,redis,GET policy:,Cache
+AuthService,UserDB,postgresql,SELECT users,SQL Database
+EventQueue,NotificationService,kafka,claim-events,Consumer
+NotificationService,EmailService,http,POST /send,External API
+NotificationService,SMSAPI,http,POST /sms,External API
