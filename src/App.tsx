@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DSLEditor } from './components/Editor/DSLEditor';
 import { DiagramCanvas } from './components/Canvas/DiagramCanvas';
 import { PropertiesPanel } from './components/Panel/PropertiesPanel';
@@ -82,6 +82,7 @@ node Payment {
 function App() {
   const { setDslText, diagramMode, setDiagramMode } = useDiagramStore();
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow'>('architecture');
+  const [showProperties, setShowProperties] = useState(false);
 
   const handleTabChange = (tab: 'architecture' | 'flow') => {
     setActiveTab(tab);
@@ -95,12 +96,31 @@ function App() {
     }
   };
 
+  // Keyboard shortcut for panel toggle
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'p' || e.key === 'P') {
+        if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+          // Only toggle if not in input/textarea
+          const target = e.target as HTMLElement;
+          if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+            setShowProperties(prev => !prev);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []);
+
   return (
     <div className="h-screen flex flex-col bg-canvas-white">
       {/* Header */}
       <header className="h-header-h bg-white border-b border-border-gray flex items-center px-6">
         <div className="flex items-center gap-3">
-          <div className="w-3 h-3 bg-deep-navy rounded-sm"></div>
+          <div className="w-3 h-3 bg-electric-blue rounded-sm"></div>
           <h1 className="text-lg font-semibold text-deep-navy">DiagramTool</h1>
         </div>
         
@@ -110,7 +130,7 @@ function App() {
             onClick={() => handleTabChange('architecture')}
             className={`px-3 py-1.5 text-xs font-semibold rounded transition ${
               activeTab === 'architecture'
-                ? 'bg-electric-indigo text-white'
+                ? 'bg-electric-blue text-white'
                 : 'text-slate-600 border border-border-gray hover:bg-panel-light'
             }`}
           >
@@ -120,7 +140,7 @@ function App() {
             onClick={() => handleTabChange('flow')}
             className={`px-3 py-1.5 text-xs font-semibold rounded transition ${
               activeTab === 'flow'
-                ? 'bg-electric-indigo text-white'
+                ? 'bg-electric-blue text-white'
                 : 'text-slate-600 border border-border-gray hover:bg-panel-light'
             }`}
           >
@@ -129,11 +149,21 @@ function App() {
         </div>
         
         <div className="ml-auto flex items-center gap-3">
-          <button className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-border-gray rounded hover:bg-panel-light transition">
-            Save
+          <button
+            onClick={() => setShowProperties(!showProperties)}
+            className={`px-3 py-1.5 text-xs font-semibold rounded transition ${
+              showProperties
+                ? 'bg-vivid-purple text-white'
+                : 'text-slate-600 border border-border-gray hover:bg-panel-light'
+            }`}
+          >
+            {showProperties ? '📋 Hide Panel' : '📋 Show Panel'}
           </button>
-          <button className="px-3 py-1.5 text-xs font-semibold text-white bg-electric-indigo rounded hover:bg-indigo-600 transition">
-            Export PNG
+          <button className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-border-gray rounded hover:bg-panel-light transition">
+            💾 Save
+          </button>
+          <button className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald rounded hover:scale-105 transition">
+            📤 Export PNG
           </button>
         </div>
       </header>
@@ -148,13 +178,19 @@ function App() {
         {/* Canvas */}
         <DiagramCanvas />
         
-        {/* Properties Panel */}
-        <PropertiesPanel />
+        {/* Properties Panel - Collapsible */}
+        {showProperties && (
+          <div className="w-sidebar-w transition-all duration-300">
+            <PropertiesPanel />
+          </div>
+        )}
       </div>
       
       {/* Footer */}
       <footer className="h-toolbar-h bg-white border-t border-border-gray flex items-center px-6 text-xs text-slate-500">
         <div className="capitalize">{diagramMode} Mode</div>
+        <div className="ml-4 text-slate-400">|</div>
+        <div className="ml-4">Press <kbd className="px-1.5 py-0.5 bg-panel-light rounded text-xs font-mono">P</kbd> to toggle panel</div>
         <div className="ml-auto">Zoom: 100%</div>
       </footer>
     </div>
