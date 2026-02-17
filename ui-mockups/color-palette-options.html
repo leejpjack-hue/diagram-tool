@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 3 - Color Palette Options (More Colorful & Energetic)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 40px;
+            font-family: 'Inter', sans-serif;
+            background: #F0F4F8;
+            color: #1E293B;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #64748B;
+            margin-bottom: 40px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 32px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            font-size: 24px;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #E2E8F0;
+        }
+
+        .palette-option {
+            margin-bottom: 48px;
+            padding-bottom: 32px;
+            border-bottom: 2px solid #F1F5F9;
+        }
+
+        .palette-option:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .palette-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .palette-name {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .palette-tag {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .color-swatches {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .color-swatch {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .color-preview {
+            height: 80px;
+        }
+
+        .color-info {
+            padding: 12px;
+            background: white;
+        }
+
+        .color-name {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .color-hex {
+            font-size: 11px;
+            color: #64748B;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .demo-section {
+            background: #F8FAFC;
+            border-radius: 8px;
+            padding: 24px;
+            margin-top: 24px;
+        }
+
+        .demo-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .demo-nodes {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .demo-node {
+            padding: 16px 20px;
+            border-radius: 8px;
+            border: 2px solid;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            min-width: 140px;
+        }
+
+        .demo-node-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .demo-node-subtitle {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        .recommendation {
+            background: #EEF2FF;
+            border: 2px solid #6366F1;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 16px;
+        }
+
+        .recommendation-title {
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .recommendation-text {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Colorful & Energetic Palette Options</h1>
+        <p class="subtitle">More vibrant, energetic color schemes for Sprint 3</p>
+
+        <!-- Option 1: Vibrant Tech -->
+        <div class="section">
+            <h2>Choose Your Color Palette</h2>
+
+            <div class="palette-option">
+                <div class="palette-header">
+                    <div class="palette-name">Option 1: Vibrant Tech</div>
+                    <span class="palette-tag" style="background: #DBEAFE; color: #1E40AF;">Modern & Bright</span>
+                </div>
+
+                <div class="color-swatches">
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #3B82F6;"></div>
+                        <div class="color-info">
+                            <div class="color-name">Electric Blue</div>
+                            <div class="color-hex">#3B82F6</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #8B5CF6;"></div>
+                        <div class="color-info">
+                            <div class="color-name">Vivid Purple</div>
+                            <div class="color-hex">#8B5CF6</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #EC4899;"></div>
+                        <div class="color-info">
+                            <div class="color-name">Hot Pink</div>
+                            <div class="color-hex">#EC4899</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #10B981;"></div>
+                        <div class="color-info">
+                            <div class="color-name">Emerald</div>
+                            <div class="color-hex">#10B981</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #F59E0B;"></div>
+                        <div class="color-info">
+                            <div class="color-name">Amber</div>
+                            <div class="color-hex">#F59E0B</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #EF4444;"></div>
+                        <div class="color-info">
+                            <div class="color-name">Red</div>
+                            <div class="color-hex">#EF4444</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-title">Preview: Architecture Nodes</div>
+                    <div class="demo-nodes">
+                        <div class="demo-node" style="background: #DBEAFE; border-color: #3B82F6; color: #1E40AF;">
+                            <div class="demo-node-title">API Service</div>
+                            <div class="demo-node-subtitle">Node.js</div>
+                        </div>
+                        <div class="demo-node" style="background: #E9D5FF; border-color: #8B5CF6; color: #6B21A8;">
+                            <div class="demo-node-title">Database</div>
+                            <div class="demo-node-subtitle">PostgreSQL</div>
+                        </div>
+                        <div class="demo-node" style="background: #D1FAE5; border-color: #10B981; color: #065F46;">
+                            <div class="demo-node-title">Queue</div>
+                            <div class="demo-node-subtitle">Kafka</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recommendation">
+                    <div class="recommendation-title">
+                        <span>💡</span>
+                        <span>Why this works</span>
+                    </div>
+                    <div class="recommendation-text">
+                        Vibrant Tech uses bright, saturated colors that pop on screen. Great for modern tech presentations and developer tools. Each node type gets its own distinct color for instant recognition.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Option 2: Energetic Gradient -->
+            <div class="palette-option">
+                <div class="palette-header">
+                    <div class="palette-name">Option 2: Energetic Gradient</div>
+                    <span class="palette-tag" style="background: #FEE2E2; color: #991B1B;">Warm & Dynamic</span>
+                </div>
+
+                <div class="color-swatches">
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: linear-gradient(135deg, #F97316, #EA580C);"></div>
+                        <div class="color-info">
+                            <div class="color-name">Orange Flame</div>
+                            <div class="color-hex">#F97316</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: linear-gradient(135deg, #EF4444, #DC2626);"></div>
+                        <div class="color-info">
+                            <div class="color-name">Red Energy</div>
+                            <div class="color-hex">#EF4444</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: linear-gradient(135deg, #F59E0B, #D97706);"></div>
+                        <div class="color-info">
+                            <div class="color-name">Yellow Sun</div>
+                            <div class="color-hex">#F59E0B</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: linear-gradient(135deg, #84CC16, #65A30D);"></div>
+                        <div class="color-info">
+                            <div class="color-name">Lime Green</div>
+                            <div class="color-hex">#84CC16</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: linear-gradient(135deg, #06B6D4, #0891B2);"></div>
+                        <div class="color-info">
+                            <div class="color-name">Cyan Wave</div>
+                            <div class="color-hex">#06B6D4</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: linear-gradient(135deg, #8B5CF6, #7C3AED);"></div>
+                        <div class="color-info">
+                            <div class="color-name">Purple Power</div>
+                            <div class="color-hex">#8B5CF6</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-title">Preview: Flow Nodes</div>
+                    <div class="demo-nodes">
+                        <div class="demo-node" style="background: linear-gradient(135deg, #FED7AA, #FDBA74); border-color: #F97316; color: #7C2D12;">
+                            <div class="demo-node-title">Process</div>
+                            <div class="demo-node-subtitle">Active Step</div>
+                        </div>
+                        <div class="demo-node" style="background: linear-gradient(135deg, #FECACA, #FCA5A5); border-color: #EF4444; color: #7F1D1D;">
+                            <div class="demo-node-title">Decision</div>
+                            <div class="demo-node-subtitle">Branch</div>
+                        </div>
+                        <div class="demo-node" style="background: linear-gradient(135deg, #D1FAE5, #A7F3D0); border-color: #10B981; color: #064E3B;">
+                            <div class="demo-node-title">Success</div>
+                            <div class="demo-node-subtitle">Complete</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recommendation">
+                    <div class="recommendation-title">
+                        <span>💡</span>
+                        <span>Why this works</span>
+                    </div>
+                    <div class="recommendation-text">
+                        Energetic Gradient uses warm colors and gradients to create visual excitement. Perfect for dynamic business processes and workflows. The gradient effect adds depth and modern appeal.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Option 3: Neon Dreams -->
+            <div class="palette-option">
+                <div class="palette-header">
+                    <div class="palette-name">Option 3: Neon Dreams</div>
+                    <span class="palette-tag" style="background: #FCE7F3; color: #9D174D;">Futuristic & Bold</span>
+                </div>
+
+                <div class="color-swatches">
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #00D9FF; box-shadow: 0 0 20px rgba(0, 217, 255, 0.5);"></div>
+                        <div class="color-info">
+                            <div class="color-name">Neon Cyan</div>
+                            <div class="color-hex">#00D9FF</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #A855F7; box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);"></div>
+                        <div class="color-info">
+                            <div class="color-name">Neon Purple</div>
+                            <div class="color-hex">#A855F7</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #FF006E; box-shadow: 0 0 20px rgba(255, 0, 110, 0.5);"></div>
+                        <div class="color-info">
+                            <div class="color-name">Neon Pink</div>
+                            <div class="color-hex">#FF006E</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #39FF14; box-shadow: 0 0 20px rgba(57, 255, 20, 0.5);"></div>
+                        <div class="color-info">
+                            <div class="color-name">Neon Green</div>
+                            <div class="color-hex">#39FF14</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #FFD60A; box-shadow: 0 0 20px rgba(255, 214, 10, 0.5);"></div>
+                        <div class="color-info">
+                            <div class="color-name">Neon Yellow</div>
+                            <div class="color-hex">#FFD60A</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #FF6B35; box-shadow: 0 0 20px rgba(255, 107, 53, 0.5);"></div>
+                        <div class="color-info">
+                            <div class="color-name">Neon Orange</div>
+                            <div class="color-hex">#FF6B35</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="demo-section" style="background: #0F172A;">
+                    <div class="demo-title" style="color: white;">Preview: Dark Mode Nodes</div>
+                    <div class="demo-nodes">
+                        <div class="demo-node" style="background: rgba(0, 217, 255, 0.2); border-color: #00D9FF; color: #00D9FF; box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);">
+                            <div class="demo-node-title">Microservice</div>
+                            <div class="demo-node-subtitle">Active</div>
+                        </div>
+                        <div class="demo-node" style="background: rgba(168, 85, 247, 0.2); border-color: #A855F7; color: #A855F7; box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);">
+                            <div class="demo-node-title">Database</div>
+                            <div class="demo-node-subtitle">Connected</div>
+                        </div>
+                        <div class="demo-node" style="background: rgba(57, 255, 20, 0.2); border-color: #39FF14; color: #39FF14; box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);">
+                            <div class="demo-node-title">Success</div>
+                            <div class="demo-node-subtitle">Complete</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recommendation">
+                    <div class="recommendation-title">
+                        <span>💡</span>
+                        <span>Why this works</span>
+                    </div>
+                    <div class="recommendation-text">
+                        Neon Dreams brings futuristic, cyberpunk aesthetics with glowing effects. Perfect for tech-focused presentations and developer tools. Works best in dark mode for maximum impact.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Option 4: Rainbow Spectrum -->
+            <div class="palette-option">
+                <div class="palette-header">
+                    <div class="palette-name">Option 4: Rainbow Spectrum</div>
+                    <span class="palette-tag" style="background: #DDD6FE; color: #5B21B6;">Full Color Range</span>
+                </div>
+
+                <div class="color-swatches">
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #EF4444;"></div>
+                        <div class="color-info">
+                            <div class="color-name">Red</div>
+                            <div class="color-hex">#EF4444</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #F97316;"></div>
+                        <div class="color-info">
+                            <div class="color-name">Orange</div>
+                            <div class="color-hex">#F97316</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #F59E0B;"></div>
+                        <div class="color-info">
+                            <div class="color-name">Yellow</div>
+                            <div class="color-hex">#F59E0B</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #10B981;"></div>
+                        <div class="color-info">
+                            <div class="color-name">Green</div>
+                            <div class="color-hex">#10B981</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #3B82F6;"></div>
+                        <div class="color-info">
+                            <div class="color-name">Blue</div>
+                            <div class="color-hex">#3B82F6</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #8B5CF6;"></div>
+                        <div class="color-info">
+                            <div class="color-name">Purple</div>
+                            <div class="color-hex">#8B5CF6</div>
+                        </div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-preview" style="background: #EC4899;"></div>
+                        <div class="color-info">
+                            <div class="color-name">Pink</div>
+                            <div class="color-hex">#EC4899</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-title">Preview: Mixed Node Types</div>
+                    <div class="demo-nodes">
+                        <div class="demo-node" style="background: #FEE2E2; border-color: #EF4444; color: #991B1B;">
+                            <div class="demo-node-title">Critical</div>
+                            <div class="demo-node-subtitle">High Priority</div>
+                        </div>
+                        <div class="demo-node" style="background: #D1FAE5; border-color: #10B981; color: #065F46;">
+                            <div class="demo-node-title">Success</div>
+                            <div class="demo-node-subtitle">Complete</div>
+                        </div>
+                        <div class="demo-node" style="background: #DBEAFE; border-color: #3B82F6; color: #1E40AF;">
+                            <div class="demo-node-title">Info</div>
+                            <div class="demo-node-subtitle">Standard</div>
+                        </div>
+                        <div class="demo-node" style="background: #E9D5FF; border-color: #8B5CF6; color: #6B21A8;">
+                            <div class="demo-node-title">Special</div>
+                            <div class="demo-node-subtitle">Featured</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recommendation">
+                    <div class="recommendation-title">
+                        <span>💡</span>
+                        <span>Why this works</span>
+                    </div>
+                    <div class="recommendation-text">
+                        Rainbow Spectrum uses the full color range for maximum visual variety. Great for dashboards and complex systems where you need many distinct colors. Each color has semantic meaning (red=critical, green=success, etc).
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recommendation -->
+            <div class="section" style="background: linear-gradient(135deg, #EEF2FF, #DBEAFE); border: 2px solid #6366F1;">
+                <h2>🎯 My Recommendation</h2>
+                <p style="font-size: 16px; line-height: 1.8; margin-bottom: 20px;">
+                    For a <strong>colorful and energetic</strong> design that still maintains professionalism for financial/enterprise software, I recommend:
+                </p>
+
+                <div style="background: white; padding: 24px; border-radius: 8px; border: 2px solid #3B82F6;">
+                    <h3 style="margin-top: 0; color: #3B82F6;">✨ Option 1: Vibrant Tech</h3>
+                    <p style="margin-bottom: 16px;">
+                        <strong>Why:</strong>
+                    </p>
+                    <ul style="margin-bottom: 16px;">
+                        <li>Bright, saturated colors that energize the interface</li>
+                        <li>Distinct colors for each node type (easy identification)</li>
+                        <li>Still professional enough for enterprise use</li>
+                        <li>Works well in both light and dark modes</li>
+                        <li>Modern tech aesthetic without being too playful</li>
+                    </ul>
+
+                    <p style="margin-bottom: 8px;"><strong>Node Type Colors:</strong></p>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <span style="background: #DBEAFE; color: #1E40AF; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600;">🔵 API: Blue</span>
+                        <span style="background: #E9D5FF; color: #6B21A8; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600;">🟣 Service: Purple</span>
+                        <span style="background: #FCE7F3; color: #9D174D; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600;">🩷 Database: Pink</span>
+                        <span style="background: #D1FAE5; color: #065F46; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600;">🟢 Queue: Green</span>
+                        <span style="background: #FEF3C7; color: #92400E; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600;">🟡 Decision: Amber</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="section">
+            <h2>📝 Your Decision</h2>
+            <p style="font-size: 16px; margin-bottom: 20px;">
+                Which color palette do you prefer? Let me know and I'll update the designs with:
+            </p>
+            <ul style="font-size: 15px; line-height: 1.8;">
+                <li>✅ New color palette for all UI elements</li>
+                <li>✅ Updated node colors and backgrounds</li>
+                <li>✅ More vibrant buttons and interactions</li>
+                <li>✅ Energetic hover effects and animations</li>
+                <li>✅ Color-coded export options</li>
+            </ul>
+
+            <p style="margin-top: 24px; padding: 16px; background: #F0FDF4; border-radius: 8px; border-left: 4px solid #10B981;">
+                <strong>👉 Just tell me:</strong> "Use Option 1", "Option 2", "Option 3", or "Option 4"<br>
+                Or suggest a custom mix: "I like Option 1 but with gradients from Option 2"
+            </p>
+        </div>
+    </div>
+</body>
+</html>
