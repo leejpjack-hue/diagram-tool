@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { DSLEditor } from './components/Editor/DSLEditor';
 import { DiagramCanvas } from './components/Canvas/DiagramCanvas';
 import { PropertiesPanel } from './components/Panel/PropertiesPanel';
@@ -83,12 +83,14 @@ function App() {
   const { setDslText, diagramMode, setDiagramMode } = useDiagramStore();
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow'>('architecture');
   const [showProperties, setShowProperties] = useState(false);
+  const [editorWidth, setEditorWidth] = useState(500); // Default width
+  const [isResizing, setIsResizing] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleTabChange = (tab: 'architecture' | 'flow') => {
     setActiveTab(tab);
     setDiagramMode(tab);
     
-    // Load corresponding DSL
     if (tab === 'architecture') {
       setDslText(ARCHITECTURE_DSL);
     } else {
@@ -96,12 +98,40 @@ function App() {
     }
   };
 
+  // Handle resize
+  const handleMouseDown = useCallback(() => {
+    setIsResizing(true);
+  }, []);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizing) return;
+    
+    const newWidth = e.clientX;
+    if (newWidth >= 300 && newWidth <= 800) {
+      setEditorWidth(newWidth);
+    }
+  }, [isResizing]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, handleMouseMove, handleMouseUp]);
+
   // Keyboard shortcut for panel toggle
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'p' || e.key === 'P') {
         if (!e.metaKey && !e.ctrlKey && !e.altKey) {
-          // Only toggle if not in input/textarea
           const target = e.target as HTMLElement;
           if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
             e.preventDefault();
@@ -169,18 +199,33 @@ function App() {
       </header>
       
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Editor Panel */}
-        <div className="w-panel-w">
+      <div ref={containerRef} className="flex-1 flex overflow-hidden">
+        {/* Editor Panel - Resizable */}
+        <div style={{ width: editorWidth, minWidth: 300, maxWidth: 800 }} className="flex-shrink-0">
           <DSLEditor />
         </div>
         
+        {/* Resize Handle */}
+        <div
+          onMouseDown={handleMouseDown}
+          className={`
+            w-1.5 bg-border-gray hover:bg-electric-blue cursor-col-resize
+            flex items-center justify-center transition-colors
+            ${isResizing ? 'bg-electric-blue' : ''}
+          `}
+          style={{ userSelect: 'none' }}
+        >
+          <div className="w-0.5 h-12 bg-slate-300 rounded" />
+        </div>
+        
         {/* Canvas */}
-        <DiagramCanvas />
+        <div className="flex-1 overflow-hidden">
+          <DiagramCanvas />
+        </div>
         
         {/* Properties Panel - Collapsible */}
         {showProperties && (
-          <div className="w-sidebar-w transition-all duration-300">
+          <div className="w-sidebar-w flex-shrink-0 transition-all duration-300">
             <PropertiesPanel />
           </div>
         )}
@@ -189,6 +234,8 @@ function App() {
       {/* Footer */}
       <footer className="h-toolbar-h bg-white border-t border-border-gray flex items-center px-6 text-xs text-slate-500">
         <div className="capitalize">{diagramMode} Mode</div>
+        <div className="ml-4 text-slate-400">|</div>
+        <div className="ml-4">Editor: {editorWidth}px</div>
         <div className="ml-4 text-slate-400">|</div>
         <div className="ml-4">Press <kbd className="px-1.5 py-0.5 bg-panel-light rounded text-xs font-mono">P</kbd> to toggle panel</div>
         <div className="ml-auto">Zoom: 100%</div>

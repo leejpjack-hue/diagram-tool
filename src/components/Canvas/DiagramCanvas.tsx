@@ -24,36 +24,34 @@ const flowNodeTypes = {
   decision: DecisionNode,
 };
 
-export function DiagramCanvas() {
+function DiagramCanvasInternal() {
   const { parsedDiagram, diagramMode } = useDiagramStore();
 
   const nodeTypes = diagramMode === 'flow' ? flowNodeTypes : architectureNodeTypes;
 
   const initialNodes = useMemo((): Node[] => {
     if (!parsedDiagram) {
-      console.log('No parsed diagram');
+      console.log('❌ No parsed diagram');
       return [];
     }
 
-    console.log('Parsed diagram:', parsedDiagram);
-    console.log('Mode:', diagramMode);
-    console.log('Nodes count:', parsedDiagram.nodes.length);
-    console.log('Edges count:', parsedDiagram.edges.length);
+    console.log('✅ Parsed diagram:', parsedDiagram);
+    console.log('📊 Mode:', diagramMode);
+    console.log('📦 Nodes:', parsedDiagram.nodes.length);
+    console.log('🔗 Edges:', parsedDiagram.edges.length);
 
     if (diagramMode === 'flow') {
       // Flow mode - vertical layout
       let yOffset = 100;
       
       return parsedDiagram.nodes.map((node) => {
-        // Determine node type
         let nodeType = 'flow';
         const flowNode = node as any;
         if (flowNode.isStart) nodeType = 'start';
         else if (flowNode.isEnd) nodeType = 'end';
         else if (flowNode.properties?.nodeType === 'decision') nodeType = 'decision';
         
-        // Position nodes vertically
-        const x = 300;
+        const x = 400;
         const y = yOffset;
         yOffset += 120;
         
@@ -78,7 +76,7 @@ export function DiagramCanvas() {
         return {
           id: node.id,
           type: node.type,
-          position: { x: col * 250 + 100, y: row * 150 + 100 },
+          position: { x: col * 250 + 150, y: row * 150 + 100 },
           data: {
             label: node.name,
             ...node.properties,
@@ -92,8 +90,8 @@ export function DiagramCanvas() {
     if (!parsedDiagram) return [];
 
     const getEdgeColor = (mode: string) => {
-      if (mode === 'flow') return '#3B82F6'; // Electric Blue
-      return '#8B5CF6'; // Vivid Purple for architecture
+      if (mode === 'flow') return '#3B82F6';
+      return '#8B5CF6';
     };
 
     const edgeColor = getEdgeColor(diagramMode);
@@ -130,18 +128,20 @@ export function DiagramCanvas() {
     }));
   }, [parsedDiagram, diagramMode]);
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   
-  // Debug logging
+  // Update nodes/edges when parsedDiagram changes
   useEffect(() => {
-    console.log('Rendered nodes:', nodes);
-    console.log('Rendered edges:', edges);
-  }, [nodes, edges]);
+    if (initialNodes.length > 0) {
+      setNodes(initialNodes);
+      setEdges(initialEdges);
+    }
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   if (!parsedDiagram) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-canvas-white">
+      <div className="w-full h-full flex items-center justify-center bg-canvas-white">
         <div className="text-center text-slate-400">
           <div className="text-4xl mb-4">📊</div>
           <div className="text-lg">Enter DSL to generate diagram</div>
@@ -151,43 +151,52 @@ export function DiagramCanvas() {
   }
 
   return (
+    <div className="w-full h-full bg-canvas-white">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.2 }}
+        attributionPosition="bottom-left"
+        minZoom={0.1}
+        maxZoom={4}
+        defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+      >
+        <Background color="#E2E8F0" gap={20} />
+        <Controls className="bg-white border border-border-gray rounded shadow-md" />
+        <MiniMap 
+          className="bg-white border border-border-gray rounded"
+          nodeColor={(node) => {
+            switch (node.type) {
+              case 'service':
+                return '#3B82F6';
+              case 'database':
+                return '#EC4899';
+              case 'queue':
+                return '#10B981';
+              case 'start':
+                return '#10B981';
+              case 'end':
+                return '#EF4444';
+              case 'decision':
+                return '#F59E0B';
+              default:
+                return '#8B5CF6';
+            }
+          }}
+        />
+      </ReactFlow>
+    </div>
+  );
+}
+
+export function DiagramCanvas() {
+  return (
     <ReactFlowProvider>
-      <div className="flex-1 bg-canvas-white" style={{ width: '100%', height: '100%' }}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          nodeTypes={nodeTypes}
-          fitView
-          attributionPosition="bottom-left"
-          style={{ width: '100%', height: '100%' }}
-        >
-          <Background color="#E2E8F0" gap={20} />
-          <Controls className="bg-white border border-border-gray rounded shadow-md" />
-          <MiniMap 
-            className="bg-white border border-border-gray rounded"
-            nodeColor={(node) => {
-              switch (node.type) {
-                case 'service':
-                  return '#334155';
-                case 'database':
-                  return '#6366F1';
-                case 'queue':
-                  return '#8B5CF6';
-                case 'start':
-                  return '#10B981';
-                case 'end':
-                  return '#EF4444';
-                case 'decision':
-                  return '#F59E0B';
-                default:
-                  return '#64748B';
-              }
-            }}
-          />
-        </ReactFlow>
-      </div>
+      <DiagramCanvasInternal />
     </ReactFlowProvider>
   );
 }
