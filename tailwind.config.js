@@ -7,14 +7,22 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Executive Heritage Palette
-        'deep-navy': '#1E293B',
-        'slate-charcoal': '#334155',
-        'electric-indigo': '#6366F1',
-        'midnight-gold': '#854D0E',
+        // Vibrant Tech Palette (Colorful & Energetic)
+        'electric-blue': '#3B82F6',
+        'vivid-purple': '#8B5CF6',
+        'hot-pink': '#EC4899',
+        'emerald': '#10B981',
+        'amber': '#F59E0B',
+        'red': '#EF4444',
+        
+        // Base colors
         'canvas-white': '#FDFDFD',
         'panel-light': '#F8FAFC',
         'border-gray': '#E2E8F0',
+        'deep-navy': '#1E293B',
+        'slate-charcoal': '#334155',
+        
+        // Semantic
         'success': '#10B981',
         'warning': '#F59E0B',
         'error': '#EF4444',
@@ -29,6 +37,9 @@ export default {
         'sidebar-w': '280px',
         'header-h': '64px',
         'toolbar-h': '48px',
+      },
+      animation: {
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
     },
   },

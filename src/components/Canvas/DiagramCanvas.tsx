@@ -91,20 +91,41 @@ export function DiagramCanvas() {
   const initialEdges = useMemo((): Edge[] => {
     if (!parsedDiagram) return [];
 
+    const getEdgeColor = (mode: string) => {
+      if (mode === 'flow') return '#3B82F6'; // Electric Blue
+      return '#8B5CF6'; // Vivid Purple for architecture
+    };
+
+    const edgeColor = getEdgeColor(diagramMode);
+
     return parsedDiagram.edges.map((edge) => ({
       id: edge.id,
       source: edge.from,
       target: edge.to,
       label: edge.label,
       animated: diagramMode === 'flow',
-      style: { stroke: diagramMode === 'flow' ? '#6366F1' : '#64748B', strokeWidth: 2 },
-      labelStyle: { fill: '#1E293B', fontWeight: 600, fontSize: 11 },
-      labelBgStyle: { fill: '#FDFDFD', fillOpacity: 0.9 },
-      labelBgPadding: [4, 6] as [number, number],
-      labelBgBorderRadius: 4,
+      style: { 
+        stroke: edgeColor, 
+        strokeWidth: 2,
+      },
+      labelStyle: { 
+        fill: '#1E293B', 
+        fontWeight: 600, 
+        fontSize: 11,
+        fontFamily: 'Inter, sans-serif'
+      },
+      labelBgStyle: { 
+        fill: '#FDFDFD', 
+        fillOpacity: 0.95,
+        stroke: edgeColor,
+        strokeOpacity: 0.3,
+        strokeWidth: 1,
+      },
+      labelBgPadding: [6, 8] as [number, number],
+      labelBgBorderRadius: 6,
       markerEnd: {
         type: MarkerType.ArrowClosed,
-        color: diagramMode === 'flow' ? '#6366F1' : '#64748B',
+        color: edgeColor,
       },
     }));
   }, [parsedDiagram, diagramMode]);

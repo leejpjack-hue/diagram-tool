@@ -9,29 +9,51 @@ export const QueueNode = memo(({ data, selected }: NodeProps) => {
   return (
     <div
       className={`
-        px-4 py-3 rounded border-2 shadow-md
-        ${selected ? 'border-purple-500 shadow-lg' : 'border-purple-600'}
-        min-w-[160px] bg-purple-50
+        px-4 py-3 rounded-lg border-2 shadow-md transition-all duration-200
+        ${selected ? 'scale-105 shadow-xl' : 'hover:shadow-lg hover:scale-102'}
+        min-w-[160px]
       `}
+      style={{
+        background: '#D1FAE5',
+        borderColor: selected ? '#10B981' : '#10B981',
+        boxShadow: selected 
+          ? '0 0 0 3px rgba(16, 185, 129, 0.2)'
+          : '0 2px 8px rgba(0,0,0,0.1)'
+      }}
     >
-      <Handle type="target" position={Position.Top} className="!bg-purple-600" />
+      <Handle type="target" position={Position.Top} style={{ background: '#10B981' }} />
       
       <div className="flex items-center gap-2 mb-1">
-        <div className="w-6 h-6 rounded flex items-center justify-center bg-purple-600 text-white text-xs font-bold">
+        <div 
+          className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold"
+          style={{ background: '#10B981' }}
+        >
           📨
         </div>
-        <div className="font-semibold text-sm text-deep-navy">{nodeData.label}</div>
+        <div 
+          className="font-semibold text-sm"
+          style={{ color: '#065F46' }}
+        >
+          {nodeData.label}
+        </div>
       </div>
       
       {nodeData.type && (
-        <div className="text-xs text-purple-600 font-mono capitalize">{nodeData.type}</div>
+        <div 
+          className="text-xs font-mono capitalize"
+          style={{ color: '#10B981' }}
+        >
+          {nodeData.type}
+        </div>
       )}
       
       {nodeData.topic && (
-        <div className="text-xs text-slate-400 mt-1 font-mono">{nodeData.topic}</div>
+        <div className="text-xs mt-1 font-mono" style={{ color: '#065F46', opacity: 0.7 }}>
+          {nodeData.topic}
+        </div>
       )}
       
-      <Handle type="source" position={Position.Bottom} className="!bg-purple-600" />
+      <Handle type="source" position={Position.Bottom} style={{ background: '#10B981' }} />
     </div>
   );
 });

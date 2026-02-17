@@ -9,32 +9,52 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
   return (
     <div
       className={`
-        px-4 py-3 rounded border-2 shadow-md
-        ${selected ? 'border-electric-indigo shadow-lg' : 'border-electric-indigo'}
-        min-w-[160px] bg-blue-50
+        px-4 py-3 rounded-lg border-2 shadow-md transition-all duration-200
+        ${selected ? 'scale-105 shadow-xl' : 'hover:shadow-lg hover:scale-102'}
+        min-w-[160px]
       `}
+      style={{
+        background: '#FCE7F3',
+        borderColor: selected ? '#EC4899' : '#EC4899',
+        boxShadow: selected 
+          ? '0 0 0 3px rgba(236, 72, 153, 0.2)'
+          : '0 2px 8px rgba(0,0,0,0.1)'
+      }}
     >
-      <Handle type="target" position={Position.Top} className="!bg-electric-indigo" />
+      <Handle type="target" position={Position.Top} style={{ background: '#EC4899' }} />
       
       <div className="flex items-center gap-2 mb-1">
-        <div className="w-6 h-6 rounded flex items-center justify-center bg-electric-indigo text-white text-xs font-bold">
+        <div 
+          className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold"
+          style={{ background: '#EC4899' }}
+        >
           🗄️
         </div>
-        <div className="font-semibold text-sm text-deep-navy">{nodeData.label}</div>
+        <div 
+          className="font-semibold text-sm"
+          style={{ color: '#9D174D' }}
+        >
+          {nodeData.label}
+        </div>
       </div>
       
       {nodeData.type && (
-        <div className="text-xs text-indigo-600 font-mono capitalize">{nodeData.type}</div>
+        <div 
+          className="text-xs font-mono capitalize"
+          style={{ color: '#EC4899' }}
+        >
+          {nodeData.type}
+        </div>
       )}
       
       {nodeData.data && Array.isArray(nodeData.data) && (
-        <div className="text-xs text-slate-400 mt-1">
+        <div className="text-xs mt-1" style={{ color: '#9D174D', opacity: 0.7 }}>
           {nodeData.data.slice(0, 2).join(', ')}
           {nodeData.data.length > 2 && ` +${nodeData.data.length - 2}`}
         </div>
       )}
       
-      <Handle type="source" position={Position.Bottom} className="!bg-electric-indigo" />
+      <Handle type="source" position={Position.Bottom} style={{ background: '#EC4899' }} />
     </div>
   );
 });
