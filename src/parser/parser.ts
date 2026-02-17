@@ -47,7 +47,7 @@ export class Parser {
       const token = this.peek();
 
       if (token.type === TokenType.KEYWORD) {
-        switch (token.value) {
+        switch ((token.value as string).toLowerCase()) {
           case 'diagram':
             this.parseDiagramDeclaration();
             break;
@@ -97,10 +97,19 @@ export class Parser {
   private parseTitle(): void {
     this.advance(); // consume 'title'
     this.expect(TokenType.COLON);
-    const titleToken = this.advance();
-    if (titleToken.type === TokenType.STRING || titleToken.type === TokenType.IDENTIFIER) {
-      this.title = titleToken.value as string;
+    
+    // Read all tokens until newline to get full title
+    const titleParts: string[] = [];
+    while (this.peek().type !== TokenType.NEWLINE && this.peek().type !== TokenType.EOF) {
+      const token = this.advance();
+      // Accept identifiers, strings, and keywords (for words like "diagram" in titles)
+      if (token.type === TokenType.IDENTIFIER || 
+          token.type === TokenType.STRING || 
+          token.type === TokenType.KEYWORD) {
+        titleParts.push(token.value as string);
+      }
     }
+    this.title = titleParts.join(' ') || 'Untitled Diagram';
   }
 
   private parseService(): void {
@@ -126,25 +135,28 @@ export class Parser {
 
       const propToken = this.peek();
       if (propToken.type === TokenType.KEYWORD) {
-        this.advance();
+        this.advance(); // consume property keyword
         this.expect(TokenType.COLON);
         
-        const valueToken = this.advance();
-        
-        switch (propToken.value) {
+        switch ((propToken.value as string).toLowerCase()) {
           case 'type':
-            node.properties.type = valueToken.value as 'api' | 'microservice' | 'lambda';
+            const typeToken = this.advance();
+            node.properties.type = typeToken.value as 'api' | 'microservice' | 'lambda';
             break;
           case 'tech':
-            node.properties.tech = valueToken.value as string;
+            const techToken = this.advance();
+            node.properties.tech = techToken.value as string;
             break;
           case 'port':
-            node.properties.port = valueToken.value as number;
+            const portToken = this.advance();
+            node.properties.port = portToken.value as number;
             break;
           case 'replicas':
-            node.properties.replicas = valueToken.value as number;
+            const replicasToken = this.advance();
+            node.properties.replicas = replicasToken.value as number;
             break;
           case 'connects':
+            // Don't consume token - parseConnectionList will read identifiers
             const connections = this.parseConnectionList();
             node.connections = connections;
             // Create edges
@@ -194,7 +206,7 @@ export class Parser {
         
         const valueToken = this.advance();
         
-        switch (propToken.value) {
+        switch ((propToken.value as string).toLowerCase()) {
           case 'type':
             node.properties.type = valueToken.value as any;
             break;
@@ -240,7 +252,7 @@ export class Parser {
         
         const valueToken = this.advance();
         
-        switch (propToken.value) {
+        switch ((propToken.value as string).toLowerCase()) {
           case 'type':
             node.properties.type = valueToken.value as any;
             break;
@@ -295,13 +307,42 @@ export class Parser {
   private parseConnectionList(): string[] {
     const connections: string[] = [];
     
-    while (this.peek().type === TokenType.IDENTIFIER || this.peek().type === TokenType.COMMA) {
-      if (this.peek().type === TokenType.COMMA) {
+    // Collect all identifiers and commas until we hit a closing brace or keyword
+    while (true) {
+      const token = this.peek();
+      
+      // Stop on these tokens
+      if (token.type === TokenType.RBRACE || 
+          token.type === TokenType.EOF) {
+        break;
+      }
+      
+      // Skip newlines but continue parsing
+      if (token.type === TokenType.NEWLINE) {
+        this.advance();
+        // After newline, check if we have a keyword (means end of list)
+        const next = this.peek();
+        if (next.type === TokenType.KEYWORD || next.type === TokenType.RBRACE) {
+          break;
+        }
+        continue;
+      }
+      
+      if (token.type === TokenType.COMMA) {
         this.advance();
         continue;
       }
-      const idToken = this.advance();
-      connections.push(idToken.value as string);
+      
+      if (token.type === TokenType.IDENTIFIER) {
+        connections.push(token.value as string);
+        this.advance();
+      } else if (token.type === TokenType.KEYWORD) {
+        // Keyword means we've moved to a new property
+        break;
+      } else {
+        // Unknown token, skip it
+        this.advance();
+      }
     }
 
     return connections;

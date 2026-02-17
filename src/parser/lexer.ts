@@ -111,7 +111,7 @@ export class Lexer {
         const isKeyword = KEYWORDS.includes(value.toLowerCase());
         tokens.push({
           type: isKeyword ? TokenType.KEYWORD : TokenType.IDENTIFIER,
-          value: isKeyword ? value.toLowerCase() : value,
+          value: value, // Preserve original casing
           line: this.line,
           column: this.column - value.length,
         });
