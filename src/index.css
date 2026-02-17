@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Executive Heritage Theme */
+:root {
+  /* Colors */
+  --deep-navy: #1E293B;
+  --slate-charcoal: #334155;
+  --electric-indigo: #6366F1;
+  --midnight-gold: #854D0E;
+  --canvas-white: #FDFDFD;
+  --panel-light: #F8FAFC;
+  --border-gray: #E2E8F0;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+  --info: #3B82F6;
+  
+  /* Typography */
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --font-sans: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  
+  /* Panel dimensions */
+  --editor-width: 400px;
+  --properties-width: 280px;
+  --header-height: 64px;
+  --toolbar-height: 48px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--canvas-white);
+  color: var(--deep-navy);
+  overflow: hidden;
+  height: 100vh;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* React Flow Custom Styles */
+.react-flow__node {
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+
+.react-flow__edge-path {
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--electric-indigo);
+  stroke-width: 3;
+}
+
+/* Monaco Editor Container */
+.monaco-editor-container {
+  height: 100%;
+  width: 100%;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--panel-light);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-gray);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--slate-charcoal);
+}
