@@ -40,10 +40,14 @@ export interface FlowNode {
   id: string;
   name: string;
   properties: {
+    label?: string;
     system?: string;
     duration?: string;
     assignee?: string;
+    nodeType?: 'process' | 'decision' | 'subprocess' | 'external';
   };
+  isStart?: boolean;
+  isEnd?: boolean;
 }
 
 export type DiagramNode = ServiceNode | DatabaseNode | QueueNode | FlowNode;
@@ -67,4 +71,6 @@ export interface ParsedDiagram {
   nodes: DiagramNode[];
   edges: Edge[];
   groups: Group[];
+  startNode?: string;
+  endNode?: string;
 }

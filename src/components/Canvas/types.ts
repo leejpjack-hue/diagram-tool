@@ -17,3 +17,13 @@ export interface QueueNodeData {
   type?: 'kafka' | 'rabbitmq' | 'sqs';
   topic?: string;
 }
+
+export interface FlowNodeData {
+  label: string;
+  system?: string;
+  duration?: string;
+  assignee?: string;
+  nodeType?: 'process' | 'decision' | 'subprocess' | 'external';
+  isStart?: boolean;
+  isEnd?: boolean;
+}

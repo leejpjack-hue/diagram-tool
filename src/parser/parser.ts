@@ -1,6 +1,6 @@
 import { Lexer, TokenType } from './lexer';
 import type { Token } from './lexer';
-import type { DiagramNode, Edge, Group, ParsedDiagram, DiagramMode } from '../store/types';
+import type { DiagramNode, Edge, Group, ParsedDiagram, DiagramMode, FlowNode } from '../store/types';
 
 export class Parser {
   private tokens: Token[];
@@ -10,6 +10,9 @@ export class Parser {
   private groups: Group[] = [];
   private title: string = 'Untitled Diagram';
   private mode: DiagramMode = 'architecture';
+  private startNode: string | undefined;
+  private endNode: string | undefined;
+  private flowNodes: Map<string, FlowNode> = new Map();
 
   constructor(text: string) {
     const lexer = new Lexer(text);
@@ -66,9 +69,26 @@ export class Parser {
           case 'group':
             this.parseGroup();
             break;
+          case 'start':
+            this.parseFlowStart();
+            break;
+          case 'end':
+            this.parseFlowEnd();
+            break;
+          case 'node':
+            this.parseFlowNodeMetadata();
+            break;
           default:
-            this.advance();
+            // Try to parse as flow connection if identifier follows
+            if (this.mode === 'flow') {
+              this.parseFlowConnection();
+            } else {
+              this.advance();
+            }
         }
+      } else if (this.mode === 'flow' && token.type === TokenType.IDENTIFIER) {
+        // Flow mode: parse connections like "A -> B -> C"
+        this.parseFlowConnection();
       } else {
         this.advance();
       }
@@ -76,12 +96,19 @@ export class Parser {
       this.skipNewlines();
     }
 
+    // Convert flowNodes map to array if in flow mode
+    const allNodes = this.mode === 'flow' 
+      ? Array.from(this.flowNodes.values())
+      : this.nodes;
+
     return {
       mode: this.mode,
       title: this.title,
-      nodes: this.nodes,
+      nodes: allNodes,
       edges: this.edges,
       groups: this.groups,
+      startNode: this.startNode,
+      endNode: this.endNode,
     };
   }
 
@@ -346,6 +373,191 @@ export class Parser {
     }
 
     return connections;
+  }
+
+  // Flow Mode Parsing
+  
+  private parseFlowStart(): void {
+    this.advance(); // consume 'start'
+    const nodeToken = this.peek();
+    if (nodeToken.type === TokenType.IDENTIFIER) {
+      this.startNode = nodeToken.value as string;
+      this.advance();
+      
+      // Create start node
+      const id = this.startNode.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      if (!this.flowNodes.has(id)) {
+        this.flowNodes.set(id, {
+          type: 'flow',
+          id,
+          name: this.startNode,
+          properties: {},
+          isStart: true,
+        });
+      }
+    }
+  }
+
+  private parseFlowEnd(): void {
+    this.advance(); // consume 'end'
+    const nodeToken = this.peek();
+    if (nodeToken.type === TokenType.IDENTIFIER) {
+      this.endNode = nodeToken.value as string;
+      this.advance();
+      
+      // Create end node
+      const id = this.endNode.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      if (!this.flowNodes.has(id)) {
+        this.flowNodes.set(id, {
+          type: 'flow',
+          id,
+          name: this.endNode,
+          properties: {},
+          isEnd: true,
+        });
+      }
+    }
+  }
+
+  private parseFlowConnection(): void {
+    // Parse flow connections: A -> B -> C or A ->|Label| B
+    const nodeNames: string[] = [];
+    let currentLabel: string | undefined;
+    
+    while (this.peek().type !== TokenType.NEWLINE && 
+           this.peek().type !== TokenType.EOF &&
+           this.peek().type !== TokenType.RBRACE) {
+      const token = this.peek();
+      
+      if (token.type === TokenType.IDENTIFIER) {
+        nodeNames.push(token.value as string);
+        this.advance();
+        
+        // Register node
+        const id = (token.value as string).toLowerCase().replace(/[^a-z0-9]/g, '_');
+        if (!this.flowNodes.has(id)) {
+          this.flowNodes.set(id, {
+            type: 'flow',
+            id,
+            name: token.value as string,
+            properties: {},
+          });
+        }
+      } else if (token.type === TokenType.ARROW) {
+        this.advance();
+      } else if (token.type === TokenType.PIPE) {
+        // Label follows: |Label|
+        this.advance();
+        if (this.peek().type === TokenType.IDENTIFIER || 
+            this.peek().type === TokenType.STRING) {
+          currentLabel = this.peek().value as string;
+          this.advance();
+          // Expect closing pipe
+          if (this.peek().type === TokenType.PIPE) {
+            this.advance();
+          }
+        }
+      } else if (token.type === TokenType.STRING) {
+        // Could be a label
+        currentLabel = token.value as string;
+        this.advance();
+      } else {
+        this.advance();
+      }
+    }
+    
+    // Create edges between consecutive nodes
+    for (let i = 0; i < nodeNames.length - 1; i++) {
+      const from = nodeNames[i].toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const to = nodeNames[i + 1].toLowerCase().replace(/[^a-z0-9]/g, '_');
+      
+      this.edges.push({
+        id: `${from}_to_${to}_${this.edges.length}`,
+        from,
+        to,
+        label: currentLabel,
+      });
+      
+      // Reset label after first edge
+      currentLabel = undefined;
+    }
+    
+    // Skip to end of line
+    while (this.peek().type === TokenType.NEWLINE) {
+      this.advance();
+    }
+  }
+
+  private parseFlowNodeMetadata(): void {
+    this.advance(); // consume 'node'
+    const nameToken = this.peek();
+    if (nameToken.type !== TokenType.IDENTIFIER) {
+      return;
+    }
+    
+    const name = nameToken.value as string;
+    const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    this.advance();
+    
+    this.expect(TokenType.LBRACE);
+    this.skipNewlines();
+    
+    const nodeData: Partial<FlowNode> = {
+      type: 'flow',
+      id,
+      name,
+      properties: {},
+    };
+    
+    while (this.peek().type !== TokenType.RBRACE && this.peek().type !== TokenType.EOF) {
+      this.skipNewlines();
+      if (this.peek().type === TokenType.RBRACE) break;
+      
+      const propToken = this.peek();
+      if (propToken.type === TokenType.KEYWORD) {
+        this.advance();
+        this.expect(TokenType.COLON);
+        
+        const valueToken = this.advance();
+        
+        switch ((propToken.value as string).toLowerCase()) {
+          case 'label':
+            nodeData.properties!.label = valueToken.value as string;
+            break;
+          case 'system':
+            nodeData.properties!.system = valueToken.value as string;
+            break;
+          case 'duration':
+            nodeData.properties!.duration = valueToken.value as string;
+            break;
+          case 'assignee':
+            nodeData.properties!.assignee = valueToken.value as string;
+            break;
+          case 'type':
+            nodeData.properties!.nodeType = valueToken.value as any;
+            break;
+        }
+      } else {
+        this.advance();
+      }
+    }
+    
+    this.expect(TokenType.RBRACE);
+    
+    // Update or create node
+    const existing = this.flowNodes.get(id);
+    if (existing) {
+      this.flowNodes.set(id, {
+        ...existing,
+        ...nodeData,
+        properties: {
+          ...existing.properties,
+          ...nodeData.properties,
+        },
+      } as FlowNode);
+    } else {
+      this.flowNodes.set(id, nodeData as FlowNode);
+    }
   }
 }
 

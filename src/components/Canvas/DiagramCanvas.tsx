@@ -1,52 +1,105 @@
 import { useMemo } from 'react';
-import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState } from '@xyflow/react';
+import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType } from '@xyflow/react';
+import type { Node, Edge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { ServiceNode } from './ServiceNode';
 import { DatabaseNode } from './DatabaseNode';
 import { QueueNode } from './QueueNode';
+import { ProcessNode } from './ProcessNode';
+import { StartEndNode } from './StartEndNode';
+import { DecisionNode } from './DecisionNode';
 import { useDiagramStore } from '../../store/diagramStore';
 
-const nodeTypes = {
+const architectureNodeTypes = {
   service: ServiceNode,
   database: DatabaseNode,
   queue: QueueNode,
 };
 
-export function DiagramCanvas() {
-  const { parsedDiagram } = useDiagramStore();
+const flowNodeTypes = {
+  flow: ProcessNode,
+  start: StartEndNode,
+  end: StartEndNode,
+  decision: DecisionNode,
+};
 
-  const initialNodes = useMemo(() => {
+export function DiagramCanvas() {
+  const { parsedDiagram, diagramMode } = useDiagramStore();
+
+  const nodeTypes = diagramMode === 'flow' ? flowNodeTypes : architectureNodeTypes;
+
+  const initialNodes = useMemo((): Node[] => {
     if (!parsedDiagram) return [];
 
-    return parsedDiagram.nodes.map((node, index) => {
-      // Simple layout - arrange in grid
-      const col = index % 3;
-      const row = Math.floor(index / 3);
+    if (diagramMode === 'flow') {
+      // Flow mode - vertical layout
+      let yOffset = 100;
       
-      return {
-        id: node.id,
-        type: node.type,
-        position: { x: col * 250 + 100, y: row * 150 + 100 },
-        data: {
-          label: node.name,
-          ...('properties' in node ? node.properties : {}),
-        },
-      };
-    });
-  }, [parsedDiagram]);
+      return parsedDiagram.nodes.map((node) => {
+        // Determine node type
+        let nodeType = 'flow';
+        const flowNode = node as any;
+        if (flowNode.isStart) nodeType = 'start';
+        else if (flowNode.isEnd) nodeType = 'end';
+        else if (flowNode.properties?.nodeType === 'decision') nodeType = 'decision';
+        
+        // Position nodes vertically
+        const x = 300;
+        const y = yOffset;
+        yOffset += 120;
+        
+        return {
+          id: node.id,
+          type: nodeType,
+          position: { x, y },
+          data: {
+            label: node.name,
+            ...node.properties,
+            isStart: flowNode.isStart || false,
+            isEnd: flowNode.isEnd || false,
+          },
+        };
+      });
+    } else {
+      // Architecture mode - grid layout
+      return parsedDiagram.nodes.map((node, index) => {
+        const col = index % 3;
+        const row = Math.floor(index / 3);
+        
+        return {
+          id: node.id,
+          type: node.type,
+          position: { x: col * 250 + 100, y: row * 150 + 100 },
+          data: {
+            label: node.name,
+            ...node.properties,
+          },
+        };
+      });
+    }
+  }, [parsedDiagram, diagramMode]);
 
-  const initialEdges = useMemo(() => {
+  const initialEdges = useMemo((): Edge[] => {
     if (!parsedDiagram) return [];
 
     return parsedDiagram.edges.map((edge) => ({
       id: edge.id,
       source: edge.from,
       target: edge.to,
-      animated: false,
-      style: { stroke: '#64748B', strokeWidth: 2 },
+      label: edge.label,
+      animated: diagramMode === 'flow',
+      style: { stroke: diagramMode === 'flow' ? '#6366F1' : '#64748B', strokeWidth: 2 },
+      labelStyle: { fill: '#1E293B', fontWeight: 600, fontSize: 11 },
+      labelBgStyle: { fill: '#FDFDFD', fillOpacity: 0.9 },
+      labelBgPadding: [4, 6] as [number, number],
+      labelBgBorderRadius: 4,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: diagramMode === 'flow' ? '#6366F1' : '#64748B',
+      },
     }));
-  }, [parsedDiagram]);
+  }, [parsedDiagram, diagramMode]);
 
   const [nodes, , onNodesChange] = useNodesState(initialNodes);
   const [edges, , onEdgesChange] = useEdgesState(initialEdges);
@@ -85,6 +138,12 @@ export function DiagramCanvas() {
                 return '#6366F1';
               case 'queue':
                 return '#8B5CF6';
+              case 'start':
+                return '#10B981';
+              case 'end':
+                return '#EF4444';
+              case 'decision':
+                return '#F59E0B';
               default:
                 return '#64748B';
             }

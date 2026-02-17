@@ -9,6 +9,8 @@ export const TokenType = {
   STRING: 'STRING',
   NUMBER: 'NUMBER',
   NEWLINE: 'NEWLINE',
+  ARROW: 'ARROW', // ->
+  PIPE: 'PIPE', // |
   EOF: 'EOF',
 } as const;
 
@@ -39,6 +41,11 @@ export class Lexer {
   private peek(): string | null {
     if (this.pos >= this.text.length) return null;
     return this.text[this.pos];
+  }
+
+  private peekNext(): string | null {
+    if (this.pos + 1 >= this.text.length) return null;
+    return this.text[this.pos + 1];
   }
 
   private advance(): string | null {
@@ -178,6 +185,29 @@ export class Lexer {
         tokens.push({
           type: TokenType.RBRACE,
           value: '}',
+          line: this.line,
+          column: this.column - 1,
+        });
+        continue;
+      }
+
+      if (char === '-' && this.peekNext() === '>') {
+        this.advance();
+        this.advance();
+        tokens.push({
+          type: TokenType.ARROW,
+          value: '->',
+          line: this.line,
+          column: this.column - 2,
+        });
+        continue;
+      }
+
+      if (char === '|') {
+        this.advance();
+        tokens.push({
+          type: TokenType.PIPE,
+          value: '|',
           line: this.line,
           column: this.column - 1,
         });

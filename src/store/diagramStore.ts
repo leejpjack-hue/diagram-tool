@@ -66,7 +66,7 @@ queue EventQueue {
 
   // Actions
   setDslText: (text) => set({ dslText: text }),
-  setParsedDiagram: (diagram) => set({ parsedDiagram: diagram }),
+  setParsedDiagram: (diagram) => set({ parsedDiagram: diagram, diagramMode: diagram?.mode || 'architecture' }),
   setSelectedNode: (nodeId) => set({ selectedNodeId: nodeId }),
   setDiagramMode: (mode) => set({ diagramMode: mode }),
   setError: (error) => set({ error }),
