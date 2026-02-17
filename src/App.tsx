@@ -2,7 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { DSLEditor } from './components/Editor/DSLEditor';
 import { DiagramCanvas } from './components/Canvas/DiagramCanvas';
 import { PropertiesPanel } from './components/Panel/PropertiesPanel';
+import { ExportModal } from './components/Export/ExportModal';
 import { useDiagramStore } from './store/diagramStore';
+import { useExport } from './utils/useExport';
 
 const ARCHITECTURE_DSL = `diagram: architecture
 title: Insurance Claims Platform
@@ -83,9 +85,12 @@ function App() {
   const { setDslText, diagramMode, setDiagramMode } = useDiagramStore();
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow'>('architecture');
   const [showProperties, setShowProperties] = useState(false);
-  const [editorWidth, setEditorWidth] = useState(500); // Default width
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [editorWidth, setEditorWidth] = useState(500);
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  const { exportPNG, exportSVG, exportJSON } = useExport();
 
   const handleTabChange = (tab: 'architecture' | 'flow') => {
     setActiveTab(tab);
@@ -98,7 +103,6 @@ function App() {
     }
   };
 
-  // Handle resize
   const handleMouseDown = useCallback(() => {
     setIsResizing(true);
   }, []);
@@ -127,7 +131,6 @@ function App() {
     };
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
-  // Keyboard shortcut for panel toggle
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'p' || e.key === 'P') {
@@ -139,11 +142,21 @@ function App() {
           }
         }
       }
+      if (e.key === 'e' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setShowExportModal(true);
+      }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, []);
+
+  const handleExport = (format: 'png' | 'svg' | 'json') => {
+    if (format === 'png') exportPNG();
+    else if (format === 'svg') exportSVG();
+    else if (format === 'json') exportJSON();
+  };
 
   return (
     <div className="h-screen flex flex-col bg-canvas-white">
@@ -192,7 +205,10 @@ function App() {
           <button className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-border-gray rounded hover:bg-panel-light transition">
             💾 Save
           </button>
-          <button className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald rounded hover:scale-105 transition">
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald rounded hover:scale-105 transition"
+          >
             📤 Export PNG
           </button>
         </div>
@@ -208,11 +224,9 @@ function App() {
         {/* Resize Handle */}
         <div
           onMouseDown={handleMouseDown}
-          className={`
-            w-1.5 bg-border-gray hover:bg-electric-blue cursor-col-resize
-            flex items-center justify-center transition-colors
-            ${isResizing ? 'bg-electric-blue' : ''}
-          `}
+          className={`w-1.5 bg-border-gray hover:bg-electric-blue cursor-col-resize flex items-center justify-center transition-colors ${
+            isResizing ? 'bg-electric-blue' : ''
+          }`}
           style={{ userSelect: 'none' }}
         >
           <div className="w-0.5 h-12 bg-slate-300 rounded" />
@@ -238,8 +252,17 @@ function App() {
         <div className="ml-4">Editor: {editorWidth}px</div>
         <div className="ml-4 text-slate-400">|</div>
         <div className="ml-4">Press <kbd className="px-1.5 py-0.5 bg-panel-light rounded text-xs font-mono">P</kbd> to toggle panel</div>
+        <div className="ml-4 text-slate-400">|</div>
+        <div className="ml-4">Press <kbd className="px-1.5 py-0.5 bg-panel-light rounded text-xs font-mono">Cmd+E</kbd> to export</div>
         <div className="ml-auto">Zoom: 100%</div>
       </footer>
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        onExport={handleExport}
+      />
     </div>
   );
 }
