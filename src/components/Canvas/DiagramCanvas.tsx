@@ -116,7 +116,7 @@ export function DiagramCanvas() {
   }
 
   return (
-    <div className="flex-1 bg-canvas-white">
+    <div className="flex-1 bg-canvas-white" style={{ width: '100%', height: '100%' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -125,6 +125,7 @@ export function DiagramCanvas() {
         nodeTypes={nodeTypes}
         fitView
         attributionPosition="bottom-left"
+        style={{ width: '100%', height: '100%' }}
       >
         <Background color="#E2E8F0" gap={20} />
         <Controls className="bg-white border border-border-gray rounded shadow-md" />
