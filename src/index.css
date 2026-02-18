@@ -1,107 +1,233 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Executive Heritage Theme */
-:root {
-  /* Colors */
-  --deep-navy: #1E293B;
-  --slate-charcoal: #334155;
-  --electric-indigo: #6366F1;
-  --midnight-gold: #854D0E;
-  --canvas-white: #FDFDFD;
-  --panel-light: #F8FAFC;
-  --border-gray: #E2E8F0;
-  --success: #10B981;
-  --warning: #F59E0B;
-  --error: #EF4444;
-  --info: #3B82F6;
-  
-  /* Typography */
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-  --font-sans: 'Inter', 'Segoe UI', -apple-system, sans-serif;
-  
-  /* Spacing */
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  
-  /* Panel dimensions */
-  --editor-width: 400px;
-  --properties-width: 280px;
-  --header-height: 64px;
-  --toolbar-height: 48px;
-}
-
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-body {
-  font-family: var(--font-sans);
-  background: var(--canvas-white);
-  color: var(--deep-navy);
-  overflow: hidden;
-  height: 100vh;
+/* Professional Header Styles */
+.app-header {
+  height: 64px;
+  background: linear-gradient(to right, white, #F9FAFB);
+  border-bottom: 2px solid #E5E7EB;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(10px);
 }
 
-#root {
-  height: 100vh;
+.app-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* React Flow Custom Styles */
-.react-flow__node {
-  font-family: var(--font-sans);
-  font-size: 14px;
+.app-title {
+  font-size: 20px;
+  font-weight: 700;
+  background: linear-gradient(to right, #111827, #374151);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.react-flow__edge-path {
-  stroke-width: 2;
+/* Professional Button Styles */
+.btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  outline: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.react-flow__edge.selected .react-flow__edge-path {
-  stroke: var(--electric-indigo);
-  stroke-width: 3;
+.btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
 }
 
-/* Ensure React Flow container has dimensions */
-.react-flow {
-  width: 100%;
-  height: 100%;
+.btn:active {
+  transform: scale(0.95);
 }
 
-.react-flow__viewport {
-  width: 100%;
-  height: 100%;
+.btn-primary {
+  background: linear-gradient(to right, #3B82F6, #2563EB);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* Monaco Editor Container */
-.monaco-editor-container {
-  height: 100%;
-  width: 100%;
+.btn-primary:hover {
+  background: linear-gradient(to right, #2563EB, #1D4ED8);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
-/* Custom Scrollbar */
+.btn-secondary {
+  background: white;
+  color: #374151;
+  border: 2px solid #D1D5DB;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+.btn-secondary:hover {
+  background: #F9FAFB;
+  border-color: #9CA3AF;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.btn-success {
+  background: linear-gradient(to right, #10B981, #059669);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.btn-success:hover {
+  background: linear-gradient(to right, #059669, #047857);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.btn-tab {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease-in-out;
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-tab-active {
+  background: linear-gradient(to right, #3B82F6, #2563EB);
+  color: white;
+  border-color: #2563EB;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.btn-tab-inactive {
+  background: white;
+  color: #4B5563;
+  border-color: #D1D5DB;
+}
+
+.btn-tab-inactive:hover {
+  background: #F9FAFB;
+  border-color: #9CA3AF;
+  color: #111827;
+}
+
+/* Mode Tabs Container */
+.mode-tabs {
+  display: flex;
+  gap: 0.5rem;
+  background: #F3F4F6;
+  padding: 4px;
+  border-radius: 12px;
+}
+
+/* Divider */
+.divider {
+  width: 2px;
+  height: 24px;
+  background: #D1D5DB;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+/* Footer */
+.app-footer {
+  height: 48px;
+  background: white;
+  border-top: 2px solid #E5E7EB;
+  display: flex;
+  align-items: center;
+  padding: 0 1.5rem;
+  font-size: 0.75rem;
+  color: #6B7280;
+  font-weight: 500;
+}
+
+/* Status Badge */
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Keyboard Shortcut */
+.kbd {
+  padding: 0.25rem 0.5rem;
+  background: #F3F4F6;
+  border: 1px solid #D1D5DB;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-weight: 600;
+  color: #374151;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Smooth transitions */
+.transition-smooth {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Gradient text */
+.text-gradient {
+  background: linear-gradient(to right, #3B82F6, #8B5CF6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--panel-light);
+  background: #F1F1F1;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-gray);
+  background: #C1C1C1;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--slate-charcoal);
+  background: #A1A1A1;
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
 }

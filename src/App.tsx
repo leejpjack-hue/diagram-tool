@@ -163,79 +163,102 @@ function App() {
   };
 
   const handleCSVImport = (rows: SimpleCSVRow[], filename: string) => {
-    // Generate diagram from CSV
     const diagram = csvToDiagram(rows, filename);
-    
-    // Update store
     setParsedDiagram(diagram);
     setDiagramMode('architecture');
     setActiveTab('architecture');
-    
-    // Also generate DSL and update editor
     const dsl = csvToDSL(rows, filename);
     setDslText(dsl);
-    
     console.log('✅ CSV imported successfully:', diagram);
   };
 
   return (
-    <div className="h-screen flex flex-col bg-canvas-white">
+    <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <header className="h-header-h bg-white border-b border-border-gray flex items-center px-6">
+      <header className="app-header px-6 flex items-center">
+        {/* Logo & Title */}
         <div className="flex items-center gap-3">
-          <div className="w-3 h-3 bg-electric-blue rounded-sm"></div>
-          <h1 className="text-lg font-semibold text-deep-navy">DiagramTool</h1>
+          <div className="app-logo">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </svg>
+          </div>
+          <h1 className="app-title">DiagramTool</h1>
         </div>
         
         {/* Mode Tabs */}
-        <div className="ml-6 flex gap-1">
+        <div className="ml-8 mode-tabs">
           <button
             onClick={() => handleTabChange('architecture')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded transition ${
-              activeTab === 'architecture'
-                ? 'bg-electric-blue text-white'
-                : 'text-slate-600 border border-border-gray hover:bg-panel-light'
-            }`}
+            className={`btn-tab ${activeTab === 'architecture' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
           >
-            🏗️ Architecture
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              Architecture
+            </span>
           </button>
           <button
             onClick={() => handleTabChange('flow')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded transition ${
-              activeTab === 'flow'
-                ? 'bg-electric-blue text-white'
-                : 'text-slate-600 border border-border-gray hover:bg-panel-light'
-            }`}
+            className={`btn-tab ${activeTab === 'flow' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
           >
-            🔄 Flow
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Flow
+            </span>
           </button>
         </div>
         
+        {/* Divider */}
+        <div className="divider ml-4"></div>
+        
+        {/* Status */}
+        <div className="ml-4">
+          <span className="status-badge bg-blue-100 text-blue-800">
+            <span className="capitalize">{diagramMode} Mode</span>
+          </span>
+        </div>
+        
+        {/* Actions */}
         <div className="ml-auto flex items-center gap-3">
           <button
             onClick={() => setShowImportModal(true)}
-            className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-border-gray rounded hover:bg-panel-light transition"
+            className="btn btn-secondary flex items-center gap-2"
           >
-            📥 Import CSV
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Import CSV
           </button>
+          
           <button
             onClick={() => setShowProperties(!showProperties)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded transition ${
-              showProperties
-                ? 'bg-vivid-purple text-white'
-                : 'text-slate-600 border border-border-gray hover:bg-panel-light'
-            }`}
+            className={`btn ${showProperties ? 'btn-primary' : 'btn-secondary'} flex items-center gap-2`}
           >
-            {showProperties ? '📋 Hide Panel' : '📋 Show Panel'}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            {showProperties ? 'Hide Panel' : 'Show Panel'}
           </button>
-          <button className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-border-gray rounded hover:bg-panel-light transition">
-            💾 Save
+          
+          <button className="btn btn-secondary flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            Save
           </button>
+          
           <button
             onClick={() => setShowExportModal(true)}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald rounded hover:scale-105 transition"
+            className="btn btn-success flex items-center gap-2"
           >
-            📤 Export PNG
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Export
           </button>
         </div>
       </header>
@@ -250,37 +273,44 @@ function App() {
         {/* Resize Handle */}
         <div
           onMouseDown={handleMouseDown}
-          className={`w-1.5 bg-border-gray hover:bg-electric-blue cursor-col-resize flex items-center justify-center transition-colors ${
-            isResizing ? 'bg-electric-blue' : ''
+          className={`w-1.5 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex items-center justify-center transition-colors group ${
+            isResizing ? 'bg-blue-500' : ''
           }`}
           style={{ userSelect: 'none' }}
         >
-          <div className="w-0.5 h-12 bg-slate-300 rounded" />
+          <div className="w-0.5 h-12 bg-gray-300 group-hover:bg-blue-400 rounded transition-colors" />
         </div>
         
         {/* Canvas */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden bg-white">
           <DiagramCanvas />
         </div>
         
         {/* Properties Panel - Collapsible */}
         {showProperties && (
-          <div className="w-sidebar-w flex-shrink-0 transition-all duration-300">
+          <div className="w-sidebar-w flex-shrink-0 border-l-2 border-gray-200 bg-white transition-all duration-300">
             <PropertiesPanel />
           </div>
         )}
       </div>
       
       {/* Footer */}
-      <footer className="h-toolbar-h bg-white border-t border-border-gray flex items-center px-6 text-xs text-slate-500">
-        <div className="capitalize">{diagramMode} Mode</div>
-        <div className="ml-4 text-slate-400">|</div>
-        <div className="ml-4">Editor: {editorWidth}px</div>
-        <div className="ml-4 text-slate-400">|</div>
-        <div className="ml-4">Press <kbd className="px-1.5 py-0.5 bg-panel-light rounded text-xs font-mono">P</kbd> to toggle panel</div>
-        <div className="ml-4 text-slate-400">|</div>
-        <div className="ml-4">Press <kbd className="px-1.5 py-0.5 bg-panel-light rounded text-xs font-mono">Cmd+E</kbd> to export</div>
-        <div className="ml-auto">Zoom: 100%</div>
+      <footer className="app-footer">
+        <span className="font-semibold text-gray-900">{diagramMode.charAt(0).toUpperCase() + diagramMode.slice(1)} Mode</span>
+        <span className="mx-2 text-gray-400">•</span>
+        <span>Editor: {editorWidth}px</span>
+        <span className="mx-2 text-gray-400">•</span>
+        <span className="flex items-center gap-1">
+          Press <kbd className="kbd">P</kbd> to toggle panel
+        </span>
+        <span className="mx-2 text-gray-400">•</span>
+        <span className="flex items-center gap-1">
+          Press <kbd className="kbd">⌘ E</kbd> to export
+        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-gray-500">Zoom:</span>
+          <span className="font-semibold text-gray-900">100%</span>
+        </div>
       </footer>
 
       {/* Export Modal */}
