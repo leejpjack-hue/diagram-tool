@@ -18,129 +18,170 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full mx-4 overflow-hidden">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black bg-opacity-60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      {/* Modal */}
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden animate-fade-in">
         {/* Header */}
-        <div className="px-6 py-4 bg-panel-light border-b border-border-gray flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-deep-navy">📤 Export Diagram</h2>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-2xl leading-none"
-          >
-            ×
-          </button>
+        <div className="px-8 py-6 bg-gradient-to-r from-blue-500 to-purple-600">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-white">Export Diagram</h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 bg-white bg-opacity-20 rounded-lg flex items-center justify-center text-white hover:bg-opacity-30 transition"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Body */}
-        <div className="p-6">
+        <div className="p-8">
           {/* Format Selection */}
-          <div className="mb-6">
-            <label className="block text-sm font-semibold text-slate-700 mb-3">
-              Export Format
+          <div className="mb-8">
+            <label className="block text-sm font-bold text-gray-900 mb-4 uppercase tracking-wide">
+              Select Format
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-4">
               <button
                 onClick={() => setSelectedFormat('png')}
-                className={`p-4 rounded-lg border-2 transition ${
+                className={`group p-6 rounded-xl border-2 transition-all ${
                   selectedFormat === 'png'
-                    ? 'border-electric-blue bg-blue-50'
-                    : 'border-border-gray hover:border-electric-blue'
+                    ? 'border-blue-500 bg-blue-50 shadow-lg scale-105'
+                    : 'border-gray-300 hover:border-blue-300 hover:shadow-md'
                 }`}
               >
-                <div className="text-2xl mb-2">🖼️</div>
-                <div className="font-semibold text-sm">PNG</div>
-                <div className="text-xs text-slate-500">Raster Image</div>
+                <div className={`text-4xl mb-3 ${selectedFormat === 'png' ? 'transform scale-110' : ''} transition-transform`}>
+                  🖼️
+                </div>
+                <div className="font-bold text-gray-900 mb-1">PNG</div>
+                <div className="text-xs text-gray-600">Raster Image</div>
+                {selectedFormat === 'png' && (
+                  <div className="mt-2 text-xs text-blue-600 font-semibold">✓ Selected</div>
+                )}
               </button>
 
               <button
                 onClick={() => setSelectedFormat('svg')}
-                className={`p-4 rounded-lg border-2 transition ${
+                className={`group p-6 rounded-xl border-2 transition-all ${
                   selectedFormat === 'svg'
-                    ? 'border-vivid-purple bg-purple-50'
-                    : 'border-border-gray hover:border-vivid-purple'
+                    ? 'border-purple-500 bg-purple-50 shadow-lg scale-105'
+                    : 'border-gray-300 hover:border-purple-300 hover:shadow-md'
                 }`}
               >
-                <div className="text-2xl mb-2">📐</div>
-                <div className="font-semibold text-sm">SVG</div>
-                <div className="text-xs text-slate-500">Vector Image</div>
+                <div className={`text-4xl mb-3 ${selectedFormat === 'svg' ? 'transform scale-110' : ''} transition-transform`}>
+                  📐
+                </div>
+                <div className="font-bold text-gray-900 mb-1">SVG</div>
+                <div className="text-xs text-gray-600">Vector Image</div>
+                {selectedFormat === 'svg' && (
+                  <div className="mt-2 text-xs text-purple-600 font-semibold">✓ Selected</div>
+                )}
               </button>
 
               <button
                 onClick={() => setSelectedFormat('json')}
-                className={`p-4 rounded-lg border-2 transition ${
+                className={`group p-6 rounded-xl border-2 transition-all ${
                   selectedFormat === 'json'
-                    ? 'border-emerald bg-green-50'
-                    : 'border-border-gray hover:border-emerald'
+                    ? 'border-green-500 bg-green-50 shadow-lg scale-105'
+                    : 'border-gray-300 hover:border-green-300 hover:shadow-md'
                 }`}
               >
-                <div className="text-2xl mb-2">📄</div>
-                <div className="font-semibold text-sm">JSON</div>
-                <div className="text-xs text-slate-500">Data Export</div>
+                <div className={`text-4xl mb-3 ${selectedFormat === 'json' ? 'transform scale-110' : ''} transition-transform`}>
+                  📄
+                </div>
+                <div className="font-bold text-gray-900 mb-1">JSON</div>
+                <div className="text-xs text-gray-600">Data Export</div>
+                {selectedFormat === 'json' && (
+                  <div className="mt-2 text-xs text-green-600 font-semibold">✓ Selected</div>
+                )}
               </button>
             </div>
           </div>
 
           {/* Quality Settings (PNG only) */}
           {selectedFormat === 'png' && (
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-slate-700 mb-3">
+            <div className="mb-8">
+              <label className="block text-sm font-bold text-gray-900 mb-4 uppercase tracking-wide">
                 Resolution Quality
               </label>
               <select
                 value={quality}
                 onChange={(e) => setQuality(Number(e.target.value))}
-                className="w-full p-3 border border-border-gray rounded-lg focus:outline-none focus:border-electric-blue"
+                className="w-full p-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 font-semibold transition"
               >
-                <option value={1}>1x - Standard (1x)</option>
-                <option value={2}>2x - High Quality (2x)</option>
-                <option value={3}>3x - Presentation (3x) ⭐</option>
-                <option value={4}>4x - Print Ready (4x)</option>
+                <option value={1}>1x - Standard Resolution</option>
+                <option value={2}>2x - High Quality</option>
+                <option value={3}>3x - Presentation Quality ⭐</option>
+                <option value={4}>4x - Print Ready</option>
               </select>
             </div>
           )}
 
           {/* Info Box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
-            {selectedFormat === 'png' && (
-              <>
-                <div className="font-semibold text-blue-900 mb-1">💡 PNG Format</div>
-                <div className="text-blue-700">
-                  Best for presentations and documents. {quality}x resolution provides crisp output for large screens.
+          <div className={`rounded-xl p-5 ${
+            selectedFormat === 'png' ? 'bg-blue-50 border-2 border-blue-200' :
+            selectedFormat === 'svg' ? 'bg-purple-50 border-2 border-purple-200' :
+            'bg-green-50 border-2 border-green-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              <div className="text-2xl">💡</div>
+              <div>
+                <div className={`font-bold mb-2 ${
+                  selectedFormat === 'png' ? 'text-blue-900' :
+                  selectedFormat === 'svg' ? 'text-purple-900' :
+                  'text-green-900'
+                }`}>
+                  {selectedFormat === 'png' && 'PNG Format'}
+                  {selectedFormat === 'svg' && 'SVG Format'}
+                  {selectedFormat === 'json' && 'JSON Format'}
                 </div>
-              </>
-            )}
-            {selectedFormat === 'svg' && (
-              <>
-                <div className="font-semibold text-purple-900 mb-1">💡 SVG Format</div>
-                <div className="text-purple-700">
-                  Best for editing in design tools (Figma, Illustrator). Infinitely scalable without quality loss.
+                <div className={`text-sm leading-relaxed ${
+                  selectedFormat === 'png' ? 'text-blue-800' :
+                  selectedFormat === 'svg' ? 'text-purple-800' :
+                  'text-green-800'
+                }`}>
+                  {selectedFormat === 'png' && `Best for presentations and documents. ${quality}x resolution provides crisp output for large screens and printed materials.`}
+                  {selectedFormat === 'svg' && 'Best for editing in design tools (Figma, Illustrator, Inkscape). Infinitely scalable without quality loss. Perfect for documentation.'}
+                  {selectedFormat === 'json' && 'Export diagram data structure for backup, import capability, or programmatic use. Includes all nodes, edges, and metadata.'}
                 </div>
-              </>
-            )}
-            {selectedFormat === 'json' && (
-              <>
-                <div className="font-semibold text-green-900 mb-1">💡 JSON Format</div>
-                <div className="text-green-700">
-                  Export diagram data structure for backup, import, or programmatic use.
-                </div>
-              </>
-            )}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-panel-light border-t border-border-gray flex justify-end gap-3">
+        <div className="px-8 py-6 bg-gray-50 border-t-2 border-gray-200 flex justify-end gap-4">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold text-slate-600 border border-border-gray rounded-lg hover:bg-white transition"
+            className="px-6 py-3 text-sm font-bold text-gray-700 bg-white border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition shadow-sm"
           >
             Cancel
           </button>
           <button
             onClick={handleExport}
-            className="px-4 py-2 text-sm font-semibold text-white bg-electric-blue rounded-lg hover:bg-blue-600 transition"
+            className="px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl hover:from-blue-600 hover:to-blue-700 transition shadow-lg hover:shadow-xl"
           >
-            📥 Download {selectedFormat.toUpperCase()}
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download {selectedFormat.toUpperCase()}
+            </span>
           </button>
         </div>
       </div>

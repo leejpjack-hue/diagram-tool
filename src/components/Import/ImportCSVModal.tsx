@@ -94,16 +94,32 @@ export function ImportCSVModal({ isOpen, onClose, onImport }: ImportCSVModalProp
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-2xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black bg-opacity-60 backdrop-blur-sm"
+        onClick={handleClose}
+      />
+      
+      {/* Modal */}
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-fade-in">
         {/* Header */}
-        <div className="px-6 py-4 bg-panel-light border-b border-border-gray flex justify-between items-center flex-shrink-0">
-          <h2 className="text-lg font-semibold text-deep-navy">📥 Import APM Data</h2>
+        <div className="px-8 py-6 bg-gradient-to-r from-emerald-500 to-teal-600 border-b-2 border-emerald-600 flex justify-between items-center flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-white">Import APM Data</h2>
+          </div>
           <button
             onClick={handleClose}
-            className="text-slate-400 hover:text-slate-600 text-2xl leading-none"
+            className="w-8 h-8 bg-white bg-opacity-20 rounded-lg flex items-center justify-center text-white hover:bg-opacity-30 transition"
           >
-            ×
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 

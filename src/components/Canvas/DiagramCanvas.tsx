@@ -10,6 +10,7 @@ import { ProcessNode } from './ProcessNode';
 import { StartEndNode } from './StartEndNode';
 import { DecisionNode } from './DecisionNode';
 import { useDiagramStore } from '../../store/diagramStore';
+import { calculateAutoLayout } from '../../utils/autoLayout';
 
 const architectureNodeTypes = {
   service: ServiceNode,
@@ -68,15 +69,19 @@ function DiagramCanvasInternal() {
         };
       });
     } else {
-      // Architecture mode - grid layout
-      return parsedDiagram.nodes.map((node, index) => {
-        const col = index % 3;
-        const row = Math.floor(index / 3);
+      // Architecture mode - use auto-layout to reduce edge overlap
+      const positions = calculateAutoLayout(
+        parsedDiagram.nodes,
+        parsedDiagram.edges
+      );
+      
+      return parsedDiagram.nodes.map((node) => {
+        const pos = positions.get(node.id) || { x: 100, y: 100 };
         
         return {
           id: node.id,
           type: node.type,
-          position: { x: col * 250 + 150, y: row * 150 + 100 },
+          position: pos,
           data: {
             label: node.name,
             ...node.properties,
