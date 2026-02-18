@@ -85,7 +85,7 @@ node Payment {
 }`;
 
 function App() {
-  const { setDslText, diagramMode, setDiagramMode, setParsedDiagram } = useDiagramStore();
+  const { setDslText, diagramMode, setDiagramMode, setParsedDiagram, zoomLevel } = useDiagramStore();
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow'>('architecture');
   const [showProperties, setShowProperties] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -149,6 +149,19 @@ function App() {
       if (e.key === 'e' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setShowExportModal(true);
+      }
+      // Zoom keyboard shortcuts
+      const target = e.target as HTMLElement;
+      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+        if (e.key === '+' || e.key === '=') {
+          window.dispatchEvent(new CustomEvent('diagram-zoom-in'));
+        }
+        if (e.key === '-') {
+          window.dispatchEvent(new CustomEvent('diagram-zoom-out'));
+        }
+        if (e.key === '0') {
+          window.dispatchEvent(new CustomEvent('diagram-zoom-fit'));
+        }
       }
     };
 
@@ -307,9 +320,17 @@ function App() {
         <span className="flex items-center gap-1">
           Press <kbd className="kbd">⌘ E</kbd> to export
         </span>
+        <span className="mx-2 text-gray-400">•</span>
+        <span className="flex items-center gap-1">
+          <kbd className="kbd">+</kbd>/<kbd className="kbd">-</kbd> zoom
+        </span>
+        <span className="mx-2 text-gray-400">•</span>
+        <span className="flex items-center gap-1">
+          <kbd className="kbd">0</kbd> fit
+        </span>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-gray-500">Zoom:</span>
-          <span className="font-semibold text-gray-900">100%</span>
+          <span className="font-semibold text-gray-900">{zoomLevel}%</span>
         </div>
       </footer>
 

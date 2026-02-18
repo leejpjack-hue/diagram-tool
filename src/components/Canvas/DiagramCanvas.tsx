@@ -1,6 +1,6 @@
-import { useMemo, useEffect } from 'react';
-import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider } from '@xyflow/react';
-import type { Node, Edge } from '@xyflow/react';
+import { useMemo, useEffect, useCallback } from 'react';
+import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider, useReactFlow } from '@xyflow/react';
+import type { Node, Edge, Viewport } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { ServiceNode } from './ServiceNode';
@@ -9,6 +9,7 @@ import { QueueNode } from './QueueNode';
 import { ProcessNode } from './ProcessNode';
 import { StartEndNode } from './StartEndNode';
 import { DecisionNode } from './DecisionNode';
+import { ZoomControls } from './ZoomControls';
 import { useDiagramStore } from '../../store/diagramStore';
 import { calculateAutoLayout } from '../../utils/autoLayout';
 
@@ -26,7 +27,8 @@ const flowNodeTypes = {
 };
 
 function DiagramCanvasInternal() {
-  const { parsedDiagram, diagramMode } = useDiagramStore();
+  const { parsedDiagram, diagramMode, setZoomLevel } = useDiagramStore();
+  const { getZoom } = useReactFlow();
 
   const nodeTypes = diagramMode === 'flow' ? flowNodeTypes : architectureNodeTypes;
 
@@ -144,6 +146,21 @@ function DiagramCanvasInternal() {
     }
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
+  // Track zoom level changes
+  const handleMoveEnd = useCallback((event: unknown, viewport: Viewport) => {
+    const zoomPercent = Math.round(viewport.zoom * 100);
+    setZoomLevel(zoomPercent);
+  }, [setZoomLevel]);
+
+  // Update zoom level on initial load
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const zoom = Math.round(getZoom() * 100);
+      setZoomLevel(zoom);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [getZoom, setZoomLevel]);
+
   if (!parsedDiagram) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-canvas-white">
@@ -156,12 +173,13 @@ function DiagramCanvasInternal() {
   }
 
   return (
-    <div className="w-full h-full bg-canvas-white">
+    <div className="w-full h-full bg-canvas-white relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onMoveEnd={handleMoveEnd}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
@@ -194,6 +212,11 @@ function DiagramCanvasInternal() {
           }}
         />
       </ReactFlow>
+      
+      {/* Floating Zoom Controls */}
+      <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-10">
+        <ZoomControls />
+      </div>
     </div>
   );
 }

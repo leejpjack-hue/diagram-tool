@@ -9,6 +9,7 @@ interface DiagramStore {
   diagramMode: DiagramMode;
   isLoading: boolean;
   error: string | null;
+  zoomLevel: number;
 
   // Actions
   setDslText: (text: string) => void;
@@ -17,6 +18,7 @@ interface DiagramStore {
   setDiagramMode: (mode: DiagramMode) => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
+  setZoomLevel: (zoom: number) => void;
 }
 
 export const useDiagramStore = create<DiagramStore>((set) => ({
@@ -63,6 +65,7 @@ queue EventQueue {
   diagramMode: 'architecture',
   isLoading: false,
   error: null,
+  zoomLevel: 100,
 
   // Actions
   setDslText: (text) => set({ dslText: text }),
@@ -71,4 +74,5 @@ queue EventQueue {
   setDiagramMode: (mode) => set({ diagramMode: mode }),
   setError: (error) => set({ error }),
   setLoading: (loading) => set({ isLoading: loading }),
+  setZoomLevel: (zoom) => set({ zoomLevel: zoom }),
 }));
