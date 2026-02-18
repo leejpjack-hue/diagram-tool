@@ -3,8 +3,11 @@ import { DSLEditor } from './components/Editor/DSLEditor';
 import { DiagramCanvas } from './components/Canvas/DiagramCanvas';
 import { PropertiesPanel } from './components/Panel/PropertiesPanel';
 import { ExportModal } from './components/Export/ExportModal';
+import { ImportCSVModal } from './components/Import/ImportCSVModal';
 import { useDiagramStore } from './store/diagramStore';
 import { useExport } from './utils/useExport';
+import { csvToDSL, csvToDiagram } from './utils/csvToDiagram';
+import type { SimpleCSVRow } from './utils/csvParser';
 
 const ARCHITECTURE_DSL = `diagram: architecture
 title: Insurance Claims Platform
@@ -82,10 +85,11 @@ node Payment {
 }`;
 
 function App() {
-  const { setDslText, diagramMode, setDiagramMode } = useDiagramStore();
+  const { setDslText, diagramMode, setDiagramMode, setParsedDiagram } = useDiagramStore();
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow'>('architecture');
   const [showProperties, setShowProperties] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editorWidth, setEditorWidth] = useState(500);
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -158,6 +162,22 @@ function App() {
     else if (format === 'json') exportJSON();
   };
 
+  const handleCSVImport = (rows: SimpleCSVRow[], filename: string) => {
+    // Generate diagram from CSV
+    const diagram = csvToDiagram(rows, filename);
+    
+    // Update store
+    setParsedDiagram(diagram);
+    setDiagramMode('architecture');
+    setActiveTab('architecture');
+    
+    // Also generate DSL and update editor
+    const dsl = csvToDSL(rows, filename);
+    setDslText(dsl);
+    
+    console.log('✅ CSV imported successfully:', diagram);
+  };
+
   return (
     <div className="h-screen flex flex-col bg-canvas-white">
       {/* Header */}
@@ -192,6 +212,12 @@ function App() {
         </div>
         
         <div className="ml-auto flex items-center gap-3">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-border-gray rounded hover:bg-panel-light transition"
+          >
+            📥 Import CSV
+          </button>
           <button
             onClick={() => setShowProperties(!showProperties)}
             className={`px-3 py-1.5 text-xs font-semibold rounded transition ${
@@ -262,6 +288,13 @@ function App() {
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
         onExport={handleExport}
+      />
+
+      {/* Import CSV Modal */}
+      <ImportCSVModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImport={handleCSVImport}
       />
     </div>
   );
