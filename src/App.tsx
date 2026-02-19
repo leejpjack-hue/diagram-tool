@@ -2,11 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { DSLEditor } from './components/Editor/DSLEditor';
 import { DiagramCanvas } from './components/Canvas/DiagramCanvas';
 import { PropertiesPanel } from './components/Panel/PropertiesPanel';
-import { ExportModal } from './components/Export/ExportModal';
-import { ImportCSVModal } from './components/Import/ImportCSVModal';
+import { ExportPanel } from './components/Panel/ExportPanel';
+import { ImportPanel } from './components/Panel/ImportPanel';
+import { FileMenu } from './components/Panel/FileMenu';
 import { useDiagramStore } from './store/diagramStore';
 import { useExport } from './utils/useExport';
 import { csvToDSL, csvToDiagram } from './utils/csvToDiagram';
+import { saveManager, type SavedDiagram, type SavedDiagramMode } from './utils/saveManager';
 import type { SimpleCSVRow } from './utils/csvParser';
 
 const ARCHITECTURE_DSL = `diagram: architecture
@@ -84,14 +86,16 @@ node Payment {
   type: external
 }`;
 
+type PanelType = 'none' | 'properties' | 'import' | 'export';
+
 function App() {
-  const { setDslText, diagramMode, setDiagramMode, setParsedDiagram } = useDiagramStore();
+  const { dslText, setDslText, diagramMode, setDiagramMode, setParsedDiagram } = useDiagramStore();
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow'>('architecture');
-  const [showProperties, setShowProperties] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
+  const [activePanel, setActivePanel] = useState<PanelType>('none');
   const [editorWidth, setEditorWidth] = useState(500);
   const [isResizing, setIsResizing] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
   const { exportPNG, exportSVG, exportJSON } = useExport();
@@ -137,24 +141,82 @@ function App() {
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
+      // Ctrl+S or Cmd+S for save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+      
+      // P for properties toggle
       if (e.key === 'p' || e.key === 'P') {
         if (!e.metaKey && !e.ctrlKey && !e.altKey) {
           const target = e.target as HTMLElement;
           if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
             e.preventDefault();
-            setShowProperties(prev => !prev);
+            setActivePanel(prev => prev === 'properties' ? 'none' : 'properties');
           }
         }
-      }
-      if (e.key === 'e' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setShowExportModal(true);
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [dslText, diagramMode]); // Re-bind when these change
+
+  // Auto-save setup
+  useEffect(() => {
+    saveManager.startAutosave(() => {
+      if (!dslText || dslText.trim().length === 0) return null;
+      
+      const title = extractTitle(dslText) || 'Untitled Diagram';
+      const mode: SavedDiagramMode = (diagramMode === 'architecture' || diagramMode === 'flow') 
+        ? diagramMode 
+        : 'architecture';
+      return { title, dslText, mode };
+    });
+
+    return () => saveManager.stopAutosave();
+  }, [dslText, diagramMode]);
+
+  // Load saved diagram on mount
+  useEffect(() => {
+    const saved = saveManager.getCurrentDiagram();
+    if (saved) {
+      setDslText(saved.dslText);
+      setDiagramMode(saved.mode);
+      setActiveTab(saved.mode);
+      setLastSaved(new Date(saved.updatedAt));
+    }
   }, []);
+
+  const handleSave = () => {
+    setSaveStatus('saving');
+    
+    setTimeout(() => {
+      const title = extractTitle(dslText) || 'Untitled Diagram';
+      const mode: SavedDiagramMode = (diagramMode === 'architecture' || diagramMode === 'flow') 
+        ? diagramMode 
+        : 'architecture';
+      saveManager.saveDiagram({ title, dslText, mode });
+      setSaveStatus('saved');
+      setLastSaved(new Date());
+    }, 300);
+  };
+
+  const handleLoadDiagram = (diagram: SavedDiagram) => {
+    setDslText(diagram.dslText);
+    setDiagramMode(diagram.mode);
+    setActiveTab(diagram.mode);
+    setLastSaved(new Date(diagram.updatedAt));
+    setSaveStatus('saved');
+  };
+
+  const handleNewDiagram = () => {
+    setDslText(ARCHITECTURE_DSL);
+    setDiagramMode('architecture');
+    setActiveTab('architecture');
+    setSaveStatus('unsaved');
+  };
 
   const handleExport = (format: 'png' | 'svg' | 'json') => {
     if (format === 'png') exportPNG();
@@ -169,14 +231,19 @@ function App() {
     setActiveTab('architecture');
     const dsl = csvToDSL(rows, filename);
     setDslText(dsl);
+    setActivePanel('none'); // Close panel after import
+  };
+
+  const togglePanel = (panel: PanelType) => {
+    setActivePanel(prev => prev === panel ? 'none' : panel);
   };
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <header className="app-header px-6 flex items-center">
+      <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-6">
         {/* Logo & Title */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-shrink-0">
           <div className="app-logo">
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
@@ -186,7 +253,7 @@ function App() {
         </div>
         
         {/* Mode Tabs */}
-        <div className="ml-8 mode-tabs">
+        <div className="mode-tabs flex-shrink-0">
           <button
             onClick={() => handleTabChange('architecture')}
             className={`btn-tab ${activeTab === 'architecture' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
@@ -207,11 +274,8 @@ function App() {
           </button>
         </div>
         
-        {/* Divider */}
-        <div className="divider"></div>
-        
         {/* Status */}
-        <div className="ml-4">
+        <div className="flex-shrink-0">
           <span className="status-badge bg-blue-100 text-blue-800">
             <span className="capitalize">{diagramMode} Mode</span>
           </span>
@@ -219,41 +283,42 @@ function App() {
         
         {/* Actions */}
         <div className="ml-auto flex items-center gap-3">
+          {/* File Menu */}
+          <FileMenu
+            currentDsl={dslText}
+            mode={(diagramMode === 'architecture' || diagramMode === 'flow') ? diagramMode : 'architecture'}
+            onLoad={handleLoadDiagram}
+            onNew={handleNewDiagram}
+          />
+          
+          {/* Save Status */}
+          {lastSaved && (
+            <span className="text-xs text-gray-500">
+              {saveStatus === 'saving' ? 'Saving...' : 
+               saveStatus === 'saved' ? `Saved ${formatTimeAgo(lastSaved)}` : 
+               'Unsaved'}
+            </span>
+          )}
+          
           <button
-            onClick={() => setShowImportModal(true)}
-            className="btn btn-secondary"
+            onClick={() => togglePanel('import')}
+            className={`btn ${activePanel === 'import' ? 'btn-primary' : 'btn-secondary'}`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
             Import CSV
           </button>
           
           <button
-            onClick={() => setShowProperties(!showProperties)}
-            className={`btn ${showProperties ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => togglePanel('export')}
+            className={`btn ${activePanel === 'export' ? 'btn-primary' : 'btn-secondary'}`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            {showProperties ? 'Hide Panel' : 'Show Panel'}
-          </button>
-          
-          <button className="btn btn-secondary">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-            </svg>
-            Save
+            Export
           </button>
           
           <button
-            onClick={() => setShowExportModal(true)}
-            className="btn btn-success"
+            onClick={() => togglePanel('properties')}
+            className={`btn ${activePanel === 'properties' ? 'btn-primary' : 'btn-secondary'}`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            Export
+            Properties
           </button>
         </div>
       </header>
@@ -281,10 +346,12 @@ function App() {
           <DiagramCanvas />
         </div>
         
-        {/* Properties Panel - Collapsible */}
-        {showProperties && (
-          <div className="w-sidebar-w flex-shrink-0 border-l border-gray-200 bg-white transition-all duration-300">
-            <PropertiesPanel />
+        {/* Side Panel - No Overlap! */}
+        {activePanel !== 'none' && (
+          <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white">
+            {activePanel === 'properties' && <PropertiesPanel />}
+            {activePanel === 'import' && <ImportPanel onImport={handleCSVImport} />}
+            {activePanel === 'export' && <ExportPanel onExport={handleExport} />}
           </div>
         )}
       </div>
@@ -296,33 +363,33 @@ function App() {
         <span>Editor: {editorWidth}px</span>
         <span className="mx-2 text-gray-400">•</span>
         <span className="flex items-center gap-1">
-          Press <kbd className="kbd">P</kbd> to toggle panel
-        </span>
-        <span className="mx-2 text-gray-400">•</span>
-        <span className="flex items-center gap-1">
-          Press <kbd className="kbd">⌘ E</kbd> to export
+          Press <kbd className="kbd">P</kbd> for Properties
         </span>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-gray-500">Zoom:</span>
           <span className="font-semibold text-gray-900">100%</span>
         </div>
       </footer>
-
-      {/* Export Modal */}
-      <ExportModal
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        onExport={handleExport}
-      />
-
-      {/* Import CSV Modal */}
-      <ImportCSVModal
-        isOpen={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onImport={handleCSVImport}
-      />
     </div>
   );
+}
+
+// Helper functions
+function extractTitle(dsl: string): string | null {
+  const match = dsl.match(/title:\s*(.+)/);
+  return match ? match[1].trim() : null;
+}
+
+function formatTimeAgo(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffMins < 120) return '1h ago';
+  
+  return date.toLocaleTimeString();
 }
 
 export default App;

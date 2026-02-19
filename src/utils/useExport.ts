@@ -12,6 +12,26 @@ export const useExport = () => {
     return `${cleanTitle}-${mode}-${date}.${format}`;
   };
 
+  const hideControls = () => {
+    const minimap = document.querySelector('.react-flow__minimap') as HTMLElement;
+    const controls = document.querySelector('.react-flow__controls') as HTMLElement;
+    const attribution = document.querySelector('.react-flow__attribution') as HTMLElement;
+    
+    if (minimap) minimap.style.display = 'none';
+    if (controls) controls.style.display = 'none';
+    if (attribution) attribution.style.display = 'none';
+  };
+
+  const showControls = () => {
+    const minimap = document.querySelector('.react-flow__minimap') as HTMLElement;
+    const controls = document.querySelector('.react-flow__controls') as HTMLElement;
+    const attribution = document.querySelector('.react-flow__attribution') as HTMLElement;
+    
+    if (minimap) minimap.style.display = 'block';
+    if (controls) controls.style.display = 'flex';
+    if (attribution) attribution.style.display = 'block';
+  };
+
   const exportPNG = async () => {
     const canvas = document.querySelector('.react-flow') as HTMLElement;
     if (!canvas) {
@@ -20,10 +40,15 @@ export const useExport = () => {
     }
 
     try {
+      hideControls();
+      
+      // Wait a bit for DOM to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const dataUrl = await toPng(canvas, {
         quality: 2,
         backgroundColor: '#FDFDFD',
-        pixelRatio: 3, // 3x resolution for presentation quality
+        pixelRatio: 3,
       });
 
       const link = document.createElement('a');
@@ -32,6 +57,8 @@ export const useExport = () => {
       link.click();
     } catch (error) {
       console.error('Export failed:', error);
+    } finally {
+      showControls();
     }
   };
 
@@ -43,6 +70,10 @@ export const useExport = () => {
     }
 
     try {
+      hideControls();
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const dataUrl = await toSvg(canvas, {
         backgroundColor: '#FDFDFD',
       });
@@ -53,6 +84,8 @@ export const useExport = () => {
       link.click();
     } catch (error) {
       console.error('Export failed:', error);
+    } finally {
+      showControls();
     }
   };
 
