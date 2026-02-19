@@ -147,7 +147,7 @@ function DiagramCanvasInternal() {
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   // Track zoom level changes
-  const handleMoveEnd = useCallback((event: unknown, viewport: Viewport) => {
+  const handleMoveEnd = useCallback((_event: unknown, viewport: Viewport) => {
     const zoomPercent = Math.round(viewport.zoom * 100);
     setZoomLevel(zoomPercent);
   }, [setZoomLevel]);
