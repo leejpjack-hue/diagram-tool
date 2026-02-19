@@ -22,12 +22,12 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
       {/* Backdrop */}
       <div 
         className="fixed inset-0 z-[99998]"
-        style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }}
         onClick={onClose}
       />
       
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden animate-fade-in">
+      <div className="relative z-[99999] bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden animate-fade-in">
         {/* Header */}
         <div className="px-8 py-6 bg-gradient-to-r from-blue-500 to-purple-600">
           <div className="flex items-center justify-between">

@@ -98,7 +98,7 @@ export function ImportCSVModal({ isOpen, onClose, onImport }: ImportCSVModalProp
       {/* Backdrop */}
       <div 
         className="fixed inset-0 z-[99998]"
-        style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }}
         onClick={handleClose}
       />
       
