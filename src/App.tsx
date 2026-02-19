@@ -85,7 +85,7 @@ node Payment {
 }`;
 
 function App() {
-  const { setDslText, diagramMode, setDiagramMode, setParsedDiagram, zoomLevel } = useDiagramStore();
+  const { setDslText, diagramMode, setDiagramMode, setParsedDiagram } = useDiagramStore();
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow'>('architecture');
   const [showProperties, setShowProperties] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -150,19 +150,6 @@ function App() {
         e.preventDefault();
         setShowExportModal(true);
       }
-      // Zoom keyboard shortcuts
-      const target = e.target as HTMLElement;
-      if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-        if (e.key === '+' || e.key === '=') {
-          window.dispatchEvent(new CustomEvent('diagram-zoom-in'));
-        }
-        if (e.key === '-') {
-          window.dispatchEvent(new CustomEvent('diagram-zoom-out'));
-        }
-        if (e.key === '0') {
-          window.dispatchEvent(new CustomEvent('diagram-zoom-fit'));
-        }
-      }
     };
 
     window.addEventListener('keydown', handleKeyPress);
@@ -182,7 +169,6 @@ function App() {
     setActiveTab('architecture');
     const dsl = csvToDSL(rows, filename);
     setDslText(dsl);
-    console.log('✅ CSV imported successfully:', diagram);
   };
 
   return (
@@ -205,28 +191,24 @@ function App() {
             onClick={() => handleTabChange('architecture')}
             className={`btn-tab ${activeTab === 'architecture' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
           >
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              Architecture
-            </span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            Architecture
           </button>
           <button
             onClick={() => handleTabChange('flow')}
             className={`btn-tab ${activeTab === 'flow' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
           >
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Flow
-            </span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Flow
           </button>
         </div>
         
         {/* Divider */}
-        <div className="divider ml-4"></div>
+        <div className="divider"></div>
         
         {/* Status */}
         <div className="ml-4">
@@ -239,7 +221,7 @@ function App() {
         <div className="ml-auto flex items-center gap-3">
           <button
             onClick={() => setShowImportModal(true)}
-            className="btn btn-secondary flex items-center gap-2"
+            className="btn btn-secondary"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -249,7 +231,7 @@ function App() {
           
           <button
             onClick={() => setShowProperties(!showProperties)}
-            className={`btn ${showProperties ? 'btn-primary' : 'btn-secondary'} flex items-center gap-2`}
+            className={`btn ${showProperties ? 'btn-primary' : 'btn-secondary'}`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -257,7 +239,7 @@ function App() {
             {showProperties ? 'Hide Panel' : 'Show Panel'}
           </button>
           
-          <button className="btn btn-secondary flex items-center gap-2">
+          <button className="btn btn-secondary">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
             </svg>
@@ -266,7 +248,7 @@ function App() {
           
           <button
             onClick={() => setShowExportModal(true)}
-            className="btn btn-success flex items-center gap-2"
+            className="btn btn-success"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -301,7 +283,7 @@ function App() {
         
         {/* Properties Panel - Collapsible */}
         {showProperties && (
-          <div className="w-sidebar-w flex-shrink-0 border-l-2 border-gray-200 bg-white transition-all duration-300">
+          <div className="w-sidebar-w flex-shrink-0 border-l border-gray-200 bg-white transition-all duration-300">
             <PropertiesPanel />
           </div>
         )}
@@ -320,17 +302,9 @@ function App() {
         <span className="flex items-center gap-1">
           Press <kbd className="kbd">⌘ E</kbd> to export
         </span>
-        <span className="mx-2 text-gray-400">•</span>
-        <span className="flex items-center gap-1">
-          <kbd className="kbd">+</kbd>/<kbd className="kbd">-</kbd> zoom
-        </span>
-        <span className="mx-2 text-gray-400">•</span>
-        <span className="flex items-center gap-1">
-          <kbd className="kbd">0</kbd> fit
-        </span>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-gray-500">Zoom:</span>
-          <span className="font-semibold text-gray-900">{zoomLevel}%</span>
+          <span className="font-semibold text-gray-900">100%</span>
         </div>
       </footer>
 

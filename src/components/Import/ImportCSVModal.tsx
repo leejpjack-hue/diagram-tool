@@ -97,7 +97,8 @@ export function ImportCSVModal({ isOpen, onClose, onImport }: ImportCSVModalProp
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black bg-opacity-70 backdrop-blur-sm"
+        className="fixed inset-0 bg-black"
+        style={{ opacity: 0.7 }}
         onClick={handleClose}
       />
       
