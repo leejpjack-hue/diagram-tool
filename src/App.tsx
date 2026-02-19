@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { DSLEditor } from './components/Editor/DSLEditor';
+import { UndoRedoControls } from './components/Editor/UndoRedoControls';
 import { DiagramCanvas } from './components/Canvas/DiagramCanvas';
 import { PropertiesPanel } from './components/Panel/PropertiesPanel';
 import { ExportPanel } from './components/Panel/ExportPanel';
 import { ImportPanel } from './components/Panel/ImportPanel';
 import { FileMenu } from './components/Panel/FileMenu';
+import { ToastContainer } from './components/Toast/ToastContainer';
 import { useDiagramStore } from './store/diagramStore';
 import { useExport } from './utils/useExport';
+import { useToast } from './utils/useToast';
 import { csvToDSL, csvToDiagram } from './utils/csvToDiagram';
 import { saveManager, type SavedDiagram, type SavedDiagramMode } from './utils/saveManager';
 import type { SimpleCSVRow } from './utils/csvParser';
@@ -99,6 +102,7 @@ function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   
   const { exportPNG, exportSVG, exportJSON } = useExport();
+  const toast = useToast();
 
   const handleTabChange = (tab: 'architecture' | 'flow') => {
     setActiveTab(tab);
@@ -193,13 +197,19 @@ function App() {
     setSaveStatus('saving');
     
     setTimeout(() => {
-      const title = extractTitle(dslText) || 'Untitled Diagram';
-      const mode: SavedDiagramMode = (diagramMode === 'architecture' || diagramMode === 'flow') 
-        ? diagramMode 
-        : 'architecture';
-      saveManager.saveDiagram({ title, dslText, mode });
-      setSaveStatus('saved');
-      setLastSaved(new Date());
+      try {
+        const title = extractTitle(dslText) || 'Untitled Diagram';
+        const mode: SavedDiagramMode = (diagramMode === 'architecture' || diagramMode === 'flow') 
+          ? diagramMode 
+          : 'architecture';
+        saveManager.saveDiagram({ title, dslText, mode });
+        setSaveStatus('saved');
+        setLastSaved(new Date());
+        toast.success(`Saved: ${title}`);
+      } catch (err) {
+        toast.error('Failed to save diagram');
+        setSaveStatus('unsaved');
+      }
     }, 300);
   };
 
@@ -209,6 +219,7 @@ function App() {
     setActiveTab(diagram.mode);
     setLastSaved(new Date(diagram.updatedAt));
     setSaveStatus('saved');
+    toast.success(`Loaded: ${diagram.title}`);
   };
 
   const handleNewDiagram = () => {
@@ -216,6 +227,7 @@ function App() {
     setDiagramMode('architecture');
     setActiveTab('architecture');
     setSaveStatus('unsaved');
+    toast.info('Created new diagram');
   };
 
   const handleExport = (format: 'png' | 'svg' | 'json') => {
@@ -283,6 +295,12 @@ function App() {
         
         {/* Actions */}
         <div className="ml-auto flex items-center gap-3">
+          {/* Undo/Redo Controls */}
+          <UndoRedoControls />
+          
+          {/* Divider */}
+          <div className="w-px h-6 bg-gray-300" />
+          
           {/* File Menu */}
           <FileMenu
             currentDsl={dslText}
@@ -370,6 +388,9 @@ function App() {
           <span className="font-semibold text-gray-900">100%</span>
         </div>
       </footer>
+      
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
     </div>
   );
 }

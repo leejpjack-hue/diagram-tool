@@ -96,6 +96,11 @@ export class Parser {
       this.skipNewlines();
     }
 
+    // Mark decision nodes in flow mode
+    if (this.mode === 'flow') {
+      this.identifyDecisionNodes();
+    }
+
     // Convert flowNodes map to array if in flow mode
     const allNodes = this.mode === 'flow' 
       ? Array.from(this.flowNodes.values())
@@ -110,6 +115,26 @@ export class Parser {
       startNode: this.startNode,
       endNode: this.endNode,
     };
+  }
+
+  private identifyDecisionNodes(): void {
+    // Find nodes that have outgoing edges with labels (conditional paths)
+    const nodesWithLabeledEdges = new Set<string>();
+    
+    this.edges.forEach(edge => {
+      if (edge.label && edge.label.trim().length > 0) {
+        nodesWithLabeledEdges.add(edge.from);
+      }
+    });
+    
+    // Mark these nodes as decision nodes
+    nodesWithLabeledEdges.forEach(nodeId => {
+      const node = this.flowNodes.get(nodeId);
+      if (node) {
+        node.properties = node.properties || {};
+        node.properties.nodeType = 'decision';
+      }
+    });
   }
 
   private parseDiagramDeclaration(): void {
