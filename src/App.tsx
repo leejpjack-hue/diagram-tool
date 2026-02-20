@@ -206,7 +206,7 @@ function App() {
         setSaveStatus('saved');
         setLastSaved(new Date());
         toast.success(`Saved: ${title}`);
-      } catch (err) {
+      } catch {
         toast.error('Failed to save diagram');
         setSaveStatus('unsaved');
       }

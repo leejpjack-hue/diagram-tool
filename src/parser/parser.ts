@@ -191,23 +191,27 @@ export class Parser {
         this.expect(TokenType.COLON);
         
         switch ((propToken.value as string).toLowerCase()) {
-          case 'type':
+          case 'type': {
             const typeToken = this.advance();
             node.properties.type = typeToken.value as 'api' | 'microservice' | 'lambda';
             break;
-          case 'tech':
+          }
+          case 'tech': {
             const techToken = this.advance();
             node.properties.tech = techToken.value as string;
             break;
-          case 'port':
+          }
+          case 'port': {
             const portToken = this.advance();
             node.properties.port = portToken.value as number;
             break;
-          case 'replicas':
+          }
+          case 'replicas': {
             const replicasToken = this.advance();
             node.properties.replicas = replicasToken.value as number;
             break;
-          case 'connects':
+          }
+          case 'connects': {
             // Don't consume token - parseConnectionList will read identifiers
             const connections = this.parseConnectionList();
             node.connections = connections;
@@ -221,6 +225,7 @@ export class Parser {
               });
             });
             break;
+          }
         }
       } else {
         this.advance();

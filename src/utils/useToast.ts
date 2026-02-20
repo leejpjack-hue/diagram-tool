@@ -14,6 +14,10 @@ const TOAST_DURATION = 3000; // 3 seconds
 export function useToast() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
   const addToast = useCallback((type: ToastType, message: string, duration?: number) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
@@ -29,15 +33,11 @@ export function useToast() {
     // Auto-remove after duration
     if (toast.duration && toast.duration > 0) {
       setTimeout(() => {
-        removeToast(id);
+        setToasts(prev => prev.filter(t => t.id !== id));
       }, toast.duration);
     }
 
     return id;
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
   const success = useCallback((message: string, duration?: number) => {

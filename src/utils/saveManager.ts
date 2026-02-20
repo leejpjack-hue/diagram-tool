@@ -118,7 +118,7 @@ class SaveManager {
           };
 
           resolve(imported);
-        } catch (err) {
+        } catch {
           reject(new Error('Failed to parse diagram file'));
         }
       };
