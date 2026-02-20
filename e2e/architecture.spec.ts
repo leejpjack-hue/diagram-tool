@@ -52,9 +52,6 @@ test.describe('Architecture Mode', () => {
     const zoomInBtn = page.getByRole('button', { name: /\+/i }).first();
     
     if (await zoomInBtn.isVisible()) {
-      // Get initial zoom level
-      const initialZoom = await page.locator('.react-flow').getAttribute('data-zoom') || '1';
-      
       // Click zoom in
       await zoomInBtn.click();
       

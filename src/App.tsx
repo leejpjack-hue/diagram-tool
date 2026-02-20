@@ -143,6 +143,26 @@ function App() {
     };
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
+  const handleSave = () => {
+    setSaveStatus('saving');
+    
+    setTimeout(() => {
+      try {
+        const title = extractTitle(dslText) || 'Untitled Diagram';
+        const mode: SavedDiagramMode = (diagramMode === 'architecture' || diagramMode === 'flow') 
+          ? diagramMode 
+          : 'architecture';
+        saveManager.saveDiagram({ title, dslText, mode });
+        setSaveStatus('saved');
+        setLastSaved(new Date());
+        toast.success(`Saved: ${title}`);
+      } catch {
+        toast.error('Failed to save diagram');
+        setSaveStatus('unsaved');
+      }
+    }, 300);
+  };
+
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       // Ctrl+S or Cmd+S for save
@@ -192,26 +212,6 @@ function App() {
       setLastSaved(new Date(saved.updatedAt));
     }
   }, []);
-
-  const handleSave = () => {
-    setSaveStatus('saving');
-    
-    setTimeout(() => {
-      try {
-        const title = extractTitle(dslText) || 'Untitled Diagram';
-        const mode: SavedDiagramMode = (diagramMode === 'architecture' || diagramMode === 'flow') 
-          ? diagramMode 
-          : 'architecture';
-        saveManager.saveDiagram({ title, dslText, mode });
-        setSaveStatus('saved');
-        setLastSaved(new Date());
-        toast.success(`Saved: ${title}`);
-      } catch {
-        toast.error('Failed to save diagram');
-        setSaveStatus('unsaved');
-      }
-    }, 300);
-  };
 
   const handleLoadDiagram = (diagram: SavedDiagram) => {
     setDslText(diagram.dslText);
