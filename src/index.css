@@ -47,7 +47,9 @@
 /* Professional Header */
 .app-header {
   height: 64px;
-  background: linear-gradient(to right, white, #F9FAFB);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid #E5E7EB;
   box-shadow: var(--shadow-sm);
 }
@@ -104,28 +106,30 @@
 }
 
 .btn-primary {
-  background: linear-gradient(to right, #3B82F6, #2563EB);
+  background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
   color: white;
   border: none;
   box-shadow: var(--shadow-md);
+  transition: all var(--duration-normal) var(--ease-out);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(to right, #2563EB, #1D4ED8);
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%);
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+  transform: translateY(-2px);
 }
 
 .btn-secondary {
   background: white;
   color: #374151;
-  border: 1px solid #D1D5DB;
+  border: 2px solid #E5E7EB;
   box-shadow: var(--shadow-sm);
 }
 
 .btn-secondary:hover {
-  background: #F9FAFB;
-  border-color: #9CA3AF;
+  background: white;
+  border-color: #3B82F6;
+  color: #3B82F6;
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
@@ -198,14 +202,24 @@
 /* Footer */
 .app-footer {
   height: 48px;
-  background: white;
-  border-top: 1px solid #E5E7EB;
+  background: #111827;
+  border-top: 1px solid #374151;
   display: flex;
   align-items: center;
   padding: 0 var(--space-6);
   font-size: 0.75rem;
-  color: #6B7280;
+  color: #9CA3AF;
   font-weight: 500;
+}
+
+.app-footer a {
+  color: #9CA3AF;
+  text-decoration: none;
+  transition: color var(--duration-fast);
+}
+
+.app-footer a:hover {
+  color: white;
 }
 
 /* Status Badge */
@@ -256,12 +270,44 @@
   }
 }
 
+@keyframes float {
+  0%, 100% { 
+    transform: translateY(0); 
+  }
+  50% { 
+    transform: translateY(-10px); 
+  }
+}
+
 .fade-in {
   animation: fadeIn var(--duration-slow) var(--ease-out);
 }
 
 .animate-fade-in {
   animation: fadeIn var(--duration-slow) var(--ease-out);
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* ===== PANEL ENHANCEMENTS ===== */
+
+/* Add hover effect to panels */
+.panel-hover {
+  transition: transform var(--duration-normal) var(--ease-out), 
+              box-shadow var(--duration-normal) var(--ease-out);
+}
+
+.panel-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* Ensure panels use rounded-xl (12px) */
+.panel-rounded {
+  border-radius: 12px;
+  border: 1px solid #E5E7EB;
 }
 
 /* ===== MODAL BACKDROP ===== */
