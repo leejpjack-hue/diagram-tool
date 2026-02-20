@@ -11,6 +11,7 @@ import { StartEndNode } from './StartEndNode';
 import { DecisionNode } from './DecisionNode';
 import { ZoomControls } from './ZoomControls';
 import { useDiagramStore } from '../../store/diagramStore';
+import type { FlowNode } from '../../store/types';
 import { calculateAutoLayout } from '../../utils/autoLayout';
 
 const architectureNodeTypes = {
@@ -27,7 +28,7 @@ const flowNodeTypes = {
 };
 
 function DiagramCanvasInternal() {
-  const { parsedDiagram, diagramMode, setZoomLevel } = useDiagramStore();
+  const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode } = useDiagramStore();
   const { getZoom } = useReactFlow();
 
   const nodeTypes = diagramMode === 'flow' ? flowNodeTypes : architectureNodeTypes;
@@ -49,7 +50,7 @@ function DiagramCanvasInternal() {
       
       return parsedDiagram.nodes.map((node) => {
         let nodeType = 'flow';
-        const flowNode = node as any;
+        const flowNode = node as FlowNode;
         if (flowNode.isStart) nodeType = 'start';
         else if (flowNode.isEnd) nodeType = 'end';
         else if (flowNode.properties?.nodeType === 'decision') nodeType = 'decision';
@@ -161,6 +162,15 @@ function DiagramCanvasInternal() {
     return () => clearTimeout(timer);
   }, [getZoom, setZoomLevel]);
 
+  // Handle node selection for copy/paste
+  const onSelectionChange = useCallback(({ nodes: selectedNodes }: { nodes: Node[] }) => {
+    if (selectedNodes.length === 1) {
+      setSelectedNode(selectedNodes[0].id);
+    } else {
+      setSelectedNode(null);
+    }
+  }, [setSelectedNode]);
+
   if (!parsedDiagram) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-canvas-white">
@@ -180,6 +190,7 @@ function DiagramCanvasInternal() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onMoveEnd={handleMoveEnd}
+        onSelectionChange={onSelectionChange}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}

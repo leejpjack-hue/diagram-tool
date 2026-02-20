@@ -74,3 +74,11 @@ export interface ParsedDiagram {
   startNode?: string;
   endNode?: string;
 }
+
+// Clipboard types for copy/paste
+export interface ClipboardNode {
+  id: string;
+  type: string;
+  name: string;
+  properties: Record<string, unknown>;
+}

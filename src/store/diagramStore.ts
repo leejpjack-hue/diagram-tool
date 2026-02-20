@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { DiagramMode, ParsedDiagram } from './types';
+import type { DiagramMode, ParsedDiagram, ClipboardNode } from './types';
 
 const MAX_HISTORY = 50;
 
@@ -18,6 +18,9 @@ interface DiagramStore {
   error: string | null;
   zoomLevel: number;
   
+  // Clipboard state
+  clipboard: ClipboardNode[];
+  
   // History state
   history: HistoryEntry[];
   historyIndex: number;
@@ -30,6 +33,10 @@ interface DiagramStore {
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
   setZoomLevel: (zoom: number) => void;
+  
+  // Clipboard actions
+  setClipboard: (nodes: ClipboardNode[]) => void;
+  clearClipboard: () => void;
   
   // Undo/Redo actions
   undo: () => void;
@@ -84,6 +91,7 @@ queue EventQueue {
   isLoading: false,
   error: null,
   zoomLevel: 100,
+  clipboard: [],
   history: [],
   historyIndex: -1,
 
@@ -122,6 +130,10 @@ queue EventQueue {
   setError: (error) => set({ error }),
   setLoading: (loading) => set({ isLoading: loading }),
   setZoomLevel: (zoom) => set({ zoomLevel: zoom }),
+  
+  // Clipboard actions
+  setClipboard: (nodes) => set({ clipboard: nodes }),
+  clearClipboard: () => set({ clipboard: [] }),
   
   // Undo/Redo implementation
   undo: () => {

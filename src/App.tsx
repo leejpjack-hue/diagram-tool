@@ -13,6 +13,7 @@ import { useToast } from './utils/useToast';
 import { csvToDSL, csvToDiagram } from './utils/csvToDiagram';
 import { saveManager, type SavedDiagram, type SavedDiagramMode } from './utils/saveManager';
 import type { SimpleCSVRow } from './utils/csvParser';
+import { extractNodeDSL, insertNodeDSL, duplicateNodeDSL } from './utils/clipboardUtils';
 
 const ARCHITECTURE_DSL = `diagram: architecture
 title: Insurance Claims Platform
@@ -92,7 +93,16 @@ node Payment {
 type PanelType = 'none' | 'properties' | 'import' | 'export';
 
 function App() {
-  const { dslText, setDslText, diagramMode, setDiagramMode, setParsedDiagram } = useDiagramStore();
+  const { 
+    dslText, 
+    setDslText, 
+    diagramMode, 
+    setDiagramMode, 
+    setParsedDiagram,
+    selectedNodeId,
+    clipboard,
+    setClipboard 
+  } = useDiagramStore();
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow'>('architecture');
   const [activePanel, setActivePanel] = useState<PanelType>('none');
   const [editorWidth, setEditorWidth] = useState(500);
@@ -171,6 +181,49 @@ function App() {
         handleSave();
       }
       
+      // Ctrl+C for copy node
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        // Only copy if we have a selected node and not in text input
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && selectedNodeId) {
+          const nodeDSL = extractNodeDSL(dslText, selectedNodeId);
+          if (nodeDSL) {
+            setClipboard([{ id: selectedNodeId, type: 'copied', name: selectedNodeId, properties: { dsl: nodeDSL } }]);
+            toast.success(`Copied: ${selectedNodeId}`);
+          }
+        }
+      }
+      
+      // Ctrl+V for paste node
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && clipboard.length > 0) {
+          const copiedNode = clipboard[0];
+          const nodeDSL = copiedNode.properties?.dsl as string;
+          if (nodeDSL) {
+            const newNodeDSL = duplicateNodeDSL(dslText, nodeDSL, copiedNode.name);
+            const updatedDSL = insertNodeDSL(dslText, newNodeDSL);
+            setDslText(updatedDSL);
+            toast.success('Pasted node');
+          }
+        }
+      }
+      
+      // Ctrl+D for duplicate node
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault();
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && selectedNodeId) {
+          const nodeDSL = extractNodeDSL(dslText, selectedNodeId);
+          if (nodeDSL) {
+            const newNodeDSL = duplicateNodeDSL(dslText, nodeDSL, selectedNodeId);
+            const updatedDSL = insertNodeDSL(dslText, newNodeDSL);
+            setDslText(updatedDSL);
+            toast.success(`Duplicated: ${selectedNodeId}`);
+          }
+        }
+      }
+      
       // P for properties toggle
       if (e.key === 'p' || e.key === 'P') {
         if (!e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -185,7 +238,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [dslText, diagramMode]); // Re-bind when these change
+  }, [dslText, diagramMode, selectedNodeId, clipboard, setClipboard, setDslText]);
 
   // Auto-save setup
   useEffect(() => {
