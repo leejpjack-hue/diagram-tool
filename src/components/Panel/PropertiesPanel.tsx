@@ -18,25 +18,25 @@ export function PropertiesPanel() {
           <div>
             {/* Node Name */}
             <div className="mb-6">
-              <label className="block text-xs font-bold text-gray-700 mb-2 uppercase">
+              <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
                 Selected Node
               </label>
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="font-bold text-gray-900">{selectedNode.name}</div>
+              <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 rounded-xl">
+                <div className="font-bold text-gray-900 text-lg">{selectedNode.name}</div>
               </div>
             </div>
 
             {/* Node Type */}
             <div className="mb-6">
-              <label className="block text-xs font-bold text-gray-700 mb-2 uppercase">
+              <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
                 Type
               </label>
-              <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                <span className={`inline-flex items-center gap-2 px-2 py-1 rounded text-sm font-semibold ${
-                  selectedNode.type === 'service' ? 'bg-blue-100 text-blue-900' :
-                  selectedNode.type === 'database' ? 'bg-pink-100 text-pink-900' :
-                  selectedNode.type === 'queue' ? 'bg-green-100 text-green-900' :
-                  'bg-gray-100 text-gray-900'
+              <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-xl">
+                <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold ${
+                  selectedNode.type === 'service' ? 'bg-blue-100 text-blue-900 border border-blue-200' :
+                  selectedNode.type === 'database' ? 'bg-pink-100 text-pink-900 border border-pink-200' :
+                  selectedNode.type === 'queue' ? 'bg-green-100 text-green-900 border border-green-200' :
+                  'bg-gray-100 text-gray-900 border border-gray-200'
                 }`}>
                   {selectedNode.type === 'service' && '🔵'}
                   {selectedNode.type === 'database' && '🩷'}
@@ -49,14 +49,14 @@ export function PropertiesPanel() {
             {/* Properties */}
             {'properties' in selectedNode && Object.entries(selectedNode.properties).length > 0 && (
               <div className="mb-6">
-                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase">
+                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
                   Properties
                 </label>
                 <div className="space-y-2">
                   {Object.entries(selectedNode.properties).map(([key, value]) => (
-                    <div key={key} className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                      <div className="text-xs text-gray-500 capitalize mb-1">{key}</div>
-                      <div className="text-sm font-medium text-gray-900">
+                    <div key={key} className="p-3 bg-gray-50 border-2 border-gray-200 rounded-xl hover:border-gray-300 transition-colors">
+                      <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">{key}</div>
+                      <div className="text-sm font-semibold text-gray-900">
                         {Array.isArray(value) ? value.join(', ') : String(value)}
                       </div>
                     </div>
@@ -68,12 +68,12 @@ export function PropertiesPanel() {
             {/* Connections */}
             {'connections' in selectedNode && selectedNode.connections.length > 0 && (
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase">
+                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
                   Connections
                 </label>
                 <div className="space-y-2">
                   {selectedNode.connections.map((conn, i) => (
-                    <div key={i} className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+                    <div key={i} className="p-3 bg-gradient-to-r from-gray-50 to-blue-50 border-2 border-gray-200 rounded-xl text-sm font-medium hover:border-blue-300 transition-colors">
                       → {conn}
                     </div>
                   ))}

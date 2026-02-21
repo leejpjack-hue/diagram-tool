@@ -128,7 +128,7 @@ export function ImportCSVModal({ isOpen, onClose, onImport }: ImportCSVModalProp
         <div className="p-6 overflow-y-auto flex-1">
           {/* File Upload */}
           {!file ? (
-            <div className="border-2 border-dashed border-border-gray rounded-lg p-12 text-center hover:border-electric-blue hover:bg-blue-50 transition cursor-pointer">
+            <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-blue-500 hover:bg-blue-50 transition cursor-pointer">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -146,11 +146,11 @@ export function ImportCSVModal({ isOpen, onClose, onImport }: ImportCSVModalProp
                     e.stopPropagation();
                     fileInputRef.current?.click();
                   }}
-                  className="px-6 py-2 bg-electric-blue text-white rounded-lg font-semibold hover:bg-blue-600 transition"
+                  className="px-6 py-2 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
                 >
                   Choose CSV File
                 </button>
-                <p className="text-slate-500 text-sm mt-4">
+                <p className="text-gray-500 text-sm mt-4">
                   or drag and drop a CSV file here
                 </p>
               </div>
@@ -158,11 +158,11 @@ export function ImportCSVModal({ isOpen, onClose, onImport }: ImportCSVModalProp
           ) : (
             <>
               {/* File Info */}
-              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="mb-6 p-4 bg-green-50 border-2 border-green-300 rounded-xl">
                 <div className="flex items-center gap-3">
                   <div className="text-3xl">📄</div>
                   <div className="flex-1">
-                    <div className="font-semibold text-deep-navy">{file.name}</div>
+                    <div className="font-semibold text-gray-900">{file.name}</div>
                     <div className="text-sm text-green-700">
                       {stats ? `${stats.uniqueServices} services, ${stats.totalRows} connections` : 'Processing...'}
                     </div>
@@ -173,7 +173,7 @@ export function ImportCSVModal({ isOpen, onClose, onImport }: ImportCSVModalProp
                       setRows([]);
                       setStats(null);
                     }}
-                    className="text-slate-400 hover:text-slate-600 text-xl"
+                    className="text-gray-400 hover:text-gray-600 text-xl"
                   >
                     ×
                   </button>
@@ -182,7 +182,7 @@ export function ImportCSVModal({ isOpen, onClose, onImport }: ImportCSVModalProp
 
               {/* Error */}
               {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-xl">
                   <div className="flex items-center gap-2 text-red-900">
                     <span className="text-xl">⚠️</span>
                     <span className="font-semibold">{error}</span>
@@ -194,20 +194,20 @@ export function ImportCSVModal({ isOpen, onClose, onImport }: ImportCSVModalProp
               {stats && rows.length > 0 && (
                 <>
                   <div className="mb-4">
-                    <div className="text-sm font-semibold text-slate-700 mb-2">
+                    <div className="text-sm font-semibold text-gray-700 mb-2">
                       PREVIEW (FIRST 5 ROWS)
                     </div>
-                    <div className="border border-border-gray rounded-lg overflow-hidden">
+                    <div className="border-2 border-gray-300 rounded-xl overflow-hidden">
                       <table className="w-full">
-                        <thead className="bg-panel-light">
+                        <thead className="bg-gray-50">
                           <tr>
-                            <th className="text-left p-3 text-xs font-semibold text-slate-600 border-b border-border-gray">
+                            <th className="text-left p-3 text-xs font-semibold text-gray-600 border-b-2 border-gray-300">
                               Source → Target
                             </th>
-                            <th className="text-left p-3 text-xs font-semibold text-slate-600 border-b border-border-gray">
+                            <th className="text-left p-3 text-xs font-semibold text-gray-600 border-b-2 border-gray-300">
                               Protocol
                             </th>
-                            <th className="text-left p-3 text-xs font-semibold text-slate-600 border-b border-border-gray">
+                            <th className="text-left p-3 text-xs font-semibold text-gray-600 border-b-2 border-gray-300">
                               Operation
                             </th>
                           </tr>
@@ -215,15 +215,15 @@ export function ImportCSVModal({ isOpen, onClose, onImport }: ImportCSVModalProp
                         <tbody>
                           {rows.slice(0, 5).map((row, i) => (
                             <tr key={i} className="hover:bg-blue-50">
-                              <td className="p-3 text-sm text-deep-navy border-b border-border-gray">
+                              <td className="p-3 text-sm text-gray-900 border-b border-gray-200">
                                 {row.source_service} → {row.target_service}
                               </td>
-                              <td className="p-3 border-b border-border-gray">
+                              <td className="p-3 border-b border-gray-200">
                                 <span className={`px-2 py-1 rounded text-xs font-semibold ${getProtocolColor(row.protocol)}`}>
                                   {row.protocol}
                                 </span>
                               </td>
-                              <td className="p-3 text-sm text-slate-600 border-b border-border-gray">
+                              <td className="p-3 text-sm text-gray-600 border-b border-gray-200">
                                 {row.operation || '-'}
                               </td>
                             </tr>
@@ -234,7 +234,7 @@ export function ImportCSVModal({ isOpen, onClose, onImport }: ImportCSVModalProp
                   </div>
 
                   {/* Stats */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
                     <div className="flex items-center gap-2 text-blue-900 font-semibold mb-2">
                       <span>📊</span>
                       <span>Import Summary</span>
@@ -261,20 +261,20 @@ export function ImportCSVModal({ isOpen, onClose, onImport }: ImportCSVModalProp
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-panel-light border-t border-border-gray flex justify-end gap-3 flex-shrink-0">
+        <div className="px-6 py-4 bg-gray-50 border-t-2 border-gray-200 flex justify-end gap-3 flex-shrink-0">
           <button
             onClick={handleClose}
-            className="px-4 py-2 text-sm font-semibold text-slate-600 border border-border-gray rounded-lg hover:bg-white transition"
+            className="px-4 py-2 text-sm font-semibold text-gray-700 border-2 border-gray-300 rounded-lg hover:bg-white transition"
           >
             Cancel
           </button>
           <button
             onClick={handleImport}
             disabled={rows.length === 0}
-            className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${
+            className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
               rows.length > 0
-                ? 'bg-electric-blue text-white hover:bg-blue-600'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white hover:shadow-lg hover:-translate-y-0.5'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
             🔄 Generate Diagram

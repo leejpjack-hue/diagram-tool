@@ -5,6 +5,15 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
+    screens: {
+      'mobile': { max: '639px' },          // Mobile portrait
+      'sm': '640px',                        // Mobile landscape
+      'tablet': '768px',                    // Tablet portrait
+      'tablet-only': { min: '768px', max: '1023px' },
+      'lg': '1024px',                       // Tablet landscape
+      'desktop': '1280px',                  // Desktop
+      'xl': '1536px',                       // Large desktop
+    },
     extend: {
       colors: {
         // Vibrant Tech Palette (Colorful & Energetic)

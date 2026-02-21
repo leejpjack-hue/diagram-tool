@@ -92,7 +92,7 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
             <select
               value={quality}
               onChange={(e) => setQuality(Number(e.target.value))}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 hover:border-gray-300 transition-colors"
             >
               <option value={1}>1x - Standard</option>
               <option value={2}>2x - High Quality</option>
@@ -105,7 +105,7 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
         {/* Export Button */}
         <button
           onClick={handleExport}
-          className="w-full py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 transition"
+          className="w-full py-3 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-lg font-bold hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
         >
           Download {selectedFormat.toUpperCase()}
         </button>

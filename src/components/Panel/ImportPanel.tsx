@@ -88,14 +88,14 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
           {!file ? (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition text-center"
+              className="w-full p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition text-center"
             >
               <div className="text-3xl mb-2">📄</div>
               <div className="font-semibold text-gray-700">Choose CSV File</div>
               <div className="text-xs text-gray-500 mt-1">Click to browse</div>
             </button>
           ) : (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="p-4 bg-green-50 border-2 border-green-300 rounded-xl">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">✓</span>
                 <div className="flex-1 min-w-0">
@@ -113,25 +113,25 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
 
         {/* Error */}
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          <div className="mb-4 p-3 bg-red-50 border-2 border-red-300 rounded-xl text-red-700 text-sm font-medium">
             ⚠️ {error}
           </div>
         )}
 
         {/* Stats */}
         {stats && rows.length > 0 && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="text-sm font-bold text-blue-900 mb-2">Import Summary</div>
+          <div className="mb-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
+            <div className="text-sm font-bold text-blue-900 mb-3">Import Summary</div>
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="bg-white p-2 rounded">
+              <div className="bg-white p-3 rounded-lg shadow-sm">
                 <div className="text-lg font-bold text-blue-900">{stats.totalRows}</div>
                 <div className="text-xs text-blue-700">Rows</div>
               </div>
-              <div className="bg-white p-2 rounded">
+              <div className="bg-white p-3 rounded-lg shadow-sm">
                 <div className="text-lg font-bold text-blue-900">{stats.uniqueServices}</div>
                 <div className="text-xs text-blue-700">Services</div>
               </div>
-              <div className="bg-white p-2 rounded">
+              <div className="bg-white p-3 rounded-lg shadow-sm">
                 <div className="text-lg font-bold text-blue-900">{stats.uniqueProtocols}</div>
                 <div className="text-xs text-blue-700">Protocols</div>
               </div>
@@ -143,10 +143,10 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
         <button
           onClick={handleImport}
           disabled={rows.length === 0}
-          className={`w-full py-3 rounded-lg font-bold transition ${
+          className={`w-full py-3 rounded-xl font-bold transition-all duration-200 ${
             rows.length > 0
-              ? 'bg-blue-500 text-white hover:bg-blue-600'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white hover:shadow-lg hover:-translate-y-0.5'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
           Generate Diagram

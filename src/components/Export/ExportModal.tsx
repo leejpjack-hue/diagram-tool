@@ -29,12 +29,7 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
       {/* Modal */}
       <div className="relative z-[99999] bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden animate-fade-in">
         {/* Header */}
-        <div className="px-8 py-6 bg-gradient-to-r from-blue-500 to-purple-600">
-          {/* TEST INDICATOR */}
-          <div className="bg-red-500 text-white text-center font-bold py-2 mb-4 rounded">
-            ✅ UPDATE VERIFIED - Version 3.0 with 85% backdrop
-          </div>
-          
+        <div className="px-8 py-6 bg-gradient-to-br from-blue-500 to-purple-600">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
@@ -180,7 +175,7 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
           </button>
           <button
             onClick={handleExport}
-            className="px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl hover:from-blue-600 hover:to-blue-700 transition shadow-lg hover:shadow-xl"
+            className="px-6 py-3 text-sm font-bold text-white bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
           >
             <span className="flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
