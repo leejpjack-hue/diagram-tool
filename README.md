@@ -1,73 +1,164 @@
-# React + TypeScript + Vite
+# DiagramTool
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Transform text into professional diagrams. Write simple DSL code, generate beautiful architecture diagrams instantly.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Simple DSL Syntax** - Write diagrams in plain text, no drag-and-drop required
+- **Architecture Mode** - Visualize microservices, databases, queues, and connections
+- **Flow Mode** - Model business processes, claims workflows, and decision trees
+- **CSV Import** - Import data from APM tools (Datadog, Jaeger, OpenTelemetry)
+- **Multi-Format Export** - Export to PNG, SVG, or JSON
+- **Auto-Save & History** - Automatic saving with access to last 10 diagrams
 
-## React Compiler
+## Quick Start
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+# Install dependencies
+npm install
 
-## Expanding the ESLint configuration
+# Start development server
+npm run dev
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+# Run tests
+npm test
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Build for production
+npm run build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## DSL Examples
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Architecture Mode
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+diagram: architecture
+title: Claims Platform
+
+service ClaimsAPI {
+  type: api
+  connects: ClaimsService
+}
+
+service ClaimsService {
+  type: microservice
+  connects: ClaimsDB, EventQueue
+}
+
+database ClaimsDB {
+  type: postgresql
+}
+
+queue EventQueue {
+  type: kafka
+}
+```
+
+### Flow Mode
+
+```
+diagram: flow
+title: Claims Processing Flow
+
+start FNOL
+
+FNOL -> Intake
+Intake -> Assignment
+Assignment -> Investigation
+
+Investigation ->|Fraud Detected| SpecialInvestigation
+Investigation ->|No Fraud| Evaluation
+
+Evaluation -> Settlement
+Settlement -> Payment -> Closure
+
+end Closure
+
+node FNOL {
+  label: First Notice of Loss
+  system: ClaimsAPI
+  duration: 1d
+}
+```
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+S` | Save diagram |
+| `Ctrl+Z` | Undo |
+| `Ctrl+Shift+Z` | Redo |
+| `Ctrl+C` | Copy selected node |
+| `Ctrl+V` | Paste node |
+| `Ctrl+D` | Duplicate selected node |
+| `Delete` | Delete selected node |
+| `Escape` | Deselect |
+
+## Testing
+
+```bash
+# Run unit tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run E2E tests (requires Playwright browsers)
+npm run test:e2e
+
+# Run E2E tests with UI
+npm run test:e2e:ui
+```
+
+## Build Status
+
+| Metric | Status |
+|--------|--------|
+| Build | ✅ Passing |
+| Unit Tests | ✅ 32/32 (100%) |
+| Bundle Size | 456.79 kB JS, 29.72 kB CSS |
+| TypeScript | ✅ No errors |
+| Lint | ⚠️ 6 errors, 3 warnings |
+
+## Project Structure
+
+```
+diagram-tool/
+├── src/
+│   ├── components/      # React components
+│   ├── parser/          # DSL parser
+│   ├── utils/           # Utilities (save, CSV, etc.)
+│   └── types/           # TypeScript types
+├── e2e/                 # Playwright E2E tests
+├── landing/             # Marketing landing page
+├── samples/             # Sample diagrams
+└── public/              # Static assets
+```
+
+## Sprint Progress
+
+**Current Sprint:** Sprint 6 (Save/Load + Flow Mode + E2E Testing)
+**Progress:** 92% complete
+**Status:** Feature-complete, minor lint cleanup needed
+
+### Completed Features
+- ✅ Save/Load with auto-save (30s)
+- ✅ File export/import (.diagram format)
+- ✅ Recent diagrams history
+- ✅ Decision node diamond visuals
+- ✅ Toast notification system
+- ✅ Copy/paste/duplicate nodes
+- ✅ Marketing landing page
+
+### Pending
+- ⏸️ E2E test execution (requires browser dependencies)
+- 📝 Lint error cleanup (6 errors)
+
+## Documentation
+
+- [Sprint 6 Requirements](../memory/sprint-06-requirements.md)
+- [Productivity Tracking](../memory/productivity-tracking.md)
+
+## License
+
+MIT
