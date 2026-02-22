@@ -38,12 +38,12 @@ export function DSLEditor() {
   }, []); // Mount-only initial parse
 
   return (
-    <div className="h-full flex flex-col bg-panel-light border-r border-border-gray">
-      <div className="px-4 py-3 bg-white border-b border-border-gray">
-        <h2 className="text-sm font-semibold text-deep-navy font-mono">DSL EDITOR</h2>
+    <div className="h-full flex flex-col bg-panel-light border-r border-border-gray mobile:border-r-0">
+      <div className="px-3 mobile:px-4 py-2 mobile:py-3 bg-white border-b border-border-gray flex items-center justify-between">
+        <h2 className="text-xs mobile:text-sm font-semibold text-deep-navy font-mono">DSL EDITOR</h2>
       </div>
       
-      <div className="flex-1">
+      <div className="flex-1 min-h-0">
         <Editor
           height="100%"
           defaultLanguage="plaintext"
@@ -52,14 +52,15 @@ export function DSLEditor() {
           theme="vs-light"
           options={{
             minimap: { enabled: false },
-            fontSize: 13,
+            fontSize: window.innerWidth < 640 ? 12 : 13,
             fontFamily: 'JetBrains Mono, Consolas, monospace',
-            lineNumbers: 'on',
+            lineNumbers: window.innerWidth < 640 ? 'off' : 'on',
             scrollBeyondLastLine: false,
             wordWrap: 'on',
             automaticLayout: true,
             tabSize: 2,
-            padding: { top: 16 },
+            padding: { top: window.innerWidth < 640 ? 8 : 16 },
+            lineHeight: window.innerWidth < 640 ? 20 : 22,
           }}
         />
       </div>
