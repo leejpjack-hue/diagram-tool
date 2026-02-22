@@ -40,18 +40,15 @@ export function csvToDiagram(rows: SimpleCSVRow[], title: string = 'APM Service 
 
     // Add target node if not exists
     if (!nodesMap.has(targetId)) {
-      const node: any = {
+      const node: DiagramNode = {
         id: targetId,
         name: targetId,
-        type: targetType,
+        type: targetType as 'service' | 'database' | 'queue',
         properties: {},
-      };
+        ...(targetType === 'service' ? { connections: [] } : {}),
+      } as DiagramNode;
 
-      if (targetType === 'service') {
-        node.connections = [];
-      }
-
-      nodesMap.set(targetId, node as DiagramNode);
+      nodesMap.set(targetId, node);
     }
 
     // Create edge ID (allow multiple edges between same nodes with different protocols)

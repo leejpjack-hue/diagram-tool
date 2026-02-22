@@ -116,8 +116,8 @@ describe('SaveManager', () => {
         download: '',
         href: '',
         click: vi.fn(),
-      };
-      vi.spyOn(document, 'createElement').mockReturnValue(mockLink as any);
+      } as Partial<HTMLAnchorElement>;
+      vi.spyOn(document, 'createElement').mockReturnValue(mockLink as HTMLAnchorElement);
 
       saveManager.exportToFile(diagram);
 

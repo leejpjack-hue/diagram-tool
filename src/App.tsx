@@ -110,8 +110,21 @@ function App() {
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isTablet, setIsTablet] = useState(false);
+  const [editorVisible, setEditorVisible] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+      setIsTablet(window.innerWidth >= 768 && window.innerWidth < 1024);
+    };
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
   
   const { exportPNG, exportSVG, exportJSON } = useExport();
   const toast = useToast();
@@ -471,52 +484,117 @@ function App() {
       </header>
       
       {/* Main Content */}
-      <div ref={containerRef} className="flex-1 flex overflow-hidden">
-        {/* Editor Panel - Resizable */}
-        <div style={{ width: editorWidth, minWidth: 300, maxWidth: 800 }} className="flex-shrink-0">
-          <DSLEditor />
-        </div>
+      <div ref={containerRef} className="flex-1 flex overflow-hidden relative">
+        {/* Editor Panel - Resizable on desktop, toggleable on mobile */}
+        {(!isMobile || editorVisible) && (
+          <div 
+            style={{ 
+              width: isMobile ? '100%' : editorWidth, 
+              minWidth: isTablet ? 250 : 300, 
+              maxWidth: isTablet ? 600 : 800 
+            }} 
+            className={`flex-shrink-0 ${isMobile ? 'absolute inset-0 z-10 bg-gray-50' : ''}`}
+          >
+            <DSLEditor />
+          </div>
+        )}
         
-        {/* Resize Handle */}
-        <div
-          onMouseDown={handleMouseDown}
-          className={`w-1.5 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex items-center justify-center transition-colors group ${
-            isResizing ? 'bg-blue-500' : ''
-          }`}
-          style={{ userSelect: 'none' }}
-        >
-          <div className="w-0.5 h-12 bg-gray-300 group-hover:bg-blue-400 rounded transition-colors" />
-        </div>
+        {/* Mobile Editor Toggle */}
+        {isMobile && (
+          <button
+            onClick={() => setEditorVisible(!editorVisible)}
+            className="fixed bottom-20 right-4 z-20 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors"
+            aria-label={editorVisible ? 'Hide Editor' : 'Show Editor'}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {editorVisible ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              )}
+            </svg>
+          </button>
+        )}
+        
+        {/* Resize Handle - Hidden on mobile */}
+        {!isMobile && (
+          <div
+            onMouseDown={handleMouseDown}
+            className={`w-1.5 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex items-center justify-center transition-colors group ${
+              isResizing ? 'bg-blue-500' : ''
+            }`}
+            style={{ userSelect: 'none' }}
+          >
+            <div className="w-0.5 h-12 bg-gray-300 group-hover:bg-blue-400 rounded transition-colors" />
+          </div>
+        )}
         
         {/* Canvas */}
         <div className="flex-1 overflow-hidden bg-white">
           <DiagramCanvas />
         </div>
         
-        {/* Side Panel - No Overlap! */}
+        {/* Side Panel - Overlay on mobile, narrower on tablet */}
         {activePanel !== 'none' && (
-          <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white">
-            {activePanel === 'properties' && <PropertiesPanel />}
-            {activePanel === 'import' && <ImportPanel onImport={handleCSVImport} />}
-            {activePanel === 'export' && <ExportPanel onExport={handleExport} />}
-          </div>
+          <>
+            {/* Mobile/Tablet Overlay Backdrop */}
+            {(isMobile || isTablet) && (
+              <div 
+                className="fixed inset-0 bg-black/50 z-20"
+                onClick={() => setActivePanel('none')}
+              />
+            )}
+            <div className={`
+              ${isMobile ? 'fixed inset-y-0 right-0 z-30 w-full max-w-sm' : ''}
+              ${isTablet ? 'fixed inset-y-0 right-0 z-30 w-64' : ''}
+              ${!isMobile && !isTablet ? 'w-80' : ''}
+              flex-shrink-0 border-l border-gray-200 bg-white
+            `}>
+              {isMobile && (
+                <div className="flex items-center justify-between p-3 border-b border-gray-200">
+                  <span className="font-semibold text-gray-900">
+                    {activePanel === 'properties' && 'Properties'}
+                    {activePanel === 'import' && 'Import CSV'}
+                    {activePanel === 'export' && 'Export'}
+                  </span>
+                  <button
+                    onClick={() => setActivePanel('none')}
+                    className="p-1 text-gray-500 hover:text-gray-700"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {activePanel === 'properties' && <PropertiesPanel />}
+              {activePanel === 'import' && <ImportPanel onImport={handleCSVImport} />}
+              {activePanel === 'export' && <ExportPanel onExport={handleExport} />}
+            </div>
+          </>
         )}
       </div>
       
-      {/* Footer */}
-      <footer className="app-footer">
-        <span className="font-semibold text-gray-900">{diagramMode.charAt(0).toUpperCase() + diagramMode.slice(1)} Mode</span>
-        <span className="mx-2 text-gray-400">•</span>
-        <span>Editor: {editorWidth}px</span>
-        <span className="mx-2 text-gray-400">•</span>
-        <span className="flex items-center gap-1">
-          Press <kbd className="kbd">P</kbd> for Properties
-        </span>
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-gray-500">Zoom:</span>
-          <span className="font-semibold text-gray-900">100%</span>
-        </div>
-      </footer>
+      {/* Footer - Hidden on mobile, simplified on tablet */}
+      {!isMobile && (
+        <footer className={`app-footer ${isTablet ? 'text-xs' : ''}`}>
+          <span className="font-semibold text-gray-900">{diagramMode.charAt(0).toUpperCase() + diagramMode.slice(1)} Mode</span>
+          {!isTablet && (
+            <>
+              <span className="mx-2 text-gray-400">•</span>
+              <span>Editor: {editorWidth}px</span>
+              <span className="mx-2 text-gray-400">•</span>
+              <span className="flex items-center gap-1">
+                Press <kbd className="kbd">P</kbd> for Properties
+              </span>
+            </>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-gray-500">Zoom:</span>
+            <span className="font-semibold text-gray-900">100%</span>
+          </div>
+        </footer>
+      )}
       
       {/* Toast Notifications */}
       <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />

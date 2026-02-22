@@ -34,7 +34,8 @@ export function DSLEditor() {
     } catch (error) {
       console.error('Initial parse error:', error);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Mount-only initial parse
 
   return (
     <div className="h-full flex flex-col bg-panel-light border-r border-border-gray">
