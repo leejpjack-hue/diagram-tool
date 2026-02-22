@@ -22,13 +22,13 @@ export function MobileBottomNav({
   return (
     <>
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 lg:hidden shadow-lg">
-        <div className="flex items-center justify-around h-16 px-2">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 lg:hidden shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] safe-area-bottom">
+        <div className="flex items-center h-14 sm:h-16 px-1 sm:px-2 max-w-lg mx-auto">
           {/* Editor Toggle */}
           <button
             onClick={onEditorToggle}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              editorVisible ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+            className={`flex flex-col items-center justify-center flex-1 h-full min-h-[56px] transition-colors touch-manipulation ${
+              editorVisible ? 'text-blue-600 bg-blue-50' : 'text-gray-600 active:bg-gray-100'
             }`}
             aria-label={editorVisible ? 'Hide Editor' : 'Show Editor'}
           >
@@ -40,13 +40,15 @@ export function MobileBottomNav({
                 d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
               />
             </svg>
-            <span className="text-xs mt-1 font-medium">Editor</span>
+            <span className="text-[10px] sm:text-xs mt-0.5 font-medium">Editor</span>
           </button>
 
-          {/* Mode Tab - Shows current mode, tapping opens selector */}
+          {/* Mode Tab - Shows current mode */}
           <button
             onClick={() => setShowTabMenu(!showTabMenu)}
-            className="flex flex-col items-center justify-center flex-1 h-full text-gray-500 hover:text-gray-700 transition-colors"
+            className={`flex flex-col items-center justify-center flex-1 h-full min-h-[56px] transition-colors touch-manipulation ${
+              showTabMenu ? 'text-blue-600 bg-blue-50' : 'text-gray-600 active:bg-gray-100'
+            }`}
             aria-label="Change Mode"
           >
             {activeTab === 'architecture' ? (
@@ -68,16 +70,16 @@ export function MobileBottomNav({
                 />
               </svg>
             )}
-            <span className="text-xs mt-1 font-medium capitalize">{activeTab}</span>
+            <span className="text-[10px] sm:text-xs mt-0.5 font-medium capitalize">{activeTab}</span>
           </button>
 
           {/* Import */}
           <button
             onClick={() => onPanelChange(activePanel === 'import' ? 'none' : 'import')}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activePanel === 'import' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+            className={`flex flex-col items-center justify-center flex-1 h-full min-h-[56px] transition-colors touch-manipulation ${
+              activePanel === 'import' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 active:bg-gray-100'
             }`}
-            aria-label="Import CSV"
+            aria-label="Import"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -87,14 +89,14 @@ export function MobileBottomNav({
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
               />
             </svg>
-            <span className="text-xs mt-1 font-medium">Import</span>
+            <span className="text-[10px] sm:text-xs mt-0.5 font-medium">Import</span>
           </button>
 
           {/* Export */}
           <button
             onClick={() => onPanelChange(activePanel === 'export' ? 'none' : 'export')}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activePanel === 'export' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+            className={`flex flex-col items-center justify-center flex-1 h-full min-h-[56px] transition-colors touch-manipulation ${
+              activePanel === 'export' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 active:bg-gray-100'
             }`}
             aria-label="Export"
           >
@@ -106,14 +108,14 @@ export function MobileBottomNav({
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
               />
             </svg>
-            <span className="text-xs mt-1 font-medium">Export</span>
+            <span className="text-[10px] sm:text-xs mt-0.5 font-medium">Export</span>
           </button>
 
           {/* Properties */}
           <button
             onClick={() => onPanelChange(activePanel === 'properties' ? 'none' : 'properties')}
-            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activePanel === 'properties' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+            className={`flex flex-col items-center justify-center flex-1 h-full min-h-[56px] transition-colors touch-manipulation ${
+              activePanel === 'properties' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 active:bg-gray-100'
             }`}
             aria-label="Properties"
           >
@@ -131,7 +133,7 @@ export function MobileBottomNav({
                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
               />
             </svg>
-            <span className="text-xs mt-1 font-medium">Props</span>
+            <span className="text-[10px] sm:text-xs mt-0.5 font-medium">Props</span>
           </button>
         </div>
       </nav>
@@ -140,19 +142,19 @@ export function MobileBottomNav({
       {showTabMenu && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-black/30"
+            className="fixed inset-0 z-[45] bg-black/30"
             onClick={() => setShowTabMenu(false)}
           />
-          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-xl border border-gray-200 p-2 min-w-[200px] animate-fade-in">
+          <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-xl border border-gray-200 p-2 min-w-[180px] animate-fade-in">
             <button
               onClick={() => {
                 onTabChange('architecture');
                 setShowTabMenu(false);
               }}
-              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors ${
+              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors touch-manipulation ${
                 activeTab === 'architecture'
                   ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  : 'text-gray-700 active:bg-gray-100'
               }`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,16 +166,17 @@ export function MobileBottomNav({
                 />
               </svg>
               <span className="font-medium">Architecture</span>
+              {activeTab === 'architecture' && <span className="ml-auto text-blue-600">✓</span>}
             </button>
             <button
               onClick={() => {
                 onTabChange('flow');
                 setShowTabMenu(false);
               }}
-              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors ${
+              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors touch-manipulation ${
                 activeTab === 'flow'
                   ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  : 'text-gray-700 active:bg-gray-100'
               }`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -185,6 +188,7 @@ export function MobileBottomNav({
                 />
               </svg>
               <span className="font-medium">Flow</span>
+              {activeTab === 'flow' && <span className="ml-auto text-blue-600">✓</span>}
             </button>
           </div>
         </>

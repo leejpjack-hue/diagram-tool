@@ -523,3 +523,50 @@ button, a, input, select {
     padding: var(--space-6);
   }
 }
+
+/* ===== MOBILE SAFE AREA ===== */
+
+/* Safe area padding for devices with notches/home indicators */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Touch-friendly button sizing */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mobile bottom nav spacing */
+@media (max-width: 1023px) {
+  /* Add bottom padding to main content to account for fixed bottom nav */
+  .main-content-mobile {
+    padding-bottom: 56px;
+  }
+}
+
+/* Improve touch targets on mobile */
+@media (max-width: 639px) {
+  .btn-tab {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  /* Larger touch targets */
+  button, 
+  [role="button"],
+  a {
+    min-height: 44px;
+  }
+  
+  /* Prevent text selection on buttons */
+  button {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* Smaller header on mobile */
+  .app-header {
+    height: 56px;
+  }
+}
