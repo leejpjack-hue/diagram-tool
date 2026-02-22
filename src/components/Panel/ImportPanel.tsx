@@ -69,14 +69,14 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
   return (
     <div className="h-full flex flex-col bg-white">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-lg font-bold text-gray-900">📥 Import APM Data</h2>
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 shrink-0">
+        <h2 className="text-base sm:text-lg font-bold text-gray-900">📥 Import APM Data</h2>
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 overscroll-contain">
         {/* File Upload */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <input
             ref={fileInputRef}
             type="file"
@@ -88,18 +88,18 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
           {!file ? (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition text-center"
+              className="w-full p-4 sm:p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition text-center min-h-[44px] flex flex-col items-center justify-center"
             >
-              <div className="text-3xl mb-2">📄</div>
+              <div className="text-2xl sm:text-3xl mb-2">📄</div>
               <div className="font-semibold text-gray-700">Choose CSV File</div>
-              <div className="text-xs text-gray-500 mt-1">Click to browse</div>
+              <div className="text-xs text-gray-500 mt-1">Tap to browse</div>
             </button>
           ) : (
-            <div className="p-4 bg-green-50 border-2 border-green-300 rounded-xl">
+            <div className="p-3 sm:p-4 bg-green-50 border-2 border-green-300 rounded-xl min-h-[44px]">
               <div className="flex items-center gap-2">
-                <span className="text-2xl">✓</span>
+                <span className="text-xl sm:text-2xl">✓</span>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-gray-900 truncate">{file.name}</div>
+                  <div className="font-semibold text-gray-900 truncate text-sm sm:text-base">{file.name}</div>
                   {stats && (
                     <div className="text-xs text-green-700">
                       {stats.uniqueServices} services, {stats.totalRows} connections
@@ -113,26 +113,26 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
 
         {/* Error */}
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border-2 border-red-300 rounded-xl text-red-700 text-sm font-medium">
+          <div className="mb-4 p-3 bg-red-50 border-2 border-red-300 rounded-xl text-red-700 text-sm font-medium min-h-[44px] flex items-center">
             ⚠️ {error}
           </div>
         )}
 
         {/* Stats */}
         {stats && rows.length > 0 && (
-          <div className="mb-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
-            <div className="text-sm font-bold text-blue-900 mb-3">Import Summary</div>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="bg-white p-3 rounded-lg shadow-sm">
-                <div className="text-lg font-bold text-blue-900">{stats.totalRows}</div>
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
+            <div className="text-sm font-bold text-blue-900 mb-2 sm:mb-3">Import Summary</div>
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
+              <div className="bg-white p-2 sm:p-3 rounded-lg shadow-sm min-h-[56px] sm:min-h-[60px] flex flex-col justify-center">
+                <div className="text-base sm:text-lg font-bold text-blue-900">{stats.totalRows}</div>
                 <div className="text-xs text-blue-700">Rows</div>
               </div>
-              <div className="bg-white p-3 rounded-lg shadow-sm">
-                <div className="text-lg font-bold text-blue-900">{stats.uniqueServices}</div>
+              <div className="bg-white p-2 sm:p-3 rounded-lg shadow-sm min-h-[56px] sm:min-h-[60px] flex flex-col justify-center">
+                <div className="text-base sm:text-lg font-bold text-blue-900">{stats.uniqueServices}</div>
                 <div className="text-xs text-blue-700">Services</div>
               </div>
-              <div className="bg-white p-3 rounded-lg shadow-sm">
-                <div className="text-lg font-bold text-blue-900">{stats.uniqueProtocols}</div>
+              <div className="bg-white p-2 sm:p-3 rounded-lg shadow-sm min-h-[56px] sm:min-h-[60px] flex flex-col justify-center">
+                <div className="text-base sm:text-lg font-bold text-blue-900">{stats.uniqueProtocols}</div>
                 <div className="text-xs text-blue-700">Protocols</div>
               </div>
             </div>
@@ -143,9 +143,9 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
         <button
           onClick={handleImport}
           disabled={rows.length === 0}
-          className={`w-full py-3 rounded-xl font-bold transition-all duration-200 ${
+          className={`w-full py-3 sm:py-4 rounded-xl font-bold transition-all duration-200 min-h-[44px] ${
             rows.length > 0
-              ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white hover:shadow-lg hover:-translate-y-0.5'
+              ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
