@@ -109,7 +109,9 @@ function App() {
   const [isResizing, setIsResizing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
   
   const { exportPNG, exportSVG, exportJSON } = useExport();
   const toast = useToast();
@@ -238,7 +240,8 @@ function App() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [dslText, diagramMode, selectedNodeId, clipboard, setClipboard, setDslText]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dslText, diagramMode, selectedNodeId, clipboard, setClipboard, setDslText]); // handleSave and toast are stable or intentionally excluded
 
   // Auto-save setup
   useEffect(() => {
@@ -264,7 +267,8 @@ function App() {
       setActiveTab(saved.mode);
       setLastSaved(new Date(saved.updatedAt));
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Mount-only effect - setState functions are stable
 
   const handleLoadDiagram = (diagram: SavedDiagram) => {
     setDslText(diagram.dslText);
@@ -301,20 +305,31 @@ function App() {
 
   const togglePanel = (panel: PanelType) => {
     setActivePanel(prev => prev === panel ? 'none' : panel);
+    setMobileMenuOpen(false);
   };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-6">
+      <header className="h-16 bg-white border-b border-gray-200 flex items-center px-2 sm:px-4 tablet:px-6 gap-2 sm:gap-4 tablet:gap-6">
         {/* Logo & Title */}
-        <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
           <div className="app-logo">
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
             </svg>
           </div>
-          <h1 className="app-title">DiagramTool</h1>
+          <h1 className="app-title hidden sm:block">DiagramTool</h1>
         </div>
         
         {/* Mode Tabs */}
@@ -326,7 +341,7 @@ function App() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            Architecture
+            <span className="hidden tablet:inline">Architecture</span>
           </button>
           <button
             onClick={() => handleTabChange('flow')}
@@ -335,24 +350,24 @@ function App() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            Flow
+            <span className="hidden tablet:inline">Flow</span>
           </button>
         </div>
         
         {/* Status */}
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 hidden sm:block">
           <span className="status-badge bg-blue-100 text-blue-800">
             <span className="capitalize">{diagramMode} Mode</span>
           </span>
         </div>
         
         {/* Actions */}
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2 tablet:gap-3">
           {/* Undo/Redo Controls */}
           <UndoRedoControls />
           
-          {/* Divider */}
-          <div className="w-px h-6 bg-gray-300" />
+          {/* Divider - hidden on mobile */}
+          <div className="hidden tablet:block w-px h-6 bg-gray-300" />
           
           {/* File Menu */}
           <FileMenu
@@ -362,35 +377,96 @@ function App() {
             onNew={handleNewDiagram}
           />
           
-          {/* Save Status */}
+          {/* Save Status - hidden on mobile */}
           {lastSaved && (
-            <span className="text-xs text-gray-500">
+            <span className="hidden tablet:block text-xs text-gray-500">
               {saveStatus === 'saving' ? 'Saving...' : 
                saveStatus === 'saved' ? `Saved ${formatTimeAgo(lastSaved)}` : 
                'Unsaved'}
             </span>
           )}
           
+          {/* Desktop buttons - hidden on mobile */}
           <button
             onClick={() => togglePanel('import')}
-            className={`btn ${activePanel === 'import' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn hidden lg:flex ${activePanel === 'import' ? 'btn-primary' : 'btn-secondary'}`}
           >
             Import CSV
           </button>
           
           <button
             onClick={() => togglePanel('export')}
-            className={`btn ${activePanel === 'export' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn hidden lg:flex ${activePanel === 'export' ? 'btn-primary' : 'btn-secondary'}`}
           >
             Export
           </button>
           
           <button
             onClick={() => togglePanel('properties')}
-            className={`btn ${activePanel === 'properties' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn hidden lg:flex ${activePanel === 'properties' ? 'btn-primary' : 'btn-secondary'}`}
           >
             Properties
           </button>
+          
+          {/* Mobile/Tablet hamburger menu */}
+          <div className="lg:hidden relative" ref={mobileMenuRef}>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="btn btn-secondary p-2"
+              aria-label="Menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {mobileMenuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
+            
+            {mobileMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                <button
+                  onClick={() => togglePanel('import')}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 ${activePanel === 'import' ? 'text-blue-600 bg-blue-50' : 'text-gray-700'}`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Import CSV
+                </button>
+                <button
+                  onClick={() => togglePanel('export')}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 ${activePanel === 'export' ? 'text-blue-600 bg-blue-50' : 'text-gray-700'}`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export
+                </button>
+                <button
+                  onClick={() => togglePanel('properties')}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 ${activePanel === 'properties' ? 'text-blue-600 bg-blue-50' : 'text-gray-700'}`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Properties
+                </button>
+                <div className="border-t border-gray-200 my-1" />
+                <div className="px-4 py-2 text-xs text-gray-500">
+                  {lastSaved && (
+                    <span>
+                      {saveStatus === 'saving' ? 'Saving...' : 
+                       saveStatus === 'saved' ? `Saved ${formatTimeAgo(lastSaved)}` : 
+                       'Unsaved'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
       
