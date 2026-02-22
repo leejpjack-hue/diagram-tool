@@ -7,6 +7,7 @@ import { ExportPanel } from './components/Panel/ExportPanel';
 import { ImportPanel } from './components/Panel/ImportPanel';
 import { FileMenu } from './components/Panel/FileMenu';
 import { ToastContainer } from './components/Toast/ToastContainer';
+import { MobileBottomNav } from './components/Toolbar/MobileBottomNav';
 import { useDiagramStore } from './store/diagramStore';
 import { useExport } from './utils/useExport';
 import { useToast } from './utils/useToast';
@@ -595,6 +596,16 @@ function App() {
           </div>
         </footer>
       )}
+      
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        activePanel={activePanel}
+        onPanelChange={setActivePanel}
+        editorVisible={editorVisible}
+        onEditorToggle={() => setEditorVisible(!editorVisible)}
+      />
       
       {/* Toast Notifications */}
       <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
