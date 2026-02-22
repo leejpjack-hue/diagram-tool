@@ -9,9 +9,9 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
   return (
     <div
       className={`
-        px-4 py-3 rounded-lg border-2 shadow-md transition-all duration-200
-        ${selected ? 'scale-105 shadow-xl' : 'hover:shadow-lg hover:scale-102'}
-        min-w-[160px]
+        px-3 py-2 sm:px-4 sm:py-3 rounded-lg border-2 shadow-md transition-all duration-200
+        ${selected ? 'scale-105 shadow-xl' : 'hover:shadow-lg active:scale-95'}
+        min-w-[140px] sm:min-w-[160px] min-h-[44px] sm:min-h-0
       `}
       style={{
         background: '#FCE7F3',
@@ -21,17 +21,22 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
           : '0 2px 8px rgba(0,0,0,0.1)'
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: '#EC4899' }} />
+      <Handle 
+        type="target" 
+        position={Position.Top} 
+        className="!w-3 !h-3 sm:!w-2.5 sm:!h-2.5"
+        style={{ background: '#EC4899' }} 
+      />
       
       <div className="flex items-center gap-2 mb-1">
         <div 
-          className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold"
+          className="w-7 h-7 sm:w-6 sm:h-6 rounded flex items-center justify-center text-white text-sm sm:text-xs font-bold"
           style={{ background: '#EC4899' }}
         >
           🗄️
         </div>
         <div 
-          className="font-semibold text-sm"
+          className="font-semibold text-base sm:text-sm"
           style={{ color: '#9D174D' }}
         >
           {nodeData.label}
@@ -54,7 +59,12 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
         </div>
       )}
       
-      <Handle type="source" position={Position.Bottom} style={{ background: '#EC4899' }} />
+      <Handle 
+        type="source" 
+        position={Position.Bottom} 
+        className="!w-3 !h-3 sm:!w-2.5 sm:!h-2.5"
+        style={{ background: '#EC4899' }} 
+      />
     </div>
   );
 });

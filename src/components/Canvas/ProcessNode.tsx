@@ -9,9 +9,9 @@ export const ProcessNode = memo(({ data, selected }: NodeProps) => {
   return (
     <div
       className={`
-        px-4 py-3 rounded-lg border-2 shadow-md transition-all duration-200
-        ${selected ? 'scale-105 shadow-xl' : 'hover:shadow-lg hover:scale-102'}
-        min-w-[140px]
+        px-3 py-2 sm:px-4 sm:py-3 rounded-lg border-2 shadow-md transition-all duration-200
+        ${selected ? 'scale-105 shadow-xl' : 'hover:shadow-lg active:scale-95'}
+        min-w-[120px] sm:min-w-[140px] min-h-[44px] sm:min-h-0
       `}
       style={{
         background: '#DBEAFE',
@@ -21,10 +21,15 @@ export const ProcessNode = memo(({ data, selected }: NodeProps) => {
           : '0 2px 8px rgba(0,0,0,0.1)'
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: '#3B82F6' }} />
+      <Handle 
+        type="target" 
+        position={Position.Top} 
+        className="!w-3 !h-3 sm:!w-2.5 sm:!h-2.5"
+        style={{ background: '#3B82F6' }} 
+      />
       
       <div 
-        className="font-semibold text-sm text-center"
+        className="font-semibold text-base sm:text-sm text-center"
         style={{ color: '#1E40AF' }}
       >
         {nodeData.label}
@@ -45,7 +50,12 @@ export const ProcessNode = memo(({ data, selected }: NodeProps) => {
         </div>
       )}
       
-      <Handle type="source" position={Position.Bottom} style={{ background: '#3B82F6' }} />
+      <Handle 
+        type="source" 
+        position={Position.Bottom} 
+        className="!w-3 !h-3 sm:!w-2.5 sm:!h-2.5"
+        style={{ background: '#3B82F6' }} 
+      />
     </div>
   );
 });

@@ -14,8 +14,9 @@ export const StartEndNode = memo(({ data, selected }: NodeProps) => {
   return (
     <div
       className={`
-        px-5 py-2 rounded-full border-2 shadow-md transition-all duration-200
-        ${selected ? 'scale-110 shadow-xl' : 'hover:shadow-lg hover:scale-105'}
+        px-4 py-2.5 sm:px-5 sm:py-2 rounded-full border-2 shadow-md transition-all duration-200
+        min-h-[44px] sm:min-h-0
+        ${selected ? 'scale-110 shadow-xl' : 'hover:shadow-lg active:scale-100'}
       `}
       style={{
         background: bgColor,
@@ -25,17 +26,41 @@ export const StartEndNode = memo(({ data, selected }: NodeProps) => {
           : '0 2px 8px rgba(0,0,0,0.2)'
       }}
     >
-      {isStart && <Handle type="source" position={Position.Bottom} style={{ background: 'white' }} />}
-      {isEnd && <Handle type="target" position={Position.Top} style={{ background: 'white' }} />}
+      {isStart && (
+        <Handle 
+          type="source" 
+          position={Position.Bottom} 
+          className="!w-3 !h-3 sm:!w-2.5 sm:!h-2.5"
+          style={{ background: 'white' }} 
+        />
+      )}
+      {isEnd && (
+        <Handle 
+          type="target" 
+          position={Position.Top} 
+          className="!w-3 !h-3 sm:!w-2.5 sm:!h-2.5"
+          style={{ background: 'white' }} 
+        />
+      )}
       
-      <div className="font-semibold text-sm text-white">
+      <div className="font-semibold text-base sm:text-sm text-white">
         {nodeData.label}
       </div>
       
       {!isStart && !isEnd && (
         <>
-          <Handle type="target" position={Position.Top} style={{ background: bgColor }} />
-          <Handle type="source" position={Position.Bottom} style={{ background: bgColor }} />
+          <Handle 
+            type="target" 
+            position={Position.Top} 
+            className="!w-3 !h-3 sm:!w-2.5 sm:!h-2.5"
+            style={{ background: bgColor }} 
+          />
+          <Handle 
+            type="source" 
+            position={Position.Bottom} 
+            className="!w-3 !h-3 sm:!w-2.5 sm:!h-2.5"
+            style={{ background: bgColor }} 
+          />
         </>
       )}
     </div>
