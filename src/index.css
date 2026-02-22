@@ -570,3 +570,19 @@ button, a, input, select {
     height: 56px;
   }
 }
+
+/* Slide up animation for mobile panels */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 250ms ease-out;
+}

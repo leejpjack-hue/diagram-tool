@@ -334,57 +334,53 @@ function App() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header - Simplified on mobile */}
-      <header className="h-14 sm:h-16 bg-white border-b border-gray-200 flex items-center px-2 sm:px-4 lg:px-6 gap-1 sm:gap-3 lg:gap-6">
-        {/* Logo only on mobile */}
+      {/* Header - HIDDEN on mobile (< 640px), only show on tablet+ */}
+      <header className="hidden sm:flex h-14 lg:h-16 bg-white border-b border-gray-200 items-center px-3 lg:px-6 gap-2 lg:gap-6 flex-shrink-0">
+        {/* Logo */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="app-logo w-8 h-8 sm:w-auto sm:h-auto">
-            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="app-logo">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
             </svg>
           </div>
-          <h1 className="app-title hidden sm:block">DiagramTool</h1>
+          <h1 className="app-title">DiagramTool</h1>
         </div>
         
-        {/* Mode Tabs - Only icons on mobile */}
-        <div className="mode-tabs flex-shrink-0 flex gap-1">
+        {/* Mode Tabs */}
+        <div className="mode-tabs flex-shrink-0 flex">
           <button
             onClick={() => handleTabChange('architecture')}
-            className={`btn-tab p-2 sm:px-3 sm:py-1.5 ${activeTab === 'architecture' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
-            title="Architecture Mode"
+            className={`btn-tab ${activeTab === 'architecture' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
           >
-            <svg className="w-5 h-5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
             <span className="hidden lg:inline ml-1">Architecture</span>
           </button>
           <button
             onClick={() => handleTabChange('flow')}
-            className={`btn-tab p-2 sm:px-3 sm:py-1.5 ${activeTab === 'flow' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
-            title="Flow Mode"
+            className={`btn-tab ${activeTab === 'flow' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
           >
-            <svg className="w-5 h-5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             <span className="hidden lg:inline ml-1">Flow</span>
           </button>
         </div>
         
-        {/* Status - Only on desktop */}
+        {/* Status - Desktop only */}
         <div className="flex-shrink-0 hidden lg:flex">
           <span className="status-badge bg-blue-100 text-blue-800">
             <span className="capitalize">{diagramMode} Mode</span>
           </span>
         </div>
         
-        {/* Actions - Right side */}
-        <div className="ml-auto flex items-center gap-1 sm:gap-2 lg:gap-3">
-          {/* Undo/Redo - Hidden on mobile */}
-          <div className="hidden sm:block">
-            <UndoRedoControls />
-          </div>
+        {/* Actions */}
+        <div className="ml-auto flex items-center gap-2 lg:gap-3">
+          <UndoRedoControls />
           
-          {/* File Menu */}
+          <div className="hidden lg:block w-px h-6 bg-gray-300" />
+          
           <FileMenu
             currentDsl={dslText}
             mode={(diagramMode === 'architecture' || diagramMode === 'flow') ? diagramMode : 'architecture'}
@@ -392,7 +388,6 @@ function App() {
             onNew={handleNewDiagram}
           />
           
-          {/* Save Status - only on desktop */}
           {lastSaved && (
             <span className="hidden lg:block text-xs text-gray-500">
               {saveStatus === 'saving' ? 'Saving...' : 
@@ -423,8 +418,8 @@ function App() {
             Properties
           </button>
           
-          {/* Hamburger menu for tablet */}
-          <div className="lg:hidden hidden sm:block relative" ref={mobileMenuRef}>
+          {/* Tablet hamburger menu */}
+          <div className="lg:hidden relative" ref={mobileMenuRef}>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="btn btn-secondary p-2 min-h-[44px]"
@@ -445,28 +440,18 @@ function App() {
                   onClick={() => togglePanel('import')}
                   className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-100 active:bg-gray-200 flex items-center gap-2 min-h-[44px] ${activePanel === 'import' ? 'text-blue-600 bg-blue-50' : 'text-gray-700'}`}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
                   Import
                 </button>
                 <button
                   onClick={() => togglePanel('export')}
                   className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-100 active:bg-gray-200 flex items-center gap-2 min-h-[44px] ${activePanel === 'export' ? 'text-blue-600 bg-blue-50' : 'text-gray-700'}`}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
                   Export
                 </button>
                 <button
                   onClick={() => togglePanel('properties')}
                   className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-100 active:bg-gray-200 flex items-center gap-2 min-h-[44px] ${activePanel === 'properties' ? 'text-blue-600 bg-blue-50' : 'text-gray-700'}`}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
                   Properties
                 </button>
               </div>
@@ -475,14 +460,14 @@ function App() {
         </div>
       </header>
       
-      {/* Main Content */}
+      {/* Main Content - Full screen on mobile */}
       <div ref={containerRef} className="flex-1 flex overflow-hidden relative">
-        {/* Canvas - Always visible as background on mobile */}
-        <div className={`flex-1 overflow-hidden bg-white ${isMobile ? 'absolute inset-0 z-0' : ''}`}>
+        {/* Canvas - Always visible */}
+        <div className={`flex-1 overflow-hidden bg-white ${isMobile ? 'absolute inset-0' : ''}`}>
           <DiagramCanvas />
         </div>
         
-        {/* Editor Panel - Overlay on mobile */}
+        {/* Editor Panel - Full screen overlay on mobile */}
         {(!isMobile || editorVisible) && (
           <div 
             style={{ 
@@ -490,7 +475,7 @@ function App() {
               minWidth: isTablet ? 250 : 300, 
               maxWidth: isMobile ? '100%' : isTablet ? 600 : 800 
             }} 
-            className={`flex-shrink-0 ${isMobile ? 'absolute inset-0 z-10 bg-gray-50' : ''}`}
+            className={`flex-shrink-0 ${isMobile ? 'fixed inset-0 z-10 bg-gray-50 pb-14' : ''}`}
           >
             <DSLEditor />
           </div>
@@ -509,32 +494,33 @@ function App() {
           </div>
         )}
         
-        {/* Side Panel - Overlay on mobile, narrower on tablet */}
+        {/* Side Panel - Slide up from bottom on mobile */}
         {activePanel !== 'none' && (
           <>
-            {/* Mobile/Tablet Overlay Backdrop */}
-            {(isMobile || isTablet) && (
-              <div 
-                className="fixed inset-0 bg-black/50 z-20"
-                onClick={() => setActivePanel('none')}
-              />
-            )}
+            {/* Backdrop */}
+            <div 
+              className="fixed inset-0 bg-black/50 z-20"
+              onClick={() => setActivePanel('none')}
+            />
+            {/* Panel - Full height on desktop, bottom sheet on mobile */}
             <div className={`
-              ${isMobile ? 'fixed inset-y-0 right-0 z-30 w-full max-w-sm' : ''}
+              ${isMobile ? 'fixed bottom-14 left-0 right-0 top-0 z-30' : ''}
               ${isTablet ? 'fixed inset-y-0 right-0 z-30 w-64' : ''}
-              ${!isMobile && !isTablet ? 'w-80' : ''}
-              flex-shrink-0 border-l border-gray-200 bg-white
+              ${!isMobile && !isTablet ? 'w-80 border-l border-gray-200' : ''}
+              flex-shrink-0 bg-white flex flex-col
+              ${isMobile ? 'animate-slide-up' : ''}
             `}>
+              {/* Mobile panel header */}
               {isMobile && (
-                <div className="flex items-center justify-between p-3 border-b border-gray-200">
+                <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-white flex-shrink-0">
                   <span className="font-semibold text-gray-900">
-                    {activePanel === 'properties' && 'Properties'}
-                    {activePanel === 'import' && 'Import CSV'}
-                    {activePanel === 'export' && 'Export'}
+                    {activePanel === 'properties' && '📋 Properties'}
+                    {activePanel === 'import' && '📥 Import CSV'}
+                    {activePanel === 'export' && '📤 Export'}
                   </span>
                   <button
                     onClick={() => setActivePanel('none')}
-                    className="p-1 text-gray-500 hover:text-gray-700"
+                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -542,9 +528,12 @@ function App() {
                   </button>
                 </div>
               )}
-              {activePanel === 'properties' && <PropertiesPanel />}
-              {activePanel === 'import' && <ImportPanel onImport={handleCSVImport} />}
-              {activePanel === 'export' && <ExportPanel onExport={handleExport} />}
+              {/* Panel content */}
+              <div className="flex-1 overflow-hidden">
+                {activePanel === 'properties' && <PropertiesPanel />}
+                {activePanel === 'import' && <ImportPanel onImport={handleCSVImport} />}
+                {activePanel === 'export' && <ExportPanel onExport={handleExport} />}
+              </div>
             </div>
           </>
         )}
