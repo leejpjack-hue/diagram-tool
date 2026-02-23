@@ -3,12 +3,15 @@ import { DSLEditor } from './components/Editor/DSLEditor';
 import { UndoRedoControls } from './components/Editor/UndoRedoControls';
 import { DiagramCanvas } from './components/Canvas/DiagramCanvas';
 import { GanttCanvas } from './components/Gantt/GanttCanvas';
+import { GanttPanel } from './components/Gantt/GanttPanel';
 import { PropertiesPanel } from './components/Panel/PropertiesPanel';
 import { ExportPanel } from './components/Panel/ExportPanel';
 import { ImportPanel } from './components/Panel/ImportPanel';
 import { FileMenu } from './components/Panel/FileMenu';
 import { ToastContainer } from './components/Toast/ToastContainer';
 import { useDiagramStore } from './store/diagramStore';
+import { useGanttStore } from './components/Gantt/ganttStore';
+import { parseGanttDSL } from './components/Gantt/ganttParser';
 import { useExport } from './utils/useExport';
 import { useToast } from './utils/useToast';
 import { csvToDSL, csvToDiagram } from './utils/csvToDiagram';
@@ -156,6 +159,9 @@ function App() {
     clipboard,
     setClipboard 
   } = useDiagramStore();
+  
+  const { setTasks, addTask, tasks } = useGanttStore();
+  
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow' | 'gantt'>('architecture');
   const [activePanel, setActivePanel] = useState<PanelType>('none');
   const [editorWidth, setEditorWidth] = useState(500);
@@ -166,6 +172,16 @@ function App() {
   
   const { exportPNG, exportSVG, exportJSON } = useExport();
   const toast = useToast();
+  
+  // Parse Gantt DSL when it changes
+  useEffect(() => {
+    if (diagramMode === 'gantt' && dslText.includes('diagram: gantt')) {
+      const project = parseGanttDSL(dslText);
+      if (project && project.tasks.length > 0) {
+        setTasks(project.tasks);
+      }
+    }
+  }, [dslText, diagramMode, setTasks]);
 
   const handleTabChange = (tab: 'architecture' | 'flow' | 'gantt') => {
     setActiveTab(tab);
@@ -178,6 +194,23 @@ function App() {
     } else if (tab === 'gantt') {
       setDslText(GANTT_DSL);
     }
+  };
+  
+  // Handle adding task from GanttPanel
+  const handleAddGanttTask = (taskData: Partial<{ name: string; startDate: Date; endDate: Date; assignee: string }>) => {
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4'];
+    const newTask = {
+      id: `task-${Date.now()}`,
+      name: taskData.name || 'New Task',
+      startDate: taskData.startDate || new Date(),
+      endDate: taskData.endDate || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+      progress: 0,
+      assignee: taskData.assignee,
+      color: colors[tasks.length % colors.length],
+      dependencies: [],
+    };
+    addTask(newTask);
+    toast.success(`Added: ${newTask.name}`);
   };
 
   const handleMouseDown = useCallback(() => {
@@ -482,11 +515,18 @@ function App() {
         </div>
         
         {/* Side Panel - No Overlap! */}
-        {activePanel !== 'none' && (
+        {activePanel !== 'none' && activeTab !== 'gantt' && (
           <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white">
             {activePanel === 'properties' && <PropertiesPanel />}
             {activePanel === 'import' && <ImportPanel onImport={handleCSVImport} />}
             {activePanel === 'export' && <ExportPanel onExport={handleExport} />}
+          </div>
+        )}
+        
+        {/* Gantt Panel - Show when in gantt mode */}
+        {activeTab === 'gantt' && (
+          <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white">
+            <GanttPanel onAddTask={handleAddGanttTask} />
           </div>
         )}
       </div>
