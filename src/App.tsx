@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { DSLEditor } from './components/Editor/DSLEditor';
 import { UndoRedoControls } from './components/Editor/UndoRedoControls';
 import { DiagramCanvas } from './components/Canvas/DiagramCanvas';
+import { GanttCanvas } from './components/Gantt/GanttCanvas';
 import { PropertiesPanel } from './components/Panel/PropertiesPanel';
 import { ExportPanel } from './components/Panel/ExportPanel';
 import { ImportPanel } from './components/Panel/ImportPanel';
@@ -90,6 +91,58 @@ node Payment {
   type: external
 }`;
 
+const GANTT_DSL = `diagram: gantt
+title: Project Timeline
+start: 2026-02-23
+
+task Planning {
+  start: 2026-02-23
+  end: 2026-02-26
+  assignee: Jack
+  progress: 100
+}
+
+task Requirements {
+  start: 2026-02-26
+  end: 2026-03-02
+  assignee: Sarah
+  depends: Planning
+  progress: 60
+}
+
+task Design {
+  start: 2026-03-02
+  end: 2026-03-09
+  assignee: Mike
+  depends: Requirements
+  progress: 20
+}
+
+task Development {
+  start: 2026-03-05
+  end: 2026-03-20
+  assignee: Jack
+  depends: Design
+  progress: 0
+}
+
+task Testing {
+  start: 2026-03-15
+  end: 2026-03-23
+  assignee: Sarah
+  depends: Development
+  progress: 0
+}
+
+task Deployment {
+  start: 2026-03-23
+  end: 2026-03-25
+  assignee: Mike
+  depends: Testing
+  milestone: true
+  progress: 0
+}`;
+
 type PanelType = 'none' | 'properties' | 'import' | 'export';
 
 function App() {
@@ -103,7 +156,7 @@ function App() {
     clipboard,
     setClipboard 
   } = useDiagramStore();
-  const [activeTab, setActiveTab] = useState<'architecture' | 'flow'>('architecture');
+  const [activeTab, setActiveTab] = useState<'architecture' | 'flow' | 'gantt'>('architecture');
   const [activePanel, setActivePanel] = useState<PanelType>('none');
   const [editorWidth, setEditorWidth] = useState(500);
   const [isResizing, setIsResizing] = useState(false);
@@ -114,14 +167,16 @@ function App() {
   const { exportPNG, exportSVG, exportJSON } = useExport();
   const toast = useToast();
 
-  const handleTabChange = (tab: 'architecture' | 'flow') => {
+  const handleTabChange = (tab: 'architecture' | 'flow' | 'gantt') => {
     setActiveTab(tab);
     setDiagramMode(tab);
     
     if (tab === 'architecture') {
       setDslText(ARCHITECTURE_DSL);
-    } else {
+    } else if (tab === 'flow') {
       setDslText(FLOW_DSL);
+    } else if (tab === 'gantt') {
+      setDslText(GANTT_DSL);
     }
   };
 
@@ -337,6 +392,15 @@ function App() {
             </svg>
             Flow
           </button>
+          <button
+            onClick={() => handleTabChange('gantt')}
+            className={`btn-tab ${activeTab === 'gantt' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Gantt
+          </button>
         </div>
         
         {/* Status */}
@@ -414,7 +478,7 @@ function App() {
         
         {/* Canvas */}
         <div className="flex-1 overflow-hidden bg-white">
-          <DiagramCanvas />
+          {activeTab === 'gantt' ? <GanttCanvas /> : <DiagramCanvas />}
         </div>
         
         {/* Side Panel - No Overlap! */}

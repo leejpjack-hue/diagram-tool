@@ -1,6 +1,6 @@
 // Diagram Types
 
-export type DiagramMode = 'architecture' | 'flow' | 'sequence' | 'c4';
+export type DiagramMode = 'architecture' | 'flow' | 'sequence' | 'c4' | 'gantt';
 
 export interface ServiceNode {
   type: 'service';
