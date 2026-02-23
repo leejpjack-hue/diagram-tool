@@ -15,11 +15,9 @@ test.describe('Mobile Viewport - Small Phone (< 640px)', () => {
     const header = page.locator('header').first();
     await expect(header).not.toBeVisible();
 
-    // Bottom nav should be visible
-    const bottomNav = page.locator('[data-testid="bottom-nav"], nav').filter({
-      has: page.getByRole('button')
-    });
-    
+    // Bottom nav should be visible (check for mobile-specific navigation)
+    // Note: mobile layout shows bottom nav or full-screen canvas
+
     // Either has bottom nav or check for mobile-specific UI
     const canvas = page.locator('.react-flow');
     await expect(canvas).toBeVisible();
@@ -132,11 +130,7 @@ test.describe('Mobile Viewport - Tablet (768-1024px)', () => {
   test('should show simplified header on tablet', async ({ page }) => {
     await page.waitForSelector('.react-flow', { timeout: 5000 });
 
-    // Check for header presence (might be simplified)
-    const header = page.locator('header').first();
-    const hasHeader = await header.isVisible().catch(() => false);
-
-    // Canvas should be visible either way
+    // Canvas should be visible on tablet (header visibility varies by width)
     const canvas = page.locator('.react-flow');
     await expect(canvas).toBeVisible();
   });
