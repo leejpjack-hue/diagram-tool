@@ -7,7 +7,6 @@ import { ExportPanel } from './components/Panel/ExportPanel';
 import { ImportPanel } from './components/Panel/ImportPanel';
 import { FileMenu } from './components/Panel/FileMenu';
 import { ToastContainer } from './components/Toast/ToastContainer';
-import { MobileBottomNav } from './components/Toolbar/MobileBottomNav';
 import { useDiagramStore } from './store/diagramStore';
 import { useExport } from './utils/useExport';
 import { useToast } from './utils/useToast';
@@ -110,20 +109,7 @@ function App() {
   const [isResizing, setIsResizing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-  const [isTablet, setIsTablet] = useState(false);
-  const [editorVisible, setEditorVisible] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const checkScreenSize = () => {
-      setIsMobile(window.innerWidth < 768);
-      setIsTablet(window.innerWidth >= 768 && window.innerWidth < 1024);
-    };
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
   
   const { exportPNG, exportSVG, exportJSON } = useExport();
   const toast = useToast();
@@ -252,8 +238,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dslText, diagramMode, selectedNodeId, clipboard, setClipboard, setDslText]); // handleSave and toast are stable or intentionally excluded
+  }, [dslText, diagramMode, selectedNodeId, clipboard, setClipboard, setDslText]);
 
   // Auto-save setup
   useEffect(() => {
@@ -279,8 +264,7 @@ function App() {
       setActiveTab(saved.mode);
       setLastSaved(new Date(saved.updatedAt));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Mount-only effect - setState functions are stable
+  }, []);
 
   const handleLoadDiagram = (diagram: SavedDiagram) => {
     setDslText(diagram.dslText);
@@ -318,12 +302,13 @@ function App() {
   const togglePanel = (panel: PanelType) => {
     setActivePanel(prev => prev === panel ? 'none' : panel);
   };
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header - HIDDEN on mobile (< 640px), only show on tablet+ */}
-      <header className="hidden sm:flex h-14 lg:h-16 bg-white border-b border-gray-200 items-center px-3 lg:px-6 gap-2 lg:gap-6 flex-shrink-0">
-        {/* Logo */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+      {/* Header */}
+      <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-6">
+        {/* Logo & Title */}
+        <div className="flex items-center gap-3 flex-shrink-0">
           <div className="app-logo">
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
@@ -333,7 +318,7 @@ function App() {
         </div>
         
         {/* Mode Tabs */}
-        <div className="mode-tabs flex-shrink-0 flex">
+        <div className="mode-tabs flex-shrink-0">
           <button
             onClick={() => handleTabChange('architecture')}
             className={`btn-tab ${activeTab === 'architecture' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
@@ -341,7 +326,7 @@ function App() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <span className="hidden lg:inline ml-1">Architecture</span>
+            Architecture
           </button>
           <button
             onClick={() => handleTabChange('flow')}
@@ -350,23 +335,26 @@ function App() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <span className="hidden lg:inline ml-1">Flow</span>
+            Flow
           </button>
         </div>
         
-        {/* Status - Desktop only */}
-        <div className="flex-shrink-0 hidden lg:flex">
+        {/* Status */}
+        <div className="flex-shrink-0">
           <span className="status-badge bg-blue-100 text-blue-800">
             <span className="capitalize">{diagramMode} Mode</span>
           </span>
         </div>
         
         {/* Actions */}
-        <div className="ml-auto flex items-center gap-2 lg:gap-3">
+        <div className="ml-auto flex items-center gap-3">
+          {/* Undo/Redo Controls */}
           <UndoRedoControls />
           
-          <div className="hidden lg:block w-px h-6 bg-gray-300" />
+          {/* Divider */}
+          <div className="w-px h-6 bg-gray-300" />
           
+          {/* File Menu */}
           <FileMenu
             currentDsl={dslText}
             mode={(diagramMode === 'architecture' || diagramMode === 'flow') ? diagramMode : 'architecture'}
@@ -374,149 +362,85 @@ function App() {
             onNew={handleNewDiagram}
           />
           
+          {/* Save Status */}
           {lastSaved && (
-            <span className="hidden lg:block text-xs text-gray-500">
+            <span className="text-xs text-gray-500">
               {saveStatus === 'saving' ? 'Saving...' : 
                saveStatus === 'saved' ? `Saved ${formatTimeAgo(lastSaved)}` : 
                'Unsaved'}
             </span>
           )}
           
-          {/* Desktop buttons */}
           <button
             onClick={() => togglePanel('import')}
-            className={`btn hidden lg:flex ${activePanel === 'import' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn ${activePanel === 'import' ? 'btn-primary' : 'btn-secondary'}`}
           >
-            Import
+            Import CSV
           </button>
           
           <button
             onClick={() => togglePanel('export')}
-            className={`btn hidden lg:flex ${activePanel === 'export' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn ${activePanel === 'export' ? 'btn-primary' : 'btn-secondary'}`}
           >
             Export
           </button>
           
           <button
             onClick={() => togglePanel('properties')}
-            className={`btn hidden lg:flex ${activePanel === 'properties' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn ${activePanel === 'properties' ? 'btn-primary' : 'btn-secondary'}`}
           >
             Properties
           </button>
-          
-          {/* Hamburger menu - REMOVED (replaced by MobileBottomNav on lg screens) */}
         </div>
       </header>
       
-      {/* Main Content - Full screen on mobile */}
-      <div ref={containerRef} className="flex-1 flex overflow-hidden relative">
-        {/* Canvas - Always visible */}
-        <div className={`flex-1 overflow-hidden bg-white ${isMobile ? 'absolute inset-0' : ''}`}>
+      {/* Main Content */}
+      <div ref={containerRef} className="flex-1 flex overflow-hidden">
+        {/* Editor Panel - Resizable */}
+        <div style={{ width: editorWidth, minWidth: 300, maxWidth: 800 }} className="flex-shrink-0">
+          <DSLEditor />
+        </div>
+        
+        {/* Resize Handle */}
+        <div
+          onMouseDown={handleMouseDown}
+          className={`w-1.5 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex items-center justify-center transition-colors group ${
+            isResizing ? 'bg-blue-500' : ''
+          }`}
+          style={{ userSelect: 'none' }}
+        >
+          <div className="w-0.5 h-12 bg-gray-300 group-hover:bg-blue-400 rounded transition-colors" />
+        </div>
+        
+        {/* Canvas */}
+        <div className="flex-1 overflow-hidden bg-white">
           <DiagramCanvas />
         </div>
         
-        {/* Editor Panel - Full screen overlay on mobile */}
-        {(!isMobile || editorVisible) && (
-          <div 
-            style={{ 
-              width: isMobile ? '100%' : editorWidth, 
-              minWidth: isTablet ? 250 : 300, 
-              maxWidth: isMobile ? '100%' : isTablet ? 600 : 800 
-            }} 
-            className={`flex-shrink-0 ${isMobile ? 'fixed inset-0 z-10 bg-gray-50 pb-14' : ''}`}
-          >
-            <DSLEditor />
-          </div>
-        )}
-        
-        {/* Resize Handle - Hidden on mobile */}
-        {!isMobile && (
-          <div
-            onMouseDown={handleMouseDown}
-            className={`w-1.5 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex items-center justify-center transition-colors group ${
-              isResizing ? 'bg-blue-500' : ''
-            }`}
-            style={{ userSelect: 'none' }}
-          >
-            <div className="w-0.5 h-12 bg-gray-300 group-hover:bg-blue-400 rounded transition-colors" />
-          </div>
-        )}
-        
-        {/* Side Panel - Slide up from bottom on mobile */}
+        {/* Side Panel - No Overlap! */}
         {activePanel !== 'none' && (
-          <>
-            {/* Backdrop */}
-            <div 
-              className="fixed inset-0 bg-black/50 z-20"
-              onClick={() => setActivePanel('none')}
-            />
-            {/* Panel - Full height on desktop, bottom sheet on mobile */}
-            <div className={`
-              ${isMobile ? 'fixed bottom-14 left-0 right-0 top-0 z-30' : ''}
-              ${isTablet ? 'fixed inset-y-0 right-0 z-30 w-64' : ''}
-              ${!isMobile && !isTablet ? 'w-80 border-l border-gray-200' : ''}
-              flex-shrink-0 bg-white flex flex-col
-              ${isMobile ? 'animate-slide-up' : ''}
-            `}>
-              {/* Mobile panel header */}
-              {isMobile && (
-                <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-white flex-shrink-0">
-                  <span className="font-semibold text-gray-900">
-                    {activePanel === 'properties' && '📋 Properties'}
-                    {activePanel === 'import' && '📥 Import CSV'}
-                    {activePanel === 'export' && '📤 Export'}
-                  </span>
-                  <button
-                    onClick={() => setActivePanel('none')}
-                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-              {/* Panel content */}
-              <div className="flex-1 overflow-hidden">
-                {activePanel === 'properties' && <PropertiesPanel />}
-                {activePanel === 'import' && <ImportPanel onImport={handleCSVImport} />}
-                {activePanel === 'export' && <ExportPanel onExport={handleExport} />}
-              </div>
-            </div>
-          </>
+          <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white">
+            {activePanel === 'properties' && <PropertiesPanel />}
+            {activePanel === 'import' && <ImportPanel onImport={handleCSVImport} />}
+            {activePanel === 'export' && <ExportPanel onExport={handleExport} />}
+          </div>
         )}
       </div>
       
-      {/* Footer - Hidden on mobile, simplified on tablet */}
-      {!isMobile && (
-        <footer className={`app-footer ${isTablet ? 'text-xs' : ''}`}>
-          <span className="font-semibold text-gray-900">{diagramMode.charAt(0).toUpperCase() + diagramMode.slice(1)} Mode</span>
-          {!isTablet && (
-            <>
-              <span className="mx-2 text-gray-400">•</span>
-              <span>Editor: {editorWidth}px</span>
-              <span className="mx-2 text-gray-400">•</span>
-              <span className="flex items-center gap-1">
-                Press <kbd className="kbd">P</kbd> for Properties
-              </span>
-            </>
-          )}
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-gray-500">Zoom:</span>
-            <span className="font-semibold text-gray-900">100%</span>
-          </div>
-        </footer>
-      )}
-      
-      {/* Mobile Bottom Navigation */}
-      <MobileBottomNav
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        activePanel={activePanel}
-        onPanelChange={setActivePanel}
-        editorVisible={editorVisible}
-        onEditorToggle={() => setEditorVisible(!editorVisible)}
-      />
+      {/* Footer */}
+      <footer className="app-footer">
+        <span className="font-semibold text-gray-900">{diagramMode.charAt(0).toUpperCase() + diagramMode.slice(1)} Mode</span>
+        <span className="mx-2 text-gray-400">•</span>
+        <span>Editor: {editorWidth}px</span>
+        <span className="mx-2 text-gray-400">•</span>
+        <span className="flex items-center gap-1">
+          Press <kbd className="kbd">P</kbd> for Properties
+        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-gray-500">Zoom:</span>
+          <span className="font-semibold text-gray-900">100%</span>
+        </div>
+      </footer>
       
       {/* Toast Notifications */}
       <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />

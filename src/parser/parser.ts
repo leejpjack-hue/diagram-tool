@@ -265,7 +265,7 @@ export class Parser {
         
         switch ((propToken.value as string).toLowerCase()) {
           case 'type':
-            node.properties.type = valueToken.value as 'postgresql' | 'mongodb' | 'mysql' | 'redis';
+            node.properties.type = valueToken.value as any;
             break;
           case 'data':
             if (valueToken.type === TokenType.STRING) {
@@ -311,7 +311,7 @@ export class Parser {
         
         switch ((propToken.value as string).toLowerCase()) {
           case 'type':
-            node.properties.type = valueToken.value as 'kafka' | 'rabbitmq' | 'sqs';
+            node.properties.type = valueToken.value as any;
             break;
           case 'topic':
             node.properties.topic = valueToken.value as string;
@@ -564,7 +564,7 @@ export class Parser {
             nodeData.properties!.assignee = valueToken.value as string;
             break;
           case 'type':
-            nodeData.properties!.nodeType = valueToken.value as 'process' | 'decision' | 'subprocess' | 'external';
+            nodeData.properties!.nodeType = valueToken.value as any;
             break;
         }
       } else {

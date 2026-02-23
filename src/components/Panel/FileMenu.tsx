@@ -103,19 +103,19 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew }: FileMenuProps) {
       {/* Menu Button */}
       <button
         onClick={handleOpen}
-        className="btn btn-secondary min-h-[44px] sm:min-h-0"
+        className="btn btn-secondary"
       >
         📄 File
       </button>
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-56 sm:w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
+        <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
           {/* Menu Items */}
           <div className="py-1">
             <button
               onClick={handleNew}
-              className="w-full px-4 py-2.5 sm:py-2 text-left text-sm hover:bg-gray-100 active:bg-gray-200 flex items-center gap-2 min-h-[44px] sm:min-h-0"
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
             >
               <span>📄</span>
               <span>New Diagram</span>
@@ -123,16 +123,16 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew }: FileMenuProps) {
 
             <button
               onClick={handleSave}
-              className="w-full px-4 py-2.5 sm:py-2 text-left text-sm hover:bg-gray-100 active:bg-gray-200 flex items-center gap-2 min-h-[44px] sm:min-h-0"
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
             >
               <span>💾</span>
               <span>Save</span>
-              <span className="ml-auto text-xs text-gray-400 hidden sm:inline">Ctrl+S</span>
+              <span className="ml-auto text-xs text-gray-400">Ctrl+S</span>
             </button>
 
             <button
               onClick={handleExport}
-              className="w-full px-4 py-2.5 sm:py-2 text-left text-sm hover:bg-gray-100 active:bg-gray-200 flex items-center gap-2 min-h-[44px] sm:min-h-0"
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
             >
               <span>📥</span>
               <span>Export to File</span>
@@ -140,7 +140,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew }: FileMenuProps) {
 
             <button
               onClick={handleImport}
-              className="w-full px-4 py-2.5 sm:py-2 text-left text-sm hover:bg-gray-100 active:bg-gray-200 flex items-center gap-2 min-h-[44px] sm:min-h-0"
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
             >
               <span>📤</span>
               <span>Import from File</span>
@@ -153,16 +153,16 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew }: FileMenuProps) {
               <div className="border-t border-gray-200" />
               
               {/* Recent Diagrams */}
-              <div className="py-1 max-h-64 overflow-y-auto overscroll-contain">
+              <div className="py-1">
                 <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase">
-                  Recent
+                  Recent Diagrams
                 </div>
                 
                 {recentDiagrams.map((diagram) => (
                   <button
                     key={diagram.id}
                     onClick={() => handleLoadRecent(diagram)}
-                    className="w-full px-4 py-2.5 sm:py-2 text-left text-sm hover:bg-gray-100 active:bg-gray-200 flex items-center justify-between min-h-[44px] sm:min-h-0"
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{diagram.title}</div>
@@ -170,7 +170,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew }: FileMenuProps) {
                         {formatDate(diagram.updatedAt)}
                       </div>
                     </div>
-                    <span className="text-xs text-gray-400 capitalize ml-2 hidden sm:inline">
+                    <span className="text-xs text-gray-400 capitalize ml-2">
                       {diagram.mode}
                     </span>
                   </button>
@@ -178,7 +178,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew }: FileMenuProps) {
 
                 <button
                   onClick={handleClearRecent}
-                  className="w-full px-4 py-2 text-left text-xs text-red-600 hover:bg-red-50 active:bg-red-100 min-h-[44px] sm:min-h-0"
+                  className="w-full px-4 py-2 text-left text-xs text-red-600 hover:bg-red-50"
                 >
                   Clear Recent History
                 </button>

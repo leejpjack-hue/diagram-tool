@@ -224,16 +224,9 @@ function DiagramCanvasInternal() {
         />
       </ReactFlow>
       
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 mobile:hidden bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-10">
+      {/* Floating Zoom Controls */}
+      <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-10">
         <ZoomControls />
-      </div>
-      
-      <div className="hidden mobile:flex absolute bottom-4 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-lg border border-gray-200 p-3 z-10">
-        <ZoomControls />
-      </div>
-      
-      <div className="mobile:hidden absolute bottom-16 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full z-10 pointer-events-none">
-        Pinch to zoom
       </div>
     </div>
   );
