@@ -110,12 +110,10 @@ function App() {
   const [isResizing, setIsResizing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const [editorVisible, setEditorVisible] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -319,19 +317,7 @@ function App() {
 
   const togglePanel = (panel: PanelType) => {
     setActivePanel(prev => prev === panel ? 'none' : panel);
-    setMobileMenuOpen(false);
   };
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
-        setMobileMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header - HIDDEN on mobile (< 640px), only show on tablet+ */}
@@ -418,45 +404,7 @@ function App() {
             Properties
           </button>
           
-          {/* Tablet hamburger menu */}
-          <div className="lg:hidden relative" ref={mobileMenuRef}>
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="btn btn-secondary p-2 min-h-[44px]"
-              aria-label="Menu"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {mobileMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
-            
-            {mobileMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                <button
-                  onClick={() => togglePanel('import')}
-                  className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-100 active:bg-gray-200 flex items-center gap-2 min-h-[44px] ${activePanel === 'import' ? 'text-blue-600 bg-blue-50' : 'text-gray-700'}`}
-                >
-                  Import
-                </button>
-                <button
-                  onClick={() => togglePanel('export')}
-                  className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-100 active:bg-gray-200 flex items-center gap-2 min-h-[44px] ${activePanel === 'export' ? 'text-blue-600 bg-blue-50' : 'text-gray-700'}`}
-                >
-                  Export
-                </button>
-                <button
-                  onClick={() => togglePanel('properties')}
-                  className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-100 active:bg-gray-200 flex items-center gap-2 min-h-[44px] ${activePanel === 'properties' ? 'text-blue-600 bg-blue-50' : 'text-gray-700'}`}
-                >
-                  Properties
-                </button>
-              </div>
-            )}
-          </div>
+          {/* Hamburger menu - REMOVED (replaced by MobileBottomNav on lg screens) */}
         </div>
       </header>
       

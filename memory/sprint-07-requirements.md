@@ -20,6 +20,7 @@
 
 ## Sprint 7.2: Polish & Testing 🔄 IN PROGRESS
 - [x] Add E2E mobile viewport tests (15 tests created)
+- [x] Fix lint errors in E2E tests (0 errors, 0 warnings)
 - [ ] Run E2E tests (blocked: missing Playwright system deps)
 - [ ] Touch gesture support (pinch to zoom, swipe)
 - [ ] Mobile-specific optimizations
