@@ -1,6 +1,7 @@
-import React, { useMemo, useState, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { useGanttStore } from './ganttStore';
-import type { GanttTask, GanttZoomLevel } from './types';
+import type { GanttTask, GanttZoomLevel, Dependency } from './types';
+import { isCritical } from './criticalPath';
 
 // Constants
 const ROW_HEIGHT = 40;
@@ -18,6 +19,9 @@ const COLORS = [
   '#ef4444', '#06b6d4', '#ec4899', '#84cc16'
 ];
 
+const CRITICAL_COLOR = '#dc2626';
+const SLACK_COLOR = '#fca5a5';
+
 // Helper functions
 const addDays = (date: Date, days: number): Date => {
   const result = new Date(date);
@@ -31,18 +35,67 @@ const diffDays = (a: Date, b: Date): number => {
 };
 
 export function GanttCanvas() {
-  const { tasks, selectedTaskId, zoomLevel, setSelectedTask, updateTask } = useGanttStore();
+  const { 
+    tasks, 
+    dependencies,
+    selectedTaskId, 
+    zoomLevel, 
+    showCriticalPath,
+    criticalPathResult,
+    expandedGroups,
+    setSelectedTask, 
+    updateTask,
+    toggleGroup,
+    recalculateCriticalPath,
+  } = useGanttStore();
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<{ taskId: string; type: 'move' | 'resize-start' | 'resize-end'; startX: number; originalTask: GanttTask } | null>(null);
 
+  // Recalculate critical path when tasks or dependencies change
+  useEffect(() => {
+    if (showCriticalPath) {
+      recalculateCriticalPath();
+    }
+  }, [tasks, dependencies, showCriticalPath, recalculateCriticalPath]);
+
+  // Filter out collapsed group children for display
+  const visibleTasks = useMemo(() => {
+    const result: GanttTask[] = [];
+    
+    const addTask = (task: GanttTask) => {
+      if (task.isGroup) {
+        result.push(task);
+        if (expandedGroups.has(task.id) && task.children) {
+          task.children.forEach(childId => {
+            const child = tasks.find(t => t.id === childId);
+            if (child) addTask(child);
+          });
+        }
+      } else if (!task.parentId) {
+        result.push(task);
+      } else {
+        // Has parent - only show if parent is expanded
+        const parent = tasks.find(t => t.id === task.parentId);
+        if (parent && expandedGroups.has(parent.id)) {
+          result.push(task);
+        }
+      }
+    };
+    
+    tasks.filter(t => !t.parentId).forEach(addTask);
+    return result;
+  }, [tasks, expandedGroups]);
+
   // Calculate date range
   const { minDate, totalDays } = useMemo(() => {
-    if (tasks.length === 0) {
+    const tasksToUse = visibleTasks.length > 0 ? visibleTasks : tasks;
+    if (tasksToUse.length === 0) {
       const today = new Date();
       return { minDate: today, totalDays: 30 };
     }
     
-    const dates = tasks.flatMap((t) => [t.startDate, t.endDate]);
+    const dates = tasksToUse.flatMap((t) => [t.startDate, t.endDate]);
     const min = new Date(Math.min(...dates.map((d) => d.getTime())));
     const max = new Date(Math.max(...dates.map((d) => d.getTime())));
     
@@ -51,11 +104,11 @@ export function GanttCanvas() {
     max.setDate(max.getDate() + 7);
     
     return { minDate: min, totalDays: diffDays(max, min) };
-  }, [tasks]);
+  }, [visibleTasks, tasks]);
 
   const dayWidth = ZOOM_WIDTHS[zoomLevel];
   const chartWidth = totalDays * dayWidth;
-  const chartHeight = tasks.length * ROW_HEIGHT + HEADER_HEIGHT;
+  const chartHeight = visibleTasks.length * ROW_HEIGHT + HEADER_HEIGHT;
 
   // Generate timeline headers
   const timelineHeaders = useMemo(() => {
@@ -116,8 +169,8 @@ export function GanttCanvas() {
   // Handle task bar interactions
   const handleMouseDown = useCallback((e: React.MouseEvent, taskId: string, type: 'move' | 'resize-start' | 'resize-end') => {
     e.preventDefault();
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
+    const task = visibleTasks.find((t) => t.id === taskId);
+    if (!task || task.isGroup) return;
     
     setSelectedTask(taskId);
     setDragging({
@@ -126,7 +179,7 @@ export function GanttCanvas() {
       startX: e.clientX,
       originalTask: { ...task },
     });
-  }, [tasks, setSelectedTask]);
+  }, [visibleTasks, setSelectedTask]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!dragging) return;
@@ -136,7 +189,7 @@ export function GanttCanvas() {
     
     if (deltaDays === 0) return;
     
-    const task = tasks.find((t) => t.id === dragging.taskId);
+    const task = visibleTasks.find((t) => t.id === dragging.taskId);
     if (!task) return;
     
     if (dragging.type === 'move') {
@@ -155,52 +208,117 @@ export function GanttCanvas() {
         updateTask(dragging.taskId, { endDate: newEnd });
       }
     }
-  }, [dragging, dayWidth, tasks, updateTask]);
+  }, [dragging, dayWidth, visibleTasks, updateTask]);
 
   const handleMouseUp = useCallback(() => {
     setDragging(null);
   }, []);
 
+  // Get dependency arrow style based on type
+  const getDependencyStyle = (type: Dependency['type']) => {
+    switch (type) {
+      case 'FS': return { dash: '4,2', color: '#94a3b8' };
+      case 'SS': return { dash: '8,4', color: '#3b82f6' };
+      case 'FF': return { dash: '2,2', color: '#10b981' };
+      case 'SF': return { dash: '6,3', color: '#f59e0b' };
+      default: return { dash: '4,2', color: '#94a3b8' };
+    }
+  };
+
   // Draw dependency arrows
   const renderDependencies = () => {
     const arrows: React.ReactElement[] = [];
     
-    tasks.forEach((task) => {
-      task.dependencies.forEach((depId) => {
-        const depTask = tasks.find((t) => t.id === depId);
-        if (!depTask) return;
-        
-        const taskIndex = tasks.findIndex((t) => t.id === task.id);
-        const depIndex = tasks.findIndex((t) => t.id === depId);
-        
-        const startX = TASK_NAME_WIDTH + diffDays(depTask.endDate, minDate) * dayWidth;
-        const startY = HEADER_HEIGHT + depIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
-        const endX = TASK_NAME_WIDTH + diffDays(task.startDate, minDate) * dayWidth;
-        const endY = HEADER_HEIGHT + taskIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
-        
-        // Create path
-        const midX = (startX + endX) / 2;
-        const path = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`;
-        
-        arrows.push(
-          <g key={`${depId}-${task.id}`}>
-            <path
-              d={path}
-              fill="none"
-              stroke="#94a3b8"
-              strokeWidth="1.5"
-              strokeDasharray="4,2"
-            />
-            <polygon
-              points={`${endX},${endY} ${endX - 6},${endY - 4} ${endX - 6},${endY + 4}`}
-              fill="#94a3b8"
-            />
-          </g>
-        );
-      });
+    dependencies.forEach((dep) => {
+      const successorTask = visibleTasks.find((t) => t.id === dep.successorId);
+      const predecessorTask = visibleTasks.find((t) => t.id === dep.predecessorId);
+      if (!successorTask || !predecessorTask) return;
+      
+      const successorIndex = visibleTasks.findIndex((t) => t.id === dep.successorId);
+      const predecessorIndex = visibleTasks.findIndex((t) => t.id === dep.predecessorId);
+      
+      if (successorIndex === -1 || predecessorIndex === -1) return;
+      
+      const style = getDependencyStyle(dep.type);
+      
+      // Calculate arrow endpoints based on dependency type
+      let startX: number, startY: number, endX: number, endY: number;
+      
+      const predBarStart = TASK_NAME_WIDTH + diffDays(predecessorTask.startDate, minDate) * dayWidth;
+      const predBarEnd = TASK_NAME_WIDTH + diffDays(predecessorTask.endDate, minDate) * dayWidth;
+      const succBarStart = TASK_NAME_WIDTH + diffDays(successorTask.startDate, minDate) * dayWidth;
+      const succBarEnd = TASK_NAME_WIDTH + diffDays(successorTask.endDate, minDate) * dayWidth;
+      
+      startY = HEADER_HEIGHT + predecessorIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
+      endY = HEADER_HEIGHT + successorIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
+      
+      switch (dep.type) {
+        case 'FS': // Finish to Start
+          startX = predBarEnd;
+          endX = succBarStart + (dep.lag * dayWidth);
+          break;
+        case 'SS': // Start to Start
+          startX = predBarStart;
+          endX = succBarStart + (dep.lag * dayWidth);
+          break;
+        case 'FF': // Finish to Finish
+          startX = predBarEnd;
+          endX = succBarEnd + (dep.lag * dayWidth);
+          break;
+        case 'SF': // Start to Finish
+          startX = predBarStart;
+          endX = succBarEnd + (dep.lag * dayWidth);
+          break;
+        default:
+          startX = predBarEnd;
+          endX = succBarStart;
+      }
+      
+      // Create curved path
+      const midX = (startX + endX) / 2;
+      const path = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`;
+      
+      arrows.push(
+        <g key={`${dep.predecessorId}-${dep.successorId}-${dep.type}`}>
+          <path
+            d={path}
+            fill="none"
+            stroke={style.color}
+            strokeWidth="1.5"
+            strokeDasharray={style.dash}
+          />
+          <polygon
+            points={`${endX},${endY} ${endX - 6},${endY - 4} ${endX - 6},${endY + 4}`}
+            fill={style.color}
+          />
+          {/* Lag indicator */}
+          {dep.lag !== 0 && (
+            <text
+              x={midX}
+              y={(startY + endY) / 2 - 5}
+              fontSize="9"
+              fill={style.color}
+              textAnchor="middle"
+            >
+              {dep.lag > 0 ? `+${dep.lag}d` : `${dep.lag}d`}
+            </text>
+          )}
+        </g>
+      );
     });
     
     return arrows;
+  };
+
+  // Check if task is on critical path
+  const isTaskCritical = (taskId: string): boolean => {
+    return showCriticalPath && criticalPathResult !== null && isCritical(taskId, criticalPathResult);
+  };
+
+  // Get slack for task
+  const getTaskSlack = (taskId: string): number => {
+    if (!criticalPathResult) return 0;
+    return criticalPathResult.slack.get(taskId) || 0;
   };
 
   return (
@@ -270,13 +388,23 @@ export function GanttCanvas() {
           <text x={8} y={48} fontSize="11" fill="#64748b">Assignee</text>
           
           {/* Task rows */}
-          {tasks.map((task, index) => {
+          {visibleTasks.map((task, index) => {
             const startIndex = diffDays(task.startDate, minDate);
             const duration = diffDays(task.endDate, task.startDate);
             const barX = TASK_NAME_WIDTH + startIndex * dayWidth;
             const barWidth = duration * dayWidth;
             const rowY = HEADER_HEIGHT + index * ROW_HEIGHT;
             const isSelected = selectedTaskId === task.id;
+            const isCriticalTask = isTaskCritical(task.id);
+            const slack = getTaskSlack(task.id);
+            const slackWidth = slack * dayWidth;
+            
+            // Group styling
+            const taskColor = task.isGroup 
+              ? '#64748b' 
+              : isCriticalTask 
+                ? CRITICAL_COLOR 
+                : task.color || COLORS[index % COLORS.length];
             
             return (
               <g key={task.id}>
@@ -286,26 +414,63 @@ export function GanttCanvas() {
                   y={rowY}
                   width={TASK_NAME_WIDTH}
                   height={ROW_HEIGHT}
-                  fill={isSelected ? '#eff6ff' : '#ffffff'}
+                  fill={isSelected ? '#eff6ff' : task.isGroup ? '#f8fafc' : '#ffffff'}
                   stroke="#e2e8f0"
                 />
-                <text
-                  x={12}
-                  y={rowY + 25}
-                  fontSize="13"
-                  fill="#1e293b"
-                  fontWeight={isSelected ? '600' : '400'}
-                >
-                  {task.name}
-                </text>
-                <text
-                  x={12}
-                  y={rowY + 36}
-                  fontSize="10"
-                  fill="#94a3b8"
-                >
-                  {task.assignee || 'Unassigned'}
-                </text>
+                
+                {/* Group expand/collapse toggle */}
+                {task.isGroup ? (
+                  <g 
+                    className="cursor-pointer"
+                    onClick={() => toggleGroup(task.id)}
+                  >
+                    <text
+                      x={8}
+                      y={rowY + 25}
+                      fontSize="14"
+                      fill="#64748b"
+                    >
+                      {expandedGroups.has(task.id) ? '▼' : '▶'}
+                    </text>
+                    <text
+                      x={24}
+                      y={rowY + 25}
+                      fontSize="13"
+                      fill="#1e293b"
+                      fontWeight="600"
+                    >
+                      {task.name}
+                    </text>
+                    <text
+                      x={24}
+                      y={rowY + 36}
+                      fontSize="10"
+                      fill="#94a3b8"
+                    >
+                      {task.children?.length || 0} tasks • {task.progress}% complete
+                    </text>
+                  </g>
+                ) : (
+                  <>
+                    <text
+                      x={task.parentId ? 24 : 12}
+                      y={rowY + 25}
+                      fontSize="13"
+                      fill="#1e293b"
+                      fontWeight={isSelected ? '600' : '400'}
+                    >
+                      {task.name}
+                    </text>
+                    <text
+                      x={task.parentId ? 24 : 12}
+                      y={rowY + 36}
+                      fontSize="10"
+                      fill="#94a3b8"
+                    >
+                      {task.assignee || 'Unassigned'}
+                    </text>
+                  </>
+                )}
                 
                 {/* Chart row background */}
                 {timelineHeaders.map((day, i) => (
@@ -321,94 +486,151 @@ export function GanttCanvas() {
                   />
                 ))}
                 
-                {/* Task bar */}
-                <g
-                  className="cursor-pointer"
-                  onClick={() => setSelectedTask(task.id)}
-                >
-                  {/* Background bar */}
-                  <rect
-                    x={barX}
-                    y={rowY + 8}
-                    width={barWidth}
-                    height={24}
-                    rx={4}
-                    fill={task.color || COLORS[index % COLORS.length]}
-                    opacity={0.2}
-                    stroke={task.color || COLORS[index % COLORS.length]}
-                    strokeWidth={isSelected ? 2 : 1}
-                  />
-                  
-                  {/* Progress bar */}
-                  <rect
-                    x={barX}
-                    y={rowY + 8}
-                    width={barWidth * (task.progress / 100)}
-                    height={24}
-                    rx={4}
-                    fill={task.color || COLORS[index % COLORS.length]}
-                  />
-                  
-                  {/* Task name on bar */}
-                  <text
-                    x={barX + 8}
-                    y={rowY + 24}
-                    fontSize="11"
-                    fill="#ffffff"
-                    fontWeight="500"
+                {/* Task bar (skip for groups unless showing summary) */}
+                {!task.isGroup && (
+                  <g
+                    className="cursor-pointer"
+                    onClick={() => setSelectedTask(task.id)}
                   >
-                    {task.name}
-                  </text>
-                  
-                  {/* Progress percentage */}
-                  <text
-                    x={barX + barWidth - 8}
-                    y={rowY + 24}
-                    fontSize="10"
-                    fill="#ffffff"
-                    fontWeight="600"
-                    textAnchor="end"
-                  >
-                    {task.progress}%
-                  </text>
-                  
-                  {/* Resize handles (only when selected) */}
-                  {isSelected && (
-                    <>
-                      {/* Left resize handle */}
+                    {/* Slack indicator (if showing critical path) */}
+                    {showCriticalPath && slack > 0 && (
                       <rect
-                        x={barX - 2}
-                        y={rowY + 8}
-                        width={8}
-                        height={24}
+                        x={barX + barWidth}
+                        y={rowY + 12}
+                        width={slackWidth}
+                        height={16}
                         rx={2}
-                        fill={task.color || COLORS[index % COLORS.length]}
-                        className="cursor-ew-resize"
-                        onMouseDown={(e) => handleMouseDown(e, task.id, 'resize-start')}
+                        fill={SLACK_COLOR}
+                        opacity={0.4}
+                        stroke={SLACK_COLOR}
+                        strokeDasharray="2,2"
                       />
-                      
-                      {/* Right resize handle */}
-                      <rect
-                        x={barX + barWidth - 6}
-                        y={rowY + 8}
-                        width={8}
-                        height={24}
-                        rx={2}
-                        fill={task.color || COLORS[index % COLORS.length]}
-                        className="cursor-ew-resize"
-                        onMouseDown={(e) => handleMouseDown(e, task.id, 'resize-end')}
-                      />
-                    </>
-                  )}
-                  
-                  {/* Milestone diamond */}
-                  {task.milestone && (
-                    <polygon
-                      points={`${barX + barWidth / 2},${rowY + 4} ${barX + barWidth / 2 + 8},${rowY + 12} ${barX + barWidth / 2},${rowY + 20} ${barX + barWidth / 2 - 8},${rowY + 12}`}
-                      fill={task.color || '#f59e0b'}
+                    )}
+                    
+                    {/* Background bar */}
+                    <rect
+                      x={barX}
+                      y={rowY + 8}
+                      width={barWidth}
+                      height={24}
+                      rx={4}
+                      fill={taskColor}
+                      opacity={0.2}
+                      stroke={taskColor}
+                      strokeWidth={isSelected ? 2 : isCriticalTask ? 2 : 1}
                     />
-                  )}
-                </g>
+                    
+                    {/* Progress bar */}
+                    <rect
+                      x={barX}
+                      y={rowY + 8}
+                      width={barWidth * (task.progress / 100)}
+                      height={24}
+                      rx={4}
+                      fill={taskColor}
+                    />
+                    
+                    {/* Task name on bar */}
+                    <text
+                      x={barX + 8}
+                      y={rowY + 24}
+                      fontSize="11"
+                      fill="#ffffff"
+                      fontWeight="500"
+                    >
+                      {task.name}
+                    </text>
+                    
+                    {/* Progress percentage */}
+                    <text
+                      x={barX + barWidth - 8}
+                      y={rowY + 24}
+                      fontSize="10"
+                      fill="#ffffff"
+                      fontWeight="600"
+                      textAnchor="end"
+                    >
+                      {task.progress}%
+                    </text>
+                    
+                    {/* Critical path indicator */}
+                    {isCriticalTask && (
+                      <text
+                        x={barX + barWidth + 4}
+                        y={rowY + 24}
+                        fontSize="10"
+                        fill={CRITICAL_COLOR}
+                        fontWeight="600"
+                      >
+                        ⚡
+                      </text>
+                    )}
+                    
+                    {/* Resize handles (only when selected) */}
+                    {isSelected && (
+                      <>
+                        {/* Left resize handle */}
+                        <rect
+                          x={barX - 2}
+                          y={rowY + 8}
+                          width={8}
+                          height={24}
+                          rx={2}
+                          fill={taskColor}
+                          className="cursor-ew-resize"
+                          onMouseDown={(e) => handleMouseDown(e, task.id, 'resize-start')}
+                        />
+                        
+                        {/* Right resize handle */}
+                        <rect
+                          x={barX + barWidth - 6}
+                          y={rowY + 8}
+                          width={8}
+                          height={24}
+                          rx={2}
+                          fill={taskColor}
+                          className="cursor-ew-resize"
+                          onMouseDown={(e) => handleMouseDown(e, task.id, 'resize-end')}
+                        />
+                      </>
+                    )}
+                    
+                    {/* Milestone diamond */}
+                    {task.milestone && (
+                      <polygon
+                        points={`${barX + barWidth / 2},${rowY + 4} ${barX + barWidth / 2 + 8},${rowY + 12} ${barX + barWidth / 2},${rowY + 20} ${barX + barWidth / 2 - 8},${rowY + 12}`}
+                        fill={task.color || '#f59e0b'}
+                      />
+                    )}
+                  </g>
+                )}
+                
+                {/* Group summary bar */}
+                {task.isGroup && (
+                  <g
+                    className="cursor-pointer"
+                    onClick={() => setSelectedTask(task.id)}
+                  >
+                    <rect
+                      x={barX}
+                      y={rowY + 14}
+                      width={barWidth}
+                      height={12}
+                      rx={2}
+                      fill={taskColor}
+                      opacity={0.3}
+                    />
+                    <rect
+                      x={barX}
+                      y={rowY + 14}
+                      width={barWidth * (task.progress / 100)}
+                      height={12}
+                      rx={2}
+                      fill={taskColor}
+                      opacity={0.6}
+                    />
+                  </g>
+                )}
               </g>
             );
           })}
@@ -441,8 +663,20 @@ export function GanttCanvas() {
         </svg>
       </div>
       
-      {/* Zoom controls */}
+      {/* Controls */}
       <div className="fixed bottom-4 right-4 flex gap-2 bg-white rounded-lg shadow-lg p-2">
+        {/* Critical path toggle */}
+        <button
+          onClick={() => useGanttStore.getState().toggleCriticalPath()}
+          className={`px-3 py-1 rounded text-sm font-medium ${
+            showCriticalPath ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+          title="Toggle Critical Path"
+        >
+          🔴 Critical
+        </button>
+        
+        {/* Zoom controls */}
         <button
           onClick={() => useGanttStore.getState().setZoomLevel('day')}
           className={`px-3 py-1 rounded text-sm font-medium ${
@@ -467,6 +701,47 @@ export function GanttCanvas() {
         >
           Month
         </button>
+      </div>
+      
+      {/* Critical path legend */}
+      {showCriticalPath && criticalPathResult && (
+        <div className="fixed bottom-4 left-4 bg-white rounded-lg shadow-lg p-3 text-sm">
+          <div className="font-semibold mb-2">Critical Path</div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-4 h-3 rounded" style={{ backgroundColor: CRITICAL_COLOR }}></div>
+            <span>Critical ({criticalPathResult.path.length} tasks)</span>
+          </div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-4 h-3 rounded" style={{ backgroundColor: SLACK_COLOR, opacity: 0.4 }}></div>
+            <span>Slack/Float</span>
+          </div>
+          <div className="text-xs text-gray-500 mt-2">
+            Duration: {criticalPathResult.duration} days
+          </div>
+        </div>
+      )}
+      
+      {/* Dependency type legend */}
+      <div className="fixed top-4 right-4 bg-white rounded-lg shadow-lg p-3 text-xs">
+        <div className="font-semibold mb-1">Dependencies</div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="w-6 border-t-2" style={{ borderStyle: 'dashed', borderColor: '#94a3b8' }}></div>
+            <span>FS (Finish-Start)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-6 border-t-2" style={{ borderStyle: 'dashed', borderColor: '#3b82f6' }}></div>
+            <span>SS (Start-Start)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-6 border-t-2" style={{ borderStyle: 'dashed', borderColor: '#10b981' }}></div>
+            <span>FF (Finish-Finish)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-6 border-t-2" style={{ borderStyle: 'dashed', borderColor: '#f59e0b' }}></div>
+            <span>SF (Start-Finish)</span>
+          </div>
+        </div>
       </div>
     </div>
   );

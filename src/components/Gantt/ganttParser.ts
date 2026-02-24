@@ -1,4 +1,4 @@
-import type { GanttTask, GanttProject } from './types';
+import type { GanttTask, GanttProject, Dependency, DependencyType } from './types';
 
 /**
  * Parse Gantt DSL into structured data
@@ -9,14 +9,16 @@ import type { GanttTask, GanttProject } from './types';
  * title: Project Name
  * start: 2026-02-23
  * 
- * task TaskName {
- *   start: 2026-02-23
- *   end: 2026-02-26
- *   assignee: Jack
- *   progress: 50
- *   depends: OtherTask
- *   color: #3b82f6
- *   milestone: true
+ * group "Phase 1" {
+ *   task TaskName {
+ *     start: 2026-02-23
+ *     end: 2026-02-26
+ *     assignee: Jack
+ *     progress: 50
+ *     depends: OtherTask:FS+2d
+ *     color: #3b82f6
+ *     milestone: true
+ *   }
  * }
  * ```
  */
@@ -26,9 +28,27 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
   let title = 'Untitled Project';
   let projectStart = new Date();
   const tasks: GanttTask[] = [];
+  const dependencies: Dependency[] = [];
   
   let currentTask: Partial<GanttTask> | null = null;
+  let currentGroup: Partial<GanttTask> | null = null;
+  let currentGroupId: string | undefined = undefined; // Track group ID separately
   let taskIdCounter = 1;
+  
+  // Parse dependency string like "TaskName:FS+2d" or "TaskName" or "TaskName:SS"
+  const parseDependencyString = (depStr: string): { name: string; type: DependencyType; lag: number } => {
+    // Match: TaskName or TaskName:FS or TaskName:FS+2d or TaskName:FS-1d
+    const match = depStr.match(/^([^:]+)(?::(FS|SS|FF|SF))?(?:([+-]\d+)d)?$/);
+    if (!match) {
+      return { name: depStr, type: 'FS', lag: 0 };
+    }
+    
+    return {
+      name: match[1].trim(),
+      type: (match[2] as DependencyType) || 'FS',
+      lag: match[3] ? parseInt(match[3], 10) : 0,
+    };
+  };
   
   for (const line of lines) {
     // Project metadata
@@ -44,19 +64,48 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
       continue;
     }
     
+    // Group definition
+    if (line.startsWith('group ')) {
+      // Save previous task
+      if (currentTask && currentTask.name) {
+        tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart, currentGroup?.id));
+      }
+      
+      const name = line.replace('group ', '').replace('{', '').trim().replace(/"/g, '');
+      currentGroup = {
+        id: `group-${taskIdCounter}`,
+        name,
+        isGroup: true,
+        collapsed: false,
+        children: [],
+        dependencies: [],
+        progress: 0,
+      };
+      taskIdCounter++;
+      continue;
+    }
+    
+    // Close group
+    if (line === '}' && currentGroup && !currentTask) {
+      currentGroup = null;
+      continue;
+    }
+    
     // Task definition
     if (line.startsWith('task ')) {
       // Save previous task
       if (currentTask && currentTask.name) {
-        tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart));
+        tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart, currentGroup?.id));
       }
       
       const name = line.replace('task ', '').replace('{', '').trim();
+      const groupId = currentGroup ? currentGroup.id : undefined;
       currentTask = {
         id: `task-${taskIdCounter}`,
         name,
         dependencies: [],
         progress: 0,
+        parentId: groupId,
       };
       continue;
     }
@@ -74,8 +123,15 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
       } else if (line.startsWith('progress:')) {
         currentTask.progress = parseInt(line.replace('progress:', '').trim(), 10) || 0;
       } else if (line.startsWith('depends:')) {
-        const depName = line.replace('depends:', '').trim();
-        currentTask.dependencies = [depName];
+        const depStr = line.replace('depends:', '').trim();
+        const parsed = parseDependencyString(depStr);
+        currentTask.dependencies = [parsed.name]; // Store name temporarily, resolve later
+        currentTask.dependencyDetails = [{
+          predecessorId: parsed.name, // Will be resolved to ID later
+          successorId: currentTask.id || '',
+          type: parsed.type,
+          lag: parsed.lag,
+        }];
       } else if (line.startsWith('color:')) {
         currentTask.color = line.replace('color:', '').trim();
       } else if (line.startsWith('milestone:')) {
@@ -83,7 +139,7 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
       } else if (line === '}') {
         // Close task block
         if (currentTask && currentTask.name) {
-          tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart));
+          tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart, currentGroup?.id));
         }
         currentTask = null;
       }
@@ -92,21 +148,71 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
   
   // Save last task if not closed
   if (currentTask && currentTask.name) {
-    tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart));
+    tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart, currentGroup?.id));
+  }
+  
+  // Add groups to tasks
+  if (currentGroup) {
+    tasks.unshift(finalizeTask(currentGroup, 0, projectStart, undefined));
   }
   
   // Resolve dependency names to IDs
   const taskNameToId = new Map(tasks.map(t => [t.name, t.id]));
+  
   tasks.forEach(task => {
+    // Resolve simple dependencies (backward compatibility)
     task.dependencies = task.dependencies
       .map(dep => taskNameToId.get(dep) || dep)
       .filter(dep => tasks.some(t => t.id === dep));
+    
+    // Resolve dependency details
+    if (task.dependencyDetails) {
+      task.dependencyDetails.forEach(dep => {
+        dep.predecessorId = taskNameToId.get(dep.predecessorId) || dep.predecessorId;
+        dep.successorId = task.id;
+      });
+    }
+    
+    // Update parent's children array
+    if (task.parentId) {
+      const parent = tasks.find(t => t.id === task.parentId);
+      if (parent && parent.children) {
+        parent.children.push(task.id);
+      }
+    }
   });
   
-  return { title, startDate: projectStart, tasks, milestones: [] };
+  // Build dependencies array from all tasks
+  tasks.forEach(task => {
+    if (task.dependencyDetails) {
+      task.dependencyDetails.forEach(dep => {
+        // Only add if predecessor exists
+        if (tasks.some(t => t.id === dep.predecessorId)) {
+          dependencies.push(dep);
+        }
+      });
+    }
+  });
+  
+  // Calculate group progress (rollup from children)
+  tasks.filter(t => t.isGroup).forEach(group => {
+    if (group.children && group.children.length > 0) {
+      const childTasks = tasks.filter(t => group.children!.includes(t.id));
+      const totalProgress = childTasks.reduce((sum, t) => sum + t.progress, 0);
+      group.progress = Math.round(totalProgress / childTasks.length);
+      
+      // Set group dates from children
+      const starts = childTasks.map(t => t.startDate.getTime());
+      const ends = childTasks.map(t => t.endDate.getTime());
+      group.startDate = new Date(Math.min(...starts));
+      group.endDate = new Date(Math.max(...ends));
+    }
+  });
+  
+  return { title, startDate: projectStart, tasks, milestones: [], dependencies };
 }
 
-function finalizeTask(partial: Partial<GanttTask>, idNum: number, projectStart: Date): GanttTask {
+function finalizeTask(partial: Partial<GanttTask>, idNum: number, projectStart: Date, parentId?: string): GanttTask {
   const startDate = partial.startDate || projectStart;
   const endDate = partial.endDate || new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000);
   
@@ -120,6 +226,11 @@ function finalizeTask(partial: Partial<GanttTask>, idNum: number, projectStart: 
     color: partial.color,
     dependencies: partial.dependencies || [],
     milestone: partial.milestone,
+    parentId: parentId,
+    children: partial.children || [],
+    isGroup: partial.isGroup || false,
+    collapsed: partial.collapsed || false,
+    dependencyDetails: partial.dependencyDetails,
   };
 }
 
@@ -161,36 +272,68 @@ export function generateGanttDSL(project: GanttProject): string {
     '',
   ];
   
-  project.tasks.forEach(task => {
-    lines.push(`task ${task.name} {`);
-    lines.push(`  start: ${formatDateISO(task.startDate)}`);
-    lines.push(`  end: ${formatDateISO(task.endDate)}`);
+  // Get root tasks (no parent)
+  const rootTasks = project.tasks.filter(t => !t.parentId);
+  
+  const renderTask = (task: GanttTask, indent: number = 0): void => {
+    const prefix = '  '.repeat(indent);
     
-    if (task.assignee) {
-      lines.push(`  assignee: ${task.assignee}`);
-    }
-    
-    if (task.progress > 0) {
-      lines.push(`  progress: ${task.progress}`);
-    }
-    
-    if (task.dependencies.length > 0) {
-      const depTask = project.tasks.find(t => t.id === task.dependencies[0]);
-      if (depTask) {
-        lines.push(`  depends: ${depTask.name}`);
+    if (task.isGroup) {
+      lines.push(`${prefix}group "${task.name}" {`);
+      
+      // Render children
+      if (task.children) {
+        task.children.forEach(childId => {
+          const child = project.tasks.find(t => t.id === childId);
+          if (child) {
+            renderTask(child, indent + 1);
+          }
+        });
       }
+      
+      lines.push(`${prefix}}`);
+    } else {
+      lines.push(`${prefix}task ${task.name} {`);
+      lines.push(`${prefix}  start: ${formatDateISO(task.startDate)}`);
+      lines.push(`${prefix}  end: ${formatDateISO(task.endDate)}`);
+      
+      if (task.assignee) {
+        lines.push(`${prefix}  assignee: ${task.assignee}`);
+      }
+      
+      if (task.progress > 0) {
+        lines.push(`${prefix}  progress: ${task.progress}`);
+      }
+      
+      // Find dependencies for this task
+      const taskDeps = project.dependencies.filter(d => d.successorId === task.id);
+      taskDeps.forEach(dep => {
+        const predTask = project.tasks.find(t => t.id === dep.predecessorId);
+        if (predTask) {
+          let depStr = predTask.name;
+          if (dep.type !== 'FS' || dep.lag !== 0) {
+            depStr += `:${dep.type}`;
+            if (dep.lag !== 0) {
+              depStr += `${dep.lag >= 0 ? '+' : ''}${dep.lag}d`;
+            }
+          }
+          lines.push(`${prefix}  depends: ${depStr}`);
+        }
+      });
+      
+      if (task.color) {
+        lines.push(`${prefix}  color: ${task.color}`);
+      }
+      
+      if (task.milestone) {
+        lines.push(`${prefix}  milestone: true`);
+      }
+      
+      lines.push(`${prefix}}`);
     }
-    
-    if (task.color) {
-      lines.push(`  color: ${task.color}`);
-    }
-    
-    if (task.milestone) {
-      lines.push(`  milestone: true`);
-    }
-    
-    lines.push('}');
-  });
+  };
+  
+  rootTasks.forEach(task => renderTask(task));
   
   return lines.join('\n');
 }

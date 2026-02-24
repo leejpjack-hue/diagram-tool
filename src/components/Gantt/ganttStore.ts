@@ -1,12 +1,24 @@
 import { create } from 'zustand';
-import type { GanttTask, GanttMilestone, GanttZoomLevel } from './types';
+import type { GanttTask, GanttMilestone, GanttZoomLevel, Dependency, GanttFilter } from './types';
+import { calculateCriticalPath, type CriticalPathResult } from './criticalPath';
 
 interface GanttState {
   tasks: GanttTask[];
   milestones: GanttMilestone[];
+  dependencies: Dependency[];
   selectedTaskId: string | null;
   zoomLevel: GanttZoomLevel;
   viewStartDate: Date;
+  
+  // Sprint 8: Critical path
+  criticalPathResult: CriticalPathResult | null;
+  showCriticalPath: boolean;
+  
+  // Sprint 8: Filtering
+  filter: GanttFilter;
+  
+  // Sprint 8: Groups
+  expandedGroups: Set<string>;
   
   // Actions
   setTasks: (tasks: GanttTask[]) => void;
@@ -18,10 +30,43 @@ interface GanttState {
   setViewStartDate: (date: Date) => void;
   setMilestones: (milestones: GanttMilestone[]) => void;
   addMilestone: (milestone: GanttMilestone) => void;
+  
+  // Sprint 8: Dependencies
+  setDependencies: (deps: Dependency[]) => void;
+  addDependency: (dep: Dependency) => void;
+  updateDependency: (predecessorId: string, successorId: string, updates: Partial<Dependency>) => void;
+  removeDependency: (predecessorId: string, successorId: string) => void;
+  
+  // Sprint 8: Critical path
+  toggleCriticalPath: () => void;
+  recalculateCriticalPath: () => void;
+  
+  // Sprint 8: Filtering
+  setFilter: (filter: Partial<GanttFilter>) => void;
+  clearFilter: () => void;
+  getFilteredTasks: () => GanttTask[];
+  
+  // Sprint 8: Groups
+  toggleGroup: (groupId: string) => void;
+  expandAllGroups: () => void;
+  collapseAllGroups: () => void;
+  
+  // Project
+  setProject: (tasks: GanttTask[], dependencies: Dependency[]) => void;
 }
+
+const defaultFilter: GanttFilter = {
+  search: '',
+  assignee: null,
+  status: 'all',
+  dateRange: { start: null, end: null },
+  criticalOnly: false,
+};
 
 // Default sample tasks
 const today = new Date();
+today.setHours(0, 0, 0, 0);
+
 const addDays = (date: Date, days: number) => {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
@@ -47,7 +92,7 @@ const defaultTasks: GanttTask[] = [
     progress: 60,
     assignee: 'Sarah',
     color: '#10b981',
-    dependencies: ['task-1'],
+    dependencies: [],
   },
   {
     id: 'task-3',
@@ -57,7 +102,7 @@ const defaultTasks: GanttTask[] = [
     progress: 20,
     assignee: 'Mike',
     color: '#f59e0b',
-    dependencies: ['task-2'],
+    dependencies: [],
   },
   {
     id: 'task-4',
@@ -67,7 +112,7 @@ const defaultTasks: GanttTask[] = [
     progress: 0,
     assignee: 'Jack',
     color: '#8b5cf6',
-    dependencies: ['task-3'],
+    dependencies: [],
   },
   {
     id: 'task-5',
@@ -77,7 +122,7 @@ const defaultTasks: GanttTask[] = [
     progress: 0,
     assignee: 'Sarah',
     color: '#ef4444',
-    dependencies: ['task-4'],
+    dependencies: [],
   },
   {
     id: 'task-6',
@@ -87,17 +132,30 @@ const defaultTasks: GanttTask[] = [
     progress: 0,
     assignee: 'Mike',
     color: '#06b6d4',
-    dependencies: ['task-5'],
+    dependencies: [],
     milestone: true,
   },
 ];
 
-export const useGanttStore = create<GanttState>((set) => ({
+const defaultDependencies: Dependency[] = [
+  { predecessorId: 'task-1', successorId: 'task-2', type: 'FS', lag: 0 },
+  { predecessorId: 'task-2', successorId: 'task-3', type: 'FS', lag: 0 },
+  { predecessorId: 'task-3', successorId: 'task-4', type: 'FS', lag: 0 },
+  { predecessorId: 'task-4', successorId: 'task-5', type: 'SS', lag: -5 }, // Overlap testing
+  { predecessorId: 'task-5', successorId: 'task-6', type: 'FS', lag: 0 },
+];
+
+export const useGanttStore = create<GanttState>((set, get) => ({
   tasks: defaultTasks,
   milestones: [],
+  dependencies: defaultDependencies,
   selectedTaskId: null,
   zoomLevel: 'week',
   viewStartDate: today,
+  criticalPathResult: null,
+  showCriticalPath: false,
+  filter: defaultFilter,
+  expandedGroups: new Set(),
   
   setTasks: (tasks) => set({ tasks }),
   
@@ -113,6 +171,9 @@ export const useGanttStore = create<GanttState>((set) => ({
   
   deleteTask: (id) => set((state) => ({
     tasks: state.tasks.filter((t) => t.id !== id),
+    dependencies: state.dependencies.filter(
+      d => d.predecessorId !== id && d.successorId !== id
+    ),
     selectedTaskId: state.selectedTaskId === id ? null : state.selectedTaskId,
   })),
   
@@ -127,4 +188,117 @@ export const useGanttStore = create<GanttState>((set) => ({
   addMilestone: (milestone) => set((state) => ({
     milestones: [...state.milestones, milestone],
   })),
+  
+  // Dependencies
+  setDependencies: (deps) => set({ dependencies: deps }),
+  
+  addDependency: (dep) => set((state) => ({
+    dependencies: [...state.dependencies, dep],
+  })),
+  
+  updateDependency: (predecessorId, successorId, updates) => set((state) => ({
+    dependencies: state.dependencies.map((d) =>
+      d.predecessorId === predecessorId && d.successorId === successorId
+        ? { ...d, ...updates }
+        : d
+    ),
+  })),
+  
+  removeDependency: (predecessorId, successorId) => set((state) => ({
+    dependencies: state.dependencies.filter(
+      (d) => !(d.predecessorId === predecessorId && d.successorId === successorId)
+    ),
+  })),
+  
+  // Critical path
+  toggleCriticalPath: () => set((state) => {
+    const newShow = !state.showCriticalPath;
+    if (newShow && !state.criticalPathResult) {
+      const result = calculateCriticalPath(state.tasks, state.dependencies, state.viewStartDate);
+      return { showCriticalPath: newShow, criticalPathResult: result };
+    }
+    return { showCriticalPath: newShow };
+  }),
+  
+  recalculateCriticalPath: () => {
+    const state = get();
+    const result = calculateCriticalPath(state.tasks, state.dependencies, state.viewStartDate);
+    set({ criticalPathResult: result });
+  },
+  
+  // Filtering
+  setFilter: (filterUpdates) => set((state) => ({
+    filter: { ...state.filter, ...filterUpdates },
+  })),
+  
+  clearFilter: () => set({ filter: defaultFilter }),
+  
+  getFilteredTasks: () => {
+    const state = get();
+    let filtered = [...state.tasks];
+    const { search, assignee, status, dateRange, criticalOnly } = state.filter;
+    
+    // Search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(t => 
+        t.name.toLowerCase().includes(searchLower) ||
+        (t.assignee && t.assignee.toLowerCase().includes(searchLower))
+      );
+    }
+    
+    // Assignee filter
+    if (assignee) {
+      filtered = filtered.filter(t => t.assignee === assignee);
+    }
+    
+    // Status filter
+    if (status !== 'all') {
+      if (status === 'not-started') {
+        filtered = filtered.filter(t => t.progress === 0);
+      } else if (status === 'in-progress') {
+        filtered = filtered.filter(t => t.progress > 0 && t.progress < 100);
+      } else if (status === 'complete') {
+        filtered = filtered.filter(t => t.progress === 100);
+      }
+    }
+    
+    // Date range filter
+    if (dateRange.start) {
+      filtered = filtered.filter(t => t.endDate >= dateRange.start!);
+    }
+    if (dateRange.end) {
+      filtered = filtered.filter(t => t.startDate <= dateRange.end!);
+    }
+    
+    // Critical path filter
+    if (criticalOnly && state.criticalPathResult) {
+      filtered = filtered.filter(t => 
+        state.criticalPathResult!.path.includes(t.id)
+      );
+    }
+    
+    return filtered;
+  },
+  
+  // Groups
+  toggleGroup: (groupId) => set((state) => {
+    const expanded = new Set(state.expandedGroups);
+    if (expanded.has(groupId)) {
+      expanded.delete(groupId);
+    } else {
+      expanded.add(groupId);
+    }
+    return { expandedGroups: expanded };
+  }),
+  
+  expandAllGroups: () => set((state) => {
+    const groupIds = state.tasks.filter(t => t.isGroup).map(t => t.id);
+    return { expandedGroups: new Set(groupIds) };
+  }),
+  
+  collapseAllGroups: () => set({ expandedGroups: new Set() }),
+  
+  // Project
+  setProject: (tasks, dependencies) => set({ tasks, dependencies }),
 }));
