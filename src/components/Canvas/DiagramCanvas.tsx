@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useCallback } from 'react';
-import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider, useReactFlow } from '@xyflow/react';
+import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider, useReactFlow, BackgroundVariant } from '@xyflow/react';
 import type { Node, Edge, Viewport } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -183,7 +183,7 @@ function DiagramCanvasInternal() {
   }
 
   return (
-    <div className="w-full h-full bg-canvas-white relative">
+    <div className="w-full h-full bg-[#0F172A] relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -199,14 +199,14 @@ function DiagramCanvasInternal() {
         maxZoom={4}
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
       >
-        <Background color="#E2E8F0" gap={20} />
-        <Controls className="bg-white border border-border-gray rounded shadow-md" />
+        <Background color="#334155" gap={25} variant={BackgroundVariant.Dots} />
+        <Controls className="bg-[#1E293B] border-white/10 rounded shadow-2xl" />
         <MiniMap 
-          className="bg-white border border-border-gray rounded"
+          className="bg-[#1E293B] border-white/10 rounded shadow-2xl"
           nodeColor={(node) => {
             switch (node.type) {
               case 'service':
-                return '#3B82F6';
+                return '#A855F7';
               case 'database':
                 return '#EC4899';
               case 'queue':
@@ -221,11 +221,12 @@ function DiagramCanvasInternal() {
                 return '#8B5CF6';
             }
           }}
+          maskColor="rgba(0, 0, 0, 0.3)"
         />
       </ReactFlow>
       
       {/* Floating Zoom Controls */}
-      <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-10">
+      <div className="absolute bottom-4 left-4 bg-[#1E293B]/80 backdrop-blur-md rounded-lg shadow-2xl border border-white/10 p-2 z-10">
         <ZoomControls />
       </div>
     </div>
