@@ -108,10 +108,9 @@ async function exportAsPdf(
 ): Promise<void> {
   try {
     // Dynamic imports
-    const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
-      import('jspdf'),
-      import('html2canvas'),
-    ]);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const jsPDF = (await import('jspdf')).default;
+    const html2canvas = (await import('html2canvas')).default;
     
     const canvas = await html2canvas(element, {
       backgroundColor: '#ffffff',
@@ -157,7 +156,7 @@ async function exportAsPdf(
 async function exportAsSvg(
   element: HTMLElement,
   filename: string,
-  options: GanttExportOptions
+  _options: GanttExportOptions
 ): Promise<void> {
   const svg = element.querySelector('svg');
   if (!svg) {

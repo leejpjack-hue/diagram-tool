@@ -4,6 +4,9 @@ import { UndoRedoControls } from './components/Editor/UndoRedoControls';
 import { DiagramCanvas } from './components/Canvas/DiagramCanvas';
 import { GanttCanvas } from './components/Gantt/GanttCanvas';
 import { GanttPanel } from './components/Gantt/GanttPanel';
+import { GanttResourcePanel } from './components/Gantt/GanttResourcePanel';
+import { GanttFilterBar } from './components/Gantt/GanttFilterBar';
+import { GanttExportDialog } from './components/Gantt/GanttExportDialog';
 import { PropertiesPanel } from './components/Panel/PropertiesPanel';
 import { ExportPanel } from './components/Panel/ExportPanel';
 import { ImportPanel } from './components/Panel/ImportPanel';
@@ -12,12 +15,14 @@ import { ToastContainer } from './components/Toast/ToastContainer';
 import { useDiagramStore } from './store/diagramStore';
 import { useGanttStore } from './components/Gantt/ganttStore';
 import { parseGanttDSL } from './components/Gantt/ganttParser';
+import { exportGanttChart } from './components/Gantt/exportUtils';
 import { useExport } from './utils/useExport';
 import { useToast } from './utils/useToast';
 import { csvToDSL, csvToDiagram } from './utils/csvToDiagram';
 import { saveManager, type SavedDiagram, type SavedDiagramMode } from './utils/saveManager';
 import type { SimpleCSVRow } from './utils/csvParser';
 import { extractNodeDSL, insertNodeDSL, duplicateNodeDSL } from './utils/clipboardUtils';
+import type { GanttExportOptions } from './components/Gantt/types';
 
 const ARCHITECTURE_DSL = `diagram: architecture
 title: Insurance Claims Platform
@@ -147,6 +152,7 @@ task Deployment {
 }`;
 
 type PanelType = 'none' | 'properties' | 'import' | 'export';
+type GanttSidePanel = 'tasks' | 'resources';
 
 function App() {
   const { 
@@ -164,11 +170,14 @@ function App() {
   
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow' | 'gantt'>('architecture');
   const [activePanel, setActivePanel] = useState<PanelType>('none');
+  const [ganttSidePanel, setGanttSidePanel] = useState<GanttSidePanel>('tasks');
+  const [showGanttExport, setShowGanttExport] = useState(false);
   const [editorWidth, setEditorWidth] = useState(500);
   const [isResizing, setIsResizing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const ganttCanvasRef = useRef<HTMLDivElement>(null);
   
   const { exportPNG, exportSVG, exportJSON } = useExport();
   const toast = useToast();
@@ -211,6 +220,23 @@ function App() {
     };
     addTask(newTask);
     toast.success(`Added: ${newTask.name}`);
+  };
+
+  // Handle Gantt export
+  const handleGanttExport = async (options: GanttExportOptions) => {
+    if (!ganttCanvasRef.current) {
+      toast.error('Could not find chart to export');
+      return;
+    }
+    
+    try {
+      const title = extractTitle(dslText) || 'Gantt Chart';
+      await exportGanttChart(ganttCanvasRef.current, options, title);
+      toast.success(`Exported as ${options.format.toUpperCase()}`);
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast.error('Export failed. Please try again.');
+    }
   };
 
   const handleMouseDown = useCallback(() => {
@@ -510,8 +536,13 @@ function App() {
         </div>
         
         {/* Canvas */}
-        <div className="flex-1 overflow-hidden bg-white">
-          {activeTab === 'gantt' ? <GanttCanvas /> : <DiagramCanvas />}
+        <div className="flex-1 flex flex-col overflow-hidden bg-white">
+          {activeTab === 'gantt' && (
+            <GanttFilterBar />
+          )}
+          <div ref={activeTab === 'gantt' ? ganttCanvasRef : undefined} className="flex-1 overflow-auto">
+            {activeTab === 'gantt' ? <GanttCanvas /> : <DiagramCanvas />}
+          </div>
         </div>
         
         {/* Side Panel - No Overlap! */}
@@ -525,8 +556,43 @@ function App() {
         
         {/* Gantt Panel - Show when in gantt mode */}
         {activeTab === 'gantt' && (
-          <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white">
-            <GanttPanel onAddTask={handleAddGanttTask} />
+          <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white flex flex-col">
+            {/* Panel Toggle */}
+            <div className="flex border-b border-gray-200">
+              <button
+                onClick={() => setGanttSidePanel('tasks')}
+                className={`flex-1 px-4 py-2 text-sm font-medium ${
+                  ganttSidePanel === 'tasks'
+                    ? 'text-blue-600 border-b-2 border-blue-500'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                📋 Tasks
+              </button>
+              <button
+                onClick={() => setGanttSidePanel('resources')}
+                className={`flex-1 px-4 py-2 text-sm font-medium ${
+                  ganttSidePanel === 'resources'
+                    ? 'text-blue-600 border-b-2 border-blue-500'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                👥 Resources
+              </button>
+              <button
+                onClick={() => setShowGanttExport(true)}
+                className="px-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                title="Export"
+              >
+                📤
+              </button>
+            </div>
+            
+            {/* Panel Content */}
+            <div className="flex-1 overflow-hidden">
+              {ganttSidePanel === 'tasks' && <GanttPanel onAddTask={handleAddGanttTask} />}
+              {ganttSidePanel === 'resources' && <GanttResourcePanel />}
+            </div>
           </div>
         )}
       </div>
@@ -545,6 +611,13 @@ function App() {
           <span className="font-semibold text-gray-900">100%</span>
         </div>
       </footer>
+      
+      {/* Gantt Export Dialog */}
+      <GanttExportDialog
+        isOpen={showGanttExport}
+        onClose={() => setShowGanttExport(false)}
+        onExport={handleGanttExport}
+      />
       
       {/* Toast Notifications */}
       <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
