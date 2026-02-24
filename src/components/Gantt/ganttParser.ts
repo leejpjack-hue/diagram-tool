@@ -29,11 +29,15 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
   let projectStart = new Date();
   const tasks: GanttTask[] = [];
   const dependencies: Dependency[] = [];
+  const groupStack: { id: string; name: string }[] = [];
   
   let currentTask: Partial<GanttTask> | null = null;
-  let currentGroup: Partial<GanttTask> | null = null;
-  let currentGroupId: string | undefined = undefined; // Track group ID separately
   let taskIdCounter = 1;
+  
+  // Get current group ID (top of stack)
+  const getCurrentGroupId = (): string | undefined => {
+    return groupStack.length > 0 ? groupStack[groupStack.length - 1].id : undefined;
+  };
   
   // Parse dependency string like "TaskName:FS+2d" or "TaskName" or "TaskName:SS"
   const parseDependencyString = (depStr: string): { name: string; type: DependencyType; lag: number } => {
@@ -68,26 +72,35 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
     if (line.startsWith('group ')) {
       // Save previous task
       if (currentTask && currentTask.name) {
-        tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart, currentGroup?.id));
+        tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart, getCurrentGroupId()));
+        currentTask = null;
       }
       
       const name = line.replace('group ', '').replace('{', '').trim().replace(/"/g, '');
-      currentGroup = {
-        id: `group-${taskIdCounter}`,
+      const groupId = `group-${taskIdCounter}`;
+      taskIdCounter++;
+      
+      // Add group to tasks
+      tasks.push({
+        id: groupId,
         name,
+        startDate: projectStart,
+        endDate: new Date(projectStart.getTime() + 7 * 24 * 60 * 60 * 1000),
+        progress: 0,
+        dependencies: [],
         isGroup: true,
         collapsed: false,
         children: [],
-        dependencies: [],
-        progress: 0,
-      };
-      taskIdCounter++;
+        parentId: getCurrentGroupId(),
+      });
+      
+      groupStack.push({ id: groupId, name });
       continue;
     }
     
     // Close group
-    if (line === '}' && currentGroup && !currentTask) {
-      currentGroup = null;
+    if (line === '}' && groupStack.length > 0 && !currentTask) {
+      groupStack.pop();
       continue;
     }
     
@@ -95,17 +108,16 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
     if (line.startsWith('task ')) {
       // Save previous task
       if (currentTask && currentTask.name) {
-        tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart, currentGroup?.id));
+        tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart, getCurrentGroupId()));
       }
       
       const name = line.replace('task ', '').replace('{', '').trim();
-      const groupId = currentGroup ? currentGroup.id : undefined;
       currentTask = {
         id: `task-${taskIdCounter}`,
         name,
         dependencies: [],
         progress: 0,
-        parentId: groupId,
+        parentId: getCurrentGroupId(),
       };
       continue;
     }
@@ -139,7 +151,7 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
       } else if (line === '}') {
         // Close task block
         if (currentTask && currentTask.name) {
-          tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart, currentGroup?.id));
+          tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart, getCurrentGroupId()));
         }
         currentTask = null;
       }
@@ -148,12 +160,7 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
   
   // Save last task if not closed
   if (currentTask && currentTask.name) {
-    tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart, currentGroup?.id));
-  }
-  
-  // Add groups to tasks
-  if (currentGroup) {
-    tasks.unshift(finalizeTask(currentGroup, 0, projectStart, undefined));
+    tasks.push(finalizeTask(currentTask, taskIdCounter++, projectStart, getCurrentGroupId()));
   }
   
   // Resolve dependency names to IDs

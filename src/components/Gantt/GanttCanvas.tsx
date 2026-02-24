@@ -242,16 +242,15 @@ export function GanttCanvas() {
       const style = getDependencyStyle(dep.type);
       
       // Calculate arrow endpoints based on dependency type
-      let startX: number, startY: number, endX: number, endY: number;
-      
       const predBarStart = TASK_NAME_WIDTH + diffDays(predecessorTask.startDate, minDate) * dayWidth;
       const predBarEnd = TASK_NAME_WIDTH + diffDays(predecessorTask.endDate, minDate) * dayWidth;
       const succBarStart = TASK_NAME_WIDTH + diffDays(successorTask.startDate, minDate) * dayWidth;
       const succBarEnd = TASK_NAME_WIDTH + diffDays(successorTask.endDate, minDate) * dayWidth;
-      
-      startY = HEADER_HEIGHT + predecessorIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
-      endY = HEADER_HEIGHT + successorIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
-      
+
+      const startY = HEADER_HEIGHT + predecessorIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
+      const endY = HEADER_HEIGHT + successorIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
+
+      let startX: number, endX: number;
       switch (dep.type) {
         case 'FS': // Finish to Start
           startX = predBarEnd;
