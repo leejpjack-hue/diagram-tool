@@ -2,10 +2,11 @@
 import http.server
 import socketserver
 import os
+from pathlib import Path
 
 PORT = 8888
 # Point to the dist folder (standard for Vite apps)
-DIRECTORY = "/home/node/.openclaw/workspace/external-projects/diagram-tool/dist"
+DIRECTORY = str(Path(__file__).parent / "dist")
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):

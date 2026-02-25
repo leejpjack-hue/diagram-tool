@@ -719,29 +719,6 @@ export function GanttCanvas() {
           </div>
         </div>
       )}
-      
-      {/* Dependency type legend */}
-      <div className="fixed top-4 right-4 bg-white rounded-lg shadow-lg p-3 text-xs">
-        <div className="font-semibold mb-1">Dependencies</div>
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="w-6 border-t-2" style={{ borderStyle: 'dashed', borderColor: '#94a3b8' }}></div>
-            <span>FS (Finish-Start)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-6 border-t-2" style={{ borderStyle: 'dashed', borderColor: '#3b82f6' }}></div>
-            <span>SS (Start-Start)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-6 border-t-2" style={{ borderStyle: 'dashed', borderColor: '#10b981' }}></div>
-            <span>FF (Finish-Finish)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-6 border-t-2" style={{ borderStyle: 'dashed', borderColor: '#f59e0b' }}></div>
-            <span>SF (Start-Finish)</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

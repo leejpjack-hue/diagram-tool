@@ -7,6 +7,7 @@ import { GanttPanel } from './components/Gantt/GanttPanel';
 import { GanttResourcePanel } from './components/Gantt/GanttResourcePanel';
 import { GanttFilterBar } from './components/Gantt/GanttFilterBar';
 import { GanttExportDialog } from './components/Gantt/GanttExportDialog';
+import { MobileViewToggle } from './components/Gantt/MobileViewToggle';
 import { PropertiesPanel } from './components/Panel/PropertiesPanel';
 import { ExportPanel } from './components/Panel/ExportPanel';
 import { ImportPanel } from './components/Panel/ImportPanel';
@@ -23,6 +24,8 @@ import { saveManager, type SavedDiagram, type SavedDiagramMode } from './utils/s
 import type { SimpleCSVRow } from './utils/csvParser';
 import { extractNodeDSL, insertNodeDSL, duplicateNodeDSL } from './utils/clipboardUtils';
 import type { GanttExportOptions } from './components/Gantt/types';
+import { useMobile } from './hooks/useMobile';
+import './styles/gantt-fixes.css';
 
 const ARCHITECTURE_DSL = `diagram: architecture
 title: Insurance Claims Platform
@@ -168,14 +171,22 @@ function App() {
   
   const { setTasks, addTask, tasks } = useGanttStore();
   
-  const [activeTab, setActiveTab] = useState<'architecture' | 'flow' | 'gantt'>('architecture');
+  // Initialize activeTab from saved diagram if available
+  const [activeTab, setActiveTab] = useState<'architecture' | 'flow' | 'gantt'>(() => {
+    const saved = saveManager.getCurrentDiagram();
+    return (saved?.mode as 'architecture' | 'flow' | 'gantt') || 'architecture';
+  });
   const [activePanel, setActivePanel] = useState<PanelType>('none');
   const [ganttSidePanel, setGanttSidePanel] = useState<GanttSidePanel>('tasks');
   const [showGanttExport, setShowGanttExport] = useState(false);
-  const [editorWidth, setEditorWidth] = useState(500);
+  const [showTaskPanel, setShowTaskPanel] = useState(true);
+  const [editorWidth, setEditorWidth] = useState(250);
   const [isResizing, setIsResizing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [lastSaved, setLastSaved] = useState<Date | null>(() => {
+    const saved = saveManager.getCurrentDiagram();
+    return saved ? new Date(saved.updatedAt) : null;
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const ganttCanvasRef = useRef<HTMLDivElement>(null);
   
@@ -375,10 +386,8 @@ function App() {
     if (saved) {
       setDslText(saved.dslText);
       setDiagramMode(saved.mode);
-      setActiveTab(saved.mode);
-      setLastSaved(new Date(saved.updatedAt));
     }
-  }, []);
+  }, [setDslText, setDiagramMode]);
 
   const handleLoadDiagram = (diagram: SavedDiagram) => {
     setDslText(diagram.dslText);
@@ -417,10 +426,13 @@ function App() {
     setActivePanel(prev => prev === panel ? 'none' : panel);
   };
 
+  const { isMobile } = useMobile();
+  const [mobileView, setMobileView] = useState<'editor' | 'timeline' | 'tasks'>('timeline');
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-6">
+      <header className="h-16 bg-white border-b border-gray-200 flex items-center px-4 md:px-6 gap-2 md:gap-6">
         {/* Logo & Title */}
         <div className="flex items-center gap-3 flex-shrink-0">
           <div className="app-logo">
@@ -520,28 +532,47 @@ function App() {
       {/* Main Content */}
       <div ref={containerRef} className="flex-1 flex overflow-hidden">
         {/* Editor Panel - Resizable */}
-        <div style={{ width: editorWidth, minWidth: 300, maxWidth: 800 }} className="flex-shrink-0">
-          <DSLEditor />
-        </div>
+        {(!isMobile || mobileView === 'editor') && (
+          <div style={{ width: isMobile ? '100%' : editorWidth, minWidth: 300, maxWidth: 800 }} className="flex-shrink-0">
+            <DSLEditor />
+          </div>
+        )}
         
-        {/* Resize Handle */}
-        <div
-          onMouseDown={handleMouseDown}
-          className={`w-1.5 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex items-center justify-center transition-colors group ${
-            isResizing ? 'bg-blue-500' : ''
-          }`}
-          style={{ userSelect: 'none' }}
-        >
-          <div className="w-0.5 h-12 bg-gray-300 group-hover:bg-blue-400 rounded transition-colors" />
-        </div>
+        {/* Resize Handle - Hide on mobile */}
+        {!isMobile && (
+          <div
+            onMouseDown={handleMouseDown}
+            className={`w-1.5 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex items-center justify-center transition-colors group ${
+              isResizing ? 'bg-blue-500' : ''
+            }`}
+            style={{ userSelect: 'none' }}
+          >
+            <div className="w-0.5 h-12 bg-gray-300 group-hover:bg-blue-400 rounded transition-colors" />
+          </div>
+        )}
         
         {/* Canvas */}
         <div className="flex-1 flex flex-col overflow-hidden bg-white">
           {activeTab === 'gantt' && (
-            <GanttFilterBar />
+            <>
+              {/* Mobile View Toggle */}
+              {isMobile && (
+                <div className="px-4 py-3 border-b border-gray-200">
+                  <MobileViewToggle
+                    currentView={mobileView}
+                    onViewChange={setMobileView}
+                  />
+                </div>
+              )}
+              <GanttFilterBar />
+            </>
           )}
           <div ref={activeTab === 'gantt' ? ganttCanvasRef : undefined} className="flex-1 overflow-auto">
-            {activeTab === 'gantt' ? <GanttCanvas /> : <DiagramCanvas />}
+            {activeTab === 'gantt' ? (
+              (!isMobile || mobileView === 'timeline') ? <GanttCanvas /> : null
+            ) : (
+              <DiagramCanvas />
+            )}
           </div>
         </div>
         
@@ -554,9 +585,20 @@ function App() {
           </div>
         )}
         
-        {/* Gantt Panel - Show when in gantt mode */}
-        {activeTab === 'gantt' && (
-          <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white flex flex-col">
+        {/* Gantt Panel - Show when in gantt mode and (not mobile OR in tasks view) */}
+        {activeTab === 'gantt' && (!isMobile || mobileView === 'tasks') && showTaskPanel && (
+          <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white flex flex-col relative">
+            {/* Collapse Button */}
+            <button
+              onClick={() => setShowTaskPanel(false)}
+              className="absolute -left-3 top-4 z-10 w-6 h-12 bg-white border border-gray-300 rounded-l-md flex items-center justify-center hover:bg-gray-100 text-gray-600 hover:text-gray-900 shadow-sm"
+              title="Hide task panel"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+            
             {/* Panel Toggle */}
             <div className="flex border-b border-gray-200">
               <button
@@ -595,21 +637,25 @@ function App() {
             </div>
           </div>
         )}
+        
+        {/* Show Task Panel Button (when hidden) */}
+        {activeTab === 'gantt' && (!isMobile || mobileView === 'tasks') && !showTaskPanel && (
+          <button
+            onClick={() => setShowTaskPanel(true)}
+            className="absolute right-4 top-20 z-10 w-8 h-24 bg-blue-500 text-white rounded-l-md flex items-center justify-center gap-1 hover:bg-blue-600 shadow-lg"
+            title="Show task panel"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span className="text-xs font-medium">Tasks</span>
+          </button>
+        )}
       </div>
       
-      {/* Footer */}
+      {/* Footer - Minimal */}
       <footer className="app-footer">
         <span className="font-semibold text-gray-900">{diagramMode.charAt(0).toUpperCase() + diagramMode.slice(1)} Mode</span>
-        <span className="mx-2 text-gray-400">•</span>
-        <span>Editor: {editorWidth}px</span>
-        <span className="mx-2 text-gray-400">•</span>
-        <span className="flex items-center gap-1">
-          Press <kbd className="kbd">P</kbd> for Properties
-        </span>
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-gray-500">Zoom:</span>
-          <span className="font-semibold text-gray-900">100%</span>
-        </div>
       </footer>
       
       {/* Gantt Export Dialog */}

@@ -1,0 +1,171 @@
+/* Fix for Gantt UI Issues - Based on prototype testing findings */
+
+/* Issue #1: Button Overlaps */
+.btn, .btn-tab {
+  margin-right: 8px; /* Add 8px horizontal spacing */
+  margin-bottom: 4px;
+}
+
+.btn-tab + .btn-tab {
+  margin-right: 6px;
+}
+
+.mode-tabs .btn-tab {
+  margin-right: 4px;
+}
+
+/* Issue #2: Search input too small */
+input[type="text"],
+input[type="search"] {
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+/* Issue #3: Gantt Filter Bar spacing */
+.gantt-filter-bar button,
+.gantt-filter-bar select {
+  margin-right: 8px;
+}
+
+.gantt-filter-bar input {
+  margin-right: 6px;
+}
+
+/* Issue #4: Tab buttons spacing */
+.mobile-view-toggle button {
+  min-width: 80px;
+  padding: 8px 12px;
+}
+
+/* Issue #5: Panel spacing */
+.gantt-panel {
+  min-width: 320px;
+}
+
+.gantt-panel .panel-section {
+  margin-bottom: 12px;
+}
+
+/* Issue #6: Add Task button */
+.add-task-button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Issue #7: Date grid visibility */
+.date-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+  border: 1px solid #e5e7eb;
+}
+
+.date-header {
+  font-weight: 600;
+  padding: 8px;
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.date-cell {
+  text-align: center;
+  padding: 4px;
+  border-right: 1px solid #f0f0f0;
+}
+
+.date-cell:last-child {
+  border-right: none;
+}
+
+/* Issue #8: Progress bar */
+.progress-bar-container {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  background: #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: #10b981;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+/* Issue #9: Task card */
+.task-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: white;
+  transition: box-shadow 0.2s ease;
+}
+
+.task-card:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Issue #10: Mobile responsive */
+@media (max-width: 768px) {
+  .gantt-panel {
+    display: none; /* Hide task list on mobile */
+  }
+  
+  .mobile-view-toggle {
+    display: flex;
+  }
+  
+  .editor-panel {
+    display: block;
+    width: 100%;
+  }
+  
+  .gantt-timeline {
+    display: block;
+    width: 100%;
+  }
+}
+
+@media (min-width: 768px) {
+  .date-grid {
+    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+  }
+  
+  .task-card {
+    padding: 8px;
+    margin-bottom: 4px;
+  }
+}
+
+/* Issue #11: Accessibility improvements */
+button:focus {
+  outline: 2px solid blue-500;
+  outline-offset: 2px;
+}
+
+button:active {
+  outline: 2px solid blue-600;
+  outline-offset: 2px;
+}
+
+select:focus {
+  outline: 2px solid blue-500;
+  outline-offset: 2px;
+}
+
+input:focus {
+  outline: 2px solid blue-500;
+  outline-offset: 2px;
+}

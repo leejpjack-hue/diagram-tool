@@ -1,0 +1,24 @@
+[Unit]
+Description=DiagramTool - Text to Diagram Web Application
+Documentation=https://github.com/leejpjack-hue/diagram-tool
+After=network.target
+
+[Service]
+Type=simple
+User=jack
+WorkingDirectory=/home/jack/.openclaw/workspace/diagram-tool
+ExecStart=/usr/bin/python3 /home/jack/.openclaw/workspace/diagram-tool/server_8888.py
+Restart=on-failure
+RestartSec=10
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=diagram-tool
+
+[Install]
+WantedBy=multi-user.target

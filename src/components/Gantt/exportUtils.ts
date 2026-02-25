@@ -35,8 +35,10 @@ export async function exportGanttChart(
 async function exportAsPng(
   element: HTMLElement,
   filename: string,
-  _options: GanttExportOptions
+  options: GanttExportOptions
 ): Promise<void> {
+  // Options available for future enhancements (includeTaskList, dateRange, etc.)
+  void options;
   try {
     // Dynamic import to avoid bundling if not used
     const html2canvas = (await import('html2canvas')).default;
@@ -104,11 +106,12 @@ function fallbackExportAsPng(element: HTMLElement, filename: string): void {
 async function exportAsPdf(
   element: HTMLElement,
   filename: string,
-  _options: GanttExportOptions
+  options: GanttExportOptions
 ): Promise<void> {
+  // Options available for future enhancements (includeTaskList, dateRange, etc.)
+  void options;
   try {
     // Dynamic imports
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const jsPDF = (await import('jspdf')).default;
     const html2canvas = (await import('html2canvas')).default;
     
@@ -156,8 +159,10 @@ async function exportAsPdf(
 async function exportAsSvg(
   element: HTMLElement,
   filename: string,
-  _options: GanttExportOptions
+  options: GanttExportOptions
 ): Promise<void> {
+  // Options available for future enhancements (includeTaskList, dateRange, etc.)
+  void options;
   const svg = element.querySelector('svg');
   if (!svg) {
     alert('Could not find chart to export');
