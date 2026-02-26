@@ -67,16 +67,16 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="side-panel">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-lg font-bold text-gray-900">📥 Import APM Data</h2>
+      <div className="panel-header">
+        <h2 className="panel-title">📥 Import APM Data</h2>
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="panel-content">
         {/* File Upload */}
-        <div className="mb-6">
+        <div className="property-group">
           <input
             ref={fileInputRef}
             type="file"
