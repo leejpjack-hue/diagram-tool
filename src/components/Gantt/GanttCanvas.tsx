@@ -43,10 +43,12 @@ export function GanttCanvas() {
     showCriticalPath,
     criticalPathResult,
     expandedGroups,
+    filter,
     setSelectedTask, 
     updateTask,
     toggleGroup,
     recalculateCriticalPath,
+    getFilteredTasks,
   } = useGanttStore();
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,8 +61,11 @@ export function GanttCanvas() {
     }
   }, [tasks, dependencies, showCriticalPath, recalculateCriticalPath]);
 
-  // Filter out collapsed group children for display
+  // Filter out collapsed group children for display AND apply filter
   const visibleTasks = useMemo(() => {
+    // First apply the filter from the store
+    const filteredTasks = getFilteredTasks();
+    
     const result: GanttTask[] = [];
     
     const addTask = (task: GanttTask) => {
@@ -68,7 +73,7 @@ export function GanttCanvas() {
         result.push(task);
         if (expandedGroups.has(task.id) && task.children) {
           task.children.forEach(childId => {
-            const child = tasks.find(t => t.id === childId);
+            const child = filteredTasks.find(t => t.id === childId);
             if (child) addTask(child);
           });
         }
@@ -76,16 +81,16 @@ export function GanttCanvas() {
         result.push(task);
       } else {
         // Has parent - only show if parent is expanded
-        const parent = tasks.find(t => t.id === task.parentId);
+        const parent = filteredTasks.find(t => t.id === task.parentId);
         if (parent && expandedGroups.has(parent.id)) {
           result.push(task);
         }
       }
     };
     
-    tasks.filter(t => !t.parentId).forEach(addTask);
+    filteredTasks.filter(t => !t.parentId).forEach(addTask);
     return result;
-  }, [tasks, expandedGroups]);
+  }, [tasks, getFilteredTasks, expandedGroups, filter]);
 
   // Calculate date range
   const { minDate, totalDays } = useMemo(() => {
@@ -663,7 +668,7 @@ export function GanttCanvas() {
       </div>
       
       {/* Controls */}
-      <div className="fixed bottom-4 right-4 flex gap-2 bg-white rounded-lg shadow-lg p-2">
+      <div className="fixed bottom-4 right-4 flex gap-2 bg-white rounded-lg shadow-lg p-2 z-10">
         {/* Critical path toggle */}
         <button
           onClick={() => useGanttStore.getState().toggleCriticalPath()}
@@ -704,7 +709,7 @@ export function GanttCanvas() {
       
       {/* Critical path legend */}
       {showCriticalPath && criticalPathResult && (
-        <div className="fixed bottom-4 left-4 bg-white rounded-lg shadow-lg p-3 text-sm">
+        <div className="fixed bottom-20 left-4 bg-white rounded-lg shadow-lg p-3 text-sm max-w-xs">
           <div className="font-semibold mb-2">Critical Path</div>
           <div className="flex items-center gap-2 mb-1">
             <div className="w-4 h-3 rounded" style={{ backgroundColor: CRITICAL_COLOR }}></div>

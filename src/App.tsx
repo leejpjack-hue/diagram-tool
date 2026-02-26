@@ -16,6 +16,7 @@ import { ToastContainer } from './components/Toast/ToastContainer';
 import { useDiagramStore } from './store/diagramStore';
 import { useGanttStore } from './components/Gantt/ganttStore';
 import { parseGanttDSL } from './components/Gantt/ganttParser';
+import { generateGanttDSL } from './components/Gantt/ganttGenerator';
 import { exportGanttChart } from './components/Gantt/exportUtils';
 import { useExport } from './utils/useExport';
 import { useToast } from './utils/useToast';
@@ -169,7 +170,7 @@ function App() {
     setClipboard 
   } = useDiagramStore();
   
-  const { setTasks, addTask, tasks } = useGanttStore();
+  const { setTasks, addTask, tasks, dependencies } = useGanttStore();
   
   // Initialize activeTab from saved diagram if available
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow' | 'gantt'>(() => {
@@ -196,12 +197,42 @@ function App() {
   // Parse Gantt DSL when it changes
   useEffect(() => {
     if (diagramMode === 'gantt' && dslText.includes('diagram: gantt')) {
+      isUpdatingFromDSL.current = true;
       const project = parseGanttDSL(dslText);
       if (project && project.tasks.length > 0) {
         setTasks(project.tasks);
       }
+      // Reset flag after a short delay to allow the state update to complete
+      setTimeout(() => {
+        isUpdatingFromDSL.current = false;
+      }, 100);
     }
   }, [dslText, diagramMode, setTasks]);
+  
+  // Sync DSL when tasks or dependencies change from UI
+  // This ensures DSL is always the single source of truth
+  const isUpdatingFromDSL = useRef(false);
+  
+  useEffect(() => {
+    // Don't sync if we're in non-gantt mode or if change came from DSL parsing
+    if (diagramMode !== 'gantt' || isUpdatingFromDSL.current) {
+      return;
+    }
+    
+    // Only sync if we have tasks
+    if (tasks.length === 0) {
+      return;
+    }
+    
+    // Generate DSL from current tasks and dependencies
+    const title = extractTitle(dslText) || 'Gantt Chart';
+    const updatedDSL = generateGanttDSL(tasks, dependencies, title);
+    
+    // Update DSL text
+    setDslText(updatedDSL);
+    setSaveStatus('unsaved');
+    
+  }, [tasks, dependencies, diagramMode]); // Watch tasks and dependencies
 
   const handleTabChange = (tab: 'architecture' | 'flow' | 'gantt') => {
     setActiveTab(tab);
@@ -230,6 +261,7 @@ function App() {
       dependencies: [],
     };
     addTask(newTask);
+    // DSL will be automatically updated by the useEffect that watches tasks
     toast.success(`Added: ${newTask.name}`);
   };
 
