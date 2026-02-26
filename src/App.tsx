@@ -464,42 +464,38 @@ function App() {
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <header className="h-16 bg-white border-b border-gray-200 flex items-center px-4 md:px-6 gap-2 md:gap-6">
+      <header className="professional-header">
         {/* Logo & Title */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <div className="app-logo">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-            </svg>
-          </div>
-          <h1 className="app-title">DiagramTool</h1>
-        </div>
+        <a href="#" className="header-logo">
+          <div className="header-logo-icon">D</div>
+          <span>DiagramTool</span>
+        </a>
         
         {/* Mode Tabs */}
-        <div className="mode-tabs flex-shrink-0">
+        <div className="tab-group">
           <button
             onClick={() => handleTabChange('architecture')}
-            className={`btn-tab ${activeTab === 'architecture' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
+            className={`tab-button ${activeTab === 'architecture' ? 'active' : ''}`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
             Architecture
           </button>
           <button
             onClick={() => handleTabChange('flow')}
-            className={`btn-tab ${activeTab === 'flow' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
+            className={`tab-button ${activeTab === 'flow' ? 'active' : ''}`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             Flow
           </button>
           <button
             onClick={() => handleTabChange('gantt')}
-            className={`btn-tab ${activeTab === 'gantt' ? 'btn-tab-active' : 'btn-tab-inactive'}`}
+            className={`tab-button ${activeTab === 'gantt' ? 'active' : ''}`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
             Gantt
@@ -508,7 +504,7 @@ function App() {
         
         {/* Status */}
         <div className="flex-shrink-0">
-          <span className="status-badge bg-blue-100 text-blue-800">
+          <span className="status-badge badge-primary">
             <span className="capitalize">{diagramMode} Mode</span>
           </span>
         </div>
