@@ -37,18 +37,19 @@ export function DSLEditor() {
   }, []);
 
   return (
-    <div className="h-full flex flex-col bg-panel-light border-r border-border-gray">
-      <div className="px-4 py-3 bg-white border-b border-border-gray">
-        <h2 className="text-sm font-semibold text-deep-navy font-mono">DSL EDITOR</h2>
+    <div className="editor-panel">
+      <div className="editor-header">
+        <div className="editor-title">DSL Editor</div>
+        <div className="editor-subtitle">Define your diagram</div>
       </div>
       
-      <div className="flex-1">
+      <div className="editor-content">
         <Editor
           height="100%"
           defaultLanguage="plaintext"
           value={dslText}
           onChange={handleEditorChange}
-          theme="vs-light"
+          theme="vs-dark"
           options={{
             minimap: { enabled: false },
             fontSize: 13,

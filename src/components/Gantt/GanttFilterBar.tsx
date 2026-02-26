@@ -24,49 +24,49 @@ export function GanttFilterBar() {
   ];
   
   return (
-    <div className="bg-white border-b border-gray-200 px-4 py-3">
+    <div className="filter-bar">
       <div className="flex flex-wrap items-center gap-3">
         {/* Search */}
-        <div className="relative">
+        <div className="filter-group">
+          <span className="filter-label">🔍</span>
           <input
             type="text"
             placeholder="Search tasks..."
             value={filter.search}
             onChange={(e) => setFilter({ search: e.target.value })}
-            className="w-48 pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="filter-input"
+            style={{ width: '200px' }}
           />
-          <svg
-            className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
         </div>
         
         {/* Assignee Filter */}
-        <select
-          value={filter.assignee || ''}
-          onChange={(e) => setFilter({ assignee: e.target.value || null })}
-          className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">All Assignees</option>
-          {assignees.map(assignee => (
-            <option key={assignee} value={assignee}>{assignee}</option>
-          ))}
-        </select>
+        <div className="filter-group">
+          <span className="filter-label">👤</span>
+          <select
+            value={filter.assignee || ''}
+            onChange={(e) => setFilter({ assignee: e.target.value || null })}
+            className="filter-input"
+          >
+            <option value="">All Assignees</option>
+            {assignees.map(assignee => (
+              <option key={assignee} value={assignee}>{assignee}</option>
+            ))}
+          </select>
+        </div>
         
         {/* Status Filter */}
-        <select
-          value={filter.status}
-          onChange={(e) => setFilter({ status: e.target.value as typeof filter.status })}
-          className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {statusOptions.map(option => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
+        <div className="filter-group">
+          <span className="filter-label">📊</span>
+          <select
+            value={filter.status}
+            onChange={(e) => setFilter({ status: e.target.value as typeof filter.status })}
+            className="filter-input"
+          >
+            {statusOptions.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
         
         {/* Critical Path Filter (only if enabled) */}
         {showCriticalPath && criticalPathResult && (
