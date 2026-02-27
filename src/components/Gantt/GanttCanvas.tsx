@@ -43,7 +43,6 @@ export function GanttCanvas() {
     showCriticalPath,
     criticalPathResult,
     expandedGroups,
-    filter,
     setSelectedTask, 
     updateTask,
     toggleGroup,
@@ -90,7 +89,7 @@ export function GanttCanvas() {
     
     filteredTasks.filter(t => !t.parentId).forEach(addTask);
     return result;
-  }, [tasks, getFilteredTasks, expandedGroups, filter]);
+  }, [getFilteredTasks, expandedGroups]);
 
   // Calculate date range
   const { minDate, totalDays } = useMemo(() => {

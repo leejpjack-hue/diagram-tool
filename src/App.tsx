@@ -228,11 +228,15 @@ function App() {
     const title = extractTitle(dslText) || 'Gantt Chart';
     const updatedDSL = generateGanttDSL(tasks, dependencies, title);
     
-    // Update DSL text
+    // Update DSL text and mark as unsaved
+    // This is a valid synchronization pattern - we're syncing UI state to DSL
     setDslText(updatedDSL);
     setSaveStatus('unsaved');
     
-  }, [tasks, dependencies, diagramMode]); // Watch tasks and dependencies
+    // Note: dslText is intentionally excluded to prevent infinite loops
+    // extractTitle is stable and setDslText/setSaveStatus are stable setters
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, dependencies, diagramMode]);
 
   const handleTabChange = (tab: 'architecture' | 'flow' | 'gantt') => {
     setActiveTab(tab);
@@ -310,7 +314,7 @@ function App() {
     };
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     setSaveStatus('saving');
     
     setTimeout(() => {
@@ -328,7 +332,7 @@ function App() {
         setSaveStatus('unsaved');
       }
     }, 300);
-  };
+  }, [dslText, diagramMode, toast]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -395,7 +399,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [dslText, diagramMode, selectedNodeId, clipboard, setClipboard, setDslText]);
+  }, [dslText, diagramMode, selectedNodeId, clipboard, setClipboard, setDslText, handleSave, toast]);
 
   // Auto-save setup
   useEffect(() => {

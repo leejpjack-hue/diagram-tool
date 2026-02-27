@@ -34,7 +34,8 @@ export function DSLEditor() {
     } catch (error) {
       console.error('Initial parse error:', error);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   return (
     <div className="editor-panel">

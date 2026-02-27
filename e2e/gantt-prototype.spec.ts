@@ -1,51 +1,6 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Gantt Visual Tests - With Design Prototype', () => {
-  const EXPECTED_DESIGN = {
-    // Desktop layout dimensions
-    desktop: {
-      dslEditorWidth: 400,
-      taskListWidth: 320,
-      headerHeight: 64,
-      statusBarHeight: 32,
-      minButtonSize: 32,
-    },
-    // Mobile layout dimensions
-    mobile: {
-      headerHeight: 56,
-      statusBarHeight: 28,
-      minTouchTarget: 44,
-      minTextSize: 14,
-    },
-    // Expected task bar positions and colors
-    tasks: [
-      {
-        name: 'Planning',
-        start: '2026-02-23',
-        end: '2026-02-26',
-        progress: 100,
-        color: '#3B82F6', // Blue
-        assignee: 'Jack',
-      },
-      {
-        name: 'Requirements',
-        start: '2026-02-26',
-        end: '2026-03-02',
-        progress: 60,
-        color: '#10B981', // Green
-        assignee: 'Sarah',
-      },
-      {
-        name: 'Design',
-        start: '2026-03-02',
-        end: '2026-03-09',
-        progress: 20,
-        color: '#F59E0B', // Orange
-        assignee: 'Mike',
-      },
-    ],
-  };
-
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
   });
