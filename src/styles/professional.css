@@ -629,6 +629,69 @@ body {
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
+/* Filter Bar Extensions */
+.filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+}
+
+.filter-checkbox-input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--danger-500);
+  border-radius: var(--radius-sm);
+}
+
+.filter-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.critical-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger-500);
+}
+
+.filter-count-badge {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: var(--bg-tertiary);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.date-range-picker {
+  margin-top: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.date-range-field {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.btn-danger-text {
+  color: var(--danger-500);
+}
+
+.btn-danger-text:hover {
+  color: var(--danger-600);
+  background: #FEE2E2;
+}
+
 /* ===== TASK PANEL ===== */
 
 .task-panel {

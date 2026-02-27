@@ -70,15 +70,15 @@ export function GanttFilterBar() {
         
         {/* Critical Path Filter (only if enabled) */}
         {showCriticalPath && criticalPathResult && (
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <label className="filter-checkbox">
             <input
               type="checkbox"
               checked={filter.criticalOnly}
               onChange={(e) => setFilter({ criticalOnly: e.target.checked })}
-              className="w-4 h-4 text-red-500 border-gray-300 rounded focus:ring-red-500"
+              className="filter-checkbox-input"
             />
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-red-500"></span>
+            <span className="filter-checkbox-label">
+              <span className="critical-indicator"></span>
               Critical only
             </span>
           </label>
@@ -87,13 +87,9 @@ export function GanttFilterBar() {
         {/* Date Range Toggle */}
         <button
           onClick={() => setShowDateRange(!showDateRange)}
-          className={`px-3 py-1.5 text-sm border rounded-md flex items-center gap-1 ${
-            showDateRange || filter.dateRange.start
-              ? 'border-blue-500 text-blue-600 bg-blue-50'
-              : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-          }`}
+          className={`btn btn-sm ${showDateRange || filter.dateRange.start ? 'btn-primary' : 'btn-secondary'}`}
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="btn-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
           Date Range
@@ -101,11 +97,8 @@ export function GanttFilterBar() {
         
         {/* Clear Filters */}
         {hasActiveFilters && (
-          <button
-            onClick={clearFilter}
-            className="px-3 py-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md flex items-center gap-1"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={clearFilter} className="btn btn-ghost btn-sm btn-danger-text">
+            <svg className="btn-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
             Clear
@@ -114,7 +107,7 @@ export function GanttFilterBar() {
         
         {/* Filter Count */}
         {hasActiveFilters && (
-          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+          <span className="filter-count-badge">
             {countActiveFilters(filter)} filter{countActiveFilters(filter) > 1 ? 's' : ''} active
           </span>
         )}
@@ -122,9 +115,9 @@ export function GanttFilterBar() {
       
       {/* Date Range Picker (expanded) */}
       {showDateRange && (
-        <div className="mt-3 flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">From:</label>
+        <div className="date-range-picker">
+          <div className="date-range-field">
+            <label className="filter-label">From:</label>
             <input
               type="date"
               value={filter.dateRange.start ? formatDateForInput(filter.dateRange.start) : ''}
@@ -134,12 +127,12 @@ export function GanttFilterBar() {
                   start: e.target.value ? new Date(e.target.value) : null,
                 },
               })}
-              className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input input-sm"
             />
           </div>
           
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">To:</label>
+          <div className="date-range-field">
+            <label className="filter-label">To:</label>
             <input
               type="date"
               value={filter.dateRange.end ? formatDateForInput(filter.dateRange.end) : ''}
@@ -149,13 +142,13 @@ export function GanttFilterBar() {
                   end: e.target.value ? new Date(e.target.value) : null,
                 },
               })}
-              className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input input-sm"
             />
           </div>
           
           <button
             onClick={() => setFilter({ dateRange: { start: null, end: null } })}
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="btn btn-ghost btn-sm"
           >
             Reset dates
           </button>
