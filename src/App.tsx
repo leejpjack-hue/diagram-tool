@@ -565,7 +565,7 @@ function App() {
       <div ref={containerRef} className="flex-1 flex overflow-hidden">
         {/* Editor Panel - Resizable */}
         {(!isMobile || mobileView === 'editor') && (
-          <div style={{ width: isMobile ? '100%' : editorWidth, minWidth: 300, maxWidth: 800 }} className="flex-shrink-0">
+          <div style={{ width: isMobile ? '100%' : editorWidth, minWidth: 300, maxWidth: 800 }} className="flex-shrink-0 flex flex-col">
             <DSLEditor />
           </div>
         )}
