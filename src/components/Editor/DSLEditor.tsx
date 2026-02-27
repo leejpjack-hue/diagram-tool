@@ -44,7 +44,7 @@ export function DSLEditor() {
         <div className="editor-subtitle">Define your diagram</div>
       </div>
       
-      <div className="editor-content">
+      <div className="editor-content" style={{ height: '100%', minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
         <Editor
           height="100%"
           defaultLanguage="plaintext"
