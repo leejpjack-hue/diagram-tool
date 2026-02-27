@@ -45,24 +45,28 @@ export function DSLEditor() {
       </div>
       
       <div className="editor-content">
-        <Editor
-          height="100%"
-          defaultLanguage="plaintext"
-          value={dslText}
-          onChange={handleEditorChange}
-          theme="vs-dark"
-          options={{
-            minimap: { enabled: false },
-            fontSize: 14,
-            fontFamily: 'JetBrains Mono, Consolas, monospace',
-            lineNumbers: 'on',
-            scrollBeyondLastLine: false,
-            wordWrap: 'on',
-            automaticLayout: true,
-            tabSize: 2,
-            padding: { top: 16 },
-          }}
-        />
+        <div style={{ height: '100%', width: '100%', minHeight: '400px' }}>
+          <Editor
+            height="100%"
+            width="100%"
+            defaultLanguage="plaintext"
+            value={dslText}
+            onChange={handleEditorChange}
+            theme="vs-dark"
+            loading={<div style={{ padding: '20px', color: '#666' }}>Loading editor...</div>}
+            options={{
+              minimap: { enabled: false },
+              fontSize: 14,
+              fontFamily: 'JetBrains Mono, Consolas, monospace',
+              lineNumbers: 'on',
+              scrollBeyondLastLine: false,
+              wordWrap: 'on',
+              automaticLayout: true,
+              tabSize: 2,
+              padding: { top: 16 },
+            }}
+          />
+        </div>
       </div>
     </div>
   );
