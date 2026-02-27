@@ -44,14 +44,33 @@ function createFullHeightSvg(element: HTMLElement): SVGSVGElement {
   // Clone the SVG
   const clonedSvg = originalSvg.cloneNode(true) as SVGSVGElement;
   
-  // Find all task rows to calculate total height
-  const taskRows = clonedSvg.querySelectorAll('g[key]');
-  const totalTasks = taskRows.length;
+  // Find all task rows by looking for task name cells
+  // Each task has a task name cell rect at the left with width="200" (TASK_NAME_WIDTH)
+  const allRects = clonedSvg.querySelectorAll('rect');
+  let taskCount = 0;
+  
+  allRects.forEach(rect => {
+    const width = rect.getAttribute('width');
+    const x = rect.getAttribute('x');
+    // Task name cells have width="200" and x="0"
+    if (width === '200' && x === '0') {
+      taskCount++;
+    }
+  });
+  
+  // If we can't find tasks via rect, try alternative method
+  if (taskCount === 0) {
+    // Fallback: count based on current height
+    const currentHeight = originalSvg.clientHeight || 600;
+    const HEADER_HEIGHT = 60;
+    const ROW_HEIGHT = 40;
+    taskCount = Math.max(1, Math.floor((currentHeight - HEADER_HEIGHT) / ROW_HEIGHT));
+  }
   
   // Constants from GanttCanvas.tsx
   const HEADER_HEIGHT = 60;
-  const ROW_HEIGHT = 50;
-  const calculatedHeight = HEADER_HEIGHT + (totalTasks * ROW_HEIGHT) + 20;
+  const ROW_HEIGHT = 40;  // Updated to match actual value in GanttCanvas.tsx
+  const calculatedHeight = HEADER_HEIGHT + (taskCount * ROW_HEIGHT) + 20;
   
   // Get current viewBox
   const currentViewBox = originalSvg.getAttribute('viewBox') || '0 0 1200 600';
@@ -69,6 +88,8 @@ function createFullHeightSvg(element: HTMLElement): SVGSVGElement {
   
   // Make sure all content is visible
   clonedSvg.style.overflow = 'visible';
+  
+  console.log(`Export: Found ${taskCount} tasks, calculated height: ${calculatedHeight}px`);
   
   return clonedSvg;
 }
@@ -112,6 +133,8 @@ async function exportAsPng(
       useCORS: true,
       width: parseInt(clonedSvg.getAttribute('width') || '1200'),
       height: parseInt(clonedSvg.getAttribute('height') || '600'),
+      windowWidth: parseInt(clonedSvg.getAttribute('width') || '1200'),
+      windowHeight: parseInt(clonedSvg.getAttribute('height') || '600'),
     });
     
     // Clean up
