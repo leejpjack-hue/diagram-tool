@@ -562,7 +562,15 @@ function App() {
       </header>
       
       {/* Main Content */}
-      <div ref={containerRef} className="flex-1 flex overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
+      <div 
+        ref={containerRef} 
+        className="flex-1 flex overflow-hidden" 
+        style={{ 
+          height: 'calc(100vh - 64px)',
+          minHeight: 'calc(100vh - 64px)',
+          maxHeight: 'calc(100vh - 64px)'
+        }}
+      >
         {/* Editor Panel - Resizable */}
         {(!isMobile || mobileView === 'editor') && (
           <div 
@@ -570,9 +578,12 @@ function App() {
               width: isMobile ? '100%' : editorWidth, 
               minWidth: 300, 
               maxWidth: 800,
-              height: '100%'
+              height: '100%',
+              minHeight: '100%',
+              display: 'flex',
+              flexDirection: 'column'
             }} 
-            className="flex-shrink-0 flex flex-col"
+            className="flex-shrink-0"
           >
             <DSLEditor />
           </div>
