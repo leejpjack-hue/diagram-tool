@@ -539,14 +539,20 @@ export function GanttCanvas() {
                     
                     {/* Task name - show inside or outside bar based on width */}
                     {(() => {
-                      const textWidth = task.name.length * 6.5; // Approximate width
-                      const showInside = textWidth < barWidth - 16; // Leave padding for progress %
+                      // Calculate available space for task name
+                      const progressTextWidth = 45; // Increased from 35 to 45 for better spacing
+                      const leftPadding = 8;
+                      const rightPadding = 8;
+                      const minBarWidthForText = 100; // Minimum bar width to show text inside
+                      const availableWidth = barWidth - progressTextWidth - leftPadding - rightPadding;
+                      const textWidth = task.name.length * 7; // Increased from 6.5 to 7 for more accurate estimate
+                      const showInside = textWidth < availableWidth && barWidth > minBarWidthForText;
                       
                       if (showInside) {
-                        // Show inside bar
+                        // Show inside bar (before progress %)
                         return (
                           <text
-                            x={barX + 8}
+                            x={barX + leftPadding}
                             y={rowY + 24}
                             fontSize="11"
                             fill="#ffffff"
@@ -565,7 +571,7 @@ export function GanttCanvas() {
                             fill="#64748b"
                             fontWeight="500"
                           >
-                            {task.name.length > 30 ? task.name.substring(0, 30) + '...' : task.name}
+                            {task.name.length > 40 ? task.name.substring(0, 40) + '...' : task.name}
                           </text>
                         );
                       }
