@@ -39,25 +39,6 @@ export function GanttFilterBar() {
           />
         </div>
         
-        {/* Go to Today Button */}
-        <button
-          onClick={() => {
-            const today = new Date();
-            const dateStr = today.toLocaleDateString('en-US', { 
-              weekday: 'short', 
-              month: 'short', 
-              day: 'numeric' 
-            });
-            // TODO: Implement scroll to today
-            // For now, just show current date
-            alert(`📍 Today: ${dateStr}\n\nScrolling to today coming in next update!`);
-          }}
-          className="px-3 py-1.5 rounded-md text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 flex items-center gap-1.5 shadow-sm transition-colors"
-          title="Go to Today"
-        >
-          📍 Today
-        </button>
-        
         {/* Assignee Filter */}
         <div className="filter-group">
           <span className="filter-label">👤</span>

@@ -537,16 +537,39 @@ export function GanttCanvas() {
                       fill={taskColor}
                     />
                     
-                    {/* Task name on bar */}
-                    <text
-                      x={barX + 8}
-                      y={rowY + 24}
-                      fontSize="11"
-                      fill="#ffffff"
-                      fontWeight="500"
-                    >
-                      {task.name}
-                    </text>
+                    {/* Task name - show inside or outside bar based on width */}
+                    {(() => {
+                      const textWidth = task.name.length * 6.5; // Approximate width
+                      const showInside = textWidth < barWidth - 16; // Leave padding for progress %
+                      
+                      if (showInside) {
+                        // Show inside bar
+                        return (
+                          <text
+                            x={barX + 8}
+                            y={rowY + 24}
+                            fontSize="11"
+                            fill="#ffffff"
+                            fontWeight="500"
+                          >
+                            {task.name}
+                          </text>
+                        );
+                      } else {
+                        // Show above bar
+                        return (
+                          <text
+                            x={barX}
+                            y={rowY + 4}
+                            fontSize="10"
+                            fill="#64748b"
+                            fontWeight="500"
+                          >
+                            {task.name.length > 30 ? task.name.substring(0, 30) + '...' : task.name}
+                          </text>
+                        );
+                      }
+                    })()}
                     
                     {/* Progress percentage */}
                     <text
