@@ -1,6 +1,7 @@
 import { useGanttStore } from './ganttStore';
 import { calculateResourceAllocations } from './resourceUtils';
 import type { ResourceAllocation } from './types';
+import './GanttResourcePanel.css';
 
 export function GanttResourcePanel() {
   const { tasks, filter, setFilter } = useGanttStore();
@@ -16,61 +17,61 @@ export function GanttResourcePanel() {
   };
   
   const getUtilizationColor = (utilization: number): string => {
-    if (utilization > 100) return 'text-red-600 bg-red-100';
-    if (utilization > 80) return 'text-amber-600 bg-amber-100';
-    return 'text-green-600 bg-green-100';
+    if (utilization > 100) return 'utilization-danger';
+    if (utilization > 80) return 'utilization-warning';
+    return 'utilization-success';
   };
   
   const getUtilizationBarColor = (utilization: number): string => {
-    if (utilization > 100) return 'bg-red-500';
-    if (utilization > 80) return 'bg-amber-500';
-    return 'bg-green-500';
+    if (utilization > 100) return 'bar-danger';
+    if (utilization > 80) return 'bar-warning';
+    return 'bar-success';
   };
   
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="resource-panel">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">Resources</h2>
-        <p className="text-sm text-gray-500 mt-1">{allocations.length} team members</p>
+      <div className="panel-header">
+        <div>
+          <h2 className="panel-title">Resources</h2>
+          <p className="panel-subtitle">{allocations.length} team members</p>
+        </div>
       </div>
       
       {/* Resource List */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="resource-list">
         {allocations.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            <div className="text-4xl mb-2">👥</div>
-            <p className="text-sm">No resources assigned</p>
-            <p className="text-xs text-gray-400 mt-1">Assign team members to tasks</p>
+          <div className="resource-empty">
+            <div className="resource-empty-icon">👥</div>
+            <p className="resource-empty-title">No resources assigned</p>
+            <p className="resource-empty-text">Assign team members to tasks</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {allocations.map((allocation) => (
-              <ResourceCard
-                key={allocation.assignee}
-                allocation={allocation}
-                isSelected={filter.assignee === allocation.assignee}
-                onClick={() => handleAssigneeClick(allocation.assignee)}
-                utilizationColor={getUtilizationColor(allocation.utilization)}
-                barColor={getUtilizationBarColor(allocation.utilization)}
-              />
-            ))}
-          </div>
+          allocations.map((allocation) => (
+            <ResourceCard
+              key={allocation.assignee}
+              allocation={allocation}
+              isSelected={filter.assignee === allocation.assignee}
+              onClick={() => handleAssigneeClick(allocation.assignee)}
+              utilizationClass={getUtilizationColor(allocation.utilization)}
+              barClass={getUtilizationBarColor(allocation.utilization)}
+            />
+          ))
         )}
       </div>
       
       {/* Summary */}
       {allocations.length > 0 && (
-        <div className="p-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Over-allocated:</span>
-            <span className={`font-medium ${allocations.some(a => a.overAllocated) ? 'text-red-600' : 'text-green-600'}`}>
+        <div className="resource-summary">
+          <div className="resource-summary-row">
+            <span className="resource-summary-label">Over-allocated:</span>
+            <span className={`resource-summary-value ${allocations.some(a => a.overAllocated) ? 'text-danger' : 'text-success'}`}>
               {allocations.filter(a => a.overAllocated).length} of {allocations.length}
             </span>
           </div>
-          <div className="flex items-center justify-between text-sm mt-1">
-            <span className="text-gray-600">Avg utilization:</span>
-            <span className="font-medium text-gray-900">
+          <div className="resource-summary-row">
+            <span className="resource-summary-label">Avg utilization:</span>
+            <span className="resource-summary-value">
               {Math.round(allocations.reduce((sum, a) => sum + a.utilization, 0) / allocations.length)}%
             </span>
           </div>
@@ -84,50 +85,46 @@ interface ResourceCardProps {
   allocation: ResourceAllocation;
   isSelected: boolean;
   onClick: () => void;
-  utilizationColor: string;
-  barColor: string;
+  utilizationClass: string;
+  barClass: string;
 }
 
-function ResourceCard({ allocation, isSelected, onClick, utilizationColor, barColor }: ResourceCardProps) {
+function ResourceCard({ allocation, isSelected, onClick, utilizationClass, barClass }: ResourceCardProps) {
   return (
     <div
       onClick={onClick}
-      className={`p-3 rounded-lg border cursor-pointer transition-all ${
-        isSelected
-          ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-          : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
-      }`}
+      className={`resource-card ${isSelected ? 'selected' : ''}`}
     >
       {/* Header row */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
+      <div className="resource-card-header">
+        <div className="resource-card-info">
+          <div className="resource-avatar">
             {allocation.assignee.charAt(0).toUpperCase()}
           </div>
           <div>
-            <div className="font-medium text-gray-900">{allocation.assignee}</div>
-            <div className="text-xs text-gray-500">{allocation.tasks.length} tasks</div>
+            <div className="resource-name">{allocation.assignee}</div>
+            <div className="resource-task-count">{allocation.tasks.length} tasks</div>
           </div>
         </div>
         
-        <div className={`px-2 py-1 rounded text-xs font-medium ${utilizationColor}`}>
+        <div className={`resource-utilization-badge ${utilizationClass}`}>
           {allocation.utilization}%
           {allocation.overAllocated && ' ⚠️'}
         </div>
       </div>
       
       {/* Utilization bar */}
-      <div className="mt-3">
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+      <div className="resource-bar-container">
+        <div className="resource-bar-track">
           <div
-            className={`h-full rounded-full transition-all ${barColor}`}
+            className={`resource-bar-fill ${barClass}`}
             style={{ width: `${Math.min(allocation.utilization, 100)}%` }}
           />
         </div>
         {allocation.utilization > 100 && (
-          <div className="h-2 bg-gray-200 rounded-full overflow-hidden mt-1">
+          <div className="resource-bar-track resource-bar-overflow">
             <div
-              className="h-full rounded-full bg-red-500"
+              className="resource-bar-fill bar-danger"
               style={{ width: `${allocation.utilization - 100}%` }}
             />
           </div>
@@ -135,14 +132,14 @@ function ResourceCard({ allocation, isSelected, onClick, utilizationColor, barCo
       </div>
       
       {/* Stats row */}
-      <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+      <div className="resource-stats">
         <span>Peak: {allocation.peakLoad} tasks/day</span>
         <span>Total: {allocation.totalDays} days</span>
       </div>
       
       {/* Over-allocation warning */}
       {allocation.overAllocated && (
-        <div className="mt-2 p-2 bg-red-50 rounded text-xs text-red-700">
+        <div className="resource-warning">
           ⚠️ Over-allocated on some days
         </div>
       )}
