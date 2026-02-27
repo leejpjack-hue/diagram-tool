@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { useEffect } from 'react';
 import { GanttFilterBar } from './GanttFilterBar';
 import { useGanttStore } from './ganttStore';
 
@@ -86,7 +87,11 @@ export const WithCriticalPath: Story = {
           criticalPathResult: {
             path: ['task-1', 'task-2'],
             duration: 10,
-            tasks: [],
+            slack: new Map([['task-1', 0], ['task-2', 0], ['task-3', 5]]),
+            earlyStart: new Map(),
+            earlyFinish: new Map(),
+            lateStart: new Map(),
+            lateFinish: new Map(),
           },
         });
       }, []);

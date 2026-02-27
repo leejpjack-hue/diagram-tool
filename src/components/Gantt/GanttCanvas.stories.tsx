@@ -134,7 +134,7 @@ export const WithDependencies: Story = {
               progress: 40,
               assignee: 'Sarah',
               color: '#10b981',
-              dependencies: [{ predecessorId: 'task-1', successorId: 'task-2', type: 'FS', lag: 0 }],
+              dependencies: ['task-1'],
             },
             {
               id: 'task-3',
@@ -144,7 +144,7 @@ export const WithDependencies: Story = {
               progress: 0,
               assignee: 'Mike',
               color: '#f59e0b',
-              dependencies: [{ predecessorId: 'task-2', successorId: 'task-3', type: 'FS', lag: 0 }],
+              dependencies: ['task-2'],
             },
           ],
           dependencies: [
@@ -192,7 +192,7 @@ export const CriticalPath: Story = {
               progress: 30,
               assignee: 'Sarah',
               color: '#ef4444',
-              dependencies: [{ predecessorId: 'task-1', successorId: 'task-2', type: 'FS', lag: 0 }],
+              dependencies: ['task-1'],
             },
             {
               id: 'task-3',
