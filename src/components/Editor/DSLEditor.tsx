@@ -38,14 +38,14 @@ export function DSLEditor() {
   }, []); // Only run once on mount
 
   return (
-    <div className="editor-panel">
+    <div className="editor-panel" style={{ height: '600px', minHeight: '600px', border: '2px solid red' }}>
       <div className="editor-header">
         <div className="editor-title">DSL Editor</div>
         <div className="editor-subtitle">Define your diagram</div>
       </div>
       
-      <div className="editor-content">
-        <div style={{ height: '100%', width: '100%', minHeight: '400px' }}>
+      <div className="editor-content" style={{ height: '500px', minHeight: '500px', border: '2px solid blue' }}>
+        <div style={{ height: '500px', width: '100%', border: '2px solid green' }}>
           <Editor
             height="100%"
             width="100%"
