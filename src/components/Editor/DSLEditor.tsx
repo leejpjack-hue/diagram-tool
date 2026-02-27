@@ -53,7 +53,7 @@ export function DSLEditor() {
           theme="vs-dark"
           options={{
             minimap: { enabled: false },
-            fontSize: 13,
+            fontSize: 14,
             fontFamily: 'JetBrains Mono, Consolas, monospace',
             lineNumbers: 'on',
             scrollBeyondLastLine: false,
