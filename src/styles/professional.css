@@ -345,11 +345,11 @@ body {
 
 .editor-content {
   flex: 1;
-  overflow: auto;
+  min-height: 0;
+  overflow: hidden;
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.6;
-  padding: var(--spacing-lg);
 }
 
 /* ===== CANVAS AREA ===== */
