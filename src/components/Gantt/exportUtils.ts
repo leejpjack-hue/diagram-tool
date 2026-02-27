@@ -16,39 +16,106 @@ export async function exportGanttChart(
 ): Promise<void> {
   const filename = `${projectName.replace(/\s+/g, '-').toLowerCase()}-${formatDateForFilename(new Date())}`;
   
+  // Create a clone of the SVG with full height for all tasks
+  const fullSvg = createFullHeightSvg(canvasElement);
+  
   switch (options.format) {
     case 'png':
-      await exportAsPng(canvasElement, filename, options);
+      await exportAsPng(fullSvg, filename, options);
       break;
     case 'pdf':
-      await exportAsPdf(canvasElement, filename, options);
+      await exportAsPdf(fullSvg, filename, options);
       break;
     case 'svg':
-      await exportAsSvg(canvasElement, filename, options);
+      await exportAsSvg(fullSvg, filename, options);
       break;
   }
+}
+
+/**
+ * Create a full-height SVG clone that includes all tasks (even off-screen ones)
+ */
+function createFullHeightSvg(element: HTMLElement): SVGSVGElement {
+  const originalSvg = element.querySelector('svg');
+  if (!originalSvg) {
+    throw new Error('Could not find SVG element');
+  }
+  
+  // Clone the SVG
+  const clonedSvg = originalSvg.cloneNode(true) as SVGSVGElement;
+  
+  // Find all task rows to calculate total height
+  const taskRows = clonedSvg.querySelectorAll('g[key]');
+  const totalTasks = taskRows.length;
+  
+  // Constants from GanttCanvas.tsx
+  const HEADER_HEIGHT = 60;
+  const ROW_HEIGHT = 50;
+  const calculatedHeight = HEADER_HEIGHT + (totalTasks * ROW_HEIGHT) + 20;
+  
+  // Get current viewBox
+  const currentViewBox = originalSvg.getAttribute('viewBox') || '0 0 1200 600';
+  const [minX, minY, , ] = currentViewBox.split(' ').map(Number);
+  const width = originalSvg.clientWidth || 1200;
+  
+  // Set new viewBox to include all tasks
+  clonedSvg.setAttribute('viewBox', `${minX} ${minY} ${width} ${calculatedHeight}`);
+  clonedSvg.setAttribute('height', `${calculatedHeight}`);
+  clonedSvg.setAttribute('width', `${width}`);
+  
+  // Remove scroll clipping
+  const style = clonedSvg.getAttribute('style') || '';
+  clonedSvg.setAttribute('style', style.replace(/overflow:\s*hidden;?/gi, ''));
+  
+  // Make sure all content is visible
+  clonedSvg.style.overflow = 'visible';
+  
+  return clonedSvg;
 }
 
 /**
  * Export as PNG using html2canvas
  */
 async function exportAsPng(
-  element: HTMLElement,
+  svgElement: SVGSVGElement,
   filename: string,
   options: GanttExportOptions
 ): Promise<void> {
   // Options available for future enhancements (includeTaskList, dateRange, etc.)
   void options;
   try {
+    // Create a temporary container
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.top = '-9999px';
+    container.style.backgroundColor = '#ffffff';
+    document.body.appendChild(container);
+    
+    // Add white background rect to SVG
+    const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('width', '100%');
+    rect.setAttribute('height', '100%');
+    rect.setAttribute('fill', '#ffffff');
+    clonedSvg.insertBefore(rect, clonedSvg.firstChild);
+    
+    container.appendChild(clonedSvg);
+    
     // Dynamic import to avoid bundling if not used
     const html2canvas = (await import('html2canvas')).default;
     
-    const canvas = await html2canvas(element, {
+    const canvas = await html2canvas(container, {
       backgroundColor: '#ffffff',
       scale: 2, // High resolution
       logging: false,
       useCORS: true,
+      width: parseInt(clonedSvg.getAttribute('width') || '1200'),
+      height: parseInt(clonedSvg.getAttribute('height') || '600'),
     });
+    
+    // Clean up
+    document.body.removeChild(container);
     
     const link = document.createElement('a');
     link.download = `${filename}.png`;
@@ -57,85 +124,118 @@ async function exportAsPng(
   } catch (error) {
     console.error('Failed to export PNG:', error);
     // Fallback: try without html2canvas
-    fallbackExportAsPng(element, filename);
+    fallbackExportAsPng(svgElement, filename);
   }
 }
 
 /**
  * Fallback PNG export using native canvas
  */
-function fallbackExportAsPng(element: HTMLElement, filename: string): void {
-  // Find SVG element
-  const svg = element.querySelector('svg');
-  if (!svg) {
-    alert('Could not find chart to export');
-    return;
-  }
-  
-  const svgData = new XMLSerializer().serializeToString(svg);
-  const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(svgBlob);
-  
-  const img = new Image();
-  img.onload = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width * 2;
-    canvas.height = img.height * 2;
+function fallbackExportAsPng(svgElement: SVGSVGElement, filename: string): void {
+  try {
+    // Add white background
+    const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('width', '100%');
+    rect.setAttribute('height', '100%');
+    rect.setAttribute('fill', '#ffffff');
+    clonedSvg.insertBefore(rect, clonedSvg.firstChild);
     
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const svgData = new XMLSerializer().serializeToString(clonedSvg);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const width = parseInt(svgElement.getAttribute('width') || '1200');
+      const height = parseInt(svgElement.getAttribute('height') || '600');
+      canvas.width = width * 2;
+      canvas.height = height * 2;
       
-      const link = document.createElement('a');
-      link.download = `${filename}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    }
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        const link = document.createElement('a');
+        link.download = `${filename}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }
+      
+      URL.revokeObjectURL(url);
+    };
     
-    URL.revokeObjectURL(url);
-  };
-  
-  img.src = url;
+    img.src = url;
+  } catch (error) {
+    console.error('Fallback PNG export failed:', error);
+    alert('Failed to export PNG. Please try SVG format instead.');
+  }
 }
 
 /**
  * Export as PDF using jsPDF
  */
 async function exportAsPdf(
-  element: HTMLElement,
+  svgElement: SVGSVGElement,
   filename: string,
   options: GanttExportOptions
 ): Promise<void> {
   // Options available for future enhancements (includeTaskList, dateRange, etc.)
   void options;
   try {
+    // Create a temporary container
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.top = '-9999px';
+    container.style.backgroundColor = '#ffffff';
+    document.body.appendChild(container);
+    
+    // Add white background rect to SVG
+    const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('width', '100%');
+    rect.setAttribute('height', '100%');
+    rect.setAttribute('fill', '#ffffff');
+    clonedSvg.insertBefore(rect, clonedSvg.firstChild);
+    
+    container.appendChild(clonedSvg);
+    
     // Dynamic imports
     const jsPDF = (await import('jspdf')).default;
     const html2canvas = (await import('html2canvas')).default;
     
-    const canvas = await html2canvas(element, {
+    const canvas = await html2canvas(container, {
       backgroundColor: '#ffffff',
       scale: 2,
       logging: false,
       useCORS: true,
+      width: parseInt(clonedSvg.getAttribute('width') || '1200'),
+      height: parseInt(clonedSvg.getAttribute('height') || '600'),
     });
+    
+    // Clean up
+    document.body.removeChild(container);
     
     const imgData = canvas.toDataURL('image/png');
     
-    // Calculate PDF dimensions (A4 landscape)
+    // Calculate PDF dimensions based on content
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+    
+    // Use A3 or larger if needed, otherwise A4 landscape
+    const isLarge = imgHeight > 2000;
     const pdf = new jsPDF({
-      orientation: 'landscape',
+      orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
       unit: 'mm',
-      format: 'a4',
+      format: isLarge ? [297, 420] : 'a4', // A3 if large, A4 otherwise
     });
     
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    
-    const imgWidth = canvas.width;
-    const imgHeight = canvas.height;
     
     const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight) * 0.9;
     
@@ -157,20 +257,15 @@ async function exportAsPdf(
  * Export as SVG (direct SVG download)
  */
 async function exportAsSvg(
-  element: HTMLElement,
+  svgElement: SVGSVGElement,
   filename: string,
   options: GanttExportOptions
 ): Promise<void> {
   // Options available for future enhancements (includeTaskList, dateRange, etc.)
   void options;
-  const svg = element.querySelector('svg');
-  if (!svg) {
-    alert('Could not find chart to export');
-    return;
-  }
   
   // Clone SVG to avoid modifying original
-  const clonedSvg = svg.cloneNode(true) as SVGSVGElement;
+  const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
   
   // Add white background
   const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
