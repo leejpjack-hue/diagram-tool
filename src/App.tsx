@@ -170,7 +170,7 @@ function App() {
     setClipboard 
   } = useDiagramStore();
   
-  const { setTasks, addTask, tasks, dependencies } = useGanttStore();
+  const { setTasks, addTask, setDependencies, tasks, dependencies } = useGanttStore();
   
   // Initialize activeTab from saved diagram if available
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow' | 'gantt'>(() => {
@@ -201,13 +201,16 @@ function App() {
       const project = parseGanttDSL(dslText);
       if (project && project.tasks.length > 0) {
         setTasks(project.tasks);
+        if (project.dependencies && project.dependencies.length > 0) {
+          setDependencies(project.dependencies);
+        }
       }
       // Reset flag after a short delay to allow the state update to complete
       setTimeout(() => {
         isUpdatingFromDSL.current = false;
       }, 100);
     }
-  }, [dslText, diagramMode, setTasks]);
+  }, [dslText, diagramMode, setTasks, setDependencies]);
   
   // Sync DSL when tasks or dependencies change from UI
   // This ensures DSL is always the single source of truth

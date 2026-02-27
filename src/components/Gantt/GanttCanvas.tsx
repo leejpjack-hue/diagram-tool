@@ -89,7 +89,7 @@ export function GanttCanvas() {
     
     filteredTasks.filter(t => !t.parentId).forEach(addTask);
     return result;
-  }, [getFilteredTasks, expandedGroups]);
+  }, [tasks, getFilteredTasks, expandedGroups]);
 
   // Calculate date range
   const { minDate, totalDays } = useMemo(() => {
