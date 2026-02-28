@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import type { GanttTask, GanttMilestone, GanttZoomLevel, Dependency, GanttFilter } from './types';
 import { calculateCriticalPath, type CriticalPathResult } from './criticalPath';
+import { 
+  autoScheduleTasks, 
+  detectCircularDependencies, 
+  checkDependencyViolations 
+} from './autoSchedule';
 
 interface GanttState {
   tasks: GanttTask[];
@@ -48,6 +53,11 @@ interface GanttState {
   
   // Sprint 8: Groups
   toggleGroup: (groupId: string) => void;
+  
+  // Sprint 9: Auto-scheduling
+  runAutoSchedule: () => { success: boolean; message: string; changed: number };
+  detectCycles: () => string[][];
+  checkViolations: () => any[];
   expandAllGroups: () => void;
   collapseAllGroups: () => void;
   
@@ -298,6 +308,44 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   }),
   
   collapseAllGroups: () => set({ expandedGroups: new Set() }),
+  
+  // Sprint 9: Auto-scheduling
+  runAutoSchedule: () => {
+    const state = get();
+    const result = autoScheduleTasks(state.tasks, state.dependencies);
+    
+    if (result.warnings.length > 0) {
+      console.warn('Auto-schedule warnings:', result.warnings);
+    }
+    
+    if (result.changed.length > 0) {
+      set({ tasks: result.tasks });
+      
+      // Recalculate critical path if shown
+      if (state.showCriticalPath) {
+        const criticalResult = calculateCriticalPath(result.tasks, state.dependencies, new Date());
+        set({ criticalPathResult: criticalResult });
+      }
+    }
+    
+    return {
+      success: result.warnings.filter(w => w.type === 'circular').length === 0,
+      message: result.warnings.length > 0 
+        ? `Auto-scheduled with ${result.warnings.length} warnings`
+        : 'Auto-schedule completed successfully',
+      changed: result.changed.length,
+    };
+  },
+  
+  detectCycles: () => {
+    const state = get();
+    return detectCircularDependencies(state.tasks, state.dependencies);
+  },
+  
+  checkViolations: () => {
+    const state = get();
+    return checkDependencyViolations(state.tasks, state.dependencies);
+  },
   
   // Project
   setProject: (tasks, dependencies) => set({ tasks, dependencies }),

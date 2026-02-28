@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { useGanttStore } from './ganttStore';
 import type { GanttTask, GanttZoomLevel, Dependency } from './types';
 import { isCritical } from './criticalPath';
+import { useToast } from '../../utils/useToast';
 
 // Constants
 const ROW_HEIGHT = 40;
@@ -50,6 +51,8 @@ export function GanttCanvas() {
     recalculateCriticalPath,
     getFilteredTasks,
   } = useGanttStore();
+  
+  const toast = useToast();
   
   // State for delay impact visualization
   const [visualizationData, setVisualizationData] = useState<{
@@ -775,6 +778,22 @@ export function GanttCanvas() {
       
       {/* Controls */}
       <div className="fixed bottom-4 right-4 flex gap-2 bg-white rounded-lg shadow-lg p-2 z-10">
+        {/* Auto-schedule button */}
+        <button
+          onClick={() => {
+            const result = useGanttStore.getState().runAutoSchedule();
+            if (result.success) {
+              toast.success(`✅ ${result.message} (${result.changed} tasks updated)`);
+            } else {
+              toast.error(`❌ ${result.message}`);
+            }
+          }}
+          className="px-3 py-1 rounded text-sm font-medium bg-purple-500 text-white hover:bg-purple-600"
+          title="Auto-schedule tasks based on dependencies"
+        >
+          🤖 Auto-Schedule
+        </button>
+        
         {/* Critical path toggle */}
         <button
           onClick={() => useGanttStore.getState().toggleCriticalPath()}
