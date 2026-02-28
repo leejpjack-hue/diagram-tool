@@ -51,6 +51,25 @@ export function GanttCanvas() {
     getFilteredTasks,
   } = useGanttStore();
   
+  // State for delay impact visualization
+  const [visualizationData, setVisualizationData] = useState<{
+    enabled: boolean;
+    result: any;
+  } | null>(null);
+  
+  // Load visualization data from localStorage
+  useEffect(() => {
+    const data = localStorage.getItem('delayImpactVisualization');
+    if (data) {
+      try {
+        const parsed = JSON.parse(data);
+        setVisualizationData(parsed);
+      } catch (e) {
+        console.error('Failed to parse visualization data:', e);
+      }
+    }
+  }, []);
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<{ taskId: string; type: 'move' | 'resize-start' | 'resize-end'; startX: number; originalTask: GanttTask } | null>(null);
 
@@ -601,6 +620,56 @@ export function GanttCanvas() {
                         ⚡
                       </text>
                     )}
+                    
+                    {/* Delay Impact Visualization */}
+                    {visualizationData && visualizationData.enabled && 
+                     visualizationData.result.affectedTasks.some((at: any) => at.task.id === task.id) && (() => {
+                      const affectedTask = visualizationData.result.affectedTasks.find((at: any) => at.task.id === task.id);
+                      if (!affectedTask || affectedTask.delayDays === 0) return null;
+                      
+                      const color = affectedTask.impactLevel === 'direct' ? '#ef4444' : 
+                                    affectedTask.impactLevel === 'indirect' ? '#f59e0b' : '#10b981';
+                      
+                      return (
+                        <g className="delay-impact-viz">
+                          {/* Original position (gray dashed) */}
+                          <rect
+                            x={barX - (affectedTask.delayDays * dayWidth)}
+                            y={rowY + 8}
+                            width={barWidth}
+                            height={24}
+                            fill="none"
+                            stroke="#94a3b8"
+                            strokeWidth="1"
+                            strokeDasharray="5,5"
+                            opacity="0.5"
+                          />
+                          
+                          {/* Delay arrow */}
+                          <path
+                            d={`M ${barX - (affectedTask.delayDays * dayWidth) + barWidth/2} ${rowY + 20} 
+                                L ${barX + barWidth/2} ${rowY + 20}`}
+                            stroke={color}
+                            strokeWidth="2"
+                            strokeDasharray="5,5"
+                            fill="none"
+                            markerEnd="url(#delay-arrow)"
+                          />
+                          
+                          {/* Delay label */}
+                          <text
+                            x={barX + barWidth/2}
+                            y={rowY + 4}
+                            fontSize="10"
+                            fontWeight="600"
+                            fill={color}
+                            textAnchor="middle"
+                          >
+                            +{affectedTask.delayDays}d
+                          </text>
+                        </g>
+                      );
+                    })()}
                     
                     {/* Resize handles (only when selected) */}
                     {isSelected && (
