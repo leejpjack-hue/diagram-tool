@@ -191,19 +191,18 @@ export function GanttCanvas() {
   }, [minDate, totalDays, dayWidth]);
 
   // Handle task bar interactions
-  const handleMouseDown = useCallback((e: React.MouseEvent, taskId: string, type: 'move' | 'resize-start' | 'resize-end') => {
+  const handleMouseDown = useCallback((e: React.MouseEvent, task: GanttTask, type: 'move' | 'resize-start' | 'resize-end') => {
     e.preventDefault();
-    const task = visibleTasks.find((t) => t.id === taskId);
-    if (!task || task.isGroup) return;
+    if (task.isGroup) return;
     
-    setSelectedTask(taskId);
+    setSelectedTask(task.id);
     setDragging({
-      taskId,
+      taskId: task.id,
       type,
       startX: e.clientX,
       originalTask: { ...task },
     });
-  }, [visibleTasks, setSelectedTask]);
+  }, [setSelectedTask]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!dragging) return;
@@ -683,7 +682,7 @@ export function GanttCanvas() {
                           rx={2}
                           fill={taskColor}
                           className="cursor-ew-resize"
-                          onMouseDown={(e) => handleMouseDown(e, task.id, 'resize-start')}
+                          onMouseDown={(e) => handleMouseDown(e, task, 'resize-start')}
                         />
                         
                         {/* Right resize handle */}
@@ -695,7 +694,7 @@ export function GanttCanvas() {
                           rx={2}
                           fill={taskColor}
                           className="cursor-ew-resize"
-                          onMouseDown={(e) => handleMouseDown(e, task.id, 'resize-end')}
+                          onMouseDown={(e) => handleMouseDown(e, task, 'resize-end')}
                         />
                       </>
                     )}
