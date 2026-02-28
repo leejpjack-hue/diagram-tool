@@ -24,94 +24,102 @@ export function GanttFilterBar() {
   ];
   
   return (
-    <div className="filter-bar">
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Search */}
-        <div className="filter-group">
-          <span className="filter-label">🔍</span>
-          <input
-            type="text"
-            placeholder="Search tasks..."
-            value={filter.search}
-            onChange={(e) => setFilter({ search: e.target.value })}
-            className="filter-input"
-            style={{ width: '200px' }}
-          />
-        </div>
-        
-        {/* Assignee Filter */}
-        <div className="filter-group">
-          <span className="filter-label">👤</span>
-          <select
-            value={filter.assignee || ''}
-            onChange={(e) => setFilter({ assignee: e.target.value || null })}
-            className="filter-input"
-          >
-            <option value="">All Assignees</option>
-            {assignees.map(assignee => (
-              <option key={assignee} value={assignee}>{assignee}</option>
-            ))}
-          </select>
-        </div>
-        
-        {/* Status Filter */}
-        <div className="filter-group">
-          <span className="filter-label">📊</span>
-          <select
-            value={filter.status}
-            onChange={(e) => setFilter({ status: e.target.value as typeof filter.status })}
-            className="filter-input"
-          >
-            {statusOptions.map(option => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </div>
-        
-        {/* Critical Path Filter (only if enabled) */}
-        {showCriticalPath && criticalPathResult && (
-          <label className="filter-checkbox">
-            <input
-              type="checkbox"
-              checked={filter.criticalOnly}
-              onChange={(e) => setFilter({ criticalOnly: e.target.checked })}
-              className="filter-checkbox-input"
-            />
-            <span className="filter-checkbox-label">
-              <span className="critical-indicator"></span>
-              Critical only
-            </span>
-          </label>
-        )}
-        
-        {/* Date Range Toggle */}
-        <button
-          onClick={() => setShowDateRange(!showDateRange)}
-          className={`btn btn-sm ${showDateRange || filter.dateRange.start ? 'btn-primary' : 'btn-secondary'}`}
-        >
-          <svg className="btn-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          Date Range
-        </button>
-        
-        {/* Clear Filters */}
-        {hasActiveFilters && (
-          <button onClick={clearFilter} className="btn btn-ghost btn-sm btn-danger-text">
-            <svg className="btn-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Clear
-          </button>
-        )}
-        
-        {/* Filter Count */}
-        {hasActiveFilters && (
-          <span className="filter-count-badge">
-            {countActiveFilters(filter)} filter{countActiveFilters(filter) > 1 ? 's' : ''} active
-          </span>
-        )}
+    <div className="filter-bar" role="search" aria-label="Filter Gantt tasks">
+      {/* Search */}
+      <div className="filter-group">
+        <span className="filter-label" aria-hidden="true">🔍</span>
+        <input
+          type="search"
+          placeholder="Search tasks..."
+          value={filter.search}
+          onChange={(e) => setFilter({ search: e.target.value })}
+          className="filter-input"
+          aria-label="Search tasks"
+          style={{ width: '200px' }}
+        />
       </div>
+      
+      {/* Assignee Filter */}
+      <div className="filter-group">
+        <span className="filter-label" aria-hidden="true">👤</span>
+        <select
+          value={filter.assignee || ''}
+          onChange={(e) => setFilter({ assignee: e.target.value || null })}
+          className="filter-input"
+          aria-label="Filter by assignee"
+        >
+          <option value="">All Assignees</option>
+          {assignees.map(assignee => (
+            <option key={assignee} value={assignee}>{assignee}</option>
+          ))}
+        </select>
+      </div>
+      
+      {/* Status Filter */}
+      <div className="filter-group">
+        <span className="filter-label" aria-hidden="true">📊</span>
+        <select
+          value={filter.status}
+          onChange={(e) => setFilter({ status: e.target.value as typeof filter.status })}
+          className="filter-input"
+          aria-label="Filter by status"
+        >
+          {statusOptions.map(option => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+      
+      {/* Critical Path Filter (only if enabled) */}
+      {showCriticalPath && criticalPathResult && (
+        <label className="filter-checkbox">
+          <input
+            type="checkbox"
+            checked={filter.criticalOnly}
+            onChange={(e) => setFilter({ criticalOnly: e.target.checked })}
+            className="filter-checkbox-input"
+            aria-label="Show critical path tasks only"
+          />
+          <span className="filter-checkbox-label">
+            <span className="critical-indicator" aria-hidden="true"></span>
+            Critical only
+          </span>
+        </label>
+      )}
+      
+      {/* Date Range Toggle */}
+      <button
+        onClick={() => setShowDateRange(!showDateRange)}
+        className={`btn btn-sm ${showDateRange || filter.dateRange.start ? 'btn-primary' : 'btn-secondary'}`}
+        aria-expanded={showDateRange}
+        aria-controls="date-range-picker"
+      >
+        <svg className="btn-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        Date Range
+      </button>
+      
+      {/* Clear Filters */}
+      {hasActiveFilters && (
+        <button 
+          onClick={clearFilter} 
+          className="btn btn-ghost btn-sm btn-danger-text"
+          aria-label="Clear all filters"
+        >
+          <svg className="btn-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Clear
+        </button>
+      )}
+      
+      {/* Filter Count */}
+      {hasActiveFilters && (
+        <span className="filter-count-badge" role="status" aria-live="polite">
+          {countActiveFilters(filter)} filter{countActiveFilters(filter) > 1 ? 's' : ''} active
+        </span>
+      )}
       
       {/* Date Range Picker (expanded) */}
       {showDateRange && (
