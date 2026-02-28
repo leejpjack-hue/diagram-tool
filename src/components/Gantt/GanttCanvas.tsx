@@ -55,23 +55,20 @@ export function GanttCanvas() {
   const toast = useToast();
   
   // State for delay impact visualization
-  const [visualizationData, setVisualizationData] = useState<{
+  const [visualizationData] = useState<{
     enabled: boolean;
     result: any;
-  } | null>(null);
-  
-  // Load visualization data from localStorage
-  useEffect(() => {
+  } | null>(() => {
     const data = localStorage.getItem('delayImpactVisualization');
     if (data) {
       try {
-        const parsed = JSON.parse(data);
-        setVisualizationData(parsed);
+        return JSON.parse(data);
       } catch (e) {
         console.error('Failed to parse visualization data:', e);
       }
     }
-  }, []);
+    return null;
+  });
   
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<{ taskId: string; type: 'move' | 'resize-start' | 'resize-end'; startX: number; originalTask: GanttTask } | null>(null);
