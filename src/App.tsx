@@ -445,6 +445,113 @@ function App() {
     toast.info('Created new diagram');
   };
 
+  const handleLoadMVPSprint = () => {
+    // Load MVP Sprint DSL
+    const mvpDSL = `# Diagram Tool MVP Sprint - 2026-02-27
+
+project "Diagram Tool MVP Sprint" {
+  start: 2026-02-24
+  end: 2026-03-07
+  
+  task "Sprint 1: Today Marker" {
+    start: 2026-02-24
+    end: 2026-02-24
+    assignee: "Jack"
+    progress: 100
+    color: "#10b981"
+    tags: ["completed", "P0"]
+  }
+  
+  task "Sprint 2: Milestone Marking" {
+    start: 2026-02-27
+    end: 2026-02-27
+    assignee: "Jack"
+    progress: 100
+    color: "#10b981"
+    tags: ["completed", "P0"]
+  }
+  
+  task "Sprint 3: Export All Tasks" {
+    start: 2026-02-27
+    end: 2026-02-27
+    assignee: "Jack"
+    progress: 100
+    color: "#10b981"
+    tags: ["completed", "P0"]
+  }
+  
+  task "UI Improvements" {
+    start: 2026-02-27
+    end: 2026-02-27
+    assignee: "Jack"
+    progress: 100
+    color: "#10b981"
+    tags: ["completed", "refinement"]
+  }
+  
+  task "Delay Impact Research" {
+    start: 2026-02-27
+    end: 2026-02-27
+    assignee: "Jack"
+    progress: 100
+    color: "#10b981"
+    tags: ["completed", "research"]
+  }
+  
+  task "Delay Impact MVP" {
+    start: 2026-02-28
+    end: 2026-03-01
+    assignee: "Jack"
+    progress: 0
+    color: "#3b82f6"
+    tags: ["in-progress", "P0"]
+  }
+  
+  task "What-If Analysis UI" {
+    start: 2026-03-02
+    end: 2026-03-03
+    assignee: "Jack"
+    progress: 0
+    color: "#8b5cf6"
+    tags: ["planned", "P1"]
+  }
+  
+  task "Risk Scoring" {
+    start: 2026-03-04
+    end: 2026-03-05
+    assignee: "Jack"
+    progress: 0
+    color: "#f59e0b"
+    tags: ["planned", "P1"]
+  }
+  
+  task "AI Suggestions" {
+    start: 2026-03-06
+    end: 2026-03-07
+    assignee: "Jack"
+    progress: 0
+    color: "#ec4899"
+    tags: ["planned", "P2"]
+  }
+  
+  task "Testing & Docs" {
+    start: 2026-03-07
+    end: 2026-03-07
+    assignee: "Jack"
+    progress: 0
+    color: "#06b6d4"
+    tags: ["planned", "P0"]
+    milestone: true
+  }
+}`;
+    
+    setDslText(mvpDSL);
+    setDiagramMode('gantt');
+    setActiveTab('gantt');
+    setSaveStatus('unsaved');
+    toast.success('🚀 Loaded MVP Sprint! We are the first users!');
+  };
+
   const handleExport = (format: 'png' | 'svg' | 'json') => {
     if (format === 'png') exportPNG();
     else if (format === 'svg') exportSVG();
@@ -530,6 +637,7 @@ function App() {
             mode={(diagramMode === 'architecture' || diagramMode === 'flow') ? diagramMode : 'architecture'}
             onLoad={handleLoadDiagram}
             onNew={handleNewDiagram}
+            onLoadMVP={handleLoadMVPSprint}
           />
           
           {/* Save Status */}

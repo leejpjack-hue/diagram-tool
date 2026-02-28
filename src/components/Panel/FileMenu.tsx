@@ -6,9 +6,10 @@ interface FileMenuProps {
   mode: SavedDiagramMode;
   onLoad: (diagram: SavedDiagram) => void;
   onNew: () => void;
+  onLoadMVP?: () => void;
 }
 
-export function FileMenu({ currentDsl, mode, onLoad, onNew }: FileMenuProps) {
+export function FileMenu({ currentDsl, mode, onLoad, onNew, onLoadMVP }: FileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [recentDiagrams, setRecentDiagrams] = useState<SavedDiagram[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -120,6 +121,20 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew }: FileMenuProps) {
               <span>📄</span>
               <span>New Diagram</span>
             </button>
+
+            {onLoadMVP && (
+              <button
+                onClick={() => {
+                  onLoadMVP();
+                  handleClose();
+                }}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-blue-600 font-medium"
+              >
+                <span>🚀</span>
+                <span>Load MVP Sprint</span>
+                <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">NEW</span>
+              </button>
+            )}
 
             <button
               onClick={handleSave}
