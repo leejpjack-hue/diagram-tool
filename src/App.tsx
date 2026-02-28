@@ -448,110 +448,117 @@ function App() {
   };
 
   const handleLoadMVPSprint = () => {
-    // Load MVP Sprint DSL
+    // Load MVP Sprint DSL with correct dependencies
     const mvpDSL = `# Diagram Tool MVP Sprint - 2026-02-27
 
-project "Diagram Tool MVP Sprint" {
+diagram: gantt
+title: Diagram Tool MVP Sprint
+start: 2026-02-24
+
+task "Sprint 1: Today Marker" {
   start: 2026-02-24
+  end: 2026-02-24
+  assignee: "Jack"
+  progress: 100
+  color: "#10b981"
+}
+
+task "Sprint 2: Milestone Marking" {
+  start: 2026-02-27
+  end: 2026-02-27
+  assignee: "Jack"
+  progress: 100
+  color: "#10b981"
+  depends: "Sprint 1: Today Marker"
+}
+
+task "Sprint 3: Export All Tasks" {
+  start: 2026-02-27
+  end: 2026-02-27
+  assignee: "Jack"
+  progress: 100
+  color: "#10b981"
+  depends: "Sprint 2: Milestone Marking"
+}
+
+task "UI Improvements" {
+  start: 2026-02-27
+  end: 2026-02-27
+  assignee: "Jack"
+  progress: 100
+  color: "#10b981"
+  depends: "Sprint 3: Export All Tasks"
+}
+
+task "Delay Impact Research" {
+  start: 2026-02-27
+  end: 2026-02-27
+  assignee: "Jack"
+  progress: 100
+  color: "#10b981"
+  depends: "UI Improvements"
+}
+
+task "Delay Impact MVP" {
+  start: 2026-02-28
+  end: 2026-03-01
+  assignee: "Jack"
+  progress: 0
+  color: "#3b82f6"
+  depends: "Delay Impact Research"
+}
+
+task "Visualization Timeline" {
+  start: 2026-03-01
+  end: 2026-03-01
+  assignee: "Jack"
+  progress: 0
+  color: "#8b5cf6"
+  depends: "Delay Impact MVP"
+}
+
+task "What-If Analysis" {
+  start: 2026-03-02
+  end: 2026-03-03
+  assignee: "Jack"
+  progress: 0
+  color: "#8b5cf6"
+  depends: "Visualization Timeline"
+}
+
+task "Risk Scoring" {
+  start: 2026-03-04
+  end: 2026-03-05
+  assignee: "Jack"
+  progress: 0
+  color: "#f59e0b"
+  depends: "What-If Analysis"
+}
+
+task "AI Suggestions" {
+  start: 2026-03-06
   end: 2026-03-07
-  
-  task "Sprint 1: Today Marker" {
-    start: 2026-02-24
-    end: 2026-02-24
-    assignee: "Jack"
-    progress: 100
-    color: "#10b981"
-    tags: ["completed", "P0"]
-  }
-  
-  task "Sprint 2: Milestone Marking" {
-    start: 2026-02-27
-    end: 2026-02-27
-    assignee: "Jack"
-    progress: 100
-    color: "#10b981"
-    tags: ["completed", "P0"]
-  }
-  
-  task "Sprint 3: Export All Tasks" {
-    start: 2026-02-27
-    end: 2026-02-27
-    assignee: "Jack"
-    progress: 100
-    color: "#10b981"
-    tags: ["completed", "P0"]
-  }
-  
-  task "UI Improvements" {
-    start: 2026-02-27
-    end: 2026-02-27
-    assignee: "Jack"
-    progress: 100
-    color: "#10b981"
-    tags: ["completed", "refinement"]
-  }
-  
-  task "Delay Impact Research" {
-    start: 2026-02-27
-    end: 2026-02-27
-    assignee: "Jack"
-    progress: 100
-    color: "#10b981"
-    tags: ["completed", "research"]
-  }
-  
-  task "Delay Impact MVP" {
-    start: 2026-02-28
-    end: 2026-03-01
-    assignee: "Jack"
-    progress: 0
-    color: "#3b82f6"
-    tags: ["in-progress", "P0"]
-  }
-  
-  task "What-If Analysis UI" {
-    start: 2026-03-02
-    end: 2026-03-03
-    assignee: "Jack"
-    progress: 0
-    color: "#8b5cf6"
-    tags: ["planned", "P1"]
-  }
-  
-  task "Risk Scoring" {
-    start: 2026-03-04
-    end: 2026-03-05
-    assignee: "Jack"
-    progress: 0
-    color: "#f59e0b"
-    tags: ["planned", "P1"]
-  }
-  
-  task "AI Suggestions" {
-    start: 2026-03-06
-    end: 2026-03-07
-    assignee: "Jack"
-    progress: 0
-    color: "#ec4899"
-    tags: ["planned", "P2"]
-  }
-  
-  task "Testing & Docs" {
-    start: 2026-03-07
-    end: 2026-03-07
-    assignee: "Jack"
-    progress: 0
-    color: "#06b6d4"
-    tags: ["planned", "P0"]
-    milestone: true
-  }
+  assignee: "Jack"
+  progress: 0
+  color: "#ec4899"
+  depends: "Risk Scoring"
+}
+
+task "Testing & Docs" {
+  start: 2026-03-07
+  end: 2026-03-07
+  assignee: "Jack"
+  progress: 0
+  color: "#06b6d4"
+  milestone: true
+  depends: "AI Suggestions"
 }`;
     
     setDslText(mvpDSL);
     setDiagramMode('gantt');
     setActiveTab('gantt');
     setSaveStatus('unsaved');
-    toast.success('🚀 Loaded MVP Sprint! We are the first users!');
+    toast.success('🚀 Loaded MVP Sprint with correct dependencies!');
   };
 
   const handleExport = (format: 'png' | 'svg' | 'json') => {
