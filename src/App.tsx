@@ -171,7 +171,7 @@ function App() {
     setClipboard 
   } = useDiagramStore();
   
-  const { setTasks, addTask, setDependencies, tasks, dependencies } = useGanttStore();
+  const { setTasks, addTask, updateTask, setDependencies, tasks, dependencies } = useGanttStore();
   
   // Initialize activeTab from saved diagram if available
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow' | 'gantt'>(() => {
@@ -272,6 +272,77 @@ function App() {
     addTask(newTask);
     // DSL will be automatically updated by the useEffect that watches tasks
     toast.success(`Added: ${newTask.name}`);
+  };
+  
+  // Handle delay impact apply
+  const handleApplyDelayImpact = (result: any) => {
+    // Apply delay impact to tasks
+    result.affectedTasks.forEach((affectedTask: any) => {
+      if (affectedTask.delayDays > 0) {
+        const task = tasks.find(t => t.id === affectedTask.task.id);
+        if (task) {
+          const newStartDate = new Date(task.startDate);
+          newStartDate.setDate(newStartDate.getDate() + affectedTask.delayDays);
+          const newEndDate = new Date(task.endDate);
+          newEndDate.setDate(newEndDate.getDate() + affectedTask.delayDays);
+          
+          updateTask(task.id, {
+            startDate: newStartDate,
+            endDate: newEndDate,
+          });
+        }
+      }
+    });
+    
+    // Update DSL text
+    const newDSL = updateDSLWithDelay(result);
+    setDslText(newDSL);
+    
+    // Clear visualization
+    localStorage.removeItem('delayImpactVisualization');
+    
+    toast.success('✅ Delay impact applied! Tasks updated.');
+  };
+  
+  const updateDSLWithDelay = (result: any): string => {
+    let updatedDSL = dslText;
+    
+    result.affectedTasks.forEach((affectedTask: any) => {
+      if (affectedTask.delayDays > 0) {
+        const task = affectedTask.task;
+        const newStartDate = new Date(task.startDate);
+        newStartDate.setDate(newStartDate.getDate() + affectedTask.delayDays);
+        const newEndDate = new Date(task.endDate);
+        newEndDate.setDate(newEndDate.getDate() + affectedTask.delayDays);
+        
+        // Update start date in DSL
+        const startDateRegex = new RegExp(
+          `(task "${escapeRegex(task.name)}"[^}]*start: )\\d{4}-\\d{2}-\\d{2}`,
+          's'
+        );
+        updatedDSL = updatedDSL.replace(startDateRegex, `$1${formatDate(newStartDate)}`);
+        
+        // Update end date in DSL
+        const endDateRegex = new RegExp(
+          `(task "${escapeRegex(task.name)}"[^}]*end: )\\d{4}-\\d{2}-\\d{2}`,
+          's'
+        );
+        updatedDSL = updatedDSL.replace(endDateRegex, `$1${formatDate(newEndDate)}`);
+      }
+    });
+    
+    return updatedDSL;
+  };
+  
+  const escapeRegex = (str: string): string => {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
+  
+  const formatDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   // Handle Gantt export
@@ -838,10 +909,7 @@ task "Testing & Docs" {
             <DelayImpactPanel
               tasks={tasks}
               dependencies={dependencies}
-              onApply={(result) => {
-                console.log('Applied delay impact:', result);
-                toast.success(`Applied delay impact: ${result.affectedTasks.length} tasks affected`);
-              }}
+              onApply={handleApplyDelayImpact}
             />
           </div>
         )}
