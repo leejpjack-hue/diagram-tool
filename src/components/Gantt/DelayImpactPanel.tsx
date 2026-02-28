@@ -7,6 +7,7 @@ import {
   getRiskLevelColor,
   type DelayImpactResult,
 } from './delayImpactUtils';
+import { useToast } from '../../utils/useToast';
 
 interface DelayImpactPanelProps {
   tasks: GanttTask[];
@@ -22,6 +23,7 @@ export function DelayImpactPanel({
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
   const [delayDays, setDelayDays] = useState<number>(1);
   const [result, setResult] = useState<DelayImpactResult | null>(null);
+  const toast = useToast();
 
   const handleAnalyze = () => {
     if (!selectedTaskId) {
@@ -46,12 +48,25 @@ export function DelayImpactPanel({
   const handleApply = () => {
     if (result && onApply) {
       onApply(result);
+      // Store affected tasks for visualization
+      localStorage.setItem('delayImpactResult', JSON.stringify(result));
     }
   };
 
   const handleReset = () => {
     setResult(null);
     setDelayDays(1);
+    localStorage.removeItem('delayImpactResult');
+  };
+
+  const handleVisualize = () => {
+    if (result) {
+      localStorage.setItem('delayImpactVisualization', JSON.stringify({
+        enabled: true,
+        result: result,
+      }));
+      toast.success('Visualization enabled! Check the Gantt chart.');
+    }
   };
 
   return (
@@ -201,19 +216,29 @@ export function DelayImpactPanel({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2">
+          <div className="space-y-2">
             <button
-              onClick={handleReset}
-              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 font-medium"
+              onClick={handleVisualize}
+              disabled={!result}
+              className="w-full px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
             >
-              Reset
+              🎨 Visualize on Gantt
             </button>
-            <button
-              onClick={handleApply}
-              className="flex-1 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 font-medium"
-            >
-              Apply Changes
-            </button>
+            
+            <div className="flex gap-2">
+              <button
+                onClick={handleReset}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 font-medium"
+              >
+                Reset
+              </button>
+              <button
+                onClick={handleApply}
+                className="flex-1 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 font-medium"
+              >
+                Apply Changes
+              </button>
+            </div>
           </div>
         </div>
       )}
