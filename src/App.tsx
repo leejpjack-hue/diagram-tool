@@ -7,6 +7,7 @@ import { GanttPanel } from './components/Gantt/GanttPanel';
 import { GanttResourcePanel } from './components/Gantt/GanttResourcePanel';
 import { GanttFilterBar } from './components/Gantt/GanttFilterBar';
 import { GanttExportDialog } from './components/Gantt/GanttExportDialog';
+import { DelayImpactPanel } from './components/Gantt/DelayImpactPanel';
 import { MobileViewToggle } from './components/Gantt/MobileViewToggle';
 import { PropertiesPanel } from './components/Panel/PropertiesPanel';
 import { ExportPanel } from './components/Panel/ExportPanel';
@@ -181,6 +182,7 @@ function App() {
   const [ganttSidePanel, setGanttSidePanel] = useState<GanttSidePanel>('tasks');
   const [showGanttExport, setShowGanttExport] = useState(false);
   const [showTaskPanel, setShowTaskPanel] = useState(true);
+  const [showDelayImpactPanel, setShowDelayImpactPanel] = useState(false);
   const [editorWidth, setEditorWidth] = useState(250);
   const [isResizing, setIsResizing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
@@ -727,6 +729,20 @@ project "Diagram Tool MVP Sprint" {
                 </div>
               )}
               <GanttFilterBar />
+              
+              {/* Delay Impact Button */}
+              <div className="px-4 py-2 border-b border-gray-200 flex items-center gap-2">
+                <button
+                  onClick={() => setShowDelayImpactPanel(!showDelayImpactPanel)}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                    showDelayImpactPanel
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  ⚡ Delay Impact
+                </button>
+              </div>
             </>
           )}
           <div ref={activeTab === 'gantt' ? ganttCanvasRef : undefined} className="flex-1 overflow-auto">
@@ -797,6 +813,29 @@ project "Diagram Tool MVP Sprint" {
               {ganttSidePanel === 'tasks' && <GanttPanel onAddTask={handleAddGanttTask} />}
               {ganttSidePanel === 'resources' && <GanttResourcePanel />}
             </div>
+          </div>
+        )}
+        
+        {/* Delay Impact Panel */}
+        {activeTab === 'gantt' && showDelayImpactPanel && (
+          <div className="w-96 flex-shrink-0 border-l border-gray-200 bg-white relative">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowDelayImpactPanel(false)}
+              className="absolute -left-3 top-4 z-10 w-6 h-12 bg-white border border-gray-300 rounded-l-md flex items-center justify-center hover:bg-gray-100 text-gray-600 hover:text-gray-900 shadow-sm"
+              title="Close delay impact panel"
+            >
+              ◀
+            </button>
+            
+            <DelayImpactPanel
+              tasks={tasks}
+              dependencies={dependencies}
+              onApply={(result) => {
+                console.log('Applied delay impact:', result);
+                toast.success(`Applied delay impact: ${result.affectedTasks.length} tasks affected`);
+              }}
+            />
           </div>
         )}
         
