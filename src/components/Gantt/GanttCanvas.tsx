@@ -760,16 +760,6 @@ export function GanttCanvas() {
                         </text>
                       </g>
                     )}
-                      <polygon
-                        points={`${barX + barWidth / 2},${rowY + 4} ${barX + barWidth / 2 + 10},${rowY + 14} ${barX + barWidth / 2},${rowY + 24} ${barX + barWidth / 2 - 10},${rowY + 14}`}
-                        fill={taskColor}
-                        stroke={isSelected ? '#fbbf24' : taskColor}
-                        strokeWidth={isSelected ? 3 : 2}
-                        filter={isSelected ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' : 'none'}
-                        className="cursor-pointer"
-                        onClick={() => setSelectedTask(task.id)}
-                      />
-                    )}
                   </g>
                 )}
                 
