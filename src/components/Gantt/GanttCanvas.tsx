@@ -2,7 +2,6 @@ import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { useGanttStore } from './ganttStore';
 import type { GanttTask, GanttZoomLevel, Dependency } from './types';
 import { isCritical } from './criticalPath';
-import { useToast } from '../../utils/useToast';
 
 // Constants
 const ROW_HEIGHT = 40;
@@ -51,8 +50,6 @@ export function GanttCanvas() {
     recalculateCriticalPath,
     getFilteredTasks,
   } = useGanttStore();
-  
-  const toast = useToast();
   
   // State for delay impact visualization
   const [visualizationData] = useState<{
@@ -778,11 +775,12 @@ export function GanttCanvas() {
         <button
           onClick={() => {
             const result = useGanttStore.getState().runAutoSchedule();
-            if (result.success) {
-              toast.success(`✅ ${result.message} (${result.changed} tasks updated)`);
-            } else {
-              toast.error(`❌ ${result.message}`);
-            }
+            // Show result in console for now
+            console.log('Auto-schedule result:', result);
+            alert(result.success 
+              ? `✅ ${result.message} (${result.changed} tasks updated)`
+              : `❌ ${result.message}`
+            );
           }}
           className="px-3 py-1 rounded text-sm font-medium bg-purple-500 text-white hover:bg-purple-600"
           title="Auto-schedule tasks based on dependencies"
