@@ -808,6 +808,34 @@ task "Testing & Docs" {
               )}
               <GanttFilterBar />
               
+              {/* Panel Toggle Controls */}
+              <div className="flex gap-2 p-2 bg-white border-b border-gray-200">
+                <button
+                  onClick={() => setShowEditor(!showEditor)}
+                  className={`px-3 py-1 rounded text-sm font-medium ${
+                    showEditor ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  📝 Editor
+                </button>
+                <button
+                  onClick={() => setShowTaskPanel(!showTaskPanel)}
+                  className={`px-3 py-1 rounded text-sm font-medium ${
+                    showTaskPanel ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  📋 Tasks
+                </button>
+                <button
+                  onClick={() => setShowResourcePanel(!showResourcePanel)}
+                  className={`px-3 py-1 rounded text-sm font-medium ${
+                    showResourcePanel ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  👥 Resources
+                </button>
+              </div>
+              
               {/* Delay Impact Button */}
               <div className="px-4 py-2 border-b border-gray-200 flex items-center gap-2">
                 <button
