@@ -539,7 +539,7 @@ export function GanttCanvas() {
                   />
                 ))}
                 
-                {/* Task bar (skip for groups unless showing summary) */}
+                {/* Task bar (skip for groups and milestones) */}
                 {!task.isGroup && !isMilestone && (
                   <g
                     className="cursor-pointer"
@@ -726,46 +726,46 @@ export function GanttCanvas() {
                         />
                       </>
                     )}
-                    
-                    {/* Milestone diamond (auto or manual) */}
-                    {isMilestone && (
-                      <g
-                        className="cursor-pointer"
-                        onClick={() => setSelectedTask(task.id)}
-                      >
-                        {/* Diamond shape - larger and more visible */}
-                        <polygon
-                          points={`${barX + barWidth / 2},${rowY + 4} ${barX + barWidth / 2 + 16},${rowY + 20} ${barX + barWidth / 2},${rowY + 36} ${barX + barWidth / 2 - 16},${rowY + 20}`}
-                          fill={taskColor}
-                          stroke={isSelected ? '#1e40af' : isCriticalTask ? CRITICAL_COLOR : '#ffffff'}
-                          strokeWidth={isSelected ? 4 : isCriticalTask ? 3 : 2}
-                          opacity={1}
-                          filter="drop-shadow(0 2px 4px rgba(0,0,0,0.3))"
-                        />
-                        {/* Milestone name above */}
-                        <text
-                          x={barX + barWidth / 2}
-                          y={rowY - 2}
-                          fontSize="11"
-                          fill="#1e293b"
-                          fontWeight="600"
-                          textAnchor="middle"
-                        >
-                          {task.name.length > 30 ? task.name.substring(0, 30) + '...' : task.name}
-                        </text>
-                        {/* Milestone indicator symbol */}
-                        <text
-                          x={barX + barWidth / 2}
-                          y={rowY + 25}
-                          fontSize="16"
-                          fill="white"
-                          fontWeight="700"
-                          textAnchor="middle"
-                        >
-                          ◆
-                        </text>
-                      </g>
-                    )}
+                  </g>
+                )}
+                
+                {/* Milestone diamond (separate from task bar) - ONLY render for milestones */}
+                {!task.isGroup && isMilestone && (
+                  <g
+                    className="cursor-pointer"
+                    onClick={() => setSelectedTask(task.id)}
+                  >
+                    {/* Diamond shape - larger and more visible */}
+                    <polygon
+                      points={`${barX + barWidth / 2},${rowY + 4} ${barX + barWidth / 2 + 16},${rowY + 20} ${barX + barWidth / 2},${rowY + 36} ${barX + barWidth / 2 - 16},${rowY + 20}`}
+                      fill={taskColor}
+                      stroke={isSelected ? '#1e40af' : isCriticalTask ? CRITICAL_COLOR : '#ffffff'}
+                      strokeWidth={isSelected ? 4 : isCriticalTask ? 3 : 2}
+                      opacity={1}
+                      filter="drop-shadow(0 2px 4px rgba(0,0,0,0.3))"
+                    />
+                    {/* Milestone name above */}
+                    <text
+                      x={barX + barWidth / 2}
+                      y={rowY - 2}
+                      fontSize="11"
+                      fill="#1e293b"
+                      fontWeight="600"
+                      textAnchor="middle"
+                    >
+                      {task.name.length > 30 ? task.name.substring(0, 30) + '...' : task.name}
+                    </text>
+                    {/* Milestone indicator symbol */}
+                    <text
+                      x={barX + barWidth / 2}
+                      y={rowY + 25}
+                      fontSize="16"
+                      fill="white"
+                      fontWeight="700"
+                      textAnchor="middle"
+                    >
+                      ◆
+                    </text>
                   </g>
                 )}
                 
