@@ -724,6 +724,42 @@ export function GanttCanvas() {
                     
                     {/* Milestone diamond (auto or manual) */}
                     {isMilestone && (
+                      <g
+                        className="cursor-pointer"
+                        onClick={() => setSelectedTask(task.id)}
+                      >
+                        {/* Diamond shape */}
+                        <polygon
+                          points={`${barX + barWidth / 2},${rowY + 8} ${barX + barWidth / 2 + 12},${rowY + 20} ${barX + barWidth / 2},${rowY + 32} ${barX + barWidth / 2 - 12},${rowY + 20}`}
+                          fill={taskColor}
+                          stroke={isSelected ? '#1e40af' : isCriticalTask ? CRITICAL_COLOR : taskColor}
+                          strokeWidth={isSelected ? 3 : isCriticalTask ? 2 : 1}
+                          opacity={0.9}
+                        />
+                        {/* Milestone name above */}
+                        <text
+                          x={barX + barWidth / 2}
+                          y={rowY + 4}
+                          fontSize="10"
+                          fill="#64748b"
+                          fontWeight="600"
+                          textAnchor="middle"
+                        >
+                          {task.name.length > 30 ? task.name.substring(0, 30) + '...' : task.name}
+                        </text>
+                        {/* Milestone indicator */}
+                        <text
+                          x={barX + barWidth / 2}
+                          y={rowY + 24}
+                          fontSize="12"
+                          fill="white"
+                          fontWeight="700"
+                          textAnchor="middle"
+                        >
+                          ⬥
+                        </text>
+                      </g>
+                    )}
                       <polygon
                         points={`${barX + barWidth / 2},${rowY + 4} ${barX + barWidth / 2 + 10},${rowY + 14} ${barX + barWidth / 2},${rowY + 24} ${barX + barWidth / 2 - 10},${rowY + 14}`}
                         fill={taskColor}
