@@ -136,20 +136,32 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
         currentTask.progress = parseInt(line.replace('progress:', '').trim(), 10) || 0;
       } else if (line.startsWith('depends:')) {
         const depStr = line.replace('depends:', '').trim();
-        const parsed = parseDependencyString(depStr);
         
-        // ADD to dependencies array (don't overwrite!)
-        currentTask.dependencies.push(parsed.name); // Store name temporarily, resolve later
+        // Support comma-separated dependencies: "TaskA, TaskB, TaskC"
+        const depNames = depStr.split(',').map(d => d.trim()).filter(d => d);
         
-        // ADD to dependencyDetails array (don't overwrite!)
+        // Ensure arrays exist
+        if (!currentTask.dependencies) {
+          currentTask.dependencies = [];
+        }
         if (!currentTask.dependencyDetails) {
           currentTask.dependencyDetails = [];
         }
-        currentTask.dependencyDetails.push({
-          predecessorId: parsed.name, // Will be resolved to ID later
-          successorId: currentTask.id || '',
-          type: parsed.type,
-          lag: parsed.lag,
+        
+        // Process each dependency
+        depNames.forEach(depName => {
+          const parsed = parseDependencyString(depName);
+          
+          // ADD to dependencies array (don't overwrite!)
+          currentTask.dependencies!.push(parsed.name); // Store name temporarily, resolve later
+          
+          // ADD to dependencyDetails array (don't overwrite!)
+          currentTask.dependencyDetails!.push({
+            predecessorId: parsed.name, // Will be resolved to ID later
+            successorId: currentTask.id || '',
+            type: parsed.type,
+            lag: parsed.lag,
+          });
         });
       } else if (line.startsWith('color:')) {
         currentTask.color = line.replace('color:', '').trim();
