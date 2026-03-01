@@ -812,25 +812,46 @@ task "Testing & Docs" {
               <div className="flex gap-2 p-2 bg-white border-b border-gray-200">
                 <button
                   onClick={() => setShowEditor(!showEditor)}
-                  className={`px-3 py-1 rounded text-sm font-medium ${
-                    showEditor ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  style={{
+                    backgroundColor: showEditor ? '#3b82f6' : '#f3f4f6',
+                    color: showEditor ? 'white' : '#374151',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
                 >
                   📝 Editor
                 </button>
                 <button
                   onClick={() => setShowTaskPanel(!showTaskPanel)}
-                  className={`px-3 py-1 rounded text-sm font-medium ${
-                    showTaskPanel ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  style={{
+                    backgroundColor: showTaskPanel ? '#22c55e' : '#f3f4f6',
+                    color: showTaskPanel ? 'white' : '#374151',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
                 >
                   📋 Tasks
                 </button>
                 <button
                   onClick={() => setShowResourcePanel(!showResourcePanel)}
-                  className={`px-3 py-1 rounded text-sm font-medium ${
-                    showResourcePanel ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  style={{
+                    backgroundColor: showResourcePanel ? '#a855f7' : '#f3f4f6',
+                    color: showResourcePanel ? 'white' : '#374151',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
                 >
                   👥 Resources
                 </button>

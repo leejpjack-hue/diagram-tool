@@ -801,7 +801,19 @@ export function GanttCanvas() {
         {visualizationData && visualizationData.enabled && (
           <button
             onClick={clearVisualization}
-            className="px-4 py-2 rounded-md text-sm font-medium shadow-md transition-all bg-orange-500 hover:bg-orange-600 text-white"
+            style={{
+              backgroundColor: '#f97316',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: 500,
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#ea580c'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f97316'}
             title="Clear delay impact visualization"
           >
             🗑️ Clear Viz
@@ -812,14 +824,25 @@ export function GanttCanvas() {
         <button
           onClick={() => {
             const result = useGanttStore.getState().runAutoSchedule();
-            // Show result in console for now
             console.log('Auto-schedule result:', result);
             alert(result.success 
               ? `✅ ${result.message} (${result.changed} tasks updated)`
               : `❌ ${result.message}`
             );
           }}
-          className="px-4 py-2 rounded-md text-sm font-medium shadow-md transition-all bg-purple-500 hover:bg-purple-600 text-white"
+          style={{
+            backgroundColor: '#a855f7',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontWeight: 500,
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            border: 'none',
+            cursor: 'pointer'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#9333ea'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#a855f7'}
           title="Auto-schedule tasks based on dependencies"
         >
           🤖 Auto-Schedule
