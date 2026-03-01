@@ -147,7 +147,9 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
       } else if (line.startsWith('color:')) {
         currentTask.color = line.replace('color:', '').trim();
       } else if (line.startsWith('milestone:')) {
-        currentTask.milestone = line.replace('milestone:', '').trim() === 'true';
+        const value = line.replace('milestone:', '').trim();
+        currentTask.milestone = value === 'true' || value === 'True' || value === '1';
+        console.log(`[Parser] Parsed milestone for task "${currentTask.name}":`, currentTask.milestone, '(value:', value, ')');
       } else if (line === '}') {
         // Close task block
         if (currentTask && currentTask.name) {
@@ -216,6 +218,7 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
     }
   });
   
+  console.log('[Parser] Parsed tasks:', tasks.map(t => ({ name: t.name, milestone: t.milestone, start: t.startDate, end: t.endDate })));
   return { title, startDate: projectStart, tasks, milestones: [], dependencies };
 }
 

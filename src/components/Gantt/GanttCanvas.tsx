@@ -445,7 +445,12 @@ export function GanttCanvas() {
             const slackWidth = slack * dayWidth;
             
             // Check if task is a milestone (manual or auto-detected zero-duration)
-            const isMilestone = task.milestone || diffDays(task.endDate, task.startDate) === 0;
+            const isMilestone = task.milestone === true || diffDays(task.endDate, task.startDate) === 0;
+            
+            // Debug logging
+            if (task.milestone || isMilestone) {
+              console.log(`[Milestone] Task: ${task.name}, milestone prop: ${task.milestone}, isMilestone: ${isMilestone}, days: ${diffDays(task.endDate, task.startDate)}`);
+            }
             
             // Group styling
             const taskColor = task.isGroup 
