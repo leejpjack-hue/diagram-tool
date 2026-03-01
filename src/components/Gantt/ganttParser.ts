@@ -153,12 +153,12 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
           const parsed = parseDependencyString(depName);
           
           // ADD to dependencies array (don't overwrite!)
-          currentTask.dependencies!.push(parsed.name); // Store name temporarily, resolve later
+          currentTask!.dependencies!.push(parsed.name); // Store name temporarily, resolve later
           
           // ADD to dependencyDetails array (don't overwrite!)
-          currentTask.dependencyDetails!.push({
+          currentTask!.dependencyDetails!.push({
             predecessorId: parsed.name, // Will be resolved to ID later
-            successorId: currentTask.id || '',
+            successorId: currentTask!.id || '',
             type: parsed.type,
             lag: parsed.lag,
           });
