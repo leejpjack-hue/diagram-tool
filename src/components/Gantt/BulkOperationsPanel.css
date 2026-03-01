@@ -1,0 +1,260 @@
+/* Sprint 10: Bulk Operations Panel Styles */
+
+.bulk-operations-panel {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  min-width: 280px;
+  max-width: 320px;
+}
+
+.bulk-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.bulk-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.bulk-count {
+  background: #3b82f6;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.bulk-close-btn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.bulk-close-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+/* Quick Actions */
+.bulk-quick-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.bulk-action-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bulk-action-btn:hover {
+  background: #e5e7eb;
+}
+
+.bulk-action-danger {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.bulk-action-danger:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+/* Control Groups */
+.bulk-control-group {
+  margin-bottom: 16px;
+}
+
+.bulk-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+/* Progress Control */
+.bulk-progress-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bulk-progress-slider {
+  flex: 1;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #e5e7eb;
+  border-radius: 3px;
+  outline: none;
+}
+
+.bulk-progress-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.bulk-progress-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.bulk-progress-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #3b82f6;
+  min-width: 40px;
+  text-align: right;
+}
+
+.bulk-progress-presets {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.bulk-preset-btn {
+  flex: 1;
+  padding: 6px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bulk-preset-btn:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+/* Assignee Select */
+.bulk-assignee-select {
+  width: 100%;
+  padding: 10px 12px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bulk-assignee-select:hover {
+  border-color: #d1d5db;
+}
+
+.bulk-assignee-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Tasks Preview */
+.bulk-tasks-preview {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.bulk-preview-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bulk-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bulk-preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.bulk-preview-name {
+  color: #374151;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
+.bulk-preview-progress {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.bulk-preview-more {
+  font-size: 12px;
+  color: #9ca3af;
+  font-style: italic;
+  padding-top: 4px;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .bulk-operations-panel {
+    min-width: 100%;
+    max-width: 100%;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  }
+  
+  .bulk-quick-actions {
+    flex-wrap: wrap;
+  }
+  
+  .bulk-action-btn {
+    flex-basis: calc(50% - 4px);
+  }
+}

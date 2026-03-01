@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { useGanttStore } from './ganttStore';
 import type { GanttTask, GanttZoomLevel, Dependency } from './types';
 import { isCritical } from './criticalPath';
+import { BulkOperationsPanel } from './BulkOperationsPanel';
 
 // Constants
 const ROW_HEIGHT = 40;
@@ -39,6 +40,7 @@ export function GanttCanvas() {
     tasks, 
     dependencies,
     selectedTaskId, 
+    selectedTaskIds,
     zoomLevel, 
     showCriticalPath,
     criticalPathResult,
@@ -47,6 +49,8 @@ export function GanttCanvas() {
     setSelectedTask, 
     updateTask,
     toggleGroup,
+    toggleTaskSelection,
+    clearSelection,
     recalculateCriticalPath,
     getFilteredTasks,
   } = useGanttStore();
@@ -439,7 +443,7 @@ export function GanttCanvas() {
             const barX = TASK_NAME_WIDTH + startIndex * dayWidth;
             const barWidth = duration * dayWidth;
             const rowY = HEADER_HEIGHT + index * ROW_HEIGHT;
-            const isSelected = selectedTaskId === task.id;
+            const isSelected = selectedTaskId === task.id || selectedTaskIds.has(task.id);
             const isCriticalTask = isTaskCritical(task.id);
             const slack = getTaskSlack(task.id);
             const slackWidth = slack * dayWidth;
@@ -543,7 +547,10 @@ export function GanttCanvas() {
                 {!task.isGroup && !isMilestone && (
                   <g
                     className="cursor-pointer"
-                    onClick={() => setSelectedTask(task.id)}
+                    onClick={(e) => {
+                      const isMultiSelect = e.ctrlKey || e.metaKey;
+                      toggleTaskSelection(task.id, isMultiSelect);
+                    }}
                   >
                     {/* Slack indicator (if showing critical path) */}
                     {showCriticalPath && slack > 0 && (
@@ -733,7 +740,10 @@ export function GanttCanvas() {
                 {!task.isGroup && isMilestone && (
                   <g
                     className="cursor-pointer"
-                    onClick={() => setSelectedTask(task.id)}
+                    onClick={(e) => {
+                      const isMultiSelect = e.ctrlKey || e.metaKey;
+                      toggleTaskSelection(task.id, isMultiSelect);
+                    }}
                   >
                     {/* Diamond shape - normal size */}
                     <polygon
@@ -761,7 +771,10 @@ export function GanttCanvas() {
                 {task.isGroup && (
                   <g
                     className="cursor-pointer"
-                    onClick={() => setSelectedTask(task.id)}
+                    onClick={(e) => {
+                      const isMultiSelect = e.ctrlKey || e.metaKey;
+                      toggleTaskSelection(task.id, isMultiSelect);
+                    }}
                   >
                     <rect
                       x={barX}
@@ -921,6 +934,27 @@ export function GanttCanvas() {
           <div className="text-xs text-gray-500 mt-2">
             Duration: {criticalPathResult.duration} days
           </div>
+        </div>
+      )}
+      
+      {/* Sprint 10: Bulk Operations Panel */}
+      {selectedTaskIds.size > 1 && (
+        <div className="fixed top-20 right-4 z-20">
+          <BulkOperationsPanel onClose={() => clearSelection()} />
+        </div>
+      )}
+      
+      {/* Selection count indicator */}
+      {selectedTaskIds.size > 0 && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-4 py-2 rounded-full shadow-lg z-20 flex items-center gap-2">
+          <span className="font-semibold">{selectedTaskIds.size}</span>
+          <span>selected</span>
+          <button
+            onClick={() => clearSelection()}
+            className="ml-2 hover:bg-blue-600 rounded-full w-6 h-6 flex items-center justify-center"
+          >
+            ✕
+          </button>
         </div>
       )}
     </div>

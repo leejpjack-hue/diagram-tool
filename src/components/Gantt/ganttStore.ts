@@ -12,6 +12,7 @@ interface GanttState {
   milestones: GanttMilestone[];
   dependencies: Dependency[];
   selectedTaskId: string | null;
+  selectedTaskIds: Set<string>; // Sprint 10: Bulk operations - multi-select
   zoomLevel: GanttZoomLevel;
   viewStartDate: Date;
   
@@ -60,6 +61,14 @@ interface GanttState {
   checkViolations: () => any[];
   expandAllGroups: () => void;
   collapseAllGroups: () => void;
+  
+  // Sprint 10: Bulk operations
+  toggleTaskSelection: (id: string, multi?: boolean) => void;
+  selectAllTasks: () => void;
+  clearSelection: () => void;
+  deleteSelectedTasks: () => void;
+  updateSelectedTasks: (updates: Partial<GanttTask>) => void;
+  getSelectedTasks: () => GanttTask[];
   
   // Project
   setProject: (tasks: GanttTask[], dependencies: Dependency[]) => void;
@@ -160,6 +169,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   milestones: [],
   dependencies: defaultDependencies,
   selectedTaskId: null,
+  selectedTaskIds: new Set<string>(), // Sprint 10: Bulk operations
   zoomLevel: 'week',
   viewStartDate: today,
   criticalPathResult: null,
@@ -345,6 +355,78 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   checkViolations: () => {
     const state = get();
     return checkDependencyViolations(state.tasks, state.dependencies);
+  },
+  
+  // Sprint 10: Bulk operations
+  toggleTaskSelection: (id, multi = false) => set((state) => {
+    const newSelection = new Set(state.selectedTaskIds);
+    
+    if (multi) {
+      // Toggle selection for multi-select mode (Ctrl+click)
+      if (newSelection.has(id)) {
+        newSelection.delete(id);
+      } else {
+        newSelection.add(id);
+      }
+    } else {
+      // Single select mode - clear previous selection and select this task
+      newSelection.clear();
+      newSelection.add(id);
+    }
+    
+    return { 
+      selectedTaskIds: newSelection,
+      selectedTaskId: newSelection.size === 1 ? id : null,
+    };
+  }),
+  
+  selectAllTasks: () => set((state) => {
+    const allTaskIds = new Set(state.tasks.filter(t => !t.isGroup).map(t => t.id));
+    return { 
+      selectedTaskIds: allTaskIds,
+      selectedTaskId: null,
+    };
+  }),
+  
+  clearSelection: () => set({ 
+    selectedTaskIds: new Set(),
+    selectedTaskId: null,
+  }),
+  
+  deleteSelectedTasks: () => set((state) => {
+    const idsToDelete = state.selectedTaskIds;
+    if (idsToDelete.size === 0) return state;
+    
+    // Remove tasks
+    const newTasks = state.tasks.filter(t => !idsToDelete.has(t.id));
+    
+    // Remove associated dependencies
+    const newDependencies = state.dependencies.filter(
+      d => !idsToDelete.has(d.predecessorId) && !idsToDelete.has(d.successorId)
+    );
+    
+    return {
+      tasks: newTasks,
+      dependencies: newDependencies,
+      selectedTaskIds: new Set(),
+      selectedTaskId: null,
+    };
+  }),
+  
+  updateSelectedTasks: (updates) => set((state) => {
+    const idsToUpdate = state.selectedTaskIds;
+    if (idsToUpdate.size === 0) return state;
+    
+    const newTasks = state.tasks.map(t => 
+      idsToUpdate.has(t.id) ? { ...t, ...updates } : t
+    );
+    
+    return { tasks: newTasks };
+  }),
+  
+  getSelectedTasks: () => {
+    const state = get();
+    return state.tasks.filter(t => state.selectedTaskIds.has(t.id));
   },
   
   // Project
