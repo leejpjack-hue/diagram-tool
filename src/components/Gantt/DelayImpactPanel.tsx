@@ -48,24 +48,46 @@ export function DelayImpactPanel({
   const handleApply = () => {
     if (result && onApply) {
       onApply(result);
-      // Store affected tasks for visualization
-      localStorage.setItem('delayImpactResult', JSON.stringify(result));
+      
+      // Clear visualization after applying
+      localStorage.removeItem('delayImpactVisualization');
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'delayImpactVisualization',
+        newValue: null,
+      }));
     }
   };
 
   const handleReset = () => {
     setResult(null);
     setDelayDays(1);
-    localStorage.removeItem('delayImpactResult');
+    
+    // Clear visualization when resetting
+    localStorage.removeItem('delayImpactVisualization');
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'delayImpactVisualization',
+      newValue: null,
+    }));
   };
 
   const handleVisualize = () => {
     if (result) {
-      localStorage.setItem('delayImpactVisualization', JSON.stringify({
+      const vizData = {
         enabled: true,
         result: result,
+        timestamp: Date.now(),
+      };
+      
+      // Store in localStorage
+      localStorage.setItem('delayImpactVisualization', JSON.stringify(vizData));
+      
+      // Dispatch custom event to notify GanttCanvas
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'delayImpactVisualization',
+        newValue: JSON.stringify(vizData),
       }));
-      toast.success('Visualization enabled! Check the Gantt chart.');
+      
+      toast.success('Visualization enabled! Check the Gantt chart. Click "🗑️ Clear Viz" to remove.');
     }
   };
 

@@ -52,7 +52,7 @@ export function GanttCanvas() {
   } = useGanttStore();
   
   // State for delay impact visualization
-  const [visualizationData] = useState<{
+  const [visualizationData, setVisualizationData] = useState<{
     enabled: boolean;
     result: any;
   } | null>(() => {
@@ -66,6 +66,32 @@ export function GanttCanvas() {
     }
     return null;
   });
+  
+  // Listen for storage changes (from DelayImpactPanel)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'delayImpactVisualization') {
+        if (e.newValue) {
+          try {
+            setVisualizationData(JSON.parse(e.newValue));
+          } catch (err) {
+            console.error('Failed to parse visualization data:', err);
+          }
+        } else {
+          setVisualizationData(null);
+        }
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+  
+  // Clear visualization function
+  const clearVisualization = useCallback(() => {
+    localStorage.removeItem('delayImpactVisualization');
+    setVisualizationData(null);
+  }, []);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<{ taskId: string; type: 'move' | 'resize-start' | 'resize-end'; startX: number; originalTask: GanttTask } | null>(null);
@@ -771,6 +797,17 @@ export function GanttCanvas() {
       
       {/* Controls */}
       <div className="fixed bottom-4 right-4 flex gap-2 bg-white rounded-lg shadow-lg p-2 z-10">
+        {/* Clear Visualization button (only show when visualization is active) */}
+        {visualizationData && visualizationData.enabled && (
+          <button
+            onClick={clearVisualization}
+            className="px-3 py-1 rounded text-sm font-medium bg-orange-500 text-white hover:bg-orange-600"
+            title="Clear delay impact visualization"
+          >
+            🗑️ Clear Viz
+          </button>
+        )}
+        
         {/* Auto-schedule button */}
         <button
           onClick={() => {
