@@ -157,7 +157,6 @@ task Deployment {
 }`;
 
 type PanelType = 'none' | 'properties' | 'import' | 'export';
-type GanttSidePanel = 'tasks' | 'resources';
 
 function App() {
   const { 
