@@ -735,36 +735,24 @@ export function GanttCanvas() {
                     className="cursor-pointer"
                     onClick={() => setSelectedTask(task.id)}
                   >
-                    {/* Diamond shape - larger and more visible */}
+                    {/* Diamond shape - normal size */}
                     <polygon
-                      points={`${barX + barWidth / 2},${rowY + 4} ${barX + barWidth / 2 + 16},${rowY + 20} ${barX + barWidth / 2},${rowY + 36} ${barX + barWidth / 2 - 16},${rowY + 20}`}
+                      points={`${barX + barWidth / 2},${rowY + 10} ${barX + barWidth / 2 + 10},${rowY + 20} ${barX + barWidth / 2},${rowY + 30} ${barX + barWidth / 2 - 10},${rowY + 20}`}
                       fill={taskColor}
-                      stroke={isSelected ? '#1e40af' : isCriticalTask ? CRITICAL_COLOR : '#ffffff'}
-                      strokeWidth={isSelected ? 4 : isCriticalTask ? 3 : 2}
-                      opacity={1}
-                      filter="drop-shadow(0 2px 4px rgba(0,0,0,0.3))"
+                      stroke={isSelected ? '#1e40af' : isCriticalTask ? CRITICAL_COLOR : taskColor}
+                      strokeWidth={isSelected ? 2 : 1}
+                      opacity={0.9}
                     />
                     {/* Milestone name above */}
                     <text
                       x={barX + barWidth / 2}
-                      y={rowY - 2}
-                      fontSize="11"
-                      fill="#1e293b"
+                      y={rowY + 4}
+                      fontSize="10"
+                      fill="#64748b"
                       fontWeight="600"
                       textAnchor="middle"
                     >
                       {task.name.length > 30 ? task.name.substring(0, 30) + '...' : task.name}
-                    </text>
-                    {/* Milestone indicator symbol */}
-                    <text
-                      x={barX + barWidth / 2}
-                      y={rowY + 25}
-                      fontSize="16"
-                      fill="white"
-                      fontWeight="700"
-                      textAnchor="middle"
-                    >
-                      ◆
                     </text>
                   </g>
                 )}
