@@ -763,7 +763,7 @@ task "Testing & Docs" {
         }}
       >
         {/* Editor Panel - Resizable */}
-        {(!isMobile || mobileView === 'editor') && (
+        {showEditor && (!isMobile || mobileView === 'editor') && (
           <div 
             style={{ 
               width: isMobile ? '100%' : editorWidth, 
@@ -781,7 +781,7 @@ task "Testing & Docs" {
         )}
         
         {/* Resize Handle - Hide on mobile */}
-        {!isMobile && (
+        {!isMobile && showEditor && (
           <div
             onMouseDown={handleMouseDown}
             className={`w-1.5 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex items-center justify-center transition-colors group ${
