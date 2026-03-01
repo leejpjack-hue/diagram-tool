@@ -179,10 +179,11 @@ function App() {
     return (saved?.mode as 'architecture' | 'flow' | 'gantt') || 'architecture';
   });
   const [activePanel, setActivePanel] = useState<PanelType>('none');
-  const [ganttSidePanel, setGanttSidePanel] = useState<GanttSidePanel>('tasks');
   const [showGanttExport, setShowGanttExport] = useState(false);
   const [showTaskPanel, setShowTaskPanel] = useState(true);
   const [showDelayImpactPanel, setShowDelayImpactPanel] = useState(false);
+  const [showEditor, setShowEditor] = useState(true);
+  const [showResourcePanel, setShowResourcePanel] = useState(false);
   const [editorWidth, setEditorWidth] = useState(250);
   const [isResizing, setIsResizing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
@@ -842,13 +843,16 @@ task "Testing & Docs" {
         )}
         
         {/* Gantt Panel - Show when in gantt mode and (not mobile OR in tasks view) */}
-        {activeTab === 'gantt' && (!isMobile || mobileView === 'tasks') && showTaskPanel && (
+        {activeTab === 'gantt' && (!isMobile || mobileView === 'tasks') && (showTaskPanel || showResourcePanel) && (
           <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white flex flex-col relative">
             {/* Collapse Button */}
             <button
-              onClick={() => setShowTaskPanel(false)}
+              onClick={() => {
+                setShowTaskPanel(false);
+                setShowResourcePanel(false);
+              }}
               className="absolute -left-3 top-4 z-10 w-6 h-12 bg-white border border-gray-300 rounded-l-md flex items-center justify-center hover:bg-gray-100 text-gray-600 hover:text-gray-900 shadow-sm"
-              title="Hide task panel"
+              title="Hide panels"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -858,9 +862,12 @@ task "Testing & Docs" {
             {/* Panel Toggle */}
             <div className="flex border-b border-gray-200">
               <button
-                onClick={() => setGanttSidePanel('tasks')}
+                onClick={() => {
+                  setShowTaskPanel(true);
+                  setShowResourcePanel(false);
+                }}
                 className={`flex-1 px-4 py-2 text-sm font-medium ${
-                  ganttSidePanel === 'tasks'
+                  showTaskPanel
                     ? 'text-blue-600 border-b-2 border-blue-500'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
@@ -868,9 +875,12 @@ task "Testing & Docs" {
                 📋 Tasks
               </button>
               <button
-                onClick={() => setGanttSidePanel('resources')}
+                onClick={() => {
+                  setShowResourcePanel(true);
+                  setShowTaskPanel(false);
+                }}
                 className={`flex-1 px-4 py-2 text-sm font-medium ${
-                  ganttSidePanel === 'resources'
+                  showResourcePanel
                     ? 'text-blue-600 border-b-2 border-blue-500'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
@@ -888,8 +898,8 @@ task "Testing & Docs" {
             
             {/* Panel Content */}
             <div className="flex-1 overflow-hidden">
-              {ganttSidePanel === 'tasks' && <GanttPanel onAddTask={handleAddGanttTask} />}
-              {ganttSidePanel === 'resources' && <GanttResourcePanel />}
+              {showTaskPanel && <GanttPanel onAddTask={handleAddGanttTask} />}
+              {showResourcePanel && <GanttResourcePanel />}
             </div>
           </div>
         )}
@@ -915,6 +925,17 @@ task "Testing & Docs" {
         )}
         
         {/* Show Task Panel Button (when hidden) */}
+        {activeTab === 'gantt' && !showTaskPanel && !showResourcePanel && (
+          <button
+            onClick={() => setShowTaskPanel(true)}
+            className="absolute right-0 top-4 z-10 w-8 h-12 bg-white border border-gray-300 rounded-l-md flex items-center justify-center hover:bg-gray-100 text-gray-600 hover:text-gray-900 shadow-md"
+            title="Show task panel"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
         {activeTab === 'gantt' && (!isMobile || mobileView === 'tasks') && !showTaskPanel && (
           <button
             onClick={() => setShowTaskPanel(true)}
