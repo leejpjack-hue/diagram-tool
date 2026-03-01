@@ -137,13 +137,20 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
       } else if (line.startsWith('depends:')) {
         const depStr = line.replace('depends:', '').trim();
         const parsed = parseDependencyString(depStr);
-        currentTask.dependencies = [parsed.name]; // Store name temporarily, resolve later
-        currentTask.dependencyDetails = [{
+        
+        // ADD to dependencies array (don't overwrite!)
+        currentTask.dependencies.push(parsed.name); // Store name temporarily, resolve later
+        
+        // ADD to dependencyDetails array (don't overwrite!)
+        if (!currentTask.dependencyDetails) {
+          currentTask.dependencyDetails = [];
+        }
+        currentTask.dependencyDetails.push({
           predecessorId: parsed.name, // Will be resolved to ID later
           successorId: currentTask.id || '',
           type: parsed.type,
           lag: parsed.lag,
-        }];
+        });
       } else if (line.startsWith('color:')) {
         currentTask.color = line.replace('color:', '').trim();
       } else if (line.startsWith('milestone:')) {
