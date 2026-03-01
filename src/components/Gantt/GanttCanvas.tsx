@@ -801,7 +801,7 @@ export function GanttCanvas() {
         {visualizationData && visualizationData.enabled && (
           <button
             onClick={clearVisualization}
-            className="px-3 py-1 rounded text-sm font-medium bg-orange-500 text-white hover:bg-orange-600"
+            className="px-4 py-2 rounded-md text-sm font-medium shadow-md transition-all bg-orange-500 hover:bg-orange-600 text-white"
             title="Clear delay impact visualization"
           >
             🗑️ Clear Viz
@@ -819,7 +819,7 @@ export function GanttCanvas() {
               : `❌ ${result.message}`
             );
           }}
-          className="px-3 py-1 rounded text-sm font-medium bg-purple-500 text-white hover:bg-purple-600"
+          className="px-4 py-2 rounded-md text-sm font-medium shadow-md transition-all bg-purple-500 hover:bg-purple-600 text-white"
           title="Auto-schedule tasks based on dependencies"
         >
           🤖 Auto-Schedule

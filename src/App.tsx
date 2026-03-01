@@ -813,7 +813,7 @@ task "Testing & Docs" {
                 <button
                   onClick={() => setShowEditor(!showEditor)}
                   className={`px-3 py-1 rounded text-sm font-medium ${
-                    showEditor ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    showEditor ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
                   📝 Editor
@@ -842,8 +842,8 @@ task "Testing & Docs" {
                   onClick={() => setShowDelayImpactPanel(!showDelayImpactPanel)}
                   className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 transition-colors ${
                     showDelayImpactPanel
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700 shadow-md'
                   }`}
                 >
                   ⚡ Delay Impact
@@ -966,7 +966,7 @@ task "Testing & Docs" {
         {activeTab === 'gantt' && (!isMobile || mobileView === 'tasks') && !showTaskPanel && (
           <button
             onClick={() => setShowTaskPanel(true)}
-            className="absolute right-4 top-20 z-10 w-8 h-24 bg-blue-500 text-white rounded-l-md flex items-center justify-center gap-1 hover:bg-blue-600 shadow-lg"
+            className="absolute right-4 top-20 z-10 w-8 h-24 bg-blue-500 hover:bg-blue-600 text-white shadow-md rounded-l-md flex items-center justify-center gap-1 hover:bg-blue-600 shadow-lg"
             title="Show task panel"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
