@@ -7,6 +7,12 @@ import {
   checkDependencyViolations 
 } from './autoSchedule';
 
+// Sprint 11: History for undo/redo
+interface HistoryState {
+  tasks: GanttTask[];
+  dependencies: Dependency[];
+}
+
 interface GanttState {
   tasks: GanttTask[];
   milestones: GanttMilestone[];
@@ -25,6 +31,12 @@ interface GanttState {
   
   // Sprint 8: Groups
   expandedGroups: Set<string>;
+  
+  // Sprint 11: Undo/Redo
+  history: HistoryState[];
+  historyIndex: number;
+  canUndo: boolean;
+  canRedo: boolean;
   
   // Actions
   setTasks: (tasks: GanttTask[]) => void;
@@ -72,6 +84,11 @@ interface GanttState {
   
   // Project
   setProject: (tasks: GanttTask[], dependencies: Dependency[]) => void;
+  
+  // Sprint 11: Undo/Redo
+  undo: () => void;
+  redo: () => void;
+  pushHistory: () => void;
 }
 
 const defaultFilter: GanttFilter = {
@@ -177,25 +194,89 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   filter: defaultFilter,
   expandedGroups: new Set(),
   
-  setTasks: (tasks) => set({ tasks }),
+  // Sprint 11: History for undo/redo
+  history: [{ tasks: defaultTasks, dependencies: defaultDependencies }],
+  historyIndex: 0,
+  canUndo: false,
+  canRedo: false,
   
-  addTask: (task) => set((state) => ({
-    tasks: [...state.tasks, task],
-  })),
+  // Sprint 11: Push current state to history
+  pushHistory: () => set((state) => {
+    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    newHistory.push({
+      tasks: JSON.parse(JSON.stringify(state.tasks)),
+      dependencies: JSON.parse(JSON.stringify(state.dependencies)),
+    });
+    // Keep history to 50 items max
+    if (newHistory.length > 50) {
+      newHistory.shift();
+    }
+    return {
+      history: newHistory,
+      historyIndex: newHistory.length - 1,
+      canUndo: newHistory.length > 1,
+      canRedo: false,
+    };
+  }),
   
-  updateTask: (id, updates) => set((state) => ({
-    tasks: state.tasks.map((t) => 
-      t.id === id ? { ...t, ...updates } : t
-    ),
-  })),
+  // Sprint 11: Undo
+  undo: () => set((state) => {
+    if (state.historyIndex <= 0) return state;
+    const newIndex = state.historyIndex - 1;
+    const historyState = state.history[newIndex];
+    return {
+      tasks: JSON.parse(JSON.stringify(historyState.tasks)),
+      dependencies: JSON.parse(JSON.stringify(historyState.dependencies)),
+      historyIndex: newIndex,
+      canUndo: newIndex > 0,
+      canRedo: true,
+    };
+  }),
   
-  deleteTask: (id) => set((state) => ({
-    tasks: state.tasks.filter((t) => t.id !== id),
-    dependencies: state.dependencies.filter(
-      d => d.predecessorId !== id && d.successorId !== id
-    ),
-    selectedTaskId: state.selectedTaskId === id ? null : state.selectedTaskId,
-  })),
+  // Sprint 11: Redo
+  redo: () => set((state) => {
+    if (state.historyIndex >= state.history.length - 1) return state;
+    const newIndex = state.historyIndex + 1;
+    const historyState = state.history[newIndex];
+    return {
+      tasks: JSON.parse(JSON.stringify(historyState.tasks)),
+      dependencies: JSON.parse(JSON.stringify(historyState.dependencies)),
+      historyIndex: newIndex,
+      canUndo: true,
+      canRedo: newIndex < state.history.length - 1,
+    };
+  }),
+  
+  setTasks: (tasks) => {
+    const state = get();
+    state.pushHistory();
+    set({ tasks });
+  },
+  
+  addTask: (task) => set((state) => {
+    state.pushHistory();
+    return { tasks: [...state.tasks, task] };
+  }),
+  
+  updateTask: (id, updates) => set((state) => {
+    state.pushHistory();
+    return {
+      tasks: state.tasks.map((t) => 
+        t.id === id ? { ...t, ...updates } : t
+      ),
+    };
+  }),
+  
+  deleteTask: (id) => set((state) => {
+    state.pushHistory();
+    return {
+      tasks: state.tasks.filter((t) => t.id !== id),
+      dependencies: state.dependencies.filter(
+        d => d.predecessorId !== id && d.successorId !== id
+      ),
+      selectedTaskId: state.selectedTaskId === id ? null : state.selectedTaskId,
+    };
+  }),
   
   setSelectedTask: (id) => set({ selectedTaskId: id }),
   
@@ -397,6 +478,8 @@ export const useGanttStore = create<GanttState>((set, get) => ({
     const idsToDelete = state.selectedTaskIds;
     if (idsToDelete.size === 0) return state;
     
+    state.pushHistory();
+    
     // Remove tasks
     const newTasks = state.tasks.filter(t => !idsToDelete.has(t.id));
     
@@ -416,6 +499,8 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   updateSelectedTasks: (updates) => set((state) => {
     const idsToUpdate = state.selectedTaskIds;
     if (idsToUpdate.size === 0) return state;
+    
+    state.pushHistory();
     
     const newTasks = state.tasks.map(t => 
       idsToUpdate.has(t.id) ? { ...t, ...updates } : t

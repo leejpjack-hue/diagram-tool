@@ -32,6 +32,11 @@ export interface GanttTask {
   
   // Sprint 8: Advanced dependencies (stored separately in project)
   dependencyDetails?: Dependency[];
+  
+  // Sprint 11: Task notes/description
+  description?: string;
+  notes?: string;
+  tags?: string[];
 }
 
 export interface GanttMilestone {
