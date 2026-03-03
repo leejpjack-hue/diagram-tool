@@ -37,7 +37,55 @@ export interface GanttTask {
   description?: string;
   notes?: string;
   tags?: string[];
+  
+  // Sprint 12: Custom fields
+  customFields?: Record<string, any>;
+  
+  // Sprint 12: Time tracking
+  timeTracking?: {
+    estimated: number; // hours
+    logged: number; // hours
+    remaining: number; // hours (auto-calculated or manually set)
+  };
 }
+
+// Sprint 12: Custom field definition
+export interface CustomFieldDefinition {
+  id: string;
+  name: string;
+  type: 'text' | 'number' | 'select' | 'multiselect' | 'date' | 'checkbox';
+  options?: string[]; // for select/multiselect types
+  required?: boolean;
+  defaultValue?: any;
+}
+
+// Sprint 12: Predefined custom fields
+export const DEFAULT_CUSTOM_FIELDS: CustomFieldDefinition[] = [
+  {
+    id: 'priority',
+    name: 'Priority',
+    type: 'select',
+    options: ['low', 'medium', 'high', 'critical'],
+    defaultValue: 'medium',
+  },
+  {
+    id: 'storyPoints',
+    name: 'Story Points',
+    type: 'number',
+    defaultValue: 0,
+  },
+  {
+    id: 'sprint',
+    name: 'Sprint',
+    type: 'text',
+  },
+  {
+    id: 'category',
+    name: 'Category',
+    type: 'select',
+    options: ['feature', 'bug', 'improvement', 'documentation', 'testing'],
+  },
+];
 
 export interface GanttMilestone {
   id: string;

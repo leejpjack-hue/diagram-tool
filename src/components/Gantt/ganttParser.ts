@@ -169,6 +169,25 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
         const value = line.replace('milestone:', '').trim();
         currentTask.milestone = value === 'true' || value === 'True' || value === '1';
         console.log(`[Parser] Parsed milestone for task "${currentTask.name}":`, currentTask.milestone, '(value:', value, ')');
+      } else if (line.startsWith('time:')) {
+        // Sprint 12: Time tracking syntax: time: estimated:16h, logged:8h
+        if (!currentTask.timeTracking) {
+          currentTask.timeTracking = { estimated: 0, logged: 0, remaining: 0 };
+        }
+        const timeStr = line.replace('time:', '').trim();
+        const parts = timeStr.split(',').map(p => p.trim());
+        parts.forEach(part => {
+          if (part.startsWith('estimated:')) {
+            currentTask!.timeTracking!.estimated = parseHours(part.replace('estimated:', ''));
+          } else if (part.startsWith('logged:')) {
+            currentTask!.timeTracking!.logged = parseHours(part.replace('logged:', ''));
+          }
+        });
+        currentTask.timeTracking.remaining = currentTask.timeTracking.estimated - currentTask.timeTracking.logged;
+      } else if (line.startsWith('custom:')) {
+        // Sprint 12: Custom fields syntax: custom: { priority: high, storyPoints: 5 }
+        const customStr = line.replace('custom:', '').trim();
+        currentTask.customFields = parseCustomFields(customStr);
       } else if (line === '}') {
         // Close task block
         if (currentTask && currentTask.name) {
@@ -260,6 +279,11 @@ function finalizeTask(partial: Partial<GanttTask>, idNum: number, projectStart: 
     isGroup: partial.isGroup || false,
     collapsed: partial.collapsed || false,
     dependencyDetails: partial.dependencyDetails,
+    description: partial.description,
+    notes: partial.notes,
+    tags: partial.tags,
+    customFields: partial.customFields,
+    timeTracking: partial.timeTracking,
   };
 }
 
@@ -288,6 +312,78 @@ function parseDate(str: string): Date | undefined {
   }
   
   return undefined;
+}
+
+/**
+ * Sprint 12: Parse hours from string like "16h" or "16"
+ */
+function parseHours(str: string): number {
+  const match = str.trim().match(/^(\d+(?:\.\d+)?)\s*h?$/);
+  if (match) {
+    return parseFloat(match[1]);
+  }
+  return 0;
+}
+
+/**
+ * Sprint 12: Parse custom fields from string like "{ priority: high, storyPoints: 5 }"
+ */
+function parseCustomFields(str: string): Record<string, any> {
+  const fields: Record<string, any> = {};
+  
+  // Remove braces if present
+  let content = str.trim();
+  if (content.startsWith('{') && content.endsWith('}')) {
+    content = content.slice(1, -1);
+  }
+  
+  // Split by comma, but respect nested structures
+  const parts: string[] = [];
+  let current = '';
+  let depth = 0;
+  
+  for (const char of content) {
+    if (char === '{' || char === '[') depth++;
+    if (char === '}' || char === ']') depth--;
+    
+    if (char === ',' && depth === 0) {
+      parts.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) {
+    parts.push(current.trim());
+  }
+  
+  // Parse each field
+  parts.forEach(part => {
+    const colonIndex = part.indexOf(':');
+    if (colonIndex > 0) {
+      const key = part.slice(0, colonIndex).trim();
+      let value: any = part.slice(colonIndex + 1).trim();
+      
+      // Try to parse as number
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue)) {
+        value = numValue;
+      }
+      
+      // Try to parse as boolean
+      if (value === 'true') value = true;
+      if (value === 'false') value = false;
+      
+      // Remove quotes from strings
+      if (typeof value === 'string' && (value.startsWith('"') || value.startsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      
+      fields[key] = value;
+    }
+  });
+  
+  return fields;
 }
 
 /**
@@ -356,6 +452,31 @@ export function generateGanttDSL(project: GanttProject): string {
       
       if (task.milestone) {
         lines.push(`${prefix}  milestone: true`);
+      }
+      
+      // Sprint 12: Time tracking
+      if (task.timeTracking) {
+        const timeParts: string[] = [];
+        if (task.timeTracking.estimated > 0) {
+          timeParts.push(`estimated:${task.timeTracking.estimated}h`);
+        }
+        if (task.timeTracking.logged > 0) {
+          timeParts.push(`logged:${task.timeTracking.logged}h`);
+        }
+        if (timeParts.length > 0) {
+          lines.push(`${prefix}  time: ${timeParts.join(', ')}`);
+        }
+      }
+      
+      // Sprint 12: Custom fields
+      if (task.customFields && Object.keys(task.customFields).length > 0) {
+        const customParts = Object.entries(task.customFields).map(([key, value]) => {
+          if (typeof value === 'string') {
+            return `${key}: ${value}`;
+          }
+          return `${key}: ${value}`;
+        });
+        lines.push(`${prefix}  custom: { ${customParts.join(', ')} }`);
       }
       
       lines.push(`${prefix}}`);

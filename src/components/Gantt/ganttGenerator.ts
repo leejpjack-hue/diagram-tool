@@ -90,6 +90,31 @@ export function generateGanttDSL(
       lines.push(`${indent}  milestone: true`);
     }
     
+    // Sprint 12: Time tracking
+    if (task.timeTracking) {
+      const timeParts: string[] = [];
+      if (task.timeTracking.estimated > 0) {
+        timeParts.push(`estimated:${task.timeTracking.estimated}h`);
+      }
+      if (task.timeTracking.logged > 0) {
+        timeParts.push(`logged:${task.timeTracking.logged}h`);
+      }
+      if (timeParts.length > 0) {
+        lines.push(`${indent}  time: ${timeParts.join(', ')}`);
+      }
+    }
+    
+    // Sprint 12: Custom fields
+    if (task.customFields && Object.keys(task.customFields).length > 0) {
+      const customParts = Object.entries(task.customFields).map(([key, value]) => {
+        if (typeof value === 'string') {
+          return `${key}: ${value}`;
+        }
+        return `${key}: ${value}`;
+      });
+      lines.push(`${indent}  custom: { ${customParts.join(', ')} }`);
+    }
+    
     lines.push(`${indent}}`);
     lines.push('');
   };
