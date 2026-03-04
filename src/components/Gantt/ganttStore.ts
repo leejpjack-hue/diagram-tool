@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import type { GanttTask, GanttMilestone, GanttZoomLevel, Dependency, GanttFilter } from './types';
+import type { GanttTask, GanttMilestone, GanttZoomLevel, Dependency, GanttFilter, LevelingOptions, LevelingResult } from './types';
 import { calculateCriticalPath, type CriticalPathResult } from './criticalPath';
 import { 
   autoScheduleTasks, 
   detectCircularDependencies, 
   checkDependencyViolations 
 } from './autoSchedule';
+import { levelResources, needsLeveling } from './resourceLeveling';
 
 // Sprint 11: History for undo/redo
 interface HistoryState {
@@ -37,6 +38,10 @@ interface GanttState {
   historyIndex: number;
   canUndo: boolean;
   canRedo: boolean;
+  
+  // Sprint 13: Resource leveling
+  levelingResult: LevelingResult | null;
+  showLevelingPreview: boolean;
   
   // Actions
   setTasks: (tasks: GanttTask[]) => void;
@@ -89,6 +94,13 @@ interface GanttState {
   undo: () => void;
   redo: () => void;
   pushHistory: () => void;
+  
+  // Sprint 13: Resource leveling
+  runLeveling: (options?: Partial<LevelingOptions>) => LevelingResult;
+  previewLeveling: (options?: Partial<LevelingOptions>) => LevelingResult;
+  applyLeveling: (result: LevelingResult) => void;
+  clearLeveling: () => void;
+  needsLeveling: () => boolean;
 }
 
 const defaultFilter: GanttFilter = {
@@ -200,6 +212,11 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   canUndo: false,
   canRedo: false,
   
+  // Sprint 13: Resource leveling
+  levelingResult: null,
+  showLevelingPreview: false,
+  
+  
   // Sprint 11: Push current state to history
   pushHistory: () => set((state) => {
     const newHistory = state.history.slice(0, state.historyIndex + 1);
@@ -216,6 +233,11 @@ export const useGanttStore = create<GanttState>((set, get) => ({
       historyIndex: newHistory.length - 1,
       canUndo: newHistory.length > 1,
       canRedo: false,
+  
+  // Sprint 13: Resource leveling
+  levelingResult: null,
+  showLevelingPreview: false,
+  
     };
   }),
   
@@ -516,4 +538,38 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   
   // Project
   setProject: (tasks, dependencies) => set({ tasks, dependencies }),
+  
+  // Sprint 13: Resource leveling
+  runLeveling: (options) => {
+    const state = get();
+    const result = levelResources(state.tasks, state.dependencies, options);
+    set({ levelingResult: result });
+    return result;
+  },
+  
+  previewLeveling: (options) => {
+    const state = get();
+    const result = levelResources(state.tasks, state.dependencies, options);
+    set({ levelingResult: result, showLevelingPreview: true });
+    return result;
+  },
+  
+  applyLeveling: (result) => {
+    get().pushHistory();
+    set({ 
+      tasks: result.leveledTasks,
+      levelingResult: result,
+      showLevelingPreview: false,
+    });
+  },
+  
+  clearLeveling: () => set({ 
+    levelingResult: null, 
+    showLevelingPreview: false,
+  }),
+  
+  needsLeveling: () => {
+    const state = get();
+    return needsLeveling(state.tasks);
+  },
 }));

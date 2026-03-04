@@ -47,6 +47,11 @@ export interface GanttTask {
     logged: number; // hours
     remaining: number; // hours (auto-calculated or manually set)
   };
+  
+  // Sprint 13: Resource leveling
+  leveled?: boolean; // Task was rescheduled by leveling
+  originalStart?: Date; // Original start before leveling
+  originalEnd?: Date; // Original end before leveling
 }
 
 // Sprint 12: Custom field definition
@@ -154,3 +159,50 @@ export interface GanttExportOptions {
   customStart?: Date;
   customEnd?: Date;
 }
+
+// Sprint 13: Resource leveling types
+export type LevelingStrategy = 'conservative' | 'aggressive' | 'balanced';
+
+export interface LevelingOptions {
+  strategy: LevelingStrategy;
+  respectConstraints: boolean;
+  maxDelayDays: number;
+  prioritizeCritical: boolean;
+  respectMilestones: boolean;
+}
+
+export interface LevelingResult {
+  success: boolean;
+  leveledTasks: GanttTask[];
+  changes: LevelingChange[];
+  unresolvedConflicts: ResourceConflict[];
+  originalDuration: number;
+  leveledDuration: number;
+  extensionDays: number;
+}
+
+export interface LevelingChange {
+  taskId: string;
+  taskName: string;
+  originalStart: Date;
+  newStart: Date;
+  originalEnd: Date;
+  newEnd: Date;
+  delayDays: number;
+  reason: string;
+}
+
+export interface ResourceConflict {
+  assignee: string;
+  date: Date;
+  conflictingTasks: string[];
+  reason: string;
+}
+
+export const DEFAULT_LEVELING_OPTIONS: LevelingOptions = {
+  strategy: 'balanced',
+  respectConstraints: true,
+  maxDelayDays: 30,
+  prioritizeCritical: true,
+  respectMilestones: true,
+};
