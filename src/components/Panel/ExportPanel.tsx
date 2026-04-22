@@ -1,11 +1,11 @@
 import { useState } from 'react';
 
 interface ExportPanelProps {
-  onExport: (format: 'png' | 'svg' | 'json', quality?: number) => void;
+  onExport: (format: 'png' | 'svg' | 'json' | 'csv', quality?: number) => void;
 }
 
 export function ExportPanel({ onExport }: ExportPanelProps) {
-  const [selectedFormat, setSelectedFormat] = useState<'png' | 'svg' | 'json'>('png');
+  const [selectedFormat, setSelectedFormat] = useState<'png' | 'svg' | 'json' | 'csv'>('png');
   const [quality, setQuality] = useState(3);
 
   const handleExport = () => {
@@ -78,6 +78,24 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
               </div>
               {selectedFormat === 'json' && (
                 <span className="ml-auto text-success-600">✓</span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setSelectedFormat('csv')}
+              className={`w-full p-3 rounded-lg border-2 text-left transition flex items-center gap-3 ${
+                selectedFormat === 'csv'
+                  ? 'border-amber-500 bg-amber-50'
+                  : 'border-gray-300 hover:border-amber-300'
+              }`}
+            >
+              <span className="text-2xl">📊</span>
+              <div>
+                <div className="font-bold text-gray-900">CSV</div>
+                <div className="text-xs text-gray-600">Spreadsheet Data</div>
+              </div>
+              {selectedFormat === 'csv' && (
+                <span className="ml-auto text-amber-600">✓</span>
               )}
             </button>
           </div>

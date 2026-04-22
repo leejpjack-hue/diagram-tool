@@ -371,9 +371,9 @@ export function GanttCanvas() {
   };
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      className="w-full h-full overflow-auto bg-white"
+      className="w-full h-full overflow-auto bg-white relative"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
@@ -829,7 +829,7 @@ export function GanttCanvas() {
       </div>
       
       {/* Controls */}
-      <div className="fixed bottom-4 right-4 flex gap-2 bg-white rounded-lg shadow-lg p-2 z-10">
+      <div className="sticky bottom-4 float-right mr-4 mb-4 flex gap-2 bg-white rounded-lg shadow-lg p-2 z-10 w-fit">
         {/* Clear Visualization button (only show when visualization is active) */}
         {visualizationData && visualizationData.enabled && (
           <button

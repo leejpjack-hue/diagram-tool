@@ -5,6 +5,7 @@
  */
 
 import type { GanttExportOptions } from './types';
+import { useGanttStore } from './ganttStore';
 
 /**
  * Export the Gantt chart to the specified format
@@ -15,10 +16,16 @@ export async function exportGanttChart(
   projectName: string
 ): Promise<void> {
   const filename = `${projectName.replace(/\s+/g, '-').toLowerCase()}-${formatDateForFilename(new Date())}`;
-  
+
+  // CSV export does not touch the DOM/SVG; short-circuit early.
+  if (options.format === 'csv') {
+    exportAsCsv(filename);
+    return;
+  }
+
   // Create a clone of the SVG with full height for all tasks
   const fullSvg = createFullHeightSvg(canvasElement);
-  
+
   switch (options.format) {
     case 'png':
       await exportAsPng(fullSvg, filename, options);
@@ -30,6 +37,69 @@ export async function exportGanttChart(
       await exportAsSvg(fullSvg, filename, options);
       break;
   }
+}
+
+/**
+ * Export tasks + dependencies as CSV
+ */
+function csvEscape(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  const s = String(value);
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function formatDateOnly(d: Date): string {
+  const dt = d instanceof Date ? d : new Date(d);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function exportAsCsv(filename: string): void {
+  const { tasks, dependencies } = useGanttStore.getState();
+
+  const depsByTask = new Map<string, string[]>();
+  dependencies.forEach(d => {
+    const list = depsByTask.get(d.successorId) || [];
+    list.push(d.predecessorId);
+    depsByTask.set(d.successorId, list);
+  });
+
+  const rows: string[][] = [
+    ['id', 'name', 'start', 'end', 'progress', 'assignee', 'color', 'milestone', 'depends'],
+    ...tasks.map(t => {
+      const depIds = depsByTask.get(t.id) || [];
+      const depNames = depIds
+        .map(id => tasks.find(x => x.id === id)?.name ?? id)
+        .join(';');
+      return [
+        t.id,
+        t.name,
+        formatDateOnly(t.startDate),
+        formatDateOnly(t.endDate),
+        String(t.progress ?? 0),
+        t.assignee ?? '',
+        t.color ?? '',
+        t.milestone ? 'true' : 'false',
+        depNames,
+      ];
+    }),
+  ];
+
+  const csv = '\uFEFF' + rows.map(r => r.map(csvEscape).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement('a');
+  link.download = `${filename}.csv`;
+  link.href = url;
+  link.click();
+
+  URL.revokeObjectURL(url);
 }
 
 /**

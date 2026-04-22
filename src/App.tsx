@@ -193,7 +193,7 @@ function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const ganttCanvasRef = useRef<HTMLDivElement>(null);
   
-  const { exportPNG, exportSVG, exportJSON } = useExport();
+  const { exportPNG, exportSVG, exportJSON, exportCSV } = useExport();
   const toast = useToast();
   
   // Parse Gantt DSL when it changes
@@ -632,10 +632,11 @@ task "Testing & Docs" {
     toast.success('🚀 Loaded MVP Sprint with correct dependencies!');
   };
 
-  const handleExport = (format: 'png' | 'svg' | 'json') => {
+  const handleExport = (format: 'png' | 'svg' | 'json' | 'csv') => {
     if (format === 'png') exportPNG();
     else if (format === 'svg') exportSVG();
     else if (format === 'json') exportJSON();
+    else if (format === 'csv') exportCSV();
   };
 
   const handleCSVImport = (rows: SimpleCSVRow[], filename: string) => {

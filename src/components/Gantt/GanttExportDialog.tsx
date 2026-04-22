@@ -37,7 +37,7 @@ export function GanttExportDialog({ isOpen, onClose, onExport }: GanttExportDial
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Format
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               <FormatButton
                 format="png"
                 label="PNG"
@@ -58,6 +58,13 @@ export function GanttExportDialog({ isOpen, onClose, onExport }: GanttExportDial
                 icon="🎨"
                 selected={options.format === 'svg'}
                 onClick={() => setOptions({ ...options, format: 'svg' })}
+              />
+              <FormatButton
+                format="csv"
+                label="CSV"
+                icon="📊"
+                selected={options.format === 'csv'}
+                onClick={() => setOptions({ ...options, format: 'csv' })}
               />
             </div>
           </div>
@@ -133,6 +140,9 @@ export function GanttExportDialog({ isOpen, onClose, onExport }: GanttExportDial
             )}
             {options.format === 'svg' && (
               <p>🎨 SVG - Vector format, editable in design tools like Figma.</p>
+            )}
+            {options.format === 'csv' && (
+              <p>📊 CSV - Tasks and dependencies as spreadsheet data (Excel-compatible).</p>
             )}
           </div>
         </div>
