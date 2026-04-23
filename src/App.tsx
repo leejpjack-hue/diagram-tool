@@ -6,7 +6,6 @@ import { GanttCanvas } from './components/Gantt/GanttCanvas';
 import { GanttPanel } from './components/Gantt/GanttPanel';
 import { GanttResourcePanel } from './components/Gantt/GanttResourcePanel';
 import { GanttFilterBar } from './components/Gantt/GanttFilterBar';
-import { GanttExportDialog } from './components/Gantt/GanttExportDialog';
 import { DelayImpactPanel } from './components/Gantt/DelayImpactPanel';
 import { MobileViewToggle } from './components/Gantt/MobileViewToggle';
 import { PropertiesPanel } from './components/Panel/PropertiesPanel';
@@ -25,7 +24,6 @@ import { csvToDSL, csvToDiagram } from './utils/csvToDiagram';
 import { saveManager, type SavedDiagram, type SavedDiagramMode } from './utils/saveManager';
 import type { SimpleCSVRow } from './utils/csvParser';
 import { extractNodeDSL, insertNodeDSL, duplicateNodeDSL } from './utils/clipboardUtils';
-import type { GanttExportOptions } from './components/Gantt/types';
 import { useMobile } from './hooks/useMobile';
 import './styles/gantt-fixes.css';
 
@@ -178,7 +176,6 @@ function App() {
     return (saved?.mode as 'architecture' | 'flow' | 'gantt') || 'architecture';
   });
   const [activePanel, setActivePanel] = useState<PanelType>('none');
-  const [showGanttExport, setShowGanttExport] = useState(false);
   const [showTaskPanel, setShowTaskPanel] = useState(true);
   const [showDelayImpactPanel, setShowDelayImpactPanel] = useState(false);
   const [showEditor, setShowEditor] = useState(true);
@@ -343,23 +340,6 @@ function App() {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-  };
-
-  // Handle Gantt export
-  const handleGanttExport = async (options: GanttExportOptions) => {
-    if (!ganttCanvasRef.current) {
-      toast.error('Could not find chart to export');
-      return;
-    }
-    
-    try {
-      const title = extractTitle(dslText) || 'Gantt Chart';
-      await exportGanttChart(ganttCanvasRef.current, options, title);
-      toast.success(`Exported as ${options.format.toUpperCase()}`);
-    } catch (error) {
-      console.error('Export failed:', error);
-      toast.error('Export failed. Please try again.');
-    }
   };
 
   const handleMouseDown = useCallback(() => {
@@ -633,6 +613,28 @@ task "Testing & Docs" {
   };
 
   const handleExport = (format: 'png' | 'svg' | 'json' | 'csv') => {
+    // On the Gantt tab the Flow canvas (.react-flow) doesn't exist, so PNG/SVG
+    // need to be generated from the Gantt SVG chart directly. JSON/CSV work
+    // the same on every tab.
+    if (activeTab === 'gantt' && (format === 'png' || format === 'svg')) {
+      if (!ganttCanvasRef.current) {
+        toast.error('Could not find chart to export');
+        return;
+      }
+      const title = extractTitle(dslText) || 'Gantt Chart';
+      exportGanttChart(
+        ganttCanvasRef.current,
+        { format, includeTaskList: true, dateRange: 'current' },
+        title
+      )
+        .then(() => toast.success(`Exported as ${format.toUpperCase()}`))
+        .catch((err) => {
+          console.error('Export failed:', err);
+          toast.error('Export failed. Please try again.');
+        });
+      return;
+    }
+
     if (format === 'png') exportPNG();
     else if (format === 'svg') exportSVG();
     else if (format === 'json') exportJSON();
@@ -882,8 +884,8 @@ task "Testing & Docs" {
           </div>
         </div>
         
-        {/* Side Panel - No Overlap! */}
-        {activePanel !== 'none' && activeTab !== 'gantt' && (
+        {/* Side Panel - shared across all tabs, including Gantt */}
+        {activePanel !== 'none' && (
           <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white">
             {activePanel === 'properties' && <PropertiesPanel />}
             {activePanel === 'import' && <ImportPanel onImport={handleCSVImport} />}
@@ -935,13 +937,6 @@ task "Testing & Docs" {
                 }`}
               >
                 👥 Resources
-              </button>
-              <button
-                onClick={() => setShowGanttExport(true)}
-                className="px-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                title="Export"
-              >
-                📤
               </button>
             </div>
             
@@ -1003,13 +998,6 @@ task "Testing & Docs" {
       <footer className="app-footer">
         <span className="font-semibold text-gray-900">{diagramMode.charAt(0).toUpperCase() + diagramMode.slice(1)} Mode</span>
       </footer>
-      
-      {/* Gantt Export Dialog */}
-      <GanttExportDialog
-        isOpen={showGanttExport}
-        onClose={() => setShowGanttExport(false)}
-        onExport={handleGanttExport}
-      />
       
       {/* Toast Notifications */}
       <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
