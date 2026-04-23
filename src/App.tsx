@@ -106,43 +106,47 @@ const GANTT_DSL = `diagram: gantt
 title: Project Timeline
 start: 2026-02-23
 
-task Planning {
-  start: 2026-02-23
-  end: 2026-02-26
-  assignee: Jack
-  progress: 100
+group "Inception" {
+  task Planning {
+    start: 2026-02-23
+    end: 2026-02-26
+    assignee: Jack
+    progress: 100
+  }
+
+  task Requirements {
+    start: 2026-02-26
+    end: 2026-03-02
+    assignee: Sarah
+    depends: Planning
+    progress: 60
+  }
 }
 
-task Requirements {
-  start: 2026-02-26
-  end: 2026-03-02
-  assignee: Sarah
-  depends: Planning
-  progress: 60
-}
+group "Delivery" {
+  task Design {
+    start: 2026-03-02
+    end: 2026-03-09
+    assignee: Mike
+    depends: Requirements
+    progress: 20
+  }
 
-task Design {
-  start: 2026-03-02
-  end: 2026-03-09
-  assignee: Mike
-  depends: Requirements
-  progress: 20
-}
+  task Development {
+    start: 2026-03-05
+    end: 2026-03-20
+    assignee: Jack
+    depends: Design
+    progress: 0
+  }
 
-task Development {
-  start: 2026-03-05
-  end: 2026-03-20
-  assignee: Jack
-  depends: Design
-  progress: 0
-}
-
-task Testing {
-  start: 2026-03-15
-  end: 2026-03-23
-  assignee: Sarah
-  depends: Development
-  progress: 0
+  task Testing {
+    start: 2026-03-15
+    end: 2026-03-23
+    assignee: Sarah
+    depends: Development
+    progress: 0
+  }
 }
 
 task Deployment {

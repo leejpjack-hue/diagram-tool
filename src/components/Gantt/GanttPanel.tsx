@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useGanttStore } from './ganttStore';
+import { computeWbsCodes } from './wbsUtils';
 import type { GanttTask, DependencyType } from './types';
 import './GanttPanel.css';
 
@@ -15,17 +16,22 @@ const DEPENDENCY_TYPES: { value: DependencyType; label: string; description: str
 ];
 
 export function GanttPanel({ onAddTask }: GanttPanelProps) {
-  const { 
-    tasks, 
+  const {
+    tasks,
     dependencies,
-    selectedTaskId, 
-    setSelectedTask, 
-    updateTask, 
+    selectedTaskId,
+    setSelectedTask,
+    updateTask,
     deleteTask,
     addDependency,
     updateDependency,
     removeDependency,
+    expandAllGroups,
+    collapseAllGroups,
   } = useGanttStore();
+
+  const wbsCodes = useMemo(() => computeWbsCodes(tasks), [tasks]);
+  const hasGroups = useMemo(() => tasks.some(t => t.isGroup), [tasks]);
   
   const [isAdding, setIsAdding] = useState(false);
   const [isAddingDependency, setIsAddingDependency] = useState(false);
@@ -118,6 +124,26 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
       </div>
       
       {/* Task List */}
+      {hasGroups && (
+        <div className="task-list-controls">
+          <button
+            type="button"
+            className="task-list-ctrl-btn"
+            onClick={expandAllGroups}
+            title="Expand all groups"
+          >
+            ▼ Expand all
+          </button>
+          <button
+            type="button"
+            className="task-list-ctrl-btn"
+            onClick={collapseAllGroups}
+            title="Collapse all groups"
+          >
+            ▶ Collapse all
+          </button>
+        </div>
+      )}
       <div className="task-list">
         {tasks.filter(t => !t.parentId).map(task => (
           <TaskListItem
@@ -127,6 +153,7 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
             selectedTaskId={selectedTaskId}
             onSelect={setSelectedTask}
             level={0}
+            wbsCodes={wbsCodes}
           />
         ))}
       </div>
@@ -402,12 +429,14 @@ interface TaskListItemProps {
   selectedTaskId: string | null;
   onSelect: (id: string) => void;
   level: number;
+  wbsCodes: Map<string, string>;
 }
 
-function TaskListItem({ task, allTasks, selectedTaskId, onSelect, level }: TaskListItemProps) {
+function TaskListItem({ task, allTasks, selectedTaskId, onSelect, level, wbsCodes }: TaskListItemProps) {
   const { expandedGroups, toggleGroup } = useGanttStore();
   const isExpanded = expandedGroups.has(task.id);
   const children = allTasks.filter(t => t.parentId === task.id);
+  const wbs = wbsCodes.get(task.id);
   
   return (
     <div>
@@ -430,6 +459,7 @@ function TaskListItem({ task, allTasks, selectedTaskId, onSelect, level }: TaskL
               </button>
             )}
             <span className="task-item-title">
+              {wbs && <span className="task-wbs">{wbs}</span>}
               {task.isGroup ? '📁 ' : ''}{task.name}
             </span>
           </div>
@@ -482,6 +512,7 @@ function TaskListItem({ task, allTasks, selectedTaskId, onSelect, level }: TaskL
           selectedTaskId={selectedTaskId}
           onSelect={onSelect}
           level={level + 1}
+          wbsCodes={wbsCodes}
         />
       ))}
     </div>

@@ -3,6 +3,7 @@ import { useGanttStore } from './ganttStore';
 import type { GanttTask, GanttZoomLevel, Dependency } from './types';
 import { isCritical } from './criticalPath';
 import { BulkOperationsPanel } from './BulkOperationsPanel';
+import { computeWbsCodes } from './wbsUtils';
 
 // Constants
 const ROW_HEIGHT = 40;
@@ -137,6 +138,9 @@ export function GanttCanvas() {
     filteredTasks.filter(t => !t.parentId).forEach(addTask);
     return result;
   }, [tasks, filter, getFilteredTasks, expandedGroups]);
+
+  // WBS codes for all tasks (e.g. "1", "1.2", "1.2.3")
+  const wbsCodes = useMemo(() => computeWbsCodes(tasks), [tasks]);
 
   // Calculate date range
   const { minDate, totalDays } = useMemo(() => {
@@ -496,7 +500,7 @@ export function GanttCanvas() {
                       fill="#1e293b"
                       fontWeight="600"
                     >
-                      {task.name}
+                      {wbsCodes.get(task.id) ? `${wbsCodes.get(task.id)}  ` : ''}{task.name}
                     </text>
                     <text
                       x={24}
@@ -516,7 +520,7 @@ export function GanttCanvas() {
                       fill="#1e293b"
                       fontWeight={isSelected ? '600' : '400'}
                     >
-                      {task.name}
+                      {wbsCodes.get(task.id) ? `${wbsCodes.get(task.id)}  ` : ''}{task.name}
                     </text>
                     <text
                       x={task.parentId ? 24 : 12}

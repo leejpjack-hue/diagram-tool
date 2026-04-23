@@ -21,6 +21,42 @@
   padding: var(--spacing-md);
 }
 
+.task-list-controls {
+  display: flex;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md) 0;
+}
+
+.task-list-ctrl-btn {
+  font-size: 11px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.task-list-ctrl-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.task-wbs {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  background: var(--bg-tertiary);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  margin-right: 6px;
+  min-width: 28px;
+  text-align: center;
+}
+
 .task-item {
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);

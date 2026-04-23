@@ -7,6 +7,7 @@ import {
   checkDependencyViolations 
 } from './autoSchedule';
 import { levelResources, needsLeveling } from './resourceLeveling';
+import { recomputeGroupRollups } from './wbsUtils';
 
 // Sprint 11: History for undo/redo
 interface HistoryState {
@@ -272,27 +273,26 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   setTasks: (tasks) => {
     const state = get();
     state.pushHistory();
-    set({ tasks });
+    set({ tasks: recomputeGroupRollups(tasks) });
   },
-  
+
   addTask: (task) => set((state) => {
     state.pushHistory();
-    return { tasks: [...state.tasks, task] };
+    return { tasks: recomputeGroupRollups([...state.tasks, task]) };
   }),
-  
+
   updateTask: (id, updates) => set((state) => {
     state.pushHistory();
-    return {
-      tasks: state.tasks.map((t) => 
-        t.id === id ? { ...t, ...updates } : t
-      ),
-    };
+    const next = state.tasks.map((t) =>
+      t.id === id ? { ...t, ...updates } : t
+    );
+    return { tasks: recomputeGroupRollups(next) };
   }),
-  
+
   deleteTask: (id) => set((state) => {
     state.pushHistory();
     return {
-      tasks: state.tasks.filter((t) => t.id !== id),
+      tasks: recomputeGroupRollups(state.tasks.filter((t) => t.id !== id)),
       dependencies: state.dependencies.filter(
         d => d.predecessorId !== id && d.successorId !== id
       ),
