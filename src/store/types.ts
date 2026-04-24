@@ -35,6 +35,16 @@ export interface QueueNode {
   };
 }
 
+export type FlowNodeKind =
+  | 'process'
+  | 'decision'
+  | 'subprocess'
+  | 'external'
+  | 'data'
+  | 'document'
+  | 'manualinput'
+  | 'terminator';
+
 export interface FlowNode {
   type: 'flow';
   id: string;
@@ -44,13 +54,28 @@ export interface FlowNode {
     system?: string;
     duration?: string;
     assignee?: string;
-    nodeType?: 'process' | 'decision' | 'subprocess' | 'external';
+    nodeType?: FlowNodeKind;
   };
   isStart?: boolean;
   isEnd?: boolean;
 }
 
-export type DiagramNode = ServiceNode | DatabaseNode | QueueNode | FlowNode;
+export type CloudProvider = 'aws' | 'azure' | 'gcp' | 'k8s';
+
+export interface CloudNode {
+  type: 'cloud';
+  id: string;
+  name: string;
+  properties: {
+    provider?: CloudProvider;
+    kind?: string; // e.g. 'lambda', 'rds', 'vm', 'pod'
+    tech?: string;
+    region?: string;
+  };
+  connections: string[];
+}
+
+export type DiagramNode = ServiceNode | DatabaseNode | QueueNode | CloudNode | FlowNode;
 
 export interface Edge {
   id: string;

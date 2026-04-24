@@ -6,9 +6,11 @@ import '@xyflow/react/dist/style.css';
 import { ServiceNode } from './ServiceNode';
 import { DatabaseNode } from './DatabaseNode';
 import { QueueNode } from './QueueNode';
+import { CloudNode } from './CloudNode';
 import { ProcessNode } from './ProcessNode';
 import { StartEndNode } from './StartEndNode';
 import { DecisionNode } from './DecisionNode';
+import { DataNode, DocumentNode, ManualInputNode, TerminatorNode } from './FlowShapeNodes';
 import { ZoomControls } from './ZoomControls';
 import { useDiagramStore } from '../../store/diagramStore';
 import type { FlowNode } from '../../store/types';
@@ -18,6 +20,7 @@ const architectureNodeTypes = {
   service: ServiceNode,
   database: DatabaseNode,
   queue: QueueNode,
+  cloud: CloudNode,
 };
 
 const flowNodeTypes = {
@@ -25,6 +28,10 @@ const flowNodeTypes = {
   start: StartEndNode,
   end: StartEndNode,
   decision: DecisionNode,
+  data: DataNode,
+  document: DocumentNode,
+  manualinput: ManualInputNode,
+  terminator: TerminatorNode,
 };
 
 function DiagramCanvasInternal() {
@@ -51,9 +58,14 @@ function DiagramCanvasInternal() {
       return parsedDiagram.nodes.map((node) => {
         let nodeType = 'flow';
         const flowNode = node as FlowNode;
+        const kind = flowNode.properties?.nodeType;
         if (flowNode.isStart) nodeType = 'start';
         else if (flowNode.isEnd) nodeType = 'end';
-        else if (flowNode.properties?.nodeType === 'decision') nodeType = 'decision';
+        else if (kind === 'decision') nodeType = 'decision';
+        else if (kind === 'data') nodeType = 'data';
+        else if (kind === 'document') nodeType = 'document';
+        else if (kind === 'manualinput') nodeType = 'manualinput';
+        else if (kind === 'terminator') nodeType = 'terminator';
         
         const x = 400;
         const y = yOffset;
@@ -211,6 +223,14 @@ function DiagramCanvasInternal() {
                 return '#EC4899';
               case 'queue':
                 return '#10B981';
+              case 'cloud':
+                return '#FB923C';
+              case 'data':
+              case 'document':
+              case 'manualinput':
+                return '#3B82F6';
+              case 'terminator':
+                return '#64748B';
               case 'start':
                 return '#10B981';
               case 'end':

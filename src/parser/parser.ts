@@ -1,6 +1,6 @@
 import { Lexer, TokenType } from './lexer';
 import type { Token } from './lexer';
-import type { DiagramNode, Edge, Group, ParsedDiagram, DiagramMode, FlowNode } from '../store/types';
+import type { DiagramNode, Edge, Group, ParsedDiagram, DiagramMode, FlowNode, CloudProvider } from '../store/types';
 
 export class Parser {
   private tokens: Token[];
@@ -65,6 +65,9 @@ export class Parser {
             break;
           case 'queue':
             this.parseQueue();
+            break;
+          case 'cloud':
+            this.parseCloud();
             break;
           case 'group':
             this.parseGroup();
@@ -326,6 +329,78 @@ export class Parser {
     this.nodes.push(node);
   }
 
+  private parseCloud(): void {
+    this.advance(); // consume 'cloud'
+    const nameToken = this.expect(TokenType.IDENTIFIER);
+    const name = nameToken.value as string;
+    const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+    const node: DiagramNode = {
+      type: 'cloud',
+      id,
+      name,
+      properties: {},
+      connections: [],
+    };
+
+    this.expect(TokenType.LBRACE);
+    this.skipNewlines();
+
+    while (this.peek().type !== TokenType.RBRACE && this.peek().type !== TokenType.EOF) {
+      this.skipNewlines();
+      if (this.peek().type === TokenType.RBRACE) break;
+
+      const propToken = this.peek();
+      if (propToken.type === TokenType.KEYWORD) {
+        this.advance();
+        this.expect(TokenType.COLON);
+
+        switch ((propToken.value as string).toLowerCase()) {
+          case 'provider': {
+            const v = this.advance();
+            node.properties.provider = (v.value as string).toLowerCase() as CloudProvider;
+            break;
+          }
+          case 'kind': {
+            const v = this.advance();
+            node.properties.kind = (v.value as string).toLowerCase();
+            break;
+          }
+          case 'tech': {
+            const v = this.advance();
+            node.properties.tech = v.value as string;
+            break;
+          }
+          case 'region': {
+            const v = this.advance();
+            node.properties.region = v.value as string;
+            break;
+          }
+          case 'connects': {
+            const connections = this.parseConnectionList();
+            node.connections = connections;
+            connections.forEach((target) => {
+              const targetId = target.toLowerCase().replace(/[^a-z0-9]/g, '_');
+              this.edges.push({
+                id: `${id}_to_${targetId}`,
+                from: id,
+                to: targetId,
+              });
+            });
+            break;
+          }
+          default:
+            this.advance();
+        }
+      } else {
+        this.advance();
+      }
+    }
+
+    this.expect(TokenType.RBRACE);
+    this.nodes.push(node);
+  }
+
   private parseGroup(): void {
     this.advance(); // consume 'group'
     const nameToken = this.expect(TokenType.IDENTIFIER);
@@ -547,25 +622,45 @@ export class Parser {
       if (propToken.type === TokenType.KEYWORD) {
         this.advance();
         this.expect(TokenType.COLON);
-        
-        const valueToken = this.advance();
-        
+
+        // Gather the full rest-of-line value (supports multi-word strings)
+        const valueParts: string[] = [];
+        while (
+          this.peek().type !== TokenType.NEWLINE &&
+          this.peek().type !== TokenType.RBRACE &&
+          this.peek().type !== TokenType.EOF
+        ) {
+          const t = this.advance();
+          if (
+            t.type === TokenType.IDENTIFIER ||
+            t.type === TokenType.STRING ||
+            t.type === TokenType.KEYWORD ||
+            t.type === TokenType.NUMBER
+          ) {
+            valueParts.push(String(t.value));
+          }
+        }
+        const fullValue = valueParts.join(' ').trim();
+        const firstValue = valueParts[0] ? String(valueParts[0]) : '';
+
         switch ((propToken.value as string).toLowerCase()) {
           case 'label':
-            nodeData.properties!.label = valueToken.value as string;
+            nodeData.properties!.label = fullValue;
             break;
           case 'system':
-            nodeData.properties!.system = valueToken.value as string;
+            nodeData.properties!.system = fullValue;
             break;
           case 'duration':
-            nodeData.properties!.duration = valueToken.value as string;
+            nodeData.properties!.duration = fullValue;
             break;
           case 'assignee':
-            nodeData.properties!.assignee = valueToken.value as string;
+            nodeData.properties!.assignee = fullValue;
             break;
-          case 'type':
-            nodeData.properties!.nodeType = valueToken.value as 'process' | 'decision' | 'subprocess' | 'external';
+          case 'type': {
+            const raw = firstValue.toLowerCase().replace(/[-_]/g, '');
+            nodeData.properties!.nodeType = raw as FlowNode['properties']['nodeType'];
             break;
+          }
         }
       } else {
         this.advance();

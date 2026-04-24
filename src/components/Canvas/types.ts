@@ -23,7 +23,15 @@ export interface FlowNodeData {
   system?: string;
   duration?: string;
   assignee?: string;
-  nodeType?: 'process' | 'decision' | 'subprocess' | 'external';
+  nodeType?: 'process' | 'decision' | 'subprocess' | 'external' | 'data' | 'document' | 'manualinput' | 'terminator';
   isStart?: boolean;
   isEnd?: boolean;
+}
+
+export interface CloudNodeData {
+  label: string;
+  provider?: 'aws' | 'azure' | 'gcp' | 'k8s';
+  kind?: string;
+  tech?: string;
+  region?: string;
 }

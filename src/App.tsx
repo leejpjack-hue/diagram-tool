@@ -12,6 +12,9 @@ import { PropertiesPanel } from './components/Panel/PropertiesPanel';
 import { ExportPanel } from './components/Panel/ExportPanel';
 import { ImportPanel } from './components/Panel/ImportPanel';
 import { FileMenu } from './components/Panel/FileMenu';
+import { TemplatePicker } from './components/TemplatePicker/TemplatePicker';
+import type { DiagramTemplate } from './components/TemplatePicker/templates';
+import { parseDiagram } from './parser/parser';
 import { ToastContainer } from './components/Toast/ToastContainer';
 import { useDiagramStore } from './store/diagramStore';
 import { useGanttStore } from './components/Gantt/ganttStore';
@@ -180,6 +183,7 @@ function App() {
     return (saved?.mode as 'architecture' | 'flow' | 'gantt') || 'architecture';
   });
   const [activePanel, setActivePanel] = useState<PanelType>('none');
+  const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
   const [showTaskPanel, setShowTaskPanel] = useState(true);
   const [showDelayImpactPanel, setShowDelayImpactPanel] = useState(false);
   const [showEditor, setShowEditor] = useState(true);
@@ -502,6 +506,19 @@ function App() {
     toast.info('Created new diagram');
   };
 
+  const handlePickTemplate = (tpl: DiagramTemplate) => {
+    setDslText(tpl.dsl);
+    setDiagramMode(tpl.mode);
+    setActiveTab(tpl.mode);
+    setSaveStatus('unsaved');
+    try {
+      setParsedDiagram(parseDiagram(tpl.dsl));
+    } catch (err) {
+      console.error('Template parse error:', err);
+    }
+    toast.success(`Loaded template: ${tpl.name}`);
+  };
+
   const handleLoadMVPSprint = () => {
     // Load MVP Sprint DSL with correct dependencies
     const mvpDSL = `# Diagram Tool MVP Sprint - 2026-02-27
@@ -736,6 +753,14 @@ task "Testing & Docs" {
             </span>
           )}
           
+          <button
+            onClick={() => setIsTemplatePickerOpen(true)}
+            className="btn btn-secondary"
+            title="Browse pre-built diagram templates"
+          >
+            Templates
+          </button>
+
           <button
             onClick={() => togglePanel('import')}
             className={`btn ${activePanel === 'import' ? 'btn-primary' : 'btn-secondary'}`}
@@ -1005,6 +1030,13 @@ task "Testing & Docs" {
       
       {/* Toast Notifications */}
       <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
+
+      {/* Template Picker Modal */}
+      <TemplatePicker
+        open={isTemplatePickerOpen}
+        onClose={() => setIsTemplatePickerOpen(false)}
+        onPick={handlePickTemplate}
+      />
     </div>
   );
 }

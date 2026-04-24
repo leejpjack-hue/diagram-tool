@@ -26,6 +26,9 @@ export interface Token {
 const KEYWORDS = [
   'diagram', 'title', 'service', 'database', 'queue', 'group',
   'contains', 'type', 'tech', 'port', 'replicas', 'data', 'topic', 'connects',
+  'cloud', 'provider', 'kind', 'region',
+  // Flow-mode keywords
+  'start', 'end', 'node', 'label', 'system', 'duration', 'assignee',
 ];
 
 export class Lexer {
