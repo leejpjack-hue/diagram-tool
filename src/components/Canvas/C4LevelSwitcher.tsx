@@ -26,14 +26,14 @@ export function C4LevelSwitcher({ current, available, onChange }: Props) {
   const presentLevels = ORDER.filter(l => available.includes(l));
 
   return (
-    <div className="absolute top-4 right-4 z-10 bg-[#1E293B]/90 backdrop-blur-md rounded-lg shadow-2xl border border-white/10 p-2 flex items-center gap-1">
-      <span className="text-[10px] uppercase tracking-wider text-slate-400 px-2 font-semibold">C4</span>
+    <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-md rounded-lg shadow-md border border-slate-200 p-2 flex items-center gap-1">
+      <span className="text-[10px] uppercase tracking-wider text-slate-500 px-2 font-semibold">C4</span>
       <button
         onClick={() => onChange('all')}
         className={`px-2.5 py-1 text-xs font-semibold rounded transition-colors ${
           current === 'all'
-            ? 'bg-white text-slate-900'
-            : 'text-slate-300 hover:bg-white/10'
+            ? 'bg-slate-900 text-white'
+            : 'text-slate-600 hover:bg-slate-100'
         }`}
       >
         All
@@ -47,7 +47,7 @@ export function C4LevelSwitcher({ current, available, onChange }: Props) {
             onClick={() => onChange(level)}
             title={`${meta.label} (${meta.desc})`}
             className={`px-2.5 py-1 text-xs font-semibold rounded transition-colors ${
-              active ? 'text-white' : 'text-slate-300 hover:bg-white/10'
+              active ? 'text-white' : 'text-slate-600 hover:bg-slate-100'
             }`}
             style={active ? { background: meta.color } : undefined}
           >

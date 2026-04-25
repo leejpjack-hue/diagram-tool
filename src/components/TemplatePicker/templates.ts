@@ -776,4 +776,51 @@ node NotifyCustomer {
   system: NotificationSvc
 }`,
   },
+  {
+    id: 'flow-bpmn-subprocess',
+    name: 'BPMN Subprocess (Order Fulfillment)',
+    description: 'BPMN flow with collapsed and expanded subprocess markers driving an end-to-end fulfillment pipeline.',
+    category: 'Flow',
+    mode: 'flow',
+    tags: ['flow', 'bpmn', 'subprocess'],
+    dsl: `diagram: flow
+title: Order Fulfillment with Subprocesses
+
+node OrderReceived {
+  type: eventstart
+  label: Order Received
+}
+
+node ValidateOrder {
+  type: subprocesscollapsed
+  label: Validate Order
+}
+
+node ReserveInventory {
+  type: subprocesscollapsed
+  label: Reserve Inventory
+}
+
+node PaymentFlow {
+  type: subprocessexpanded
+  label: Process Payment
+}
+
+node Fulfillment {
+  type: subprocesscollapsed
+  label: Pack and Ship
+}
+
+node OrderComplete {
+  type: eventend
+  label: Order Complete
+}
+
+OrderReceived -> ValidateOrder
+ValidateOrder -> ReserveInventory
+ReserveInventory -> PaymentFlow
+PaymentFlow -> Fulfillment
+Fulfillment -> OrderComplete
+`,
+  },
 ];

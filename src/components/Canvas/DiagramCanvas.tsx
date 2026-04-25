@@ -15,6 +15,7 @@ import { DataNode, DocumentNode, ManualInputNode, TerminatorNode } from './FlowS
 import {
   GatewayExclusiveNode, GatewayParallelNode, GatewayInclusiveNode,
   EventStartNode, EventEndNode, EventTimerNode, EventMessageNode,
+  SubprocessNode, SubprocessExpandedNode,
 } from './BpmnShapes';
 import { SwimlaneNode } from './SwimlaneOverlay';
 import { C4LevelSwitcher } from './C4LevelSwitcher';
@@ -47,6 +48,8 @@ const flowNodeTypes = {
   eventend: EventEndNode,
   eventtimer: EventTimerNode,
   eventmessage: EventMessageNode,
+  subprocesscollapsed: SubprocessNode,
+  subprocessexpanded: SubprocessExpandedNode,
   swimlane: SwimlaneNode,
 };
 
@@ -56,10 +59,21 @@ const LANE_HEIGHT = 180;
 const LANE_NODE_X_START = LANE_HEADER_W + 40;
 const LANE_NODE_X_STEP = 200;
 
+// C4 level ordering used for drill-down navigation (parent → next level).
+const C4_ORDER: C4Level[] = ['context', 'container', 'component', 'code'];
+const nextC4Level = (lvl: C4Level): C4Level | null => {
+  const i = C4_ORDER.indexOf(lvl);
+  return i >= 0 && i < C4_ORDER.length - 1 ? C4_ORDER[i + 1] : null;
+};
+
 function DiagramCanvasInternal() {
   const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode } = useDiagramStore();
   const { getZoom } = useReactFlow();
   const [c4Level, setC4Level] = useState<C4Level | 'all'>('all');
+  // When the user clicks a parent node, we filter to its direct children.
+  // drillParent stores the parent id; null means no drill is active.
+  const [drillParent, setDrillParent] = useState<string | null>(null);
+  const [drillParentName, setDrillParentName] = useState<string>('');
 
   // Architecture nodes can declare a C4 level; collect the unique set so the
   // switcher only offers levels actually present.
@@ -110,6 +124,8 @@ function DiagramCanvasInternal() {
         else if (kind === 'eventend') nodeType = 'eventend';
         else if (kind === 'eventtimer') nodeType = 'eventtimer';
         else if (kind === 'eventmessage') nodeType = 'eventmessage';
+        else if (kind === 'subprocesscollapsed') nodeType = 'subprocesscollapsed';
+        else if (kind === 'subprocessexpanded') nodeType = 'subprocessexpanded';
 
         return {
           type: nodeType,
@@ -207,8 +223,18 @@ function DiagramCanvasInternal() {
         };
       });
     } else {
-      // Architecture mode - apply C4 level filter, then auto-layout the visible subset.
+      // Architecture mode - apply C4 level filter and (optional) drill-down filter,
+      // then auto-layout the visible subset.
       const visibleNodes = parsedDiagram.nodes.filter((node) => {
+        // Drill-down: when a parent is selected, show only its direct children.
+        if (drillParent) {
+          if (node.type === 'service' || node.type === 'cloud' || node.type === 'class') {
+            const parent = (node as ServiceNodeType | CloudNodeType | ClassNodeType).properties?.parent;
+            return parent === drillParent;
+          }
+          // database/queue: only include if connected to a visible child (resolved below)
+          return false;
+        }
         if (c4Level === 'all') return true;
         if (node.type === 'service' || node.type === 'cloud' || node.type === 'class') {
           const lvl = (node as ServiceNodeType | CloudNodeType | ClassNodeType).properties?.level;
@@ -237,7 +263,7 @@ function DiagramCanvasInternal() {
         };
       });
     }
-  }, [parsedDiagram, diagramMode, c4Level]);
+  }, [parsedDiagram, diagramMode, c4Level, drillParent]);
 
   const initialEdges = useMemo((): Edge[] => {
     if (!parsedDiagram) return [];
@@ -249,12 +275,18 @@ function DiagramCanvasInternal() {
 
     const edgeColor = getEdgeColor(diagramMode);
 
-    // Filter edges by C4 level so they don't dangle when architecture nodes are hidden.
+    // Filter edges by C4 level / drill-down so they don't dangle when nodes are hidden.
     let edges = parsedDiagram.edges;
-    if (diagramMode !== 'flow' && c4Level !== 'all') {
+    if (diagramMode !== 'flow' && (c4Level !== 'all' || drillParent)) {
       const visibleIds = new Set(
         parsedDiagram.nodes
           .filter(n => {
+            if (drillParent) {
+              if (n.type === 'service' || n.type === 'cloud' || n.type === 'class') {
+                return (n as ServiceNodeType | CloudNodeType | ClassNodeType).properties?.parent === drillParent;
+              }
+              return false;
+            }
             if (n.type === 'service' || n.type === 'cloud' || n.type === 'class') {
               const lvl = (n as ServiceNodeType | CloudNodeType | ClassNodeType).properties?.level;
               return !lvl || lvl === c4Level;
@@ -296,7 +328,7 @@ function DiagramCanvasInternal() {
         color: edgeColor,
       },
     }));
-  }, [parsedDiagram, diagramMode, c4Level]);
+  }, [parsedDiagram, diagramMode, c4Level, drillParent]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -309,10 +341,51 @@ function DiagramCanvasInternal() {
     }
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
-  // Reset the C4 level filter whenever a new diagram is loaded.
+  // Reset the C4 level filter and drill-down whenever a new diagram is loaded.
   useEffect(() => {
     setC4Level('all');
+    setDrillParent(null);
+    setDrillParentName('');
   }, [parsedDiagram]);
+
+  // Click a parent node to drill into its children at the next C4 level.
+  // No-op when there are no children with parent = clicked node id.
+  const onNodeClick = useCallback((_e: unknown, node: Node) => {
+    if (diagramMode === 'flow' || !parsedDiagram) return;
+    const clicked = parsedDiagram.nodes.find(n => n.id === node.id);
+    if (!clicked) return;
+    if (clicked.type !== 'service' && clicked.type !== 'cloud' && clicked.type !== 'class') return;
+
+    // Find the level of the clicked node's children (all expected at the same next level).
+    const children = parsedDiagram.nodes.filter(n => {
+      if (n.type !== 'service' && n.type !== 'cloud' && n.type !== 'class') return false;
+      return (n as ServiceNodeType | CloudNodeType | ClassNodeType).properties?.parent === clicked.id;
+    });
+    if (children.length === 0) return; // leaf — no drill possible
+
+    // Determine target level: prefer the children's declared level; otherwise next from clicked.
+    let target: C4Level | null = null;
+    for (const c of children) {
+      const lvl = (c as ServiceNodeType | CloudNodeType | ClassNodeType).properties?.level;
+      if (lvl) { target = lvl; break; }
+    }
+    if (!target) {
+      const clickedLvl = (clicked as ServiceNodeType | CloudNodeType | ClassNodeType).properties?.level;
+      if (clickedLvl) target = nextC4Level(clickedLvl);
+    }
+    if (!target) return;
+
+    setC4Level(target);
+    setDrillParent(clicked.id);
+    setDrillParentName(clicked.name);
+  }, [parsedDiagram, diagramMode]);
+
+  // Switching the C4 level via the pill bar exits drill-down.
+  const handleLevelChange = useCallback((lvl: C4Level | 'all') => {
+    setC4Level(lvl);
+    setDrillParent(null);
+    setDrillParentName('');
+  }, []);
 
   // Track zoom level changes
   const handleMoveEnd = useCallback((_event: unknown, viewport: Viewport) => {
@@ -350,7 +423,7 @@ function DiagramCanvasInternal() {
   }
 
   return (
-    <div className="w-full h-full bg-[#0F172A] relative">
+    <div className="w-full h-full bg-white relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -358,6 +431,7 @@ function DiagramCanvasInternal() {
         onEdgesChange={onEdgesChange}
         onMoveEnd={handleMoveEnd}
         onSelectionChange={onSelectionChange}
+        onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
@@ -366,10 +440,10 @@ function DiagramCanvasInternal() {
         maxZoom={4}
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
       >
-        <Background color="#334155" gap={25} variant={BackgroundVariant.Dots} />
-        <Controls className="bg-[#1E293B] border-white/10 rounded shadow-2xl" />
-        <MiniMap 
-          className="bg-[#1E293B] border-white/10 rounded shadow-2xl"
+        <Background color="#CBD5E1" gap={25} variant={BackgroundVariant.Dots} />
+        <Controls className="bg-white border border-slate-200 rounded shadow-md" />
+        <MiniMap
+          className="bg-white border border-slate-200 rounded shadow-md"
           nodeColor={(node) => {
             switch (node.type) {
               case 'service':
@@ -408,12 +482,12 @@ function DiagramCanvasInternal() {
                 return '#8B5CF6';
             }
           }}
-          maskColor="rgba(0, 0, 0, 0.3)"
+          maskColor="rgba(15, 23, 42, 0.08)"
         />
       </ReactFlow>
-      
+
       {/* Floating Zoom Controls */}
-      <div className="absolute bottom-4 left-4 bg-[#1E293B]/80 backdrop-blur-md rounded-lg shadow-2xl border border-white/10 p-2 z-10">
+      <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-md rounded-lg shadow-md border border-slate-200 p-2 z-10">
         <ZoomControls />
       </div>
 
@@ -422,8 +496,23 @@ function DiagramCanvasInternal() {
         <C4LevelSwitcher
           current={c4Level}
           available={availableC4Levels}
-          onChange={setC4Level}
+          onChange={handleLevelChange}
         />
+      )}
+
+      {/* Drill-down breadcrumb (architecture mode, only when drilled in) */}
+      {diagramMode !== 'flow' && drillParent && (
+        <div className="absolute top-16 right-4 z-10 bg-white/95 backdrop-blur-md rounded-lg shadow-md border border-slate-200 px-3 py-2 flex items-center gap-2">
+          <button
+            onClick={() => { setDrillParent(null); setDrillParentName(''); setC4Level('all'); }}
+            className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
+            title="Exit drill-down"
+          >
+            ← All
+          </button>
+          <span className="text-slate-300">/</span>
+          <span className="text-xs font-semibold text-slate-900">{drillParentName}</span>
+        </div>
       )}
     </div>
   );

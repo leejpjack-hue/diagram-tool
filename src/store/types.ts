@@ -58,7 +58,10 @@ export type FlowNodeKind =
   | 'eventstart'
   | 'eventend'
   | 'eventtimer'
-  | 'eventmessage';
+  | 'eventmessage'
+  // BPMN subprocess (collapsed = drillable; expanded = inline)
+  | 'subprocesscollapsed'
+  | 'subprocessexpanded';
 
 export interface FlowNode {
   type: 'flow';

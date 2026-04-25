@@ -148,3 +148,69 @@ export const EventMessageNode = memo(({ data, selected }: NodeProps) => {
   return <EventShell glyph="✉" selected={selected} label={d.label} ringWidth={2} />;
 });
 EventMessageNode.displayName = 'EventMessageNode';
+
+/**
+ * BPMN Subprocess: rectangle with rounded corners and a small marker badge
+ * on the bottom edge. A "+" badge means collapsed (drillable into details);
+ * "−" means expanded. The shape itself otherwise behaves like a process box.
+ */
+const SUB = { w: 180, h: 80, stroke: '#3B82F6', fill: '#EFF6FF', text: '#1E40AF' };
+
+function SubprocessShell({ glyph, selected, label, system }: { glyph: '+' | '−'; selected?: boolean; label?: string; system?: string }) {
+  return (
+    <div
+      className="relative transition-all duration-200"
+      style={{
+        width: SUB.w,
+        height: SUB.h,
+        transform: selected ? 'scale(1.04)' : undefined,
+        filter: selected ? 'drop-shadow(0 0 0 3px rgba(59,130,246,0.3))' : 'drop-shadow(0 2px 6px rgba(0,0,0,0.12))',
+      }}
+    >
+      <div
+        className="absolute inset-0 flex flex-col items-center justify-center text-center px-4"
+        style={{
+          background: SUB.fill,
+          border: `2px solid ${SUB.stroke}`,
+          borderRadius: 12,
+          color: SUB.text,
+        }}
+      >
+        <div className="font-semibold text-sm leading-tight">{label}</div>
+        {system && <div className="text-[10px] font-mono mt-0.5 opacity-80">{system}</div>}
+      </div>
+      {/* Marker badge on bottom edge */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center font-bold"
+        style={{
+          bottom: -1,
+          width: 18,
+          height: 18,
+          fontSize: 14,
+          background: 'white',
+          border: `1.5px solid ${SUB.stroke}`,
+          borderRadius: 3,
+          color: SUB.stroke,
+          transform: 'translate(-50%, 50%)',
+          lineHeight: 1,
+        }}
+      >
+        {glyph}
+      </div>
+      <Handle type="target" position={Position.Top} style={{ background: SUB.stroke }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: SUB.stroke, bottom: -16 }} />
+    </div>
+  );
+}
+
+export const SubprocessNode = memo(({ data, selected }: NodeProps) => {
+  const d = data as unknown as FlowNodeData;
+  return <SubprocessShell glyph="+" selected={selected} label={d.label} system={d.system} />;
+});
+SubprocessNode.displayName = 'SubprocessNode';
+
+export const SubprocessExpandedNode = memo(({ data, selected }: NodeProps) => {
+  const d = data as unknown as FlowNodeData;
+  return <SubprocessShell glyph="−" selected={selected} label={d.label} system={d.system} />;
+});
+SubprocessExpandedNode.displayName = 'SubprocessExpandedNode';
