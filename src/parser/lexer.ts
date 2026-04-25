@@ -29,6 +29,12 @@ const KEYWORDS = [
   'cloud', 'provider', 'kind', 'region',
   // Flow-mode keywords
   'start', 'end', 'node', 'label', 'system', 'duration', 'assignee',
+  // C4 hierarchy
+  'level', 'parent',
+  // UML class
+  'class', 'attributes', 'methods', 'stereotype',
+  // Swimlanes
+  'lane', 'color',
 ];
 
 export class Lexer {

@@ -2,6 +2,10 @@
 
 export type DiagramMode = 'architecture' | 'flow' | 'sequence' | 'c4' | 'gantt';
 
+// C4 hierarchical levels — applies to architecture-mode nodes.
+// Nodes without an explicit level are visible at every level.
+export type C4Level = 'context' | 'container' | 'component' | 'code';
+
 export interface ServiceNode {
   type: 'service';
   id: string;
@@ -11,6 +15,8 @@ export interface ServiceNode {
     tech?: string;
     port?: number;
     replicas?: number;
+    level?: C4Level;
+    parent?: string;
   };
   connections: string[];
 }
@@ -43,7 +49,16 @@ export type FlowNodeKind =
   | 'data'
   | 'document'
   | 'manualinput'
-  | 'terminator';
+  | 'terminator'
+  // BPMN gateways
+  | 'gatewayexclusive'
+  | 'gatewayparallel'
+  | 'gatewayinclusive'
+  // BPMN events
+  | 'eventstart'
+  | 'eventend'
+  | 'eventtimer'
+  | 'eventmessage';
 
 export interface FlowNode {
   type: 'flow';
@@ -55,6 +70,7 @@ export interface FlowNode {
     duration?: string;
     assignee?: string;
     nodeType?: FlowNodeKind;
+    lane?: string; // resolved lane id (set during parsing)
   };
   isStart?: boolean;
   isEnd?: boolean;
@@ -71,11 +87,36 @@ export interface CloudNode {
     kind?: string; // e.g. 'lambda', 'rds', 'vm', 'pod'
     tech?: string;
     region?: string;
+    level?: C4Level;
+    parent?: string;
   };
   connections: string[];
 }
 
-export type DiagramNode = ServiceNode | DatabaseNode | QueueNode | CloudNode | FlowNode;
+// UML class node: title bar, attributes, methods.
+export interface ClassNode {
+  type: 'class';
+  id: string;
+  name: string;
+  properties: {
+    stereotype?: string; // e.g. <<interface>>, <<abstract>>
+    attributes?: string[];
+    methods?: string[];
+    level?: C4Level;
+    parent?: string;
+  };
+  connections: string[];
+}
+
+export type DiagramNode = ServiceNode | DatabaseNode | QueueNode | CloudNode | ClassNode | FlowNode;
+
+// Swimlane: a horizontal band that visually groups flow nodes by actor/role.
+export interface Lane {
+  id: string;
+  name: string;
+  contains: string[]; // flow node ids
+  color?: string;
+}
 
 export interface Edge {
   id: string;
@@ -96,6 +137,7 @@ export interface ParsedDiagram {
   nodes: DiagramNode[];
   edges: Edge[];
   groups: Group[];
+  lanes?: Lane[];
   startNode?: string;
   endNode?: string;
 }

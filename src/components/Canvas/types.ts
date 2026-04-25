@@ -1,9 +1,13 @@
+export type C4Level = 'context' | 'container' | 'component' | 'code';
+
 export interface ServiceNodeData {
   label: string;
   type?: 'api' | 'microservice' | 'lambda';
   tech?: string;
   port?: number;
   replicas?: number;
+  level?: C4Level;
+  parent?: string;
 }
 
 export interface DatabaseNodeData {
@@ -23,9 +27,14 @@ export interface FlowNodeData {
   system?: string;
   duration?: string;
   assignee?: string;
-  nodeType?: 'process' | 'decision' | 'subprocess' | 'external' | 'data' | 'document' | 'manualinput' | 'terminator';
+  nodeType?:
+    | 'process' | 'decision' | 'subprocess' | 'external'
+    | 'data' | 'document' | 'manualinput' | 'terminator'
+    | 'gatewayexclusive' | 'gatewayparallel' | 'gatewayinclusive'
+    | 'eventstart' | 'eventend' | 'eventtimer' | 'eventmessage';
   isStart?: boolean;
   isEnd?: boolean;
+  lane?: string;
 }
 
 export interface CloudNodeData {
@@ -34,4 +43,15 @@ export interface CloudNodeData {
   kind?: string;
   tech?: string;
   region?: string;
+  level?: C4Level;
+  parent?: string;
+}
+
+export interface ClassNodeData {
+  label: string;
+  stereotype?: string;
+  attributes?: string[];
+  methods?: string[];
+  level?: C4Level;
+  parent?: string;
 }

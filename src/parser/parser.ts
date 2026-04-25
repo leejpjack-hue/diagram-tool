@@ -1,6 +1,6 @@
 import { Lexer, TokenType } from './lexer';
 import type { Token } from './lexer';
-import type { DiagramNode, Edge, Group, ParsedDiagram, DiagramMode, FlowNode, CloudProvider } from '../store/types';
+import type { DiagramNode, Edge, Group, Lane, ParsedDiagram, DiagramMode, FlowNode, CloudProvider, C4Level, ClassNode } from '../store/types';
 
 export class Parser {
   private tokens: Token[];
@@ -8,6 +8,7 @@ export class Parser {
   private nodes: DiagramNode[] = [];
   private edges: Edge[] = [];
   private groups: Group[] = [];
+  private lanes: Lane[] = [];
   private title: string = 'Untitled Diagram';
   private mode: DiagramMode = 'architecture';
   private startNode: string | undefined;
@@ -32,6 +33,19 @@ export class Parser {
     if (token.type !== type) {
       throw new Error(
         `Expected ${type} but got ${token.type} at line ${token.line}, column ${token.column}`
+      );
+    }
+    return token;
+  }
+
+  // Accept a name in a definition position (after `service`, `lane`, `class`, etc.).
+  // A user-defined name may collide with a reserved keyword like `System` or `Cloud`,
+  // so allow either token type.
+  private expectName(): Token {
+    const token = this.advance();
+    if (token.type !== TokenType.IDENTIFIER && token.type !== TokenType.KEYWORD) {
+      throw new Error(
+        `Expected name but got ${token.type} at line ${token.line}, column ${token.column}`
       );
     }
     return token;
@@ -69,8 +83,14 @@ export class Parser {
           case 'cloud':
             this.parseCloud();
             break;
+          case 'class':
+            this.parseClass();
+            break;
           case 'group':
             this.parseGroup();
+            break;
+          case 'lane':
+            this.parseLane();
             break;
           case 'start':
             this.parseFlowStart();
@@ -102,10 +122,11 @@ export class Parser {
     // Mark decision nodes in flow mode
     if (this.mode === 'flow') {
       this.identifyDecisionNodes();
+      this.assignLaneMembership();
     }
 
     // Convert flowNodes map to array if in flow mode
-    const allNodes = this.mode === 'flow' 
+    const allNodes = this.mode === 'flow'
       ? Array.from(this.flowNodes.values())
       : this.nodes;
 
@@ -115,9 +136,23 @@ export class Parser {
       nodes: allNodes,
       edges: this.edges,
       groups: this.groups,
+      lanes: this.lanes.length > 0 ? this.lanes : undefined,
       startNode: this.startNode,
       endNode: this.endNode,
     };
+  }
+
+  // Map each lane's `contains` ids onto the corresponding flow node's lane property.
+  private assignLaneMembership(): void {
+    this.lanes.forEach(lane => {
+      lane.contains.forEach(nodeId => {
+        const node = this.flowNodes.get(nodeId);
+        if (node) {
+          node.properties = node.properties || {};
+          node.properties.lane = lane.id;
+        }
+      });
+    });
   }
 
   private identifyDecisionNodes(): void {
@@ -130,12 +165,15 @@ export class Parser {
       }
     });
     
-    // Mark these nodes as decision nodes
+    // Mark these nodes as decision nodes — but DON'T overwrite an explicit
+    // nodeType that the user already declared (e.g. `type: gatewayexclusive`).
     nodesWithLabeledEdges.forEach(nodeId => {
       const node = this.flowNodes.get(nodeId);
       if (node) {
         node.properties = node.properties || {};
-        node.properties.nodeType = 'decision';
+        if (!node.properties.nodeType) {
+          node.properties.nodeType = 'decision';
+        }
       }
     });
   }
@@ -169,7 +207,7 @@ export class Parser {
 
   private parseService(): void {
     this.advance(); // consume 'service'
-    const nameToken = this.expect(TokenType.IDENTIFIER);
+    const nameToken = this.expectName();
     const name = nameToken.value as string;
     const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
@@ -214,6 +252,16 @@ export class Parser {
             node.properties.replicas = replicasToken.value as number;
             break;
           }
+          case 'level': {
+            const v = this.advance();
+            node.properties.level = (v.value as string).toLowerCase() as C4Level;
+            break;
+          }
+          case 'parent': {
+            const v = this.advance();
+            node.properties.parent = (v.value as string).toLowerCase().replace(/[^a-z0-9]/g, '_');
+            break;
+          }
           case 'connects': {
             // Don't consume token - parseConnectionList will read identifiers
             const connections = this.parseConnectionList();
@@ -241,7 +289,7 @@ export class Parser {
 
   private parseDatabase(): void {
     this.advance(); // consume 'database'
-    const nameToken = this.expect(TokenType.IDENTIFIER);
+    const nameToken = this.expectName();
     const name = nameToken.value as string;
     const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
@@ -287,7 +335,7 @@ export class Parser {
 
   private parseQueue(): void {
     this.advance(); // consume 'queue'
-    const nameToken = this.expect(TokenType.IDENTIFIER);
+    const nameToken = this.expectName();
     const name = nameToken.value as string;
     const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
@@ -331,7 +379,7 @@ export class Parser {
 
   private parseCloud(): void {
     this.advance(); // consume 'cloud'
-    const nameToken = this.expect(TokenType.IDENTIFIER);
+    const nameToken = this.expectName();
     const name = nameToken.value as string;
     const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
@@ -376,6 +424,16 @@ export class Parser {
             node.properties.region = v.value as string;
             break;
           }
+          case 'level': {
+            const v = this.advance();
+            node.properties.level = (v.value as string).toLowerCase() as C4Level;
+            break;
+          }
+          case 'parent': {
+            const v = this.advance();
+            node.properties.parent = (v.value as string).toLowerCase().replace(/[^a-z0-9]/g, '_');
+            break;
+          }
           case 'connects': {
             const connections = this.parseConnectionList();
             node.connections = connections;
@@ -401,9 +459,179 @@ export class Parser {
     this.nodes.push(node);
   }
 
+  private parseClass(): void {
+    this.advance(); // consume 'class'
+    const nameToken = this.expectName();
+    const name = nameToken.value as string;
+    const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+    const node: ClassNode = {
+      type: 'class',
+      id,
+      name,
+      properties: {},
+      connections: [],
+    };
+
+    this.expect(TokenType.LBRACE);
+    this.skipNewlines();
+
+    while (this.peek().type !== TokenType.RBRACE && this.peek().type !== TokenType.EOF) {
+      this.skipNewlines();
+      if (this.peek().type === TokenType.RBRACE) break;
+
+      const propToken = this.peek();
+      if (propToken.type === TokenType.KEYWORD) {
+        this.advance();
+        this.expect(TokenType.COLON);
+
+        switch ((propToken.value as string).toLowerCase()) {
+          case 'stereotype': {
+            // Read rest-of-line as stereotype text.
+            const parts: string[] = [];
+            while (
+              this.peek().type !== TokenType.NEWLINE &&
+              this.peek().type !== TokenType.RBRACE &&
+              this.peek().type !== TokenType.EOF
+            ) {
+              const t = this.advance();
+              if (
+                t.type === TokenType.IDENTIFIER ||
+                t.type === TokenType.STRING ||
+                t.type === TokenType.KEYWORD
+              ) {
+                parts.push(String(t.value));
+              }
+            }
+            node.properties.stereotype = parts.join(' ').trim();
+            break;
+          }
+          case 'attributes': {
+            // attributes: name:string, age:int
+            // Comma-separated entries. Tokens between commas are joined.
+            const items = this.readCommaSeparatedLine();
+            node.properties.attributes = items;
+            break;
+          }
+          case 'methods': {
+            const items = this.readCommaSeparatedLine();
+            node.properties.methods = items;
+            break;
+          }
+          case 'level': {
+            const v = this.advance();
+            node.properties.level = (v.value as string).toLowerCase() as C4Level;
+            break;
+          }
+          case 'parent': {
+            const v = this.advance();
+            node.properties.parent = (v.value as string).toLowerCase().replace(/[^a-z0-9]/g, '_');
+            break;
+          }
+          case 'connects': {
+            const connections = this.parseConnectionList();
+            node.connections = connections;
+            connections.forEach((target) => {
+              const targetId = target.toLowerCase().replace(/[^a-z0-9]/g, '_');
+              this.edges.push({
+                id: `${id}_to_${targetId}`,
+                from: id,
+                to: targetId,
+              });
+            });
+            break;
+          }
+          default:
+            this.advance();
+        }
+      } else {
+        this.advance();
+      }
+    }
+
+    this.expect(TokenType.RBRACE);
+    this.nodes.push(node);
+  }
+
+  // Read tokens until the next newline/rbrace/eof and split on commas. Each item
+  // becomes one entry. Used by `attributes:` and `methods:` on class nodes.
+  private readCommaSeparatedLine(): string[] {
+    const buffer: string[] = [];
+    let current: string[] = [];
+    while (
+      this.peek().type !== TokenType.NEWLINE &&
+      this.peek().type !== TokenType.RBRACE &&
+      this.peek().type !== TokenType.EOF
+    ) {
+      const t = this.advance();
+      if (t.type === TokenType.COMMA) {
+        if (current.length) buffer.push(current.join(' ').trim());
+        current = [];
+      } else if (
+        t.type === TokenType.IDENTIFIER ||
+        t.type === TokenType.STRING ||
+        t.type === TokenType.KEYWORD ||
+        t.type === TokenType.NUMBER ||
+        t.type === TokenType.COLON
+      ) {
+        current.push(String(t.value));
+      }
+    }
+    if (current.length) buffer.push(current.join(' ').trim());
+    return buffer.filter(s => s.length > 0);
+  }
+
+  private parseLane(): void {
+    this.advance(); // consume 'lane'
+    const nameToken = this.expectName();
+    const name = nameToken.value as string;
+    const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+    const lane: Lane = {
+      id,
+      name,
+      contains: [],
+    };
+
+    this.expect(TokenType.LBRACE);
+    this.skipNewlines();
+
+    while (this.peek().type !== TokenType.RBRACE && this.peek().type !== TokenType.EOF) {
+      this.skipNewlines();
+      if (this.peek().type === TokenType.RBRACE) break;
+
+      const propToken = this.peek();
+      if (propToken.type === TokenType.KEYWORD) {
+        this.advance();
+        this.expect(TokenType.COLON);
+
+        switch ((propToken.value as string).toLowerCase()) {
+          case 'contains': {
+            lane.contains = this.parseConnectionList().map(c =>
+              c.toLowerCase().replace(/[^a-z0-9]/g, '_')
+            );
+            break;
+          }
+          case 'color': {
+            const v = this.advance();
+            lane.color = v.value as string;
+            break;
+          }
+          default:
+            this.advance();
+        }
+      } else {
+        this.advance();
+      }
+    }
+
+    this.expect(TokenType.RBRACE);
+    this.lanes.push(lane);
+  }
+
   private parseGroup(): void {
     this.advance(); // consume 'group'
-    const nameToken = this.expect(TokenType.IDENTIFIER);
+    const nameToken = this.expectName();
     const name = nameToken.value as string;
     const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
@@ -551,17 +779,29 @@ export class Parser {
       } else if (token.type === TokenType.ARROW) {
         this.advance();
       } else if (token.type === TokenType.PIPE) {
-        // Label follows: |Label|
+        // Label follows: |Label| — accept multi-word labels until the closing pipe.
         this.advance();
-        if (this.peek().type === TokenType.IDENTIFIER || 
-            this.peek().type === TokenType.STRING) {
-          currentLabel = this.peek().value as string;
-          this.advance();
-          // Expect closing pipe
-          if (this.peek().type === TokenType.PIPE) {
-            this.advance();
+        const labelParts: string[] = [];
+        while (
+          this.peek().type !== TokenType.PIPE &&
+          this.peek().type !== TokenType.NEWLINE &&
+          this.peek().type !== TokenType.EOF &&
+          this.peek().type !== TokenType.RBRACE
+        ) {
+          const lt = this.advance();
+          if (
+            lt.type === TokenType.IDENTIFIER ||
+            lt.type === TokenType.STRING ||
+            lt.type === TokenType.KEYWORD ||
+            lt.type === TokenType.NUMBER
+          ) {
+            labelParts.push(String(lt.value));
           }
         }
+        if (this.peek().type === TokenType.PIPE) {
+          this.advance(); // consume closing pipe
+        }
+        if (labelParts.length > 0) currentLabel = labelParts.join(' ');
       } else if (token.type === TokenType.STRING) {
         // Could be a label
         currentLabel = token.value as string;
