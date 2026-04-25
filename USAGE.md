@@ -18,7 +18,8 @@ Live: https://diagram.teqcon.uk/
 8. [Swimlanes](#swimlanes)
 9. [Templates and shortcuts](#templates-and-shortcuts)
 10. [Exporting](#exporting)
-11. [Troubleshooting](#troubleshooting)
+11. [Custom icons](#custom-icons)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -86,7 +87,7 @@ service OrdersApi {
 }
 ```
 
-Visual: rounded rectangle. Blue palette for `api`, purple for everything else. Big ⚡ / ⚙️ icon.
+Visual: rounded rectangle. Blue palette for `api`, purple for everything else. The 44×44 badge shows a custom SVG glyph (lightning bolt for `api`, gear for service) — see [Custom icons](#custom-icons).
 
 ### `database` — relational, document, key-value
 
@@ -97,7 +98,7 @@ database OrdersDb {
 }
 ```
 
-Visual: pink palette, 🗄️ icon. The first 2 entries of `data:` show below the title.
+Visual: pink palette, custom database cylinder SVG. The first 2 entries of `data:` show below the title.
 
 ### `queue` — message queue / topic
 
@@ -108,7 +109,7 @@ queue Events {
 }
 ```
 
-Visual: green palette, 📨 icon.
+Visual: green palette, custom envelope/queue SVG.
 
 ### `cloud` — provider-managed component
 
@@ -133,21 +134,35 @@ cloud Lambda1 {
 | `gcp`    | Sky blue | Four-color quadrant dots           |
 | `k8s`    | Blue     | Heptagon                           |
 
-**Cloud kind icons** (shown instead of provider glyph when `kind:` is set):
+**Cloud kind icons** (shown instead of provider glyph when `kind:` is set). Every kind below is a hand-drawn SVG file under `src/components/Canvas/icons/kinds/`. Icons are monochrome `currentColor` line-art so they stay legible on any provider pill (AWS orange, Azure blue, GCP cyan, K8s blue).
 
-| Kind             | Badge | | Kind         | Badge |
-|------------------|-------|-|--------------|-------|
-| `lambda`         | λ     | | `vm`         | VM    |
-| `s3`             | S3    | | `functions`  | ƒ     |
-| `rds`            | DB    | | `cosmosdb`   | CX    |
-| `ec2`            | EC    | | `blob`       | BL    |
-| `dynamodb`       | DY    | | `gce`        | GCE   |
-| `sqs`            | Q     | | `cloudfunction` | ƒ  |
-| `apigateway`     | API   | | `bigquery`   | BQ    |
-| `cloudfront`     | CF    | | `gcs`        | GCS   |
-| `pod`            | ⬢     | | `service`    | ⚙     |
-| `ingress`        | ↗     | | `configmap`  | ☰     |
-| `deployment`     | ⊞     |   |              |       |
+| Category | Kinds | Glyph |
+|----------|-------|-------|
+| **K8s**       | `pod`                                    | hexagon with center dot         |
+|               | `cluster`                                | heptagon with mesh nodes        |
+|               | `service`                                | gear / cog                      |
+|               | `ingress`                                | arrow entering box              |
+|               | `configmap`                              | document with lines             |
+|               | `deployment`                             | three offset rectangles         |
+| **Compute**   | `lambda`                                 | lightning bolt (filled)         |
+|               | `function`, `functions`, `cloudfunction` | scripted ƒ                      |
+|               | `ec2`, `vm`, `gce`                       | server / chip                   |
+| **Storage**   | `s3`, `blob`, `gcs`                      | bucket                          |
+|               | `rds`, `dynamodb`                        | three-tier cylinder             |
+|               | `mongodb`, `mongo`                       | leaf                            |
+|               | `postgresql`, `postgres`                 | cylinder with face              |
+|               | `cosmosdb`                               | three-axis sphere               |
+|               | `bigquery`                               | analytics dial + magnifier      |
+| **Network**   | `apigateway`                             | doorway with arrow              |
+|               | `loadbalancer`, `lb`                     | distribution node fan-out       |
+|               | `cdn`, `cloudfront`                      | globe with meridian             |
+|               | `nginx`                                  | bold N polyline                 |
+| **Security**  | `firewall`                               | shield with brick pattern       |
+|               | `waf`                                    | shield with globe + lock        |
+| **Cache/Queue** | `cache`, `redis`                       | two-tier cylinder               |
+|               | `sqs`                                    | envelope                        |
+
+Any AWS / Azure / GCP / K8s kind not in the table above will fall back to a 1–3 letter unicode tag (`DY` for DynamoDB, `BL` for Blob, `BQ` for BigQuery, etc.) until an SVG is supplied for it.
 
 ### `class` — UML class
 
@@ -377,6 +392,71 @@ Use the export controls in the toolbar to download the current diagram as PNG, S
 - PowerPoint / Keynote / Google Slides
 
 Tip: zoom in for higher-resolution PNG exports — output respects the current zoom level.
+
+---
+
+## Custom icons
+
+Every glyph rendered on a node badge — provider logo, cloud kind, database, queue, service — is a standalone `.svg` file under `src/components/Canvas/icons/`. Drop a new SVG into the right folder and it auto-loads via Vite's `import.meta.glob`. **No code change is required** to add or replace an icon.
+
+### Folder layout
+
+```
+src/components/Canvas/icons/
+├── index.tsx              # registry + <ProviderIcon/>, <KindIcon/>, <NodeIcon/>
+├── providers/             # cloud-provider badge glyphs
+│   ├── aws.svg            # provider: aws  →  filename = DSL value
+│   ├── azure.svg
+│   ├── gcp.svg
+│   └── k8s.svg
+├── kinds/                 # cloud kind: glyphs (lambda, s3, pod, …)
+│   └── *.svg
+└── nodes/                 # built-in node-type glyphs
+    ├── api.svg            # ServiceNode when type: api
+    ├── service.svg        # ServiceNode default
+    ├── database.svg       # DatabaseNode
+    └── queue.svg          # QueueNode
+```
+
+### Lookup priority
+
+| Node       | Resolution order                                                       |
+|------------|------------------------------------------------------------------------|
+| **Cloud**  | `kinds/<kind>.svg` → unicode tag (`DY`, `BL`, …) → `providers/<provider>.svg` |
+| **Service**| `nodes/api.svg` or `nodes/service.svg` → `⚡` / `⚙️` emoji fallback    |
+| **Database**| `nodes/database.svg` → `🗄️` emoji fallback                            |
+| **Queue**  | `nodes/queue.svg` → `📨` emoji fallback                                |
+
+So the system gracefully falls back if a custom SVG is missing.
+
+### Authoring rules for designers
+
+1. **Format:** SVG only. Filename (lower-case, no spaces) becomes the lookup key. `kinds/lambda.svg` → matches DSL `kind: lambda`.
+2. **ViewBox:** `<svg viewBox="0 0 16 16">` or `<svg viewBox="0 0 24 24">` — keep it square. Set `width="100%" height="100%"` on the root, no fixed pixel dimensions.
+3. **Color strategy:**
+   - For monochrome shapes use `fill="currentColor"` and/or `stroke="currentColor"`. The parent badge controls the tint (white on a colored pill, etc.).
+   - Multi-color icons (like GCP four dots) may hardcode hex. Keep contrast in mind — they will be rendered on colored 44×44 badges.
+4. **Inner padding:** leave ~10% margin so the glyph never touches the badge edge.
+5. **No text inside the SVG** — no `<title>`, `<desc>`, or text labels. Labels are rendered separately by the node component.
+
+### Adding a brand-new kind
+
+```bash
+# 1. Drop the file
+cp my-redshift.svg src/components/Canvas/icons/kinds/redshift.svg
+
+# 2. Use it in DSL
+cloud Reports {
+  provider: aws
+  kind: redshift
+}
+```
+
+That's it — no registration step. The glob picks the file up on the next dev-server reload.
+
+### Replacing an existing icon
+
+Same as above: overwrite the file. The new design ships on the next build. Keep `currentColor` if you want the icon to keep inheriting the badge color.
 
 ---
 

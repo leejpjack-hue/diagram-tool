@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { DatabaseNodeData } from './types';
+import { NodeIcon, hasNodeIcon } from './icons';
 
 export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as DatabaseNodeData;
@@ -33,7 +34,11 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
             boxShadow: '0 1px 2px rgba(0,0,0,0.18)',
           }}
         >
-          🗄️
+          {hasNodeIcon('database') ? (
+            <NodeIcon name="database" size={28} />
+          ) : (
+            '🗄️'
+          )}
         </div>
         <div
           className="font-semibold text-base"

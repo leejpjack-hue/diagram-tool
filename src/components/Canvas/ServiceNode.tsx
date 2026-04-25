@@ -2,10 +2,12 @@ import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { ServiceNodeData } from './types';
+import { NodeIcon, hasNodeIcon } from './icons';
 
 export const ServiceNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as ServiceNodeData;
   const isAPI = nodeData.type === 'api';
+  const iconKey = isAPI ? 'api' : 'service';
   
   return (
     <div
@@ -34,7 +36,11 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
             boxShadow: '0 1px 2px rgba(0,0,0,0.18)',
           }}
         >
-          {isAPI ? '⚡' : '⚙️'}
+          {hasNodeIcon(iconKey) ? (
+            <NodeIcon name={iconKey} size={28} />
+          ) : (
+            isAPI ? '⚡' : '⚙️'
+          )}
         </div>
         <div
           className="font-semibold text-base"
