@@ -23,15 +23,20 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
     >
       <Handle type="target" position={Position.Top} style={{ background: '#EC4899' }} />
       
-      <div className="flex items-center gap-2 mb-1">
-        <div 
-          className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold"
-          style={{ background: '#EC4899' }}
+      <div className="flex items-center gap-3 mb-1">
+        <div
+          className="w-11 h-11 rounded-lg flex items-center justify-center text-white font-bold shrink-0"
+          style={{
+            background: '#EC4899',
+            fontSize: 26,
+            lineHeight: 1,
+            boxShadow: '0 1px 2px rgba(0,0,0,0.18)',
+          }}
         >
           🗄️
         </div>
-        <div 
-          className="font-semibold text-sm"
+        <div
+          className="font-semibold text-base"
           style={{ color: '#9D174D' }}
         >
           {nodeData.label}

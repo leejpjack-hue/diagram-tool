@@ -24,15 +24,20 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
     >
       <Handle type="target" position={Position.Top} className="!bg-electric-blue" />
       
-      <div className="flex items-center gap-2 mb-1">
-        <div 
-          className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold"
-          style={{ background: isAPI ? '#3B82F6' : '#8B5CF6' }}
+      <div className="flex items-center gap-3 mb-1">
+        <div
+          className="w-11 h-11 rounded-lg flex items-center justify-center text-white font-bold shrink-0"
+          style={{
+            background: isAPI ? '#3B82F6' : '#8B5CF6',
+            fontSize: 26,
+            lineHeight: 1,
+            boxShadow: '0 1px 2px rgba(0,0,0,0.18)',
+          }}
         >
           {isAPI ? '⚡' : '⚙️'}
         </div>
-        <div 
-          className="font-semibold text-sm"
+        <div
+          className="font-semibold text-base"
           style={{ color: isAPI ? '#1E40AF' : '#6B21A8' }}
         >
           {nodeData.label}

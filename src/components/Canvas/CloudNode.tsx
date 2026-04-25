@@ -13,10 +13,10 @@ const PROVIDER_META: Record<string, { label: string; bg: string; fg: string; pil
   k8s:   { label: 'K8s',   bg: '#EFF6FF', fg: '#1E40AF', pill: '#326CE5', pillFg: '#FFFFFF' },
 };
 
-// Small inline SVG glyphs (16x16) keyed by provider. Drawn with currentColor
-// so the parent badge can control fill via the `style.color` prop.
-function ProviderGlyph({ provider }: { provider: string }) {
-  const sz = 16;
+// Inline SVG glyphs keyed by provider. Drawn with currentColor so the parent
+// badge can control fill via the `style.color` prop.
+function ProviderGlyph({ provider, size = 26 }: { provider: string; size?: number }) {
+  const sz = size;
   switch (provider) {
     case 'aws':
       // Stacked chevrons evoking AWS cloud-stack shape
@@ -100,19 +100,25 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
     >
       <Handle type="target" position={Position.Top} style={{ background: meta.pill }} />
 
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center gap-3 mb-1">
         <div
-          className="rounded flex items-center justify-center font-bold"
-          style={{ background: meta.pill, color: meta.pillFg, width: 28, height: 24 }}
+          className="rounded-lg flex items-center justify-center font-bold shrink-0"
+          style={{
+            background: meta.pill,
+            color: meta.pillFg,
+            width: 44,
+            height: 44,
+            boxShadow: '0 1px 2px rgba(0,0,0,0.18)',
+          }}
           title={meta.label}
         >
           {kindBadge ? (
-            <span className="text-xs">{kindBadge}</span>
+            <span style={{ fontSize: kindBadge.length > 2 ? 13 : 16, lineHeight: 1 }}>{kindBadge}</span>
           ) : (
-            <ProviderGlyph provider={provider} />
+            <ProviderGlyph provider={provider} size={28} />
           )}
         </div>
-        <div className="font-semibold text-sm" style={{ color: meta.fg }}>
+        <div className="font-semibold text-base" style={{ color: meta.fg }}>
           {nodeData.label}
         </div>
       </div>
