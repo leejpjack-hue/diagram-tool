@@ -37,7 +37,11 @@ export const GroupContainerNode = memo(({ data }: NodeProps) => {
         borderRadius: 12,
         background: fill,
         position: 'relative',
-        pointerEvents: 'none',
+        // Pointer events stay on the outer rect so the user can grab it for
+        // dragging — the contained component nodes paint on top with their
+        // own zIndex and capture clicks before the rect sees them.
+        pointerEvents: 'all',
+        cursor: 'grab',
       }}
     >
       <div

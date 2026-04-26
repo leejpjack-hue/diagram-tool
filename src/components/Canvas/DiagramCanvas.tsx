@@ -23,7 +23,7 @@ import { C4LevelSwitcher } from './C4LevelSwitcher';
 import { ZoomControls } from './ZoomControls';
 import { useDiagramStore } from '../../store/diagramStore';
 import type { FlowNode, C4Level, ServiceNode as ServiceNodeType, CloudNode as CloudNodeType, ClassNode as ClassNodeType } from '../../store/types';
-import { calculateAutoLayout } from '../../utils/autoLayout';
+import { calculateAutoLayout, resolveGroupOverlaps } from '../../utils/autoLayout';
 import { LayoutDirectionContext } from './layoutDirection';
 import { Position } from '@xyflow/react';
 
@@ -279,7 +279,19 @@ function DiagramCanvasInternal() {
       const visibleIds = new Set(visibleNodes.map(n => n.id));
       const visibleEdges = parsedDiagram.edges.filter(e => visibleIds.has(e.from) && visibleIds.has(e.to));
 
-      const positions = calculateAutoLayout(visibleNodes, visibleEdges, layoutDirection);
+      let positions = calculateAutoLayout(visibleNodes, visibleEdges, layoutDirection);
+
+      // If sub-system grouping containers exist, push overlapping groups
+      // apart so their dashed bounding boxes don't cross through each other.
+      const groupsForLayout = parsedDiagram.groups ?? [];
+      if (groupsForLayout.length >= 2) {
+        positions = resolveGroupOverlaps(
+          positions,
+          groupsForLayout,
+          visibleIds,
+          layoutDirection,
+        );
+      }
 
       const archNodes: Node[] = visibleNodes.map((node) => {
         const pos = positions.get(node.id) || { x: 100, y: 100 };
@@ -333,9 +345,15 @@ function DiagramCanvasInternal() {
               width: maxX - minX + PADDING * 2,
               height: maxY - minY + PADDING * 2 + HEADER,
               color: g.color,
+              // Pre-bake the member id list so the drag-follow handler
+              // (handleNodesChange below) can move them all in one batch.
+              memberIds: g.contains.filter((id) => visibleIds.has(id)),
             },
-            draggable: false,
-            selectable: false,
+            // Draggable + selectable so users can manually reposition a
+            // sub-system region after auto-layout. zIndex stays negative so
+            // the dashed rect paints behind the actual component nodes.
+            draggable: true,
+            selectable: true,
             zIndex: -1,
             style: { zIndex: -1 },
           });
@@ -426,6 +444,45 @@ function DiagramCanvasInternal() {
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Drag-follow for group containers: when a `__group_*` node moves, apply
+  // the same delta to its member nodes in the same change batch so the
+  // dashed rectangle and the components inside it travel together.
+  const handleNodesChange = useCallback(
+    (changes: Parameters<typeof onNodesChange>[0]) => {
+      const extra: typeof changes = [];
+      for (const c of changes) {
+        if (
+          c.type === 'position' &&
+          c.position &&
+          typeof c.id === 'string' &&
+          c.id.startsWith('__group_')
+        ) {
+          const groupNode = nodes.find(n => n.id === c.id);
+          if (!groupNode) continue;
+          const memberIds = (groupNode.data as { memberIds?: string[] })?.memberIds;
+          if (!memberIds || memberIds.length === 0) continue;
+
+          const dx = c.position.x - groupNode.position.x;
+          const dy = c.position.y - groupNode.position.y;
+          if (dx === 0 && dy === 0) continue;
+
+          for (const mid of memberIds) {
+            const m = nodes.find(n => n.id === mid);
+            if (!m) continue;
+            extra.push({
+              type: 'position',
+              id: mid,
+              position: { x: m.position.x + dx, y: m.position.y + dy },
+              dragging: c.dragging,
+            });
+          }
+        }
+      }
+      onNodesChange(extra.length > 0 ? [...changes, ...extra] : changes);
+    },
+    [nodes, onNodesChange],
+  );
   
   // Update nodes/edges when parsedDiagram changes
   useEffect(() => {
@@ -522,7 +579,7 @@ function DiagramCanvasInternal() {
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onMoveEnd={handleMoveEnd}
         onSelectionChange={onSelectionChange}

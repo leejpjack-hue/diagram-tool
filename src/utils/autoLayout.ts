@@ -249,6 +249,96 @@ export function applyForceDirectedLayout(
 }
 
 /**
+ * Resolve overlap between sub-system grouping rectangles.
+ *
+ * Each `group` block defines a set of member node ids. After the main layout
+ * has placed every node, two groups can still end up with overlapping
+ * bounding rectangles even when their members don't physically overlap. This
+ * pass detects pairwise group-rectangle collisions and shifts the offending
+ * group's members along the axis perpendicular to the flow direction until
+ * the overlap is gone — preserving layer ordering along the flow axis.
+ *
+ * Returns a new positions map. Iterates up to a small bound and bails out
+ * when stable. Non-grouped nodes are never moved.
+ */
+export function resolveGroupOverlaps(
+  positions: Map<string, { x: number; y: number }>,
+  groups: Array<{ id: string; contains: string[] }>,
+  visibleIds: Set<string>,
+  direction: LayoutDirection = 'TB',
+  nodeW: number = 200,
+  nodeH: number = 100,
+  padding: number = 30,
+): Map<string, { x: number; y: number }> {
+  const out = new Map<string, { x: number; y: number }>();
+  positions.forEach((p, id) => out.set(id, { ...p }));
+
+  type Rect = { minX: number; minY: number; maxX: number; maxY: number; members: string[] };
+  const rects = new Map<string, Rect>();
+
+  const computeRect = (members: string[]): Rect | null => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const id of members) {
+      const p = out.get(id);
+      if (!p) continue;
+      minX = Math.min(minX, p.x - padding);
+      minY = Math.min(minY, p.y - padding);
+      maxX = Math.max(maxX, p.x + nodeW + padding);
+      maxY = Math.max(maxY, p.y + nodeH + padding);
+    }
+    if (!isFinite(minX)) return null;
+    return { minX, minY, maxX, maxY, members };
+  };
+
+  for (const g of groups) {
+    const members = g.contains.filter(id => visibleIds.has(id));
+    if (members.length === 0) continue;
+    const r = computeRect(members);
+    if (r) rects.set(g.id, r);
+  }
+
+  if (rects.size < 2) return out;
+
+  // Push along the axis PERPENDICULAR to the flow so we don't disturb the
+  // hierarchical layer ordering: TB → push along x; LR → push along y.
+  const isLR = direction === 'LR';
+  const pushAxis: 'x' | 'y' = isLR ? 'y' : 'x';
+  const ids = Array.from(rects.keys());
+  const SAFE_GAP = 20;
+
+  for (let iter = 0; iter < 8; iter++) {
+    let moved = false;
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const ra = rects.get(ids[i])!;
+        const rb = rects.get(ids[j])!;
+        const ox = Math.min(ra.maxX, rb.maxX) - Math.max(ra.minX, rb.minX);
+        const oy = Math.min(ra.maxY, rb.maxY) - Math.max(ra.minY, rb.minY);
+        if (ox <= 0 || oy <= 0) continue;
+
+        const push = (pushAxis === 'x' ? ox : oy) + SAFE_GAP;
+        const dir = (pushAxis === 'x'
+          ? (rb.minX >= ra.minX ? 1 : -1)
+          : (rb.minY >= ra.minY ? 1 : -1));
+
+        for (const id of rb.members) {
+          const p = out.get(id);
+          if (!p) continue;
+          if (pushAxis === 'x') p.x += dir * push;
+          else p.y += dir * push;
+        }
+        if (pushAxis === 'x') { rb.minX += dir * push; rb.maxX += dir * push; }
+        else { rb.minY += dir * push; rb.maxY += dir * push; }
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+
+  return out;
+}
+
+/**
  * Main layout function that combines hierarchical and force-directed approaches.
  * `direction` defaults to TB (top→bottom). Pass 'LR' for left→right.
  */

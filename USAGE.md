@@ -283,10 +283,10 @@ group DataTier {
 
 **Notes**
 
-- Groups are **purely visual** — they don't affect edge routing or layout, just paint a dashed rectangle behind their members with a soft tint.
+- Groups paint a dashed rectangle behind their members with a soft tint. Auto-layout is group-aware: after placing nodes, a post-pass detects pairs of group rectangles that would overlap and shifts one group's members along the perpendicular-to-flow axis until the rectangles are separated. Two groups never visually overlap each other unless their members do.
+- **Group containers are draggable.** Grab the dashed rectangle and drag — every contained node travels with it, so you can rearrange whole sub-systems after auto-layout if you want a different presentation. Member nodes are still individually draggable on top.
 - A node may appear in multiple groups; they'll each draw their own outline.
 - Members that are filtered out by `level:` or drill-down are quietly skipped — empty groups don't render.
-- Group containers are **non-interactive**: they can't be selected, dragged, or clicked. Click a contained node to interact with it normally.
 
 ---
 
