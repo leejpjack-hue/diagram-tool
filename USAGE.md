@@ -10,16 +10,17 @@ Live: https://diagram.teqcon.uk/
 
 1. [Quick start](#quick-start)
 2. [DSL fundamentals](#dsl-fundamentals)
-3. [Architecture mode](#architecture-mode)
-4. [Flow mode](#flow-mode)
-5. [Gantt mode](#gantt-mode)
-6. [Edges and labels](#edges-and-labels)
-7. [C4 hierarchy & drill-down](#c4-hierarchy--drill-down)
-8. [Swimlanes](#swimlanes)
-9. [Templates and shortcuts](#templates-and-shortcuts)
-10. [Exporting](#exporting)
-11. [Custom icons](#custom-icons)
-12. [Troubleshooting](#troubleshooting)
+3. [Layout direction](#layout-direction)
+4. [Architecture mode](#architecture-mode)
+5. [Flow mode](#flow-mode)
+6. [Gantt mode](#gantt-mode)
+7. [Edges and labels](#edges-and-labels)
+8. [C4 hierarchy & drill-down](#c4-hierarchy--drill-down)
+9. [Swimlanes](#swimlanes)
+10. [Templates and shortcuts](#templates-and-shortcuts)
+11. [Exporting](#exporting)
+12. [Custom icons](#custom-icons)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -41,6 +42,7 @@ The canvas is white so you can paste rendered diagrams cleanly into Notion, Conf
 # Lines starting with `#` are comments
 diagram: architecture        # mode: architecture | flow | gantt
 title: My System Title       # appears in exports
+direction: horizontal        # vertical (default) | horizontal — see below
 
 # A node block — keyword, identifier, then `{ ... }` of properties
 service AuthApi {
@@ -66,6 +68,40 @@ AuthApi ->|reads| UserDb     # `|label|` adds a label to the arrow
 - Identifiers are case-insensitive when referenced in edges (`AuthApi` and `authapi` both work).
 - Multi-word string values are allowed: `tech: Node.js + Express`. They run to end of line.
 - Use blank lines freely; whitespace is insignificant outside strings.
+
+---
+
+## Layout direction
+
+Architecture and flow diagrams default to a **vertical** layout — sources at the top, edges flowing top → bottom. Set `direction: horizontal` (top level, anywhere before the first node) to flip the entire diagram to flow **left → right** instead. Source/target handles automatically move from the top/bottom edges to the left/right edges, so edges curve correctly.
+
+```
+diagram: architecture
+direction: horizontal
+title: Order System
+
+service Web   { type: api  connects: OrdersApi }
+service OrdersApi { type: api  connects: OrdersDb }
+database OrdersDb { type: postgresql }
+```
+
+Renders Web → OrdersApi → OrdersDb across the canvas instead of stacked downward.
+
+**Accepted values** (case-insensitive, dashes/underscores ignored):
+
+| You write… | Interpreted as | Result |
+|---|---|---|
+| `direction: vertical` *(default)* | TB | Top → Bottom (default) |
+| `direction: tb` / `top-bottom` | TB | Top → Bottom |
+| `direction: horizontal` | LR | Left → Right |
+| `direction: lr` / `left-right` | LR | Left → Right |
+
+Anything unrecognised falls back to vertical so a typo can't break rendering.
+
+**Notes**
+- The keyword applies to **architecture** and **flow** diagrams. Gantt mode is unaffected (it has its own time-axis layout).
+- **Swimlanes** always lay out horizontally within each lane regardless of `direction:` — that's intrinsic to the swimlane shape.
+- Flow templates with **decision gateways** keep their secondary branch handles on the perpendicular sides (top/bottom in LR mode, left/right in TB mode), so you can route `yes`/`no` paths to either side.
 
 ---
 
@@ -487,6 +523,6 @@ node X {
 
 ## Reserved keywords
 
-Avoid using these as node names: `diagram`, `title`, `service`, `database`, `queue`, `group`, `contains`, `type`, `tech`, `port`, `replicas`, `data`, `topic`, `connects`, `cloud`, `provider`, `kind`, `region`, `start`, `end`, `node`, `label`, `system`, `duration`, `assignee`, `level`, `parent`, `class`, `attributes`, `methods`, `stereotype`, `lane`, `color`.
+Avoid using these as node names: `diagram`, `title`, `direction`, `service`, `database`, `queue`, `group`, `contains`, `type`, `tech`, `port`, `replicas`, `data`, `topic`, `connects`, `cloud`, `provider`, `kind`, `region`, `start`, `end`, `node`, `label`, `system`, `duration`, `assignee`, `level`, `parent`, `class`, `attributes`, `methods`, `stereotype`, `lane`, `color`.
 
 If you need one of these as a name, prefix or suffix it: `MainSystem`, `OrderClass`, `EventLane`.

@@ -3,13 +3,19 @@
  * Uses hierarchical and force-directed approaches to minimize edge overlap
  */
 
+export type LayoutDirection = 'TB' | 'LR';
+
 /**
  * Calculate hierarchical layout based on node dependencies
- * Places nodes in layers based on their distance from sources
+ * Places nodes in layers based on their distance from sources.
+ *
+ * direction='TB' (default) → layers stack top→bottom, nodes spread horizontally.
+ * direction='LR'           → layers stack left→right, nodes spread vertically.
  */
 export function calculateHierarchicalLayout(
   nodes: Array<{ id: string; type: string; name: string }>,
-  edges: Array<{ id: string; from: string; to: string }>
+  edges: Array<{ id: string; from: string; to: string }>,
+  direction: LayoutDirection = 'TB',
 ): Map<string, { x: number; y: number }> {
   const positions = new Map<string, { x: number; y: number }>();
   
@@ -66,16 +72,47 @@ export function calculateHierarchicalLayout(
   });
 
   // Assign positions
-  const levelWidth = 350;
-  const nodeHeight = 180;
+  // For TB: levels move along Y, siblings spread along X.
+  // For LR: levels move along X, siblings spread along Y.
   const startX = 100;
   const startY = 100;
+
+  if (direction === 'LR') {
+    const levelStepX = 360;     // horizontal distance between layers
+    const siblingStepY = 160;   // vertical distance between sibling nodes within a layer
+    const minSpan = 600;        // try to vertically center if smaller than this
+
+    nodesByLevel.forEach((nodeIds, level) => {
+      const levelX = startX + level * levelStepX;
+      const totalHeight = (nodeIds.length - 1) * siblingStepY;
+      const offsetY = startY + (totalHeight > minSpan ? 0 : (minSpan - totalHeight) / 2);
+
+      nodeIds.forEach((nodeId, index) => {
+        positions.set(nodeId, { x: levelX, y: offsetY + index * siblingStepY });
+      });
+    });
+
+    // Disconnected nodes: stack to the right of the rightmost layer
+    let disconnectedX = startX;
+    let disconnectedY = startY;
+    nodes.forEach(node => {
+      if (!positions.has(node.id)) {
+        positions.set(node.id, { x: disconnectedX, y: disconnectedY });
+        disconnectedY += siblingStepY;
+      }
+    });
+    return positions;
+  }
+
+  // TB (default)
+  const levelWidth = 350;
+  const nodeHeight = 180;
 
   nodesByLevel.forEach((nodeIds, level) => {
     const levelY = startY + level * nodeHeight;
     const totalWidth = (nodeIds.length - 1) * levelWidth;
     const offsetX = startX + (totalWidth > 800 ? 0 : (800 - totalWidth) / 2);
-    
+
     nodeIds.forEach((nodeId, index) => {
       const x = offsetX + index * levelWidth;
       const y = levelY;
@@ -212,17 +249,19 @@ export function applyForceDirectedLayout(
 }
 
 /**
- * Main layout function that combines hierarchical and force-directed approaches
+ * Main layout function that combines hierarchical and force-directed approaches.
+ * `direction` defaults to TB (top→bottom). Pass 'LR' for left→right.
  */
 export function calculateAutoLayout(
   nodes: Array<{ id: string; type: string; name: string }>,
-  edges: Array<{ id: string; from: string; to: string }>
+  edges: Array<{ id: string; from: string; to: string }>,
+  direction: LayoutDirection = 'TB',
 ): Map<string, { x: number; y: number }> {
   // Step 1: Calculate hierarchical layout
-  const hierarchicalPositions = calculateHierarchicalLayout(nodes, edges);
-  
+  const hierarchicalPositions = calculateHierarchicalLayout(nodes, edges, direction);
+
   // Step 2: Apply force-directed refinement
   const finalPositions = applyForceDirectedLayout(hierarchicalPositions, edges, 30);
-  
+
   return finalPositions;
 }

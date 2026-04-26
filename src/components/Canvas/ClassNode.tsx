@@ -1,7 +1,8 @@
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { ClassNodeData } from './types';
+import { useLayoutHandles } from './layoutDirection';
 
 /**
  * UML class diagram node — three-section box:
@@ -19,6 +20,7 @@ export const ClassNode = memo(({ data, selected }: NodeProps) => {
   const d = data as unknown as ClassNodeData;
   const attrs = d.attributes ?? [];
   const methods = d.methods ?? [];
+  const { target, source } = useLayoutHandles();
 
   return (
     <div
@@ -31,7 +33,7 @@ export const ClassNode = memo(({ data, selected }: NodeProps) => {
         boxShadow: selected ? '0 0 0 3px rgba(15,118,110,0.25)' : '0 2px 8px rgba(0,0,0,0.1)',
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: '#0F766E' }} />
+      <Handle type="target" position={target} style={{ background: '#0F766E' }} />
 
       <div className="px-3 py-2 text-center" style={{ background: '#CCFBF1', borderBottom: '1px solid #0F766E' }}>
         {d.stereotype && (
@@ -58,7 +60,7 @@ export const ClassNode = memo(({ data, selected }: NodeProps) => {
         </div>
       )}
 
-      <Handle type="source" position={Position.Bottom} style={{ background: '#0F766E' }} />
+      <Handle type="source" position={source} style={{ background: '#0F766E' }} />
     </div>
   );
 });

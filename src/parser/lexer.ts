@@ -24,7 +24,7 @@ export interface Token {
 }
 
 const KEYWORDS = [
-  'diagram', 'title', 'service', 'database', 'queue', 'group',
+  'diagram', 'title', 'direction', 'service', 'database', 'queue', 'group',
   'contains', 'type', 'tech', 'port', 'replicas', 'data', 'topic', 'connects',
   'cloud', 'provider', 'kind', 'region',
   // Flow-mode keywords

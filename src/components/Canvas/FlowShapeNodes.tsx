@@ -1,7 +1,8 @@
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
+import { useLayoutHandles } from './layoutDirection';
 
 /**
  * Standard flowchart shapes beyond process/decision/start/end.
@@ -52,6 +53,7 @@ function LabelLayer({ data }: { data: FlowNodeData }) {
 
 export const DataNode = memo(({ data, selected }: ShapeProps) => {
   const d = data as unknown as FlowNodeData;
+  const { target, source, centerStyle } = useLayoutHandles();
   return (
     <Wrapper selected={selected}>
       <div className="relative" style={{ width: SIZE.w, height: SIZE.h }}>
@@ -64,8 +66,8 @@ export const DataNode = memo(({ data, selected }: ShapeProps) => {
           />
         </svg>
         <LabelLayer data={d} />
-        <Handle type="target" position={Position.Top} style={{ background: STROKE, left: SIZE.w / 2 }} />
-        <Handle type="source" position={Position.Bottom} style={{ background: STROKE, left: SIZE.w / 2 }} />
+        <Handle type="target" position={target} style={{ background: STROKE, ...centerStyle(SIZE.w, SIZE.h) }} />
+        <Handle type="source" position={source} style={{ background: STROKE, ...centerStyle(SIZE.w, SIZE.h) }} />
       </div>
     </Wrapper>
   );
@@ -76,6 +78,13 @@ export const DocumentNode = memo(({ data, selected }: ShapeProps) => {
   const d = data as unknown as FlowNodeData;
   const w = SIZE.w, h = SIZE.h;
   const path = `M 2 2 L ${w - 2} 2 L ${w - 2} ${h - 12} Q ${(w * 0.75)} ${h + 2} ${w / 2} ${h - 10} Q ${w * 0.25} ${h - 18} 2 ${h - 10} Z`;
+  const { target, source, centerStyle, direction } = useLayoutHandles();
+  // The wavy bottom drops a few px below baseline; in TB we pin the source
+  // handle slightly higher so it sits on the wave's apex. In LR the source
+  // is on the right edge and that adjustment doesn't apply.
+  const sourceStyle = direction === 'LR'
+    ? { background: STROKE, ...centerStyle(w, h) }
+    : { background: STROKE, left: w / 2, top: h - 4 };
   return (
     <Wrapper selected={selected}>
       <div className="relative" style={{ width: w, height: h }}>
@@ -83,8 +92,8 @@ export const DocumentNode = memo(({ data, selected }: ShapeProps) => {
           <path d={path} fill={FILL} stroke={STROKE} strokeWidth={2} strokeLinejoin="round" />
         </svg>
         <LabelLayer data={d} />
-        <Handle type="target" position={Position.Top} style={{ background: STROKE, left: w / 2 }} />
-        <Handle type="source" position={Position.Bottom} style={{ background: STROKE, left: w / 2, top: h - 4 }} />
+        <Handle type="target" position={target} style={{ background: STROKE, ...centerStyle(w, h) }} />
+        <Handle type="source" position={source} style={sourceStyle} />
       </div>
     </Wrapper>
   );
@@ -94,6 +103,7 @@ DocumentNode.displayName = 'DocumentNode';
 export const ManualInputNode = memo(({ data, selected }: ShapeProps) => {
   const d = data as unknown as FlowNodeData;
   const w = SIZE.w, h = SIZE.h;
+  const { target, source, centerStyle } = useLayoutHandles();
   return (
     <Wrapper selected={selected}>
       <div className="relative" style={{ width: w, height: h }}>
@@ -106,8 +116,8 @@ export const ManualInputNode = memo(({ data, selected }: ShapeProps) => {
           />
         </svg>
         <LabelLayer data={d} />
-        <Handle type="target" position={Position.Top} style={{ background: STROKE, left: w / 2 }} />
-        <Handle type="source" position={Position.Bottom} style={{ background: STROKE, left: w / 2 }} />
+        <Handle type="target" position={target} style={{ background: STROKE, ...centerStyle(w, h) }} />
+        <Handle type="source" position={source} style={{ background: STROKE, ...centerStyle(w, h) }} />
       </div>
     </Wrapper>
   );
@@ -116,6 +126,7 @@ ManualInputNode.displayName = 'ManualInputNode';
 
 export const TerminatorNode = memo(({ data, selected }: ShapeProps) => {
   const d = data as unknown as FlowNodeData;
+  const { target, source } = useLayoutHandles();
   return (
     <div
       className={`px-5 py-2 rounded-full border-2 shadow-md transition-all duration-200 ${
@@ -127,9 +138,9 @@ export const TerminatorNode = memo(({ data, selected }: ShapeProps) => {
         boxShadow: selected ? '0 0 0 3px rgba(100,116,139,0.3)' : '0 2px 8px rgba(0,0,0,0.1)',
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: '#64748B' }} />
+      <Handle type="target" position={target} style={{ background: '#64748B' }} />
       <div className="font-semibold text-sm" style={{ color: '#334155' }}>{d.label}</div>
-      <Handle type="source" position={Position.Bottom} style={{ background: '#64748B' }} />
+      <Handle type="source" position={source} style={{ background: '#64748B' }} />
     </div>
   );
 });

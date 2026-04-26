@@ -1,12 +1,14 @@
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { DatabaseNodeData } from './types';
 import { NodeIcon, hasNodeIcon } from './icons';
+import { useLayoutHandles } from './layoutDirection';
 
 export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as DatabaseNodeData;
-  
+  const { target, source } = useLayoutHandles();
+
   return (
     <div
       className={`
@@ -22,7 +24,7 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
           : '0 2px 8px rgba(0,0,0,0.1)'
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: '#EC4899' }} />
+      <Handle type="target" position={target} style={{ background: '#EC4899' }} />
       
       <div className="flex items-center gap-3 mb-1">
         <div
@@ -64,7 +66,7 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
         </div>
       )}
       
-      <Handle type="source" position={Position.Bottom} style={{ background: '#EC4899' }} />
+      <Handle type="source" position={source} style={{ background: '#EC4899' }} />
     </div>
   );
 });

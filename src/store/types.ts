@@ -134,6 +134,10 @@ export interface Group {
   contains: string[];
 }
 
+// Layout flow direction: 'TB' (top → bottom, default) or 'LR' (left → right).
+// Set in DSL with `direction: vertical | horizontal` (or the aliases tb / lr).
+export type LayoutDirection = 'TB' | 'LR';
+
 export interface ParsedDiagram {
   mode: DiagramMode;
   title: string;
@@ -143,6 +147,7 @@ export interface ParsedDiagram {
   lanes?: Lane[];
   startNode?: string;
   endNode?: string;
+  direction?: LayoutDirection;
 }
 
 // Clipboard types for copy/paste

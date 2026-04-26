@@ -1,6 +1,6 @@
 import { Lexer, TokenType } from './lexer';
 import type { Token } from './lexer';
-import type { DiagramNode, Edge, Group, Lane, ParsedDiagram, DiagramMode, FlowNode, CloudProvider, C4Level, ClassNode } from '../store/types';
+import type { DiagramNode, Edge, Group, Lane, ParsedDiagram, DiagramMode, FlowNode, CloudProvider, C4Level, ClassNode, LayoutDirection } from '../store/types';
 
 export class Parser {
   private tokens: Token[];
@@ -11,6 +11,7 @@ export class Parser {
   private lanes: Lane[] = [];
   private title: string = 'Untitled Diagram';
   private mode: DiagramMode = 'architecture';
+  private direction: LayoutDirection = 'TB';
   private startNode: string | undefined;
   private endNode: string | undefined;
   private flowNodes: Map<string, FlowNode> = new Map();
@@ -70,6 +71,9 @@ export class Parser {
             break;
           case 'title':
             this.parseTitle();
+            break;
+          case 'direction':
+            this.parseDirection();
             break;
           case 'service':
             this.parseService();
@@ -139,6 +143,7 @@ export class Parser {
       lanes: this.lanes.length > 0 ? this.lanes : undefined,
       startNode: this.startNode,
       endNode: this.endNode,
+      direction: this.direction,
     };
   }
 
@@ -184,6 +189,23 @@ export class Parser {
     const modeToken = this.advance();
     if (modeToken.type === TokenType.IDENTIFIER || modeToken.type === TokenType.STRING) {
       this.mode = (modeToken.value as string) as DiagramMode;
+    }
+  }
+
+  // Parse `direction: vertical | horizontal | tb | lr | top-bottom | left-right`.
+  // Unknown values fall back to TB so a typo can't break rendering.
+  private parseDirection(): void {
+    this.advance(); // consume 'direction'
+    this.expect(TokenType.COLON);
+    const valueToken = this.advance();
+    if (valueToken.type !== TokenType.IDENTIFIER && valueToken.type !== TokenType.STRING && valueToken.type !== TokenType.KEYWORD) {
+      return;
+    }
+    const raw = String(valueToken.value).toLowerCase().replace(/[\s_-]/g, '');
+    if (raw === 'horizontal' || raw === 'lr' || raw === 'leftright' || raw === 'lefttoright') {
+      this.direction = 'LR';
+    } else {
+      this.direction = 'TB';
     }
   }
 

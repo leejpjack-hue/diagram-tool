@@ -1,13 +1,15 @@
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { ServiceNodeData } from './types';
 import { NodeIcon, hasNodeIcon } from './icons';
+import { useLayoutHandles } from './layoutDirection';
 
 export const ServiceNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as ServiceNodeData;
   const isAPI = nodeData.type === 'api';
   const iconKey = isAPI ? 'api' : 'service';
+  const { target, source } = useLayoutHandles();
   
   return (
     <div
@@ -24,7 +26,7 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
           : '0 2px 8px rgba(0,0,0,0.1)'
       }}
     >
-      <Handle type="target" position={Position.Top} className="!bg-electric-blue" />
+      <Handle type="target" position={target} className="!bg-electric-blue" />
       
       <div className="flex items-center gap-3 mb-1">
         <div
@@ -68,7 +70,7 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
         </div>
       )}
       
-      <Handle type="source" position={Position.Bottom} style={{ background: isAPI ? '#3B82F6' : '#8B5CF6' }} />
+      <Handle type="source" position={source} style={{ background: isAPI ? '#3B82F6' : '#8B5CF6' }} />
     </div>
   );
 });

@@ -23,6 +23,8 @@ import { ZoomControls } from './ZoomControls';
 import { useDiagramStore } from '../../store/diagramStore';
 import type { FlowNode, C4Level, ServiceNode as ServiceNodeType, CloudNode as CloudNodeType, ClassNode as ClassNodeType } from '../../store/types';
 import { calculateAutoLayout } from '../../utils/autoLayout';
+import { LayoutDirectionContext } from './layoutDirection';
+import { Position } from '@xyflow/react';
 
 const architectureNodeTypes = {
   service: ServiceNode,
@@ -90,6 +92,19 @@ function DiagramCanvasInternal() {
   }, [parsedDiagram, diagramMode]);
 
   const nodeTypes = diagramMode === 'flow' ? flowNodeTypes : architectureNodeTypes;
+
+  // Layout direction: pulled from DSL `direction:` keyword. Default vertical.
+  const layoutDirection = parsedDiagram?.direction ?? 'TB';
+  const isLR = layoutDirection === 'LR';
+  // Stable props applied to every React Flow node — drives default edge
+  // curvature anchors. Memoized so `initialNodes` doesn't re-derive on every
+  // render (which would loop with the setNodes effect below).
+  const directionalNodeProps = useMemo(
+    () => (isLR
+      ? { sourcePosition: Position.Right, targetPosition: Position.Left }
+      : { sourcePosition: Position.Bottom, targetPosition: Position.Top }),
+    [isLR],
+  );
 
   const initialNodes = useMemo((): Node[] => {
     if (!parsedDiagram) {
@@ -202,24 +217,39 @@ function DiagramCanvasInternal() {
               y: row * LANE_HEIGHT + 40 + (LANE_HEIGHT / 2 - 35),
             },
             data,
+            // Lanes are intrinsically left→right, so always anchor edges
+            // horizontally regardless of the global direction setting.
+            sourcePosition: Position.Right,
+            targetPosition: Position.Left,
           };
         });
 
         return [...laneBandNodes, ...flowReactNodes];
       }
 
-      // No lanes: vertical stack as before
+      // No lanes: stack along the active layout axis.
+      // TB → vertical column; LR → horizontal row.
       let yOffset = 100;
+      let xOffset = 100;
       return parsedDiagram.nodes.map((node) => {
         const { type, data } = flowNodeFor(node);
-        const x = 400;
-        const y = yOffset;
-        yOffset += 120;
+        let x: number;
+        let y: number;
+        if (isLR) {
+          x = xOffset;
+          y = 220;
+          xOffset += 220;
+        } else {
+          x = 400;
+          y = yOffset;
+          yOffset += 120;
+        }
         return {
           id: node.id,
           type,
           position: { x, y },
           data,
+          ...directionalNodeProps,
         };
       });
     } else {
@@ -247,7 +277,7 @@ function DiagramCanvasInternal() {
       const visibleIds = new Set(visibleNodes.map(n => n.id));
       const visibleEdges = parsedDiagram.edges.filter(e => visibleIds.has(e.from) && visibleIds.has(e.to));
 
-      const positions = calculateAutoLayout(visibleNodes, visibleEdges);
+      const positions = calculateAutoLayout(visibleNodes, visibleEdges, layoutDirection);
 
       return visibleNodes.map((node) => {
         const pos = positions.get(node.id) || { x: 100, y: 100 };
@@ -260,10 +290,11 @@ function DiagramCanvasInternal() {
             label: node.name,
             ...node.properties,
           },
+          ...directionalNodeProps,
         };
       });
     }
-  }, [parsedDiagram, diagramMode, c4Level, drillParent]);
+  }, [parsedDiagram, diagramMode, c4Level, drillParent, layoutDirection, isLR, directionalNodeProps]);
 
   const initialEdges = useMemo((): Edge[] => {
     if (!parsedDiagram) return [];
@@ -423,6 +454,7 @@ function DiagramCanvasInternal() {
   }
 
   return (
+    <LayoutDirectionContext.Provider value={layoutDirection}>
     <div className="w-full h-full bg-white relative">
       <ReactFlow
         nodes={nodes}
@@ -515,6 +547,7 @@ function DiagramCanvasInternal() {
         </div>
       )}
     </div>
+    </LayoutDirectionContext.Provider>
   );
 }
 

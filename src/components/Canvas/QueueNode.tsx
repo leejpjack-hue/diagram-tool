@@ -1,12 +1,14 @@
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { QueueNodeData } from './types';
 import { NodeIcon, hasNodeIcon } from './icons';
+import { useLayoutHandles } from './layoutDirection';
 
 export const QueueNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as QueueNodeData;
-  
+  const { target, source } = useLayoutHandles();
+
   return (
     <div
       className={`
@@ -22,7 +24,7 @@ export const QueueNode = memo(({ data, selected }: NodeProps) => {
           : '0 2px 8px rgba(0,0,0,0.1)'
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: '#10B981' }} />
+      <Handle type="target" position={target} style={{ background: '#10B981' }} />
       
       <div className="flex items-center gap-3 mb-1">
         <div
@@ -63,7 +65,7 @@ export const QueueNode = memo(({ data, selected }: NodeProps) => {
         </div>
       )}
       
-      <Handle type="source" position={Position.Bottom} style={{ background: '#10B981' }} />
+      <Handle type="source" position={source} style={{ background: '#10B981' }} />
     </div>
   );
 });

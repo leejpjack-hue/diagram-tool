@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
+import { useLayoutHandles } from './layoutDirection';
 
 /**
  * BPMN-style symbols:
@@ -21,6 +22,10 @@ const EVT = { size: 64, stroke: '#10B981', fill: '#D1FAE5', text: '#065F46' };
 
 function GatewayShell({ glyph, selected, label }: { glyph: string; selected?: boolean; label?: string }) {
   const s = GATE.size;
+  const { target, source, direction } = useLayoutHandles();
+  // Auxiliary branch handles — the two perpendicular sides keep Y/N branches
+  // accessible by id ('left'/'right' in TB, 'top'/'bottom' in LR).
+  const isLR = direction === 'LR';
   return (
     <div
       className="relative transition-all duration-200"
@@ -58,10 +63,28 @@ function GatewayShell({ glyph, selected, label }: { glyph: string; selected?: bo
           {label}
         </div>
       )}
-      <Handle type="target" position={Position.Top} style={{ background: GATE.stroke, left: s / 2 }} />
-      <Handle type="source" position={Position.Bottom} style={{ background: GATE.stroke, left: s / 2 }} />
-      <Handle type="source" position={Position.Right} id="right" style={{ background: GATE.stroke, top: s / 2 }} />
-      <Handle type="source" position={Position.Left} id="left" style={{ background: GATE.stroke, top: s / 2 }} />
+      <Handle
+        type="target"
+        position={target}
+        style={{ background: GATE.stroke, ...(isLR ? { top: s / 2 } : { left: s / 2 }) }}
+      />
+      <Handle
+        type="source"
+        position={source}
+        style={{ background: GATE.stroke, ...(isLR ? { top: s / 2 } : { left: s / 2 }) }}
+      />
+      {/* Branch handles on the two perpendicular sides */}
+      {isLR ? (
+        <>
+          <Handle type="source" position={Position.Top} id="top" style={{ background: GATE.stroke, left: s / 2 }} />
+          <Handle type="source" position={Position.Bottom} id="bottom" style={{ background: GATE.stroke, left: s / 2 }} />
+        </>
+      ) : (
+        <>
+          <Handle type="source" position={Position.Right} id="right" style={{ background: GATE.stroke, top: s / 2 }} />
+          <Handle type="source" position={Position.Left} id="left" style={{ background: GATE.stroke, top: s / 2 }} />
+        </>
+      )}
     </div>
   );
 }
@@ -88,6 +111,7 @@ function EventShell({
   glyph, selected, label, ringWidth = 2,
 }: { glyph: string; selected?: boolean; label?: string; ringWidth?: number }) {
   const s = EVT.size;
+  const { target, source, centerStyle } = useLayoutHandles();
   return (
     <div
       className="relative transition-all duration-200"
@@ -119,8 +143,8 @@ function EventShell({
           {label}
         </div>
       )}
-      <Handle type="target" position={Position.Top} style={{ background: EVT.stroke, left: s / 2 }} />
-      <Handle type="source" position={Position.Bottom} style={{ background: EVT.stroke, left: s / 2 }} />
+      <Handle type="target" position={target} style={{ background: EVT.stroke, ...centerStyle(s, s) }} />
+      <Handle type="source" position={source} style={{ background: EVT.stroke, ...centerStyle(s, s) }} />
     </div>
   );
 }
@@ -157,6 +181,12 @@ EventMessageNode.displayName = 'EventMessageNode';
 const SUB = { w: 180, h: 80, stroke: '#3B82F6', fill: '#EFF6FF', text: '#1E40AF' };
 
 function SubprocessShell({ glyph, selected, label, system }: { glyph: '+' | '−'; selected?: boolean; label?: string; system?: string }) {
+  const { target, source, direction } = useLayoutHandles();
+  // Source handle hangs slightly below the box edge in TB so the marker badge
+  // doesn't visually swallow it; in LR we let it sit flush on the right edge.
+  const sourceStyle = direction === 'LR'
+    ? { background: SUB.stroke }
+    : { background: SUB.stroke, bottom: -16 };
   return (
     <div
       className="relative transition-all duration-200"
@@ -197,8 +227,8 @@ function SubprocessShell({ glyph, selected, label, system }: { glyph: '+' | '−
       >
         {glyph}
       </div>
-      <Handle type="target" position={Position.Top} style={{ background: SUB.stroke }} />
-      <Handle type="source" position={Position.Bottom} style={{ background: SUB.stroke, bottom: -16 }} />
+      <Handle type="target" position={target} style={{ background: SUB.stroke }} />
+      <Handle type="source" position={source} style={sourceStyle} />
     </div>
   );
 }

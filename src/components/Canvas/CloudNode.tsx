@@ -1,8 +1,9 @@
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { CloudNodeData } from './types';
 import { ProviderIcon, KindIcon, hasKindIcon } from './icons';
+import { useLayoutHandles } from './layoutDirection';
 
 // Provider visual identity — colored badges with stylized geometric glyphs.
 // Glyphs themselves now live as standalone .svg files in ./icons/providers/.
@@ -33,6 +34,7 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as CloudNodeData;
   const provider = nodeData.provider || 'aws';
   const meta = PROVIDER_META[provider] ?? PROVIDER_META.aws;
+  const { target, source } = useLayoutHandles();
   const kindKey = (nodeData.kind || '').replace(/-/g, '');
   // Priority: custom kind SVG (designer-supplied) → unicode kind glyph → provider SVG glyph.
   const kindBadge = KIND_ICON[kindKey];
@@ -53,7 +55,7 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
           : '0 2px 8px rgba(0,0,0,0.1)',
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: meta.pill }} />
+      <Handle type="target" position={target} style={{ background: meta.pill }} />
 
       <div className="flex items-center gap-3 mb-1">
         <div
@@ -100,7 +102,7 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
         </div>
       )}
 
-      <Handle type="source" position={Position.Bottom} style={{ background: meta.pill }} />
+      <Handle type="source" position={source} style={{ background: meta.pill }} />
     </div>
   );
 });

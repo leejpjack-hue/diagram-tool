@@ -1,11 +1,13 @@
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
+import { useLayoutHandles } from './layoutDirection';
 
 export const ProcessNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
-  
+  const { target, source } = useLayoutHandles();
+
   return (
     <div
       className={`
@@ -21,7 +23,7 @@ export const ProcessNode = memo(({ data, selected }: NodeProps) => {
           : '0 2px 8px rgba(0,0,0,0.1)'
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: '#3B82F6' }} />
+      <Handle type="target" position={target} style={{ background: '#3B82F6' }} />
       
       <div 
         className="font-semibold text-sm text-center"
@@ -45,7 +47,7 @@ export const ProcessNode = memo(({ data, selected }: NodeProps) => {
         </div>
       )}
       
-      <Handle type="source" position={Position.Bottom} style={{ background: '#3B82F6' }} />
+      <Handle type="source" position={source} style={{ background: '#3B82F6' }} />
     </div>
   );
 });

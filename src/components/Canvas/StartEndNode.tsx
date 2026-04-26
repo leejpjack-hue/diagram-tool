@@ -1,12 +1,14 @@
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
+import { useLayoutHandles } from './layoutDirection';
 
 export const StartEndNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
   const isStart = nodeData.isStart;
   const isEnd = nodeData.isEnd;
+  const { target, source } = useLayoutHandles();
   
   const bgColor = isStart ? '#10B981' : '#EF4444';
   const ringColor = isStart ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)';
@@ -25,8 +27,8 @@ export const StartEndNode = memo(({ data, selected }: NodeProps) => {
           : '0 2px 8px rgba(0,0,0,0.2)'
       }}
     >
-      {isStart && <Handle type="source" position={Position.Bottom} style={{ background: 'white' }} />}
-      {isEnd && <Handle type="target" position={Position.Top} style={{ background: 'white' }} />}
+      {isStart && <Handle type="source" position={source} style={{ background: 'white' }} />}
+      {isEnd && <Handle type="target" position={target} style={{ background: 'white' }} />}
       
       <div className="font-semibold text-sm text-white">
         {nodeData.label}
@@ -34,8 +36,8 @@ export const StartEndNode = memo(({ data, selected }: NodeProps) => {
       
       {!isStart && !isEnd && (
         <>
-          <Handle type="target" position={Position.Top} style={{ background: bgColor }} />
-          <Handle type="source" position={Position.Bottom} style={{ background: bgColor }} />
+          <Handle type="target" position={target} style={{ background: bgColor }} />
+          <Handle type="source" position={source} style={{ background: bgColor }} />
         </>
       )}
     </div>
