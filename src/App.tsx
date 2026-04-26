@@ -449,16 +449,10 @@ function App() {
         }
       }
       
-      // P for properties toggle
-      if (e.key === 'p' || e.key === 'P') {
-        if (!e.metaKey && !e.ctrlKey && !e.altKey) {
-          const target = e.target as HTMLElement;
-          if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-            e.preventDefault();
-            setActivePanel(prev => prev === 'properties' ? 'none' : 'properties');
-          }
-        }
-      }
+      // (Removed: bare-key 'P' shortcut to toggle properties. Monaco's
+      // editor uses a contenteditable div, which the INPUT/TEXTAREA guard
+      // above doesn't catch — so the shortcut intercepted every 'p' typed
+      // in DSL. Use the toolbar Properties button instead.)
     };
 
     window.addEventListener('keydown', handleKeyPress);

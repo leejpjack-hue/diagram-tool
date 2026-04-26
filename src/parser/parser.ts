@@ -702,13 +702,20 @@ export class Parser {
       if (this.peek().type === TokenType.RBRACE) break;
 
       const propToken = this.peek();
-      if (propToken.type === TokenType.KEYWORD && propToken.value === 'contains') {
+      // Compare property keywords case-insensitively — the lexer preserves
+      // original casing on token.value, but the user may write `Label:`
+      // or `Color:`.
+      const propKey =
+        propToken.type === TokenType.KEYWORD
+          ? String(propToken.value).toLowerCase()
+          : '';
+      if (propKey === 'contains') {
         this.advance();
         this.expect(TokenType.COLON);
         group.contains = this.parseConnectionList().map(c =>
           c.toLowerCase().replace(/[^a-z0-9]/g, '_')
         );
-      } else if (propToken.type === TokenType.KEYWORD && propToken.value === 'label') {
+      } else if (propKey === 'label') {
         // `label:` overrides the default display name
         this.advance();
         this.expect(TokenType.COLON);
@@ -722,13 +729,14 @@ export class Parser {
           if (
             t.type === TokenType.IDENTIFIER ||
             t.type === TokenType.STRING ||
-            t.type === TokenType.KEYWORD
+            t.type === TokenType.KEYWORD ||
+            t.type === TokenType.NUMBER
           ) {
             parts.push(String(t.value));
           }
         }
         if (parts.length > 0) group.label = parts.join(' ');
-      } else if (propToken.type === TokenType.KEYWORD && propToken.value === 'color') {
+      } else if (propKey === 'color') {
         this.advance();
         this.expect(TokenType.COLON);
         const t = this.advance();
