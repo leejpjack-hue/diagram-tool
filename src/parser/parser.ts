@@ -1,6 +1,6 @@
 import { Lexer, TokenType } from './lexer';
 import type { Token } from './lexer';
-import type { DiagramNode, Edge, Group, Lane, ParsedDiagram, DiagramMode, FlowNode, CloudProvider, C4Level, ClassNode, LayoutDirection } from '../store/types';
+import type { DiagramNode, Edge, Group, Lane, ParsedDiagram, DiagramMode, FlowNode, CloudProvider, C4Level, ClassNode, LayoutDirection, EdgeStyle } from '../store/types';
 
 export class Parser {
   private tokens: Token[];
@@ -12,6 +12,7 @@ export class Parser {
   private title: string = 'Untitled Diagram';
   private mode: DiagramMode = 'architecture';
   private direction: LayoutDirection = 'TB';
+  private edgeStyle: EdgeStyle = 'curved';
   private startNode: string | undefined;
   private endNode: string | undefined;
   private flowNodes: Map<string, FlowNode> = new Map();
@@ -74,6 +75,9 @@ export class Parser {
             break;
           case 'direction':
             this.parseDirection();
+            break;
+          case 'edges':
+            this.parseEdgeStyle();
             break;
           case 'service':
             this.parseService();
@@ -144,7 +148,34 @@ export class Parser {
       startNode: this.startNode,
       endNode: this.endNode,
       direction: this.direction,
+      edgeStyle: this.edgeStyle,
     };
+  }
+
+  // Parse `edges: curved | orthogonal | step | straight` (aliases:
+  // bezier→curved, smoothstep→orthogonal, line→straight).
+  // Anything unrecognised falls back to curved.
+  private parseEdgeStyle(): void {
+    this.advance(); // consume 'edges'
+    this.expect(TokenType.COLON);
+    const valueToken = this.advance();
+    if (
+      valueToken.type !== TokenType.IDENTIFIER &&
+      valueToken.type !== TokenType.STRING &&
+      valueToken.type !== TokenType.KEYWORD
+    ) {
+      return;
+    }
+    const raw = String(valueToken.value).toLowerCase().replace(/[\s_-]/g, '');
+    if (raw === 'orthogonal' || raw === 'smoothstep' || raw === 'rounded') {
+      this.edgeStyle = 'orthogonal';
+    } else if (raw === 'step' || raw === 'sharp' || raw === '90' || raw === 'rightangle') {
+      this.edgeStyle = 'step';
+    } else if (raw === 'straight' || raw === 'line' || raw === 'direct') {
+      this.edgeStyle = 'straight';
+    } else {
+      this.edgeStyle = 'curved';
+    }
   }
 
   // Map each lane's `contains` ids onto the corresponding flow node's lane property.
@@ -674,9 +705,36 @@ export class Parser {
       if (propToken.type === TokenType.KEYWORD && propToken.value === 'contains') {
         this.advance();
         this.expect(TokenType.COLON);
-        group.contains = this.parseConnectionList().map(c => 
+        group.contains = this.parseConnectionList().map(c =>
           c.toLowerCase().replace(/[^a-z0-9]/g, '_')
         );
+      } else if (propToken.type === TokenType.KEYWORD && propToken.value === 'label') {
+        // `label:` overrides the default display name
+        this.advance();
+        this.expect(TokenType.COLON);
+        const parts: string[] = [];
+        while (
+          this.peek().type !== TokenType.NEWLINE &&
+          this.peek().type !== TokenType.RBRACE &&
+          this.peek().type !== TokenType.EOF
+        ) {
+          const t = this.advance();
+          if (
+            t.type === TokenType.IDENTIFIER ||
+            t.type === TokenType.STRING ||
+            t.type === TokenType.KEYWORD
+          ) {
+            parts.push(String(t.value));
+          }
+        }
+        if (parts.length > 0) group.label = parts.join(' ');
+      } else if (propToken.type === TokenType.KEYWORD && propToken.value === 'color') {
+        this.advance();
+        this.expect(TokenType.COLON);
+        const t = this.advance();
+        if (t.type === TokenType.IDENTIFIER || t.type === TokenType.STRING) {
+          group.color = String(t.value);
+        }
       } else {
         this.advance();
       }

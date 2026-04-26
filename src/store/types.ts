@@ -132,7 +132,16 @@ export interface Group {
   id: string;
   name: string;
   contains: string[];
+  label?: string; // optional display label; defaults to `name`
+  color?: string; // optional dashed-border color; defaults to slate
 }
+
+// Connecting-line style for architecture/flow edges.
+//   curved      = smooth bezier  (React Flow 'default')
+//   orthogonal  = rounded 90°    (React Flow 'smoothstep')
+//   step        = sharp 90°      (React Flow 'step')
+//   straight    = straight line  (React Flow 'straight')
+export type EdgeStyle = 'curved' | 'orthogonal' | 'step' | 'straight';
 
 // Layout flow direction: 'TB' (top → bottom, default) or 'LR' (left → right).
 // Set in DSL with `direction: vertical | horizontal` (or the aliases tb / lr).
@@ -148,6 +157,7 @@ export interface ParsedDiagram {
   startNode?: string;
   endNode?: string;
   direction?: LayoutDirection;
+  edgeStyle?: EdgeStyle;
 }
 
 // Clipboard types for copy/paste

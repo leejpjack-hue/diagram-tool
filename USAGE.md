@@ -11,16 +11,18 @@ Live: https://diagram.teqcon.uk/
 1. [Quick start](#quick-start)
 2. [DSL fundamentals](#dsl-fundamentals)
 3. [Layout direction](#layout-direction)
-4. [Architecture mode](#architecture-mode)
-5. [Flow mode](#flow-mode)
-6. [Gantt mode](#gantt-mode)
-7. [Edges and labels](#edges-and-labels)
-8. [C4 hierarchy & drill-down](#c4-hierarchy--drill-down)
-9. [Swimlanes](#swimlanes)
-10. [Templates and shortcuts](#templates-and-shortcuts)
-11. [Exporting](#exporting)
-12. [Custom icons](#custom-icons)
-13. [Troubleshooting](#troubleshooting)
+4. [Connector style](#connector-style)
+5. [Architecture mode](#architecture-mode)
+6. [Sub-system grouping](#sub-system-grouping)
+7. [Flow mode](#flow-mode)
+8. [Gantt mode](#gantt-mode)
+9. [Edges and labels](#edges-and-labels)
+10. [C4 hierarchy & drill-down](#c4-hierarchy--drill-down)
+11. [Swimlanes](#swimlanes)
+12. [Templates and shortcuts](#templates-and-shortcuts)
+13. [Exporting](#exporting)
+14. [Custom icons](#custom-icons)
+15. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -42,7 +44,8 @@ The canvas is white so you can paste rendered diagrams cleanly into Notion, Conf
 # Lines starting with `#` are comments
 diagram: architecture        # mode: architecture | flow | gantt
 title: My System Title       # appears in exports
-direction: horizontal        # vertical (default) | horizontal — see below
+direction: horizontal        # vertical (default) | horizontal — see Layout direction
+edges: orthogonal            # curved (default) | orthogonal | step | straight — see Connector style
 
 # A node block — keyword, identifier, then `{ ... }` of properties
 service AuthApi {
@@ -102,6 +105,26 @@ Anything unrecognised falls back to vertical so a typo can't break rendering.
 - The keyword applies to **architecture** and **flow** diagrams. Gantt mode is unaffected (it has its own time-axis layout).
 - **Swimlanes** always lay out horizontally within each lane regardless of `direction:` — that's intrinsic to the swimlane shape.
 - Flow templates with **decision gateways** keep their secondary branch handles on the perpendicular sides (top/bottom in LR mode, left/right in TB mode), so you can route `yes`/`no` paths to either side.
+
+---
+
+## Connector style
+
+By default edges between architecture components are drawn as **smooth curves** (bezier). Use the top-level `edges:` keyword to switch to right-angle or straight connectors instead — useful when you want the diagram to read like a network/infrastructure schematic rather than a free-form sketch.
+
+```
+diagram: architecture
+edges: orthogonal     # 90° corners with rounded bends
+```
+
+| You write…                                       | Renders as                                  |
+|--------------------------------------------------|---------------------------------------------|
+| `edges: curved` *(default)* / `bezier`           | Smooth bezier curves                        |
+| `edges: orthogonal` / `smoothstep` / `rounded`   | 90° right-angle corners (rounded)           |
+| `edges: step` / `sharp` / `right-angle`          | 90° right-angle corners (sharp)             |
+| `edges: straight` / `line` / `direct`            | Straight point-to-point lines               |
+
+The keyword applies to architecture diagrams only. Flow-mode connectors keep their animated bezier style — orthogonal corners pair badly with the dashed pulse animation. Pair `edges: orthogonal` with `direction: horizontal` for the cleanest cloud-architecture look.
 
 ---
 
@@ -217,6 +240,53 @@ class Order {
 Visual: white box, three sections (stereotype/title, attributes, methods). Teal palette.
 
 `attributes:` and `methods:` accept bullet-style lines. Use `+` (public), `-` (private), `#` (protected) prefixes by convention.
+
+---
+
+## Sub-system grouping
+
+Real architectures have sub-systems — a compute tier, a data tier, an analytics pillar, an external-vendor cluster. Use the `group` block to draw a **dashed-line container** around any set of components. The container is auto-sized from its members' positions and labelled at the top-left.
+
+```
+diagram: architecture
+title: Order System
+edges: orthogonal
+
+cloud Web      { provider: aws  kind: cloudfront  connects: ApiGw }
+cloud ApiGw    { provider: aws  kind: apigateway connects: AuthFn, OrdersFn }
+cloud AuthFn   { provider: aws  kind: lambda  connects: UserDb }
+cloud OrdersFn { provider: aws  kind: lambda  connects: OrdersDb, EventBus }
+database UserDb   { type: postgresql }
+database OrdersDb { type: postgresql }
+queue    EventBus { type: sqs }
+
+group ComputeTier {
+  label: Compute Tier
+  color: #3B82F6
+  contains: AuthFn, OrdersFn
+}
+
+group DataTier {
+  label: Data Tier
+  color: #EC4899
+  contains: UserDb, OrdersDb, EventBus
+}
+```
+
+**Block properties**
+
+| Property    | Required | Default                     | Notes                                                |
+|-------------|----------|-----------------------------|------------------------------------------------------|
+| `contains:` | yes      | —                           | Comma-separated list of node identifiers to wrap.    |
+| `label:`    | no       | the group's name            | Multi-word string allowed.                           |
+| `color:`    | no       | slate (`#64748B`)           | Any 6-digit `#RRGGBB`. Drives both border and tint.  |
+
+**Notes**
+
+- Groups are **purely visual** — they don't affect edge routing or layout, just paint a dashed rectangle behind their members with a soft tint.
+- A node may appear in multiple groups; they'll each draw their own outline.
+- Members that are filtered out by `level:` or drill-down are quietly skipped — empty groups don't render.
+- Group containers are **non-interactive**: they can't be selected, dragged, or clicked. Click a contained node to interact with it normally.
 
 ---
 
@@ -523,6 +593,6 @@ node X {
 
 ## Reserved keywords
 
-Avoid using these as node names: `diagram`, `title`, `direction`, `service`, `database`, `queue`, `group`, `contains`, `type`, `tech`, `port`, `replicas`, `data`, `topic`, `connects`, `cloud`, `provider`, `kind`, `region`, `start`, `end`, `node`, `label`, `system`, `duration`, `assignee`, `level`, `parent`, `class`, `attributes`, `methods`, `stereotype`, `lane`, `color`.
+Avoid using these as node names: `diagram`, `title`, `direction`, `edges`, `service`, `database`, `queue`, `group`, `contains`, `type`, `tech`, `port`, `replicas`, `data`, `topic`, `connects`, `cloud`, `provider`, `kind`, `region`, `start`, `end`, `node`, `label`, `system`, `duration`, `assignee`, `level`, `parent`, `class`, `attributes`, `methods`, `stereotype`, `lane`, `color`.
 
 If you need one of these as a name, prefix or suffix it: `MainSystem`, `OrderClass`, `EventLane`.

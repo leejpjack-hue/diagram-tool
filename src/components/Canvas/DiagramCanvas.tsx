@@ -18,6 +18,7 @@ import {
   SubprocessNode, SubprocessExpandedNode,
 } from './BpmnShapes';
 import { SwimlaneNode } from './SwimlaneOverlay';
+import { GroupContainerNode } from './GroupContainer';
 import { C4LevelSwitcher } from './C4LevelSwitcher';
 import { ZoomControls } from './ZoomControls';
 import { useDiagramStore } from '../../store/diagramStore';
@@ -32,6 +33,7 @@ const architectureNodeTypes = {
   queue: QueueNode,
   cloud: CloudNode,
   class: ClassNode,
+  groupcontainer: GroupContainerNode,
 };
 
 const flowNodeTypes = {
@@ -279,7 +281,7 @@ function DiagramCanvasInternal() {
 
       const positions = calculateAutoLayout(visibleNodes, visibleEdges, layoutDirection);
 
-      return visibleNodes.map((node) => {
+      const archNodes: Node[] = visibleNodes.map((node) => {
         const pos = positions.get(node.id) || { x: 100, y: 100 };
 
         return {
@@ -293,6 +295,55 @@ function DiagramCanvasInternal() {
           ...directionalNodeProps,
         };
       });
+
+      // Sub-system grouping containers: dashed rectangles drawn behind any
+      // declared `group` blocks. Bounding box is computed from the actual
+      // post-layout positions of the contained nodes, then padded.
+      const groupNodes: Node[] = [];
+      const groups = parsedDiagram.groups ?? [];
+      if (groups.length > 0) {
+        // Approximate rendered node footprint — used to expand each member's
+        // anchor point into a rectangle for the bounding-box union.
+        const NODE_W = 200;
+        const NODE_H = 100;
+        const PADDING = 30;
+        const HEADER = 28; // extra top space so the label badge has room
+
+        groups.forEach((g) => {
+          const memberIds = g.contains.filter((id) => visibleIds.has(id));
+          if (memberIds.length === 0) return;
+
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          memberIds.forEach((id) => {
+            const p = positions.get(id);
+            if (!p) return;
+            minX = Math.min(minX, p.x);
+            minY = Math.min(minY, p.y);
+            maxX = Math.max(maxX, p.x + NODE_W);
+            maxY = Math.max(maxY, p.y + NODE_H);
+          });
+          if (!isFinite(minX)) return;
+
+          groupNodes.push({
+            id: `__group_${g.id}`,
+            type: 'groupcontainer',
+            position: { x: minX - PADDING, y: minY - PADDING - HEADER },
+            data: {
+              label: g.label ?? g.name,
+              width: maxX - minX + PADDING * 2,
+              height: maxY - minY + PADDING * 2 + HEADER,
+              color: g.color,
+            },
+            draggable: false,
+            selectable: false,
+            zIndex: -1,
+            style: { zIndex: -1 },
+          });
+        });
+      }
+
+      // Render groups first so they sit behind the actual component nodes.
+      return [...groupNodes, ...archNodes];
     }
   }, [parsedDiagram, diagramMode, c4Level, drillParent, layoutDirection, isLR, directionalNodeProps]);
 
@@ -329,14 +380,26 @@ function DiagramCanvasInternal() {
       edges = edges.filter(e => visibleIds.has(e.from) && visibleIds.has(e.to));
     }
 
+    // Translate the DSL edge-style keyword into React Flow's built-in edge
+    // types. Flow mode keeps the smooth default (animated dashed pulses
+    // look weird on hard 90° corners); architecture honours the keyword.
+    const edgeStyle = parsedDiagram.edgeStyle ?? 'curved';
+    const rfEdgeType: string | undefined =
+      diagramMode === 'flow' ? undefined :
+      edgeStyle === 'orthogonal' ? 'smoothstep' :
+      edgeStyle === 'step' ? 'step' :
+      edgeStyle === 'straight' ? 'straight' :
+      undefined; // 'curved' uses React Flow's default bezier
+
     return edges.map((edge) => ({
       id: edge.id,
       source: edge.from,
       target: edge.to,
       label: edge.label,
       animated: diagramMode === 'flow',
-      style: { 
-        stroke: edgeColor, 
+      type: rfEdgeType,
+      style: {
+        stroke: edgeColor,
         strokeWidth: 2,
       },
       labelStyle: { 
