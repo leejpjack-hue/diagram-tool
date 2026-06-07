@@ -1,11 +1,15 @@
 import { useState } from 'react';
 
+type ExportFormat = 'png' | 'jpg' | 'pdf' | 'json' | 'csv';
+
 interface ExportPanelProps {
-  onExport: (format: 'png' | 'svg' | 'json' | 'csv', quality?: number) => void;
+  onExport: (format: ExportFormat, quality?: number) => void;
 }
 
+const RASTER_FORMATS: ExportFormat[] = ['png', 'jpg', 'pdf'];
+
 export function ExportPanel({ onExport }: ExportPanelProps) {
-  const [selectedFormat, setSelectedFormat] = useState<'png' | 'svg' | 'json' | 'csv'>('png');
+  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('png');
   const [quality, setQuality] = useState(3);
 
   const handleExport = () => {
@@ -46,19 +50,37 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
             </button>
 
             <button
-              onClick={() => setSelectedFormat('svg')}
+              onClick={() => setSelectedFormat('jpg')}
               className={`w-full p-3 rounded-lg border-2 text-left transition flex items-center gap-3 ${
-                selectedFormat === 'svg'
+                selectedFormat === 'jpg'
+                  ? 'border-rose-500 bg-rose-50'
+                  : 'border-gray-300 hover:border-rose-300'
+              }`}
+            >
+              <span className="text-2xl">📷</span>
+              <div>
+                <div className="font-bold text-gray-900">JPG</div>
+                <div className="text-xs text-gray-600">Compressed Image</div>
+              </div>
+              {selectedFormat === 'jpg' && (
+                <span className="ml-auto text-rose-600">✓</span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setSelectedFormat('pdf')}
+              className={`w-full p-3 rounded-lg border-2 text-left transition flex items-center gap-3 ${
+                selectedFormat === 'pdf'
                   ? 'border-purple-500 bg-purple-50'
                   : 'border-gray-300 hover:border-purple-300'
               }`}
             >
-              <span className="text-2xl">📐</span>
+              <span className="text-2xl">📄</span>
               <div>
-                <div className="font-bold text-gray-900">SVG</div>
-                <div className="text-xs text-gray-600">Vector Image</div>
+                <div className="font-bold text-gray-900">PDF</div>
+                <div className="text-xs text-gray-600">Print-Ready Document</div>
               </div>
-              {selectedFormat === 'svg' && (
+              {selectedFormat === 'pdf' && (
                 <span className="ml-auto text-purple-600">✓</span>
               )}
             </button>
@@ -101,8 +123,8 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
           </div>
         </div>
 
-        {/* Quality Settings (PNG only) */}
-        {selectedFormat === 'png' && (
+        {/* Quality Settings (raster formats) */}
+        {RASTER_FORMATS.includes(selectedFormat) && (
           <div className="property-group">
             <label className="property-label">
               Resolution Quality

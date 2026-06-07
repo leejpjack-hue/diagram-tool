@@ -198,7 +198,7 @@ function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const ganttCanvasRef = useRef<HTMLDivElement>(null);
   
-  const { exportPNG, exportSVG, exportJSON, exportCSV } = useExport();
+  const { exportPNG, exportJPG, exportPDF, exportJSON, exportCSV } = useExport();
   const toast = useToast();
   
   // Parse Gantt DSL when it changes
@@ -627,11 +627,11 @@ task "Testing & Docs" {
     toast.success('🚀 Loaded MVP Sprint with correct dependencies!');
   };
 
-  const handleExport = (format: 'png' | 'svg' | 'json' | 'csv') => {
-    // On the Gantt tab the Flow canvas (.react-flow) doesn't exist, so PNG/SVG
-    // need to be generated from the Gantt SVG chart directly. JSON/CSV work
-    // the same on every tab.
-    if (activeTab === 'gantt' && (format === 'png' || format === 'svg')) {
+  const handleExport = (format: 'png' | 'jpg' | 'pdf' | 'json' | 'csv', quality = 3) => {
+    // On the Gantt tab the Flow canvas (.react-flow) doesn't exist, so the
+    // image formats need to be generated from the Gantt SVG chart directly.
+    // JSON/CSV work the same on every tab.
+    if (activeTab === 'gantt' && (format === 'png' || format === 'jpg' || format === 'pdf')) {
       if (!ganttCanvasRef.current) {
         toast.error('Could not find chart to export');
         return;
@@ -650,8 +650,9 @@ task "Testing & Docs" {
       return;
     }
 
-    if (format === 'png') exportPNG();
-    else if (format === 'svg') exportSVG();
+    if (format === 'png') exportPNG(quality);
+    else if (format === 'jpg') exportJPG(quality);
+    else if (format === 'pdf') exportPDF(quality);
     else if (format === 'json') exportJSON();
     else if (format === 'csv') exportCSV();
   };

@@ -28,7 +28,10 @@ export async function exportGanttChart(
 
   switch (options.format) {
     case 'png':
-      await exportAsPng(fullSvg, filename, options);
+      await exportAsRaster(fullSvg, filename, options, 'image/png', 'png');
+      break;
+    case 'jpg':
+      await exportAsRaster(fullSvg, filename, options, 'image/jpeg', 'jpg');
       break;
     case 'pdf':
       await exportAsPdf(fullSvg, filename, options);
@@ -167,10 +170,12 @@ function createFullHeightSvg(element: HTMLElement): SVGSVGElement {
 /**
  * Export as PNG using html2canvas
  */
-async function exportAsPng(
+async function exportAsRaster(
   svgElement: SVGSVGElement,
   filename: string,
-  options: GanttExportOptions
+  options: GanttExportOptions,
+  mimeType: 'image/png' | 'image/jpeg',
+  ext: 'png' | 'jpg'
 ): Promise<void> {
   // Options available for future enhancements (includeTaskList, dateRange, etc.)
   void options;
@@ -211,20 +216,27 @@ async function exportAsPng(
     document.body.removeChild(container);
     
     const link = document.createElement('a');
-    link.download = `${filename}.png`;
-    link.href = canvas.toDataURL('image/png');
+    link.download = `${filename}.${ext}`;
+    link.href = mimeType === 'image/jpeg'
+      ? canvas.toDataURL('image/jpeg', 0.95)
+      : canvas.toDataURL('image/png');
     link.click();
   } catch (error) {
-    console.error('Failed to export PNG:', error);
+    console.error(`Failed to export ${ext.toUpperCase()}:`, error);
     // Fallback: try without html2canvas
-    fallbackExportAsPng(svgElement, filename);
+    fallbackExportAsRaster(svgElement, filename, mimeType, ext);
   }
 }
 
 /**
- * Fallback PNG export using native canvas
+ * Fallback raster export using native canvas
  */
-function fallbackExportAsPng(svgElement: SVGSVGElement, filename: string): void {
+function fallbackExportAsRaster(
+  svgElement: SVGSVGElement,
+  filename: string,
+  mimeType: 'image/png' | 'image/jpeg',
+  ext: 'png' | 'jpg'
+): void {
   try {
     // Add white background
     const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
@@ -251,20 +263,22 @@ function fallbackExportAsPng(svgElement: SVGSVGElement, filename: string): void 
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
+
         const link = document.createElement('a');
-        link.download = `${filename}.png`;
-        link.href = canvas.toDataURL('image/png');
+        link.download = `${filename}.${ext}`;
+        link.href = mimeType === 'image/jpeg'
+          ? canvas.toDataURL('image/jpeg', 0.95)
+          : canvas.toDataURL('image/png');
         link.click();
       }
-      
+
       URL.revokeObjectURL(url);
     };
-    
+
     img.src = url;
   } catch (error) {
-    console.error('Fallback PNG export failed:', error);
-    alert('Failed to export PNG. Please try SVG format instead.');
+    console.error(`Fallback ${ext.toUpperCase()} export failed:`, error);
+    alert(`Failed to export ${ext.toUpperCase()}. Please try PDF format instead.`);
   }
 }
 

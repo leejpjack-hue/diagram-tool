@@ -1,4 +1,4 @@
-import { toPng, toSvg } from 'html-to-image';
+import { toPng, toJpeg } from 'html-to-image';
 import { useDiagramStore } from '../store/diagramStore';
 import { useGanttStore } from '../components/Gantt/ganttStore';
 
@@ -33,60 +33,84 @@ export const useExport = () => {
     if (attribution) attribution.style.display = 'block';
   };
 
-  const exportPNG = async () => {
-    const canvas = document.querySelector('.react-flow') as HTMLElement;
+  const getCanvas = () =>
+    document.querySelector('.react-flow') as HTMLElement | null;
+
+  // Render the canvas to a raster data URL, hiding the editor-only overlays
+  // (minimap / controls / attribution) for the duration of the capture.
+  const captureCanvas = async (
+    encoder: typeof toPng | typeof toJpeg,
+    pixelRatio: number,
+    backgroundColor: string,
+  ): Promise<string | null> => {
+    const canvas = getCanvas();
     if (!canvas) {
       console.error('Canvas not found');
-      return;
+      return null;
     }
 
     try {
       hideControls();
-      
       // Wait a bit for DOM to update
       await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const dataUrl = await toPng(canvas, {
-        quality: 2,
-        backgroundColor: '#FDFDFD',
-        pixelRatio: 3,
-      });
-
-      const link = document.createElement('a');
-      link.download = getFileName('png');
-      link.href = dataUrl;
-      link.click();
-    } catch (error) {
-      console.error('Export failed:', error);
+      return await encoder(canvas, { backgroundColor, pixelRatio, quality: 0.95 });
     } finally {
       showControls();
     }
   };
 
-  const exportSVG = async () => {
-    const canvas = document.querySelector('.react-flow') as HTMLElement;
+  const triggerDownload = (href: string, filename: string) => {
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = href;
+    link.click();
+  };
+
+  const exportPNG = async (quality = 3) => {
+    try {
+      const dataUrl = await captureCanvas(toPng, quality, '#FDFDFD');
+      if (dataUrl) triggerDownload(dataUrl, getFileName('png'));
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
+  const exportJPG = async (quality = 3) => {
+    try {
+      // JPEG has no alpha channel, so a solid background is required.
+      const dataUrl = await captureCanvas(toJpeg, quality, '#FFFFFF');
+      if (dataUrl) triggerDownload(dataUrl, getFileName('jpg'));
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
+  const exportPDF = async (quality = 3) => {
+    const canvas = getCanvas();
     if (!canvas) {
       console.error('Canvas not found');
       return;
     }
 
     try {
-      hideControls();
-      
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const dataUrl = await toSvg(canvas, {
-        backgroundColor: '#FDFDFD',
-      });
+      const dataUrl = await captureCanvas(toPng, quality, '#FFFFFF');
+      if (!dataUrl) return;
 
-      const link = document.createElement('a');
-      link.download = getFileName('svg');
-      link.href = dataUrl;
-      link.click();
+      // Size the PDF page to the canvas (in CSS px → pt) and embed the
+      // high-resolution capture at full page size so it stays crisp.
+      const pageWidth = canvas.offsetWidth;
+      const pageHeight = canvas.offsetHeight;
+
+      const { default: jsPDF } = await import('jspdf');
+      const pdf = new jsPDF({
+        orientation: pageWidth >= pageHeight ? 'landscape' : 'portrait',
+        unit: 'pt',
+        format: [pageWidth, pageHeight],
+      });
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pageWidth, pageHeight);
+      pdf.save(getFileName('pdf'));
     } catch (error) {
       console.error('Export failed:', error);
-    } finally {
-      showControls();
     }
   };
 
@@ -228,7 +252,8 @@ export const useExport = () => {
 
   return {
     exportPNG,
-    exportSVG,
+    exportJPG,
+    exportPDF,
     exportJSON,
     exportCSV,
   };

@@ -153,7 +153,7 @@ export interface GanttFilter {
 
 // Sprint 8: Export options
 export interface GanttExportOptions {
-  format: 'png' | 'pdf' | 'svg' | 'csv';
+  format: 'png' | 'jpg' | 'pdf' | 'svg' | 'csv';
   includeTaskList: boolean;
   dateRange: 'current' | 'full' | 'custom';
   customStart?: Date;
