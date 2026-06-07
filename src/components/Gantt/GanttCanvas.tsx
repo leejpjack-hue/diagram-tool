@@ -10,10 +10,15 @@ const ROW_HEIGHT = 40;
 const HEADER_HEIGHT = 60;
 const TASK_NAME_WIDTH = 200;
 
+// Base pixels-per-day for each zoom level. The actual width is this value
+// multiplied by the user-adjustable widthScale (+/- buttons).
+//   day   -> one column per day
+//   week  -> one column per week (labelled wk1..wk5 within each month)
+//   month -> one wide column per calendar month
 const ZOOM_WIDTHS: Record<GanttZoomLevel, number> = {
-  day: 60,
-  week: 25,
-  month: 8,
+  day: 40,
+  week: 16,
+  month: 6,
 };
 
 const COLORS = [
@@ -42,7 +47,8 @@ export function GanttCanvas() {
     dependencies,
     selectedTaskId, 
     selectedTaskIds,
-    zoomLevel, 
+    zoomLevel,
+    widthScale,
     showCriticalPath,
     criticalPathResult,
     expandedGroups,
@@ -161,65 +167,81 @@ export function GanttCanvas() {
     return { minDate: min, totalDays: diffDays(max, min) };
   }, [visibleTasks, tasks]);
 
-  const dayWidth = ZOOM_WIDTHS[zoomLevel];
+  const dayWidth = ZOOM_WIDTHS[zoomLevel] * widthScale;
   const chartWidth = totalDays * dayWidth;
   const chartHeight = visibleTasks.length * ROW_HEIGHT + HEADER_HEIGHT;
 
-  // Generate timeline headers
-  const timelineHeaders = useMemo(() => {
-    const headers: { date: Date; label: string; isWeekend: boolean; isMonthStart: boolean }[] = [];
-    
-    for (let i = 0; i < totalDays; i++) {
-      const date = addDays(minDate, i);
-      const day = date.getDay();
-      headers.push({
-        date,
-        label: date.getDate().toString(),
-        isWeekend: day === 0 || day === 6,
-        isMonthStart: date.getDate() === 1,
-      });
-    }
-    
-    return headers;
-  }, [minDate, totalDays]);
+  // Timeline columns (primary header row) + super band (coarser row above).
+  // The granularity depends on the zoom level:
+  //   day   -> column per day,  band = months
+  //   week  -> column per week, band = months  (labels wk1..wk5 within a month)
+  //   month -> column per month, band = years
+  // Columns carry day offsets/spans so task bars (which use dayWidth) stay aligned.
+  const { columns, superBand } = useMemo(() => {
+    type Col = { offsetDays: number; days: number; label: string; shade: boolean };
+    type Band = { offsetDays: number; days: number; label: string };
+    const cols: Col[] = [];
+    const band: Band[] = [];
 
-  // Generate month headers
-  const monthHeaders = useMemo(() => {
-    const months: { label: string; startOffset: number; width: number }[] = [];
-    let currentMonth = -1;
-    let monthStart = 0;
-    let monthDays = 0;
-    
-    for (let i = 0; i < totalDays; i++) {
-      const date = addDays(minDate, i);
-      const month = date.getMonth();
-      
-      if (month !== currentMonth) {
-        if (currentMonth !== -1) {
-          months.push({
-            label: addDays(minDate, monthStart).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-            startOffset: monthStart * dayWidth,
-            width: monthDays * dayWidth,
-          });
-        }
-        currentMonth = month;
-        monthStart = i;
-        monthDays = 0;
+    // group consecutive days into spans where keyOf(date) is constant
+    const groupBy = (
+      keyOf: (d: Date) => string,
+      labelOf: (d: Date) => string,
+      withShade: boolean,
+    ): Col[] => {
+      const out: Col[] = [];
+      let i = 0;
+      let alt = false;
+      while (i < totalDays) {
+        const start = addDays(minDate, i);
+        const key = keyOf(start);
+        let span = 1;
+        while (i + span < totalDays && keyOf(addDays(minDate, i + span)) === key) span++;
+        out.push({ offsetDays: i, days: span, label: labelOf(start), shade: withShade && alt });
+        alt = !alt;
+        i += span;
       }
-      monthDays++;
+      return out;
+    };
+
+    if (zoomLevel === 'day') {
+      for (let i = 0; i < totalDays; i++) {
+        const date = addDays(minDate, i);
+        const dow = date.getDay();
+        cols.push({ offsetDays: i, days: 1, label: String(date.getDate()), shade: dow === 0 || dow === 6 });
+      }
+    } else if (zoomLevel === 'week') {
+      // week-of-month: days 1-7 -> wk1, 8-14 -> wk2, ...
+      cols.push(
+        ...groupBy(
+          (d) => `${d.getFullYear()}-${d.getMonth()}-${Math.ceil(d.getDate() / 7)}`,
+          (d) => `wk${Math.ceil(d.getDate() / 7)}`,
+          true,
+        ),
+      );
+    } else {
+      cols.push(
+        ...groupBy(
+          (d) => `${d.getFullYear()}-${d.getMonth()}`,
+          (d) => d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          true,
+        ),
+      );
     }
-    
-    // Add last month
-    if (monthDays > 0) {
-      months.push({
-        label: addDays(minDate, monthStart).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-        startOffset: monthStart * dayWidth,
-        width: monthDays * dayWidth,
-      });
-    }
-    
-    return months;
-  }, [minDate, totalDays, dayWidth]);
+
+    // super band
+    const bandCols =
+      zoomLevel === 'month'
+        ? groupBy((d) => String(d.getFullYear()), (d) => String(d.getFullYear()), false)
+        : groupBy(
+            (d) => `${d.getFullYear()}-${d.getMonth()}`,
+            (d) => d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+            false,
+          );
+    band.push(...bandCols.map(({ offsetDays, days, label }) => ({ offsetDays, days, label })));
+
+    return { columns: cols, superBand: band };
+  }, [zoomLevel, minDate, totalDays]);
 
   // Handle task bar interactions
   const handleMouseDown = useCallback((e: React.MouseEvent, task: GanttTask, type: 'move' | 'resize-start' | 'resize-end') => {
@@ -384,51 +406,51 @@ export function GanttCanvas() {
     >
       <div style={{ minWidth: chartWidth + TASK_NAME_WIDTH }}>
         <svg width={chartWidth + TASK_NAME_WIDTH} height={chartHeight} className="block">
-          {/* Month headers */}
+          {/* Super band (months, or years in month view) */}
           <g>
-            {monthHeaders.map((month, i) => (
+            {superBand.map((seg, i) => (
               <g key={i}>
                 <rect
-                  x={TASK_NAME_WIDTH + month.startOffset}
+                  x={TASK_NAME_WIDTH + seg.offsetDays * dayWidth}
                   y={0}
-                  width={month.width}
+                  width={seg.days * dayWidth}
                   height={24}
                   fill="#f1f5f9"
                   stroke="#e2e8f0"
                 />
                 <text
-                  x={TASK_NAME_WIDTH + month.startOffset + 8}
+                  x={TASK_NAME_WIDTH + seg.offsetDays * dayWidth + 8}
                   y={16}
                   fontSize="12"
                   fontWeight="600"
                   fill="#475569"
                 >
-                  {month.label}
+                  {seg.label}
                 </text>
               </g>
             ))}
           </g>
-          
-          {/* Day headers */}
+
+          {/* Primary column headers (days / weeks / months) */}
           <g transform={`translate(0, 24)`}>
-            {timelineHeaders.map((day, i) => (
+            {columns.map((col, i) => (
               <g key={i}>
                 <rect
-                  x={TASK_NAME_WIDTH + i * dayWidth}
+                  x={TASK_NAME_WIDTH + col.offsetDays * dayWidth}
                   y={0}
-                  width={dayWidth}
+                  width={col.days * dayWidth}
                   height={36}
-                  fill={day.isWeekend ? '#f8fafc' : '#ffffff'}
+                  fill={col.shade ? '#f8fafc' : '#ffffff'}
                   stroke="#e2e8f0"
                 />
                 <text
-                  x={TASK_NAME_WIDTH + i * dayWidth + dayWidth / 2}
+                  x={TASK_NAME_WIDTH + col.offsetDays * dayWidth + (col.days * dayWidth) / 2}
                   y={24}
                   fontSize="11"
-                  fill={day.isWeekend ? '#94a3b8' : '#64748b'}
+                  fill="#64748b"
                   textAnchor="middle"
                 >
-                  {day.label}
+                  {col.label}
                 </text>
               </g>
             ))}
@@ -534,14 +556,14 @@ export function GanttCanvas() {
                 )}
                 
                 {/* Chart row background */}
-                {timelineHeaders.map((day, i) => (
+                {columns.map((col, i) => (
                   <rect
                     key={i}
-                    x={TASK_NAME_WIDTH + i * dayWidth}
+                    x={TASK_NAME_WIDTH + col.offsetDays * dayWidth}
                     y={rowY}
-                    width={dayWidth}
+                    width={col.days * dayWidth}
                     height={ROW_HEIGHT}
-                    fill={day.isWeekend ? '#f8fafc' : '#ffffff'}
+                    fill={col.shade ? '#f8fafc' : '#ffffff'}
                     stroke="#f1f5f9"
                     strokeWidth={0.5}
                   />
@@ -921,6 +943,35 @@ export function GanttCanvas() {
         >
           Month
         </button>
+
+        {/* Manual column-width adjust */}
+        <div className="flex items-center gap-1 ml-1 pl-2 border-l border-gray-200">
+          <button
+            onClick={() => {
+              const s = useGanttStore.getState();
+              s.setWidthScale(s.widthScale - 0.2);
+            }}
+            disabled={widthScale <= 0.4}
+            className="w-7 h-7 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Narrower columns"
+          >
+            −
+          </button>
+          <span className="text-xs font-medium text-gray-600 w-10 text-center tabular-nums" title="Column width">
+            {Math.round(widthScale * 100)}%
+          </span>
+          <button
+            onClick={() => {
+              const s = useGanttStore.getState();
+              s.setWidthScale(s.widthScale + 0.2);
+            }}
+            disabled={widthScale >= 3}
+            className="w-7 h-7 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Wider columns"
+          >
+            +
+          </button>
+        </div>
       </div>
       
       {/* Critical path legend */}

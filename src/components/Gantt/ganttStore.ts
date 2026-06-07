@@ -22,6 +22,7 @@ interface GanttState {
   selectedTaskId: string | null;
   selectedTaskIds: Set<string>; // Sprint 10: Bulk operations - multi-select
   zoomLevel: GanttZoomLevel;
+  widthScale: number; // manual column-width multiplier (applies on top of zoom level)
   viewStartDate: Date;
   
   // Sprint 8: Critical path
@@ -51,6 +52,7 @@ interface GanttState {
   deleteTask: (id: string) => void;
   setSelectedTask: (id: string | null) => void;
   setZoomLevel: (level: GanttZoomLevel) => void;
+  setWidthScale: (scale: number) => void;
   setViewStartDate: (date: Date) => void;
   setMilestones: (milestones: GanttMilestone[]) => void;
   addMilestone: (milestone: GanttMilestone) => void;
@@ -201,6 +203,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   selectedTaskId: null,
   selectedTaskIds: new Set<string>(), // Sprint 10: Bulk operations
   zoomLevel: 'week',
+  widthScale: 1,
   viewStartDate: today,
   criticalPathResult: null,
   showCriticalPath: false,
@@ -303,6 +306,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   setSelectedTask: (id) => set({ selectedTaskId: id }),
   
   setZoomLevel: (level) => set({ zoomLevel: level }),
+  setWidthScale: (scale) => set({ widthScale: Math.max(0.4, Math.min(3, scale)) }),
   
   setViewStartDate: (date) => set({ viewStartDate: date }),
   
