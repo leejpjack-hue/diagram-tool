@@ -115,6 +115,7 @@ group "Inception" {
     end: 2026-02-26
     assignee: Jack
     progress: 100
+    color: #3b82f6
   }
 
   task Requirements {
@@ -123,6 +124,7 @@ group "Inception" {
     assignee: Sarah
     depends: Planning
     progress: 60
+    color: #10b981
   }
 }
 
@@ -133,6 +135,7 @@ group "Delivery" {
     assignee: Mike
     depends: Requirements
     progress: 20
+    color: #f59e0b
   }
 
   task Development {
@@ -141,6 +144,7 @@ group "Delivery" {
     assignee: Jack
     depends: Design
     progress: 0
+    color: #8b5cf6
   }
 
   task Testing {
@@ -149,6 +153,7 @@ group "Delivery" {
     assignee: Sarah
     depends: Development
     progress: 0
+    color: #ec4899
   }
 }
 
@@ -159,6 +164,7 @@ task Deployment {
   depends: Testing
   milestone: true
   progress: 0
+  color: #ef4444
 }`;
 
 type PanelType = 'none' | 'properties' | 'import' | 'export';

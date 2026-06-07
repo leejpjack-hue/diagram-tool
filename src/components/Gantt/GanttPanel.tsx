@@ -15,6 +15,12 @@ const DEPENDENCY_TYPES: { value: DependencyType; label: string; description: str
   { value: 'SF', label: 'Start → Finish', description: 'Predecessor starts before successor finishes' },
 ];
 
+// Preset task colours (matches the Gantt canvas default palette)
+const TASK_COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6',
+  '#ef4444', '#06b6d4', '#ec4899', '#84cc16',
+];
+
 export function GanttPanel({ onAddTask }: GanttPanelProps) {
   const {
     tasks,
@@ -277,7 +283,54 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
               </div>
             </div>
           )}
-          
+
+          {/* Colour Picker */}
+          {!selectedTask.isGroup && (
+            <div className="gantt-form-group" style={{ marginTop: 4 }}>
+              <label className="gantt-label">Colour</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                {TASK_COLORS.map((c) => {
+                  const isActive = (selectedTask.color || '').toLowerCase() === c.toLowerCase();
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      title={c}
+                      aria-label={`Set colour ${c}`}
+                      onClick={() => updateTask(selectedTask.id, { color: c })}
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 6,
+                        backgroundColor: c,
+                        border: isActive ? '2px solid #1e293b' : '1px solid #cbd5e1',
+                        boxShadow: isActive ? '0 0 0 2px #fff inset' : 'none',
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                    />
+                  );
+                })}
+                <input
+                  type="color"
+                  value={selectedTask.color || '#3b82f6'}
+                  title="Custom colour"
+                  aria-label="Custom colour"
+                  onChange={(e) => updateTask(selectedTask.id, { color: e.target.value })}
+                  style={{
+                    width: 28,
+                    height: 24,
+                    padding: 0,
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    background: 'none',
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Dependencies Section */}
           {!selectedTask.isGroup && (
             <div className="gantt-dependencies-section">
