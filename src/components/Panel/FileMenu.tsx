@@ -6,10 +6,10 @@ interface FileMenuProps {
   mode: SavedDiagramMode;
   onLoad: (diagram: SavedDiagram) => void;
   onNew: () => void;
-  onLoadMVP?: () => void;
+  notify?: (type: 'success' | 'error', message: string) => void;
 }
 
-export function FileMenu({ currentDsl, mode, onLoad, onNew, onLoadMVP }: FileMenuProps) {
+export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [recentDiagrams, setRecentDiagrams] = useState<SavedDiagram[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -26,7 +26,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, onLoadMVP }: FileMen
 
   const handleNew = () => {
     if (saveManager.hasUnsavedChanges(currentDsl)) {
-      if (!confirm('You have unsaved changes. Create new diagram anyway?')) {
+      if (!confirm('You have unsaved changes. Start a new diagram anyway?')) {
         return;
       }
     }
@@ -40,7 +40,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, onLoadMVP }: FileMen
       dslText: currentDsl,
       mode,
     });
-    alert(`Saved: ${saved.title}`);
+    notify?.('success', `Saved "${saved.title}"`);
     handleClose();
   };
 
@@ -66,9 +66,9 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, onLoadMVP }: FileMen
     try {
       const diagram = await saveManager.importFromFile(file);
       onLoad(diagram);
-      alert(`Imported: ${diagram.title}`);
+      notify?.('success', `Opened "${diagram.title}"`);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to import file');
+      notify?.('error', err instanceof Error ? err.message : "That file couldn't be opened.");
     }
 
     // Reset input
@@ -77,7 +77,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, onLoadMVP }: FileMen
 
   const handleLoadRecent = (diagram: SavedDiagram) => {
     if (saveManager.hasUnsavedChanges(currentDsl)) {
-      if (!confirm('You have unsaved changes. Load anyway?')) {
+      if (!confirm('You have unsaved changes. Open this diagram anyway?')) {
         return;
       }
     }
@@ -86,7 +86,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, onLoadMVP }: FileMen
   };
 
   const handleClearRecent = () => {
-    if (confirm('Clear all recent diagrams from history?')) {
+    if (confirm('Remove all diagrams from the recent list?')) {
       saveManager.clearRecent();
       setRecentDiagrams([]);
     }
@@ -119,22 +119,8 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, onLoadMVP }: FileMen
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
             >
               <span>📄</span>
-              <span>New Diagram</span>
+              <span>New diagram</span>
             </button>
-
-            {onLoadMVP && (
-              <button
-                onClick={() => {
-                  onLoadMVP();
-                  handleClose();
-                }}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-blue-600 font-medium"
-              >
-                <span>🚀</span>
-                <span>Load MVP Sprint</span>
-                <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">NEW</span>
-              </button>
-            )}
 
             <button
               onClick={handleSave}
@@ -150,7 +136,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, onLoadMVP }: FileMen
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
             >
               <span>📥</span>
-              <span>Export to File</span>
+              <span>Download backup (.diagram)</span>
             </button>
 
             <button
@@ -158,7 +144,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, onLoadMVP }: FileMen
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
             >
               <span>📤</span>
-              <span>Import from File</span>
+              <span>Open backup file…</span>
             </button>
           </div>
 
@@ -170,7 +156,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, onLoadMVP }: FileMen
               {/* Recent Diagrams */}
               <div className="py-1">
                 <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase">
-                  Recent Diagrams
+                  Recent diagrams
                 </div>
                 
                 {recentDiagrams.map((diagram) => (
@@ -195,7 +181,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, onLoadMVP }: FileMen
                   onClick={handleClearRecent}
                   className="w-full px-4 py-2 text-left text-xs text-red-600 hover:bg-red-50"
                 >
-                  Clear Recent History
+                  Clear recent diagrams
                 </button>
               </div>
             </>

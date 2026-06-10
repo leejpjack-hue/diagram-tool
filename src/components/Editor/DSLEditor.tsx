@@ -40,8 +40,8 @@ export function DSLEditor() {
   return (
     <div className="editor-panel" style={{ height: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="editor-header">
-        <div className="editor-title">DSL Editor</div>
-        <div className="editor-subtitle">Define your diagram</div>
+        <div className="editor-title">Editor</div>
+        <div className="editor-subtitle">Describe your diagram in plain text</div>
       </div>
       
       <div className="editor-content" style={{ flex: '1 1 auto', minHeight: '400px', display: 'flex', flexDirection: 'column' }}>

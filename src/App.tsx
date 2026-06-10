@@ -3,6 +3,7 @@ import { DSLEditor } from './components/Editor/DSLEditor';
 import { UndoRedoControls } from './components/Editor/UndoRedoControls';
 import { DiagramCanvas } from './components/Canvas/DiagramCanvas';
 import { GanttCanvas } from './components/Gantt/GanttCanvas';
+import { GanttBoardView } from './components/Gantt/GanttBoardView';
 import { GanttPanel } from './components/Gantt/GanttPanel';
 import { GanttResourcePanel } from './components/Gantt/GanttResourcePanel';
 import { GanttFilterBar } from './components/Gantt/GanttFilterBar';
@@ -194,6 +195,7 @@ function App() {
   const [showTaskPanel, setShowTaskPanel] = useState(true);
   const [showDelayImpactPanel, setShowDelayImpactPanel] = useState(false);
   const [showEditor, setShowEditor] = useState(true);
+  const [ganttView, setGanttView] = useState<'timeline' | 'board'>('timeline');
   const [showResourcePanel, setShowResourcePanel] = useState(false);
   const [editorWidth, setEditorWidth] = useState(250);
   const [isResizing, setIsResizing] = useState(false);
@@ -532,120 +534,6 @@ function App() {
     toast.success(`Loaded template: ${tpl.name}`);
   };
 
-  const handleLoadMVPSprint = () => {
-    // Load MVP Sprint DSL with correct dependencies
-    const mvpDSL = `# Diagram Tool MVP Sprint - 2026-02-27
-
-diagram: gantt
-title: Diagram Tool MVP Sprint
-start: 2026-02-24
-
-task "Sprint 1: Today Marker" {
-  start: 2026-02-24
-  end: 2026-02-24
-  assignee: "Jack"
-  progress: 100
-  color: "#10b981"
-}
-
-task "Sprint 2: Milestone Marking" {
-  start: 2026-02-27
-  end: 2026-02-27
-  assignee: "Jack"
-  progress: 100
-  color: "#10b981"
-  depends: "Sprint 1: Today Marker"
-}
-
-task "Sprint 3: Export All Tasks" {
-  start: 2026-02-27
-  end: 2026-02-27
-  assignee: "Jack"
-  progress: 100
-  color: "#10b981"
-  depends: "Sprint 2: Milestone Marking"
-}
-
-task "UI Improvements" {
-  start: 2026-02-27
-  end: 2026-02-27
-  assignee: "Jack"
-  progress: 100
-  color: "#10b981"
-  depends: "Sprint 3: Export All Tasks"
-}
-
-task "Delay Impact Research" {
-  start: 2026-02-27
-  end: 2026-02-27
-  assignee: "Jack"
-  progress: 100
-  color: "#10b981"
-  depends: "UI Improvements"
-}
-
-task "Delay Impact MVP" {
-  start: 2026-02-28
-  end: 2026-03-01
-  assignee: "Jack"
-  progress: 0
-  color: "#3b82f6"
-  depends: "Delay Impact Research"
-}
-
-task "Visualization Timeline" {
-  start: 2026-03-01
-  end: 2026-03-01
-  assignee: "Jack"
-  progress: 0
-  color: "#8b5cf6"
-  depends: "Delay Impact MVP"
-}
-
-task "What-If Analysis" {
-  start: 2026-03-02
-  end: 2026-03-03
-  assignee: "Jack"
-  progress: 0
-  color: "#8b5cf6"
-  depends: "Visualization Timeline"
-}
-
-task "Risk Scoring" {
-  start: 2026-03-04
-  end: 2026-03-05
-  assignee: "Jack"
-  progress: 0
-  color: "#f59e0b"
-  depends: "What-If Analysis"
-}
-
-task "AI Suggestions" {
-  start: 2026-03-06
-  end: 2026-03-07
-  assignee: "Jack"
-  progress: 0
-  color: "#ec4899"
-  depends: "Risk Scoring"
-}
-
-task "Testing & Docs" {
-  start: 2026-03-07
-  end: 2026-03-07
-  assignee: "Jack"
-  progress: 0
-  color: "#06b6d4"
-  milestone: true
-  depends: "AI Suggestions"
-}`;
-    
-    setDslText(mvpDSL);
-    setDiagramMode('gantt');
-    setActiveTab('gantt');
-    setSaveStatus('unsaved');
-    toast.success('🚀 Loaded MVP Sprint with correct dependencies!');
-  };
-
   const handleExport = (format: 'png' | 'jpg' | 'pdf' | 'json' | 'csv', quality = 3) => {
     // On the Gantt tab the Flow canvas (.react-flow) doesn't exist, so the
     // image formats need to be generated from the Gantt SVG chart directly.
@@ -758,7 +646,7 @@ task "Testing & Docs" {
             mode={(diagramMode === 'architecture' || diagramMode === 'flow') ? diagramMode : 'architecture'}
             onLoad={handleLoadDiagram}
             onNew={handleNewDiagram}
-            onLoadMVP={handleLoadMVPSprint}
+            notify={(type, msg) => (type === 'success' ? toast.success(msg) : toast.error(msg))}
           />
           
           {/* Save Status */}
@@ -792,12 +680,15 @@ task "Testing & Docs" {
             Export
           </button>
           
-          <button
-            onClick={() => togglePanel('properties')}
-            className={`btn ${activePanel === 'properties' ? 'btn-primary' : 'btn-secondary'}`}
-          >
-            Properties
-          </button>
+          {/* Gantt has its own task editor; this panel reads the diagram store */}
+          {activeTab !== 'gantt' && (
+            <button
+              onClick={() => togglePanel('properties')}
+              className={`btn ${activePanel === 'properties' ? 'btn-primary' : 'btn-secondary'}`}
+            >
+              Properties
+            </button>
+          )}
         </div>
       </header>
       
@@ -857,64 +748,65 @@ task "Testing & Docs" {
               )}
               <GanttFilterBar />
               
-              {/* Panel Toggle Controls */}
-              <div className="flex gap-2 p-2 bg-white border-b border-gray-200">
+              {/* View + panel controls */}
+              <div className="flex items-center gap-2 p-2 bg-white border-b border-gray-200">
+                {/* Timeline / Board view switch */}
+                <div className="flex rounded-md bg-gray-100 p-0.5">
+                  <button
+                    onClick={() => setGanttView('timeline')}
+                    className={`px-3 py-1 rounded text-[13px] font-medium transition-colors ${
+                      ganttView === 'timeline' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                    title="Show tasks on a timeline"
+                  >
+                    📊 Timeline
+                  </button>
+                  <button
+                    onClick={() => setGanttView('board')}
+                    className={`px-3 py-1 rounded text-[13px] font-medium transition-colors ${
+                      ganttView === 'board' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                    title="Show tasks as a status board"
+                  >
+                    🗂️ Board
+                  </button>
+                </div>
+
+                <div className="w-px h-5 bg-gray-200" />
+
                 <button
                   onClick={() => setShowEditor(!showEditor)}
-                  style={{
-                    backgroundColor: showEditor ? '#3b82f6' : '#f3f4f6',
-                    color: showEditor ? 'white' : '#374151',
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
+                  className={`px-3 py-1.5 rounded text-[13px] font-medium transition-colors ${
+                    showEditor ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title="Show or hide the text editor"
                 >
                   📝 Editor
                 </button>
                 <button
                   onClick={() => setShowTaskPanel(!showTaskPanel)}
-                  style={{
-                    backgroundColor: showTaskPanel ? '#22c55e' : '#f3f4f6',
-                    color: showTaskPanel ? 'white' : '#374151',
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
+                  className={`px-3 py-1.5 rounded text-[13px] font-medium transition-colors ${
+                    showTaskPanel ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title="Show or hide the task list"
                 >
                   📋 Tasks
                 </button>
                 <button
                   onClick={() => setShowResourcePanel(!showResourcePanel)}
-                  style={{
-                    backgroundColor: showResourcePanel ? '#a855f7' : '#f3f4f6',
-                    color: showResourcePanel ? 'white' : '#374151',
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
+                  className={`px-3 py-1.5 rounded text-[13px] font-medium transition-colors ${
+                    showResourcePanel ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title="Show team workload and utilisation"
                 >
-                  👥 Resources
+                  👥 Workload
                 </button>
-              </div>
-              
-              {/* Delay Impact Button */}
-              <div className="px-4 py-2 border-b border-gray-200 flex items-center gap-2">
                 <button
                   onClick={() => setShowDelayImpactPanel(!showDelayImpactPanel)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 transition-colors ${
-                    showDelayImpactPanel
-                      ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md'
-                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700 shadow-md'
+                  className={`px-3 py-1.5 rounded text-[13px] font-medium transition-colors ${
+                    showDelayImpactPanel ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
+                  title="Model what happens when a task slips"
                 >
                   ⚡ Delay Impact
                 </button>
@@ -923,7 +815,9 @@ task "Testing & Docs" {
           )}
           <div ref={activeTab === 'gantt' ? ganttCanvasRef : undefined} className="flex-1 overflow-auto">
             {activeTab === 'gantt' ? (
-              (!isMobile || mobileView === 'timeline') ? <GanttCanvas /> : null
+              (!isMobile || mobileView === 'timeline')
+                ? (ganttView === 'board' ? <GanttBoardView /> : <GanttCanvas />)
+                : null
             ) : (
               <DiagramCanvas />
             )}
@@ -931,7 +825,7 @@ task "Testing & Docs" {
         </div>
         
         {/* Side Panel - shared across all tabs, including Gantt */}
-        {activePanel !== 'none' && (
+        {activePanel !== 'none' && !(activePanel === 'properties' && activeTab === 'gantt') && (
           <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white">
             {activePanel === 'properties' && <PropertiesPanel />}
             {activePanel === 'import' && <ImportPanel onImport={handleCSVImport} />}
@@ -1014,28 +908,17 @@ task "Testing & Docs" {
           </div>
         )}
         
-        {/* Show Task Panel Button (when hidden) */}
-        {activeTab === 'gantt' && !showTaskPanel && !showResourcePanel && (
+        {/* Reopen the task panel when both side panels are hidden */}
+        {activeTab === 'gantt' && (!isMobile || mobileView === 'tasks') && !showTaskPanel && !showResourcePanel && (
           <button
             onClick={() => setShowTaskPanel(true)}
-            className="absolute right-0 top-4 z-10 w-8 h-12 bg-white border border-gray-300 rounded-l-md flex items-center justify-center hover:bg-gray-100 text-gray-600 hover:text-gray-900 shadow-md"
-            title="Show task panel"
+            className="absolute right-0 top-20 z-10 w-8 h-24 bg-blue-500 hover:bg-blue-600 text-white rounded-l-md flex flex-col items-center justify-center gap-1 shadow-lg"
+            title="Show the task list"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-          </button>
-        )}
-        {activeTab === 'gantt' && (!isMobile || mobileView === 'tasks') && !showTaskPanel && (
-          <button
-            onClick={() => setShowTaskPanel(true)}
-            className="absolute right-4 top-20 z-10 w-8 h-24 bg-blue-500 hover:bg-blue-600 text-white shadow-md rounded-l-md flex items-center justify-center gap-1 hover:bg-blue-600 shadow-lg"
-            title="Show task panel"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            <span className="text-xs font-medium">Tasks</span>
+            <span className="text-xs font-medium" style={{ writingMode: 'vertical-rl' }}>Tasks</span>
           </button>
         )}
       </div>

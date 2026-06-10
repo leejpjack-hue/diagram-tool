@@ -20,7 +20,7 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
     <div className="side-panel">
       {/* Header */}
       <div className="panel-header">
-        <h2 className="panel-title">📤 Export Diagram</h2>
+        <h2 className="panel-title">📤 Export</h2>
       </div>
 
       {/* Body */}
@@ -28,7 +28,7 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
         {/* Format Selection */}
         <div className="property-group">
           <label className="property-label">
-            Select Format
+            Format
           </label>
           <div className="space-y-2">
             <button
@@ -42,7 +42,7 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
               <span className="text-2xl">🖼️</span>
               <div>
                 <div className="font-bold text-gray-900">PNG</div>
-                <div className="text-xs text-gray-600">Raster Image</div>
+                <div className="text-xs text-gray-600">Crisp image for docs and wikis</div>
               </div>
               {selectedFormat === 'png' && (
                 <span className="ml-auto text-primary-600">✓</span>
@@ -60,7 +60,7 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
               <span className="text-2xl">📷</span>
               <div>
                 <div className="font-bold text-gray-900">JPG</div>
-                <div className="text-xs text-gray-600">Compressed Image</div>
+                <div className="text-xs text-gray-600">Smaller file for quick sharing</div>
               </div>
               {selectedFormat === 'jpg' && (
                 <span className="ml-auto text-rose-600">✓</span>
@@ -78,7 +78,7 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
               <span className="text-2xl">📄</span>
               <div>
                 <div className="font-bold text-gray-900">PDF</div>
-                <div className="text-xs text-gray-600">Print-Ready Document</div>
+                <div className="text-xs text-gray-600">Print-ready document</div>
               </div>
               {selectedFormat === 'pdf' && (
                 <span className="ml-auto text-purple-600">✓</span>
@@ -96,7 +96,7 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
               <span className="text-2xl">📄</span>
               <div>
                 <div className="font-bold text-gray-900">JSON</div>
-                <div className="text-xs text-gray-600">Data Export</div>
+                <div className="text-xs text-gray-600">Structured data for tools</div>
               </div>
               {selectedFormat === 'json' && (
                 <span className="ml-auto text-success-600">✓</span>
@@ -114,7 +114,7 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
               <span className="text-2xl">📊</span>
               <div>
                 <div className="font-bold text-gray-900">CSV</div>
-                <div className="text-xs text-gray-600">Spreadsheet Data</div>
+                <div className="text-xs text-gray-600">Open in Excel or Sheets</div>
               </div>
               {selectedFormat === 'csv' && (
                 <span className="ml-auto text-amber-600">✓</span>
@@ -127,17 +127,17 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
         {RASTER_FORMATS.includes(selectedFormat) && (
           <div className="property-group">
             <label className="property-label">
-              Resolution Quality
+              Image resolution
             </label>
             <select
               value={quality}
               onChange={(e) => setQuality(Number(e.target.value))}
               className="input"
             >
-              <option value={1}>1x - Standard</option>
-              <option value={2}>2x - High Quality</option>
-              <option value={3}>3x - Presentation ⭐</option>
-              <option value={4}>4x - Print Ready</option>
+              <option value={1}>1× — Standard</option>
+              <option value={2}>2× — High quality</option>
+              <option value={3}>3× — Presentation (recommended)</option>
+              <option value={4}>4× — Print</option>
             </select>
           </div>
         )}

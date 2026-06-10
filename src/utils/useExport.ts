@@ -115,13 +115,26 @@ export const useExport = () => {
   };
 
   const exportJSON = () => {
-    if (!parsedDiagram) return;
-
-    const exportData = {
-      version: '1.0',
-      exportedAt: new Date().toISOString(),
-      diagram: parsedDiagram,
-    };
+    // Gantt has its own store — exporting parsedDiagram here would silently
+    // download whatever architecture/flow diagram was open before.
+    let exportData: Record<string, unknown>;
+    if (diagramMode === 'gantt') {
+      const { tasks, dependencies } = useGanttStore.getState();
+      exportData = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        mode: 'gantt',
+        tasks,
+        dependencies,
+      };
+    } else {
+      if (!parsedDiagram) return;
+      exportData = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        diagram: parsedDiagram,
+      };
+    }
 
     const json = JSON.stringify(exportData, null, 2);
     const blob = new Blob([json], { type: 'application/json' });

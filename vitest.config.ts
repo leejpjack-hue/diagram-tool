@@ -17,6 +17,15 @@ export default defineConfig({
     // Exclude Playwright E2E tests
     '**/.{idea,git,cache,output,temp}/**'],
     projects: [{
+      // Unit tests (jsdom). Without this project entry, defining `projects`
+      // would silently drop all *.test.ts files from `npm test`.
+      extends: true,
+      test: {
+        name: 'unit',
+        environment: 'jsdom',
+        include: ['src/**/*.test.{ts,tsx}']
+      }
+    }, {
       extends: true,
       plugins: [
       // The plugin will run tests for the stories defined in your Storybook config

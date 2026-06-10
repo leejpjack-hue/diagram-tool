@@ -374,10 +374,20 @@ export class Parser {
       if (propToken.type === TokenType.KEYWORD) {
         this.advance();
         this.expect(TokenType.COLON);
-        
+
+        const key = (propToken.value as string).toLowerCase();
+        if (key === 'connects') {
+          // parseConnectionList reads its own identifiers — no value token here
+          this.parseConnectionList().forEach((target) => {
+            const targetId = target.toLowerCase().replace(/[^a-z0-9]/g, '_');
+            this.edges.push({ id: `${id}_to_${targetId}`, from: id, to: targetId });
+          });
+          continue;
+        }
+
         const valueToken = this.advance();
-        
-        switch ((propToken.value as string).toLowerCase()) {
+
+        switch (key) {
           case 'type':
             node.properties.type = valueToken.value as 'postgresql' | 'mongodb' | 'mysql' | 'redis';
             break;
@@ -423,10 +433,20 @@ export class Parser {
       if (propToken.type === TokenType.KEYWORD) {
         this.advance();
         this.expect(TokenType.COLON);
-        
+
+        const key = (propToken.value as string).toLowerCase();
+        if (key === 'connects') {
+          // parseConnectionList reads its own identifiers — no value token here
+          this.parseConnectionList().forEach((target) => {
+            const targetId = target.toLowerCase().replace(/[^a-z0-9]/g, '_');
+            this.edges.push({ id: `${id}_to_${targetId}`, from: id, to: targetId });
+          });
+          continue;
+        }
+
         const valueToken = this.advance();
-        
-        switch ((propToken.value as string).toLowerCase()) {
+
+        switch (key) {
           case 'type':
             node.properties.type = valueToken.value as 'kafka' | 'rabbitmq' | 'sqs';
             break;

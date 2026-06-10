@@ -18,7 +18,7 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
     if (!selectedFile) return;
 
     if (!selectedFile.name.endsWith('.csv')) {
-      setError('Please select a CSV file');
+      setError('That file isn\'t a CSV. Choose a .csv export.');
       return;
     }
 
@@ -52,7 +52,7 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
 
   const handleImport = () => {
     if (rows.length === 0) {
-      setError('No data to import');
+      setError('Nothing to import yet — choose a CSV file first.');
       return;
     }
 
@@ -70,7 +70,7 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
     <div className="side-panel">
       {/* Header */}
       <div className="panel-header">
-        <h2 className="panel-title">📥 Import APM Data</h2>
+        <h2 className="panel-title">📥 Import from CSV</h2>
       </div>
 
       {/* Body */}
@@ -91,8 +91,8 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
               className="w-full p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition text-center"
             >
               <div className="text-3xl mb-2">📄</div>
-              <div className="font-semibold text-gray-700">Choose CSV File</div>
-              <div className="text-xs text-gray-500 mt-1">Click to browse</div>
+              <div className="font-semibold text-gray-700">Choose a CSV file</div>
+              <div className="text-xs text-gray-500 mt-1">Service maps from Datadog, Jaeger, or OpenTelemetry</div>
             </button>
           ) : (
             <div className="p-4 bg-green-50 border-2 border-green-300 rounded-xl">
@@ -121,7 +121,7 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
         {/* Stats */}
         {stats && rows.length > 0 && (
           <div className="mb-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
-            <div className="text-sm font-bold text-blue-900 mb-3">Import Summary</div>
+            <div className="text-sm font-bold text-blue-900 mb-3">What we found</div>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="bg-white p-3 rounded-lg shadow-sm">
                 <div className="text-lg font-bold text-blue-900">{stats.totalRows}</div>
@@ -149,7 +149,7 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
-          Generate Diagram
+          Generate diagram
         </button>
       </div>
     </div>

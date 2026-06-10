@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useCallback, useState } from 'react';
-import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider, useReactFlow, BackgroundVariant } from '@xyflow/react';
-import type { Node, Edge, Viewport } from '@xyflow/react';
+import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider, useReactFlow, BackgroundVariant, ViewportPortal } from '@xyflow/react';
+import type { Node, Edge, Viewport, Connection } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { ServiceNode } from './ServiceNode';
@@ -21,9 +21,13 @@ import { SwimlaneNode } from './SwimlaneOverlay';
 import { GroupContainerNode } from './GroupContainer';
 import { C4LevelSwitcher } from './C4LevelSwitcher';
 import { ZoomControls } from './ZoomControls';
+import { ShapeLibrary } from '../Panel/ShapeLibrary';
 import { useDiagramStore } from '../../store/diagramStore';
 import type { FlowNode, C4Level, ServiceNode as ServiceNodeType, CloudNode as CloudNodeType, ClassNode as ClassNodeType } from '../../store/types';
 import { calculateAutoLayout, resolveGroupOverlaps } from '../../utils/autoLayout';
+import { addConnectionDSL } from '../../utils/connectDSL';
+import { parseDiagram } from '../../parser/parser';
+import { getHelperLines, type HelperLineResult } from './helperLines';
 import { LayoutDirectionContext } from './layoutDirection';
 import { Position } from '@xyflow/react';
 
@@ -71,7 +75,7 @@ const nextC4Level = (lvl: C4Level): C4Level | null => {
 };
 
 function DiagramCanvasInternal() {
-  const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode } = useDiagramStore();
+  const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode, dslText, setDslText, setParsedDiagram } = useDiagramStore();
   const { getZoom } = useReactFlow();
   const [c4Level, setC4Level] = useState<C4Level | 'all'>('all');
   // When the user clicks a parent node, we filter to its direct children.
@@ -445,11 +449,32 @@ function DiagramCanvasInternal() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
+  // Alignment guides shown while dragging a node.
+  const [helperLines, setHelperLines] = useState<HelperLineResult>({});
+
   // Drag-follow for group containers: when a `__group_*` node moves, apply
   // the same delta to its member nodes in the same change batch so the
   // dashed rectangle and the components inside it travel together.
   const handleNodesChange = useCallback(
     (changes: Parameters<typeof onNodesChange>[0]) => {
+      // Alignment guides: a single dragged node snaps to other nodes'
+      // edges/centers; the guide lines render via ViewportPortal below.
+      if (
+        changes.length === 1 &&
+        changes[0].type === 'position' &&
+        changes[0].position &&
+        changes[0].dragging &&
+        !changes[0].id.startsWith('__')
+      ) {
+        const c = changes[0];
+        const guides = getHelperLines(c.id, c.position!, nodes);
+        if (guides.snapX !== undefined) c.position!.x = guides.snapX;
+        if (guides.snapY !== undefined) c.position!.y = guides.snapY;
+        setHelperLines(guides);
+      } else {
+        setHelperLines(prev => (prev.horizontal !== undefined || prev.vertical !== undefined ? {} : prev));
+      }
+
       const extra: typeof changes = [];
       for (const c of changes) {
         if (
@@ -562,12 +587,37 @@ function DiagramCanvasInternal() {
     }
   }, [setSelectedNode]);
 
+  // Drag-to-connect: dragging from one node's handle to another writes the
+  // connection back into the DSL (the source of truth) and re-parses.
+  const onConnect = useCallback((conn: Connection) => {
+    if (!parsedDiagram || !conn.source || !conn.target) return;
+    if (conn.source === conn.target) return;
+    if (conn.source.startsWith('__') || conn.target.startsWith('__')) return; // lanes/groups
+    const src = parsedDiagram.nodes.find(n => n.id === conn.source);
+    const tgt = parsedDiagram.nodes.find(n => n.id === conn.target);
+    if (!src || !tgt) return;
+
+    const next = addConnectionDSL(
+      dslText,
+      diagramMode === 'flow' ? 'flow' : 'architecture',
+      src.name,
+      tgt.name,
+    );
+    if (!next) return; // duplicate or source block not found
+    setDslText(next);
+    try {
+      setParsedDiagram(parseDiagram(next));
+    } catch (err) {
+      console.error('Connect parse error:', err);
+    }
+  }, [parsedDiagram, dslText, diagramMode, setDslText, setParsedDiagram]);
+
   if (!parsedDiagram) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-canvas-white">
         <div className="text-center text-slate-400">
           <div className="text-4xl mb-4">📊</div>
-          <div className="text-lg">Enter DSL to generate diagram</div>
+          <div className="text-lg">Start typing in the editor — your diagram draws itself</div>
         </div>
       </div>
     );
@@ -581,10 +631,15 @@ function DiagramCanvasInternal() {
         edges={edges}
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
         onMoveEnd={handleMoveEnd}
         onSelectionChange={onSelectionChange}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
+        snapToGrid
+        snapGrid={[10, 10]}
+        connectionRadius={28}
+        connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '6 4' }}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         attributionPosition="bottom-left"
@@ -593,6 +648,38 @@ function DiagramCanvasInternal() {
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
       >
         <Background color="#CBD5E1" gap={25} variant={BackgroundVariant.Dots} />
+        {(helperLines.horizontal !== undefined || helperLines.vertical !== undefined) && (
+          <ViewportPortal>
+            {helperLines.vertical !== undefined && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: helperLines.vertical,
+                  top: -50000,
+                  width: 1,
+                  height: 100000,
+                  background: '#f43f5e',
+                  pointerEvents: 'none',
+                  zIndex: 1000,
+                }}
+              />
+            )}
+            {helperLines.horizontal !== undefined && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: helperLines.horizontal,
+                  left: -50000,
+                  height: 1,
+                  width: 100000,
+                  background: '#f43f5e',
+                  pointerEvents: 'none',
+                  zIndex: 1000,
+                }}
+              />
+            )}
+          </ViewportPortal>
+        )}
         <Controls className="bg-white border border-slate-200 rounded shadow-md" />
         <MiniMap
           className="bg-white border border-slate-200 rounded shadow-md"
@@ -637,6 +724,9 @@ function DiagramCanvasInternal() {
           maskColor="rgba(15, 23, 42, 0.08)"
         />
       </ReactFlow>
+
+      {/* Shape library palette */}
+      <ShapeLibrary />
 
       {/* Floating Zoom Controls */}
       <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-md rounded-lg shadow-md border border-slate-200 p-2 z-10">
