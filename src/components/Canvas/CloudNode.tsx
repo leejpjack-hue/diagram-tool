@@ -40,6 +40,8 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
   // Priority: custom kind SVG (designer-supplied) → unicode kind glyph → provider SVG glyph.
   const kindBadge = KIND_ICON[kindKey];
   const customKind = hasKindIcon(kindKey);
+  // A `color:` in the DSL overrides the provider accent.
+  const accent = nodeData.color || meta.pill;
 
   return (
     <div
@@ -48,14 +50,14 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
         ${selected ? 'scale-105' : 'hover:scale-102'}
         min-w-[180px]
       `}
-      style={cardStyle(meta.pill, !!selected)}
+      style={cardStyle(accent, !!selected)}
     >
-      <Handle type="target" position={target} style={{ background: meta.pill }} />
+      <Handle type="target" position={target} style={{ background: accent }} />
 
       <div className="flex items-center gap-3 mb-1">
         <div
           className="rounded-[10px] flex items-center justify-center font-bold shrink-0 w-10 h-10"
-          style={{ ...chipStyle(meta.pill), color: meta.pillFg }}
+          style={{ ...chipStyle(accent), color: meta.pillFg }}
           title={meta.label}
         >
           {customKind ? (
@@ -74,7 +76,7 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
       <div className="flex items-center gap-1.5 mt-1.5">
         <span
           className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded"
-          style={badgeStyle(meta.pill)}
+          style={badgeStyle(accent)}
         >
           {meta.label}
         </span>
@@ -91,7 +93,7 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
         </div>
       )}
 
-      <Handle type="source" position={source} style={{ background: meta.pill }} />
+      <Handle type="source" position={source} style={{ background: accent }} />
     </div>
   );
 });

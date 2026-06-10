@@ -386,6 +386,9 @@ export class Parser {
               node.properties.data = (valueToken.value as string).split(',').map(s => s.trim());
             }
             break;
+          case 'color':
+            node.properties.color = String(valueToken.value);
+            break;
         }
       } else {
         this.advance();
@@ -429,6 +432,9 @@ export class Parser {
             break;
           case 'topic':
             node.properties.topic = valueToken.value as string;
+            break;
+          case 'color':
+            node.properties.color = String(valueToken.value);
             break;
         }
       } else {
@@ -495,6 +501,11 @@ export class Parser {
           case 'parent': {
             const v = this.advance();
             node.properties.parent = (v.value as string).toLowerCase().replace(/[^a-z0-9]/g, '_');
+            break;
+          }
+          case 'color': {
+            const v = this.advance();
+            node.properties.color = String(v.value);
             break;
           }
           case 'connects': {
@@ -589,6 +600,11 @@ export class Parser {
           case 'parent': {
             const v = this.advance();
             node.properties.parent = (v.value as string).toLowerCase().replace(/[^a-z0-9]/g, '_');
+            break;
+          }
+          case 'color': {
+            const v = this.advance();
+            node.properties.color = String(v.value);
             break;
           }
           case 'connects': {

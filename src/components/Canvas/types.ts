@@ -16,12 +16,14 @@ export interface DatabaseNodeData {
   label: string;
   type?: 'postgresql' | 'mongodb' | 'mysql' | 'redis';
   data?: string[];
+  color?: string; // accent color override
 }
 
 export interface QueueNodeData {
   label: string;
   type?: 'kafka' | 'rabbitmq' | 'sqs';
   topic?: string;
+  color?: string; // accent color override
 }
 
 export interface FlowNodeData {
@@ -47,6 +49,7 @@ export interface CloudNodeData {
   region?: string;
   level?: C4Level;
   parent?: string;
+  color?: string; // accent color override
 }
 
 export interface ClassNodeData {
@@ -56,4 +59,5 @@ export interface ClassNodeData {
   methods?: string[];
   level?: C4Level;
   parent?: string;
+  color?: string; // accent color override
 }

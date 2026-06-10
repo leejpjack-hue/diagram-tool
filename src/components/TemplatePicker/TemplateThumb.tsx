@@ -37,7 +37,8 @@ function Tiers() {
       <rect x="160" y="46" width="80" height="20" rx="5" fill="#ddd6fe" stroke="#8b5cf6" />
       <rect x="70" y="84" width="60" height="20" rx="10" fill="#bbf7d0" stroke="#10b981" />
       <rect x="160" y="84" width="60" height="20" rx="10" fill="#bbf7d0" stroke="#10b981" />
-      <path d="M140 28 L90 46 M140 28 L190 46 M85 66 L100 84 M195 66 L190 84" stroke={STROKE} fill="none" />
+      {/* orthogonal elbows — templates use edges: orthogonal */}
+      <path d="M140 28 V37 H80 V46 M140 28 V37 H200 V46 M80 66 V75 H100 V84 M200 66 V75 H190 V84" stroke={STROKE} fill="none" />
     </>
   );
 }
@@ -45,10 +46,11 @@ function Tiers() {
 function Flow() {
   return (
     <>
-      <rect x="20" y="44" width="52" height="24" rx="12" fill="#bfdbfe" stroke="#3b82f6" />
-      <rect x="96" y="44" width="56" height="24" rx="5" fill="#e9d5ff" stroke="#8b5cf6" />
+      {/* green start → blue process → amber decision → red end, matching canvas colours */}
+      <rect x="20" y="44" width="52" height="24" rx="12" fill="#bbf7d0" stroke="#10b981" />
+      <rect x="96" y="44" width="56" height="24" rx="5" fill="#dbeafe" stroke="#3b82f6" />
       <path d="M196 40 L222 56 L196 72 L170 56 Z" fill="#fef3c7" stroke="#f59e0b" />
-      <rect x="238" y="44" width="36" height="24" rx="12" fill="#bbf7d0" stroke="#10b981" />
+      <rect x="238" y="44" width="36" height="24" rx="12" fill="#fecaca" stroke="#ef4444" />
       <path d="M72 56 L96 56 M152 56 L170 56 M222 56 L238 56" stroke={STROKE} />
     </>
   );

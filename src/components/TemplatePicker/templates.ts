@@ -20,20 +20,24 @@ export const TEMPLATES: DiagramTemplate[] = [
     tags: ['aws', 'serverless', 'web'],
     dsl: `diagram: architecture
 title: AWS 3-Tier Web App
+edges: orthogonal
 
 cloud CDN {
+  color: "#6366f1"
   provider: aws
   kind: cloudfront
   connects: WebApi
 }
 
 cloud WebApi {
+  color: "#8b5cf6"
   provider: aws
   kind: apigateway
   connects: OrdersFn, CatalogFn
 }
 
 cloud OrdersFn {
+  color: "#8b5cf6"
   provider: aws
   kind: lambda
   tech: Node.js 20
@@ -41,6 +45,7 @@ cloud OrdersFn {
 }
 
 cloud CatalogFn {
+  color: "#8b5cf6"
   provider: aws
   kind: lambda
   tech: Python 3.11
@@ -48,17 +53,20 @@ cloud CatalogFn {
 }
 
 cloud OrdersDb {
+  color: "#10b981"
   provider: aws
   kind: rds
   tech: PostgreSQL
 }
 
 cloud CatalogDb {
+  color: "#10b981"
   provider: aws
   kind: dynamodb
 }
 
 cloud Assets {
+  color: "#10b981"
   provider: aws
   kind: s3
 }`,
@@ -72,26 +80,31 @@ cloud Assets {
     tags: ['k8s', 'microservices', 'containers'],
     dsl: `diagram: architecture
 title: Kubernetes Microservices
+edges: orthogonal
 
 cloud Ingress {
+  color: "#6366f1"
   provider: k8s
   kind: ingress
   connects: ApiGateway
 }
 
 cloud ApiGateway {
+  color: "#8b5cf6"
   provider: k8s
   kind: service
   connects: AuthPod, OrdersPod, InventoryPod
 }
 
 cloud AuthPod {
+  color: "#8b5cf6"
   provider: k8s
   kind: pod
   tech: Node.js
 }
 
 cloud OrdersPod {
+  color: "#8b5cf6"
   provider: k8s
   kind: pod
   tech: Go
@@ -99,6 +112,7 @@ cloud OrdersPod {
 }
 
 cloud InventoryPod {
+  color: "#8b5cf6"
   provider: k8s
   kind: pod
   tech: Java
@@ -106,19 +120,23 @@ cloud InventoryPod {
 }
 
 cloud AppConfig {
+  color: "#10b981"
   provider: k8s
   kind: configmap
 }
 
 database OrdersDb {
+  color: "#10b981"
   type: postgresql
 }
 
 database InventoryDb {
+  color: "#10b981"
   type: postgresql
 }
 
 queue EventBus {
+  color: "#10b981"
   type: kafka
   topic: domain-events
 }`,
@@ -132,14 +150,17 @@ queue EventBus {
     tags: ['gcp', 'data', 'analytics'],
     dsl: `diagram: architecture
 title: GCP Analytics Pipeline
+edges: orthogonal
 
 cloud Source {
+  color: "#6366f1"
   provider: gcp
   kind: gcs
   connects: IngestFn
 }
 
 cloud IngestFn {
+  color: "#8b5cf6"
   provider: gcp
   kind: cloudfunction
   tech: Python
@@ -147,16 +168,19 @@ cloud IngestFn {
 }
 
 queue EventStream {
+  color: "#10b981"
   type: kafka
   topic: raw-events
 }
 
 cloud Warehouse {
+  color: "#10b981"
   provider: gcp
   kind: bigquery
 }
 
 cloud TransformFn {
+  color: "#8b5cf6"
   provider: gcp
   kind: cloudfunction
   tech: Python
@@ -172,36 +196,43 @@ cloud TransformFn {
     tags: ['c4', 'context'],
     dsl: `diagram: architecture
 title: Claims Platform - System Context
+edges: straight
 
 service Customer {
+  color: "#6366f1"
   type: api
   tech: Web / Mobile
   connects: ClaimsPlatform
 }
 
 service ClaimsAdjuster {
+  color: "#6366f1"
   type: api
   tech: Internal Portal
   connects: ClaimsPlatform
 }
 
 service ClaimsPlatform {
+  color: "#8b5cf6"
   type: microservice
   tech: Core System
   connects: PolicyAdmin, PaymentGateway, FraudService
 }
 
 service PolicyAdmin {
+  color: "#3b82f6"
   type: microservice
   tech: External
 }
 
 service PaymentGateway {
+  color: "#3b82f6"
   type: microservice
   tech: Stripe / Adyen
 }
 
 service FraudService {
+  color: "#3b82f6"
   type: microservice
   tech: 3rd-party ML
 }`,
@@ -215,6 +246,7 @@ service FraudService {
     tags: ['flowchart', 'signup'],
     dsl: `diagram: flow
 title: User Signup
+direction: LR
 
 start Begin
 
@@ -271,9 +303,11 @@ node ShowError {
     tags: ['c4', 'hierarchy', 'drill-down'],
     dsl: `diagram: architecture
 title: Banking Platform — C4 Drill-Down
+edges: straight
 
 # Level 1: Context
 service Customer {
+  color: "#6366f1"
   type: api
   tech: External User
   level: context
@@ -281,6 +315,7 @@ service Customer {
 }
 
 service BankingApp {
+  color: "#8b5cf6"
   type: microservice
   tech: System Boundary
   level: context
@@ -288,12 +323,14 @@ service BankingApp {
 }
 
 service PaymentGateway {
+  color: "#3b82f6"
   type: microservice
   tech: External
   level: context
 }
 
 service EmailSvc {
+  color: "#3b82f6"
   type: microservice
   tech: External
   level: context
@@ -301,6 +338,7 @@ service EmailSvc {
 
 # Level 2: Container
 service WebApp {
+  color: "#8b5cf6"
   type: api
   tech: React SPA
   level: container
@@ -309,6 +347,7 @@ service WebApp {
 }
 
 service Mobile {
+  color: "#8b5cf6"
   type: api
   tech: iOS / Android
   level: container
@@ -317,6 +356,7 @@ service Mobile {
 }
 
 service WebApi {
+  color: "#8b5cf6"
   type: api
   tech: Spring Boot
   level: container
@@ -325,6 +365,7 @@ service WebApi {
 }
 
 service AccountSvc {
+  color: "#8b5cf6"
   type: microservice
   tech: Java
   level: container
@@ -333,6 +374,7 @@ service AccountSvc {
 }
 
 service TxSvc {
+  color: "#8b5cf6"
   type: microservice
   tech: Java
   level: container
@@ -341,17 +383,20 @@ service TxSvc {
 }
 
 database AccountDb {
+  color: "#10b981"
   type: postgresql
   data: accounts, profiles
 }
 
 database TxDb {
+  color: "#10b981"
   type: postgresql
   data: ledger, transactions
 }
 
 # Level 3: Component (inside TxSvc)
 service TxController {
+  color: "#3b82f6"
   type: api
   tech: REST controller
   level: component
@@ -360,6 +405,7 @@ service TxController {
 }
 
 service TxValidator {
+  color: "#3b82f6"
   type: microservice
   tech: Validation rules
   level: component
@@ -368,6 +414,7 @@ service TxValidator {
 }
 
 service TxRepository {
+  color: "#3b82f6"
   type: microservice
   tech: JPA
   level: component
@@ -383,8 +430,11 @@ service TxRepository {
     tags: ['er', 'database', 'uml'],
     dsl: `diagram: architecture
 title: E-Commerce ER Diagram
+direction: LR
+edges: straight
 
 class Customer {
+  color: "#3b82f6"
   stereotype: entity
   attributes: id: PK, email: string, created_at: timestamp
   methods: place_order(), update_profile()
@@ -392,11 +442,13 @@ class Customer {
 }
 
 class Address {
+  color: "#3b82f6"
   stereotype: entity
   attributes: id: PK, customer_id: FK, line1: string, city: string, postal_code: string
 }
 
 class Order {
+  color: "#8b5cf6"
   stereotype: entity
   attributes: id: PK, customer_id: FK, total: decimal, status: enum
   methods: cancel(), fulfill()
@@ -404,17 +456,20 @@ class Order {
 }
 
 class OrderLine {
+  color: "#8b5cf6"
   stereotype: entity
   attributes: id: PK, order_id: FK, product_id: FK, qty: int, price: decimal
   connects: Product
 }
 
 class Product {
+  color: "#10b981"
   stereotype: entity
   attributes: id: PK, sku: string, name: string, price: decimal, stock: int
 }
 
 class Payment {
+  color: "#10b981"
   stereotype: entity
   attributes: id: PK, order_id: FK, amount: decimal, method: enum, captured_at: timestamp
 }`,
@@ -428,14 +483,17 @@ class Payment {
     tags: ['network', 'topology', 'aws'],
     dsl: `diagram: architecture
 title: Multi-Tier Network Topology
+edges: straight
 
 cloud Internet {
+  color: "#3b82f6"
   provider: aws
   kind: cloudfront
   connects: WAF
 }
 
 cloud WAF {
+  color: "#8b5cf6"
   provider: aws
   kind: cloudfront
   region: edge
@@ -443,6 +501,7 @@ cloud WAF {
 }
 
 cloud ALB {
+  color: "#3b82f6"
   provider: aws
   kind: apigateway
   region: us-east-1
@@ -450,18 +509,21 @@ cloud ALB {
 }
 
 service WebTier1 {
+  color: "#3b82f6"
   type: api
   tech: Nginx
   connects: AppTier
 }
 
 service WebTier2 {
+  color: "#3b82f6"
   type: api
   tech: Nginx
   connects: AppTier
 }
 
 service AppTier {
+  color: "#8b5cf6"
   type: microservice
   tech: Node.js
   replicas: 4
@@ -469,16 +531,19 @@ service AppTier {
 }
 
 database PrimaryDb {
+  color: "#10b981"
   type: postgresql
   data: users, orders
 }
 
 database Cache {
+  color: "#f59e0b"
   type: redis
   data: sessions, hot-objects
 }
 
 cloud FileStore {
+  color: "#10b981"
   provider: aws
   kind: s3
   region: us-east-1
@@ -493,19 +558,24 @@ cloud FileStore {
     tags: ['uml', 'class', 'oop'],
     dsl: `diagram: architecture
 title: Authentication — UML Classes
+direction: LR
+edges: straight
 
 class User {
+  color: "#3b82f6"
   attributes: id: UUID, email: string, password_hash: string, created_at: DateTime
   methods: verify_password(pwd): bool, change_email(new): void
   connects: Session
 }
 
 class Session {
+  color: "#8b5cf6"
   attributes: id: UUID, user_id: UUID, token: string, expires_at: DateTime
   methods: is_valid(): bool, revoke(): void
 }
 
 class AuthService {
+  color: "#10b981"
   stereotype: service
   attributes: jwt_secret: string, ttl: int
   methods: login(email, pwd): Session, logout(token): void, refresh(token): Session
@@ -513,6 +583,7 @@ class AuthService {
 }
 
 class TokenRepo {
+  color: "#3b82f6"
   stereotype: repository
   methods: save(t: Session): void, find(token): Session, revoke_all(user_id): void
 }`,
@@ -603,18 +674,22 @@ node Closed {
 }
 
 lane Customer {
+  color: "#3b82f6"
   contains: ApplicationSubmitted, CollectDocs, NotifyApprove, NotifyDecline
 }
 
 lane LoanOfficer {
+  color: "#8b5cf6"
   contains: ReviewDocs, ManualReview
 }
 
 lane Underwriter {
+  color: "#f59e0b"
   contains: UnderwriterDecision
 }
 
 lane System {
+  color: "#10b981"
   contains: CreditCheck, RiskGateway, AutoApprove, FundLoan, Closed
 }`,
   },
@@ -627,6 +702,7 @@ lane System {
     tags: ['bpmn', 'gateways', 'events'],
     dsl: `diagram: flow
 title: BPMN Showcase — Order to Ship
+direction: LR
 
 start OrderReceived
 
@@ -700,6 +776,7 @@ node Shipped {
     tags: ['bpmn', 'orders'],
     dsl: `diagram: flow
 title: Order Processing
+direction: LR
 
 start OrderPlaced
 
@@ -785,6 +862,7 @@ node NotifyCustomer {
     tags: ['flow', 'bpmn', 'subprocess'],
     dsl: `diagram: flow
 title: Order Fulfillment with Subprocesses
+direction: LR
 
 node OrderReceived {
   type: eventstart

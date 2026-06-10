@@ -30,6 +30,7 @@ export interface DatabaseNode {
   properties: {
     type?: 'postgresql' | 'mongodb' | 'mysql' | 'redis';
     data?: string[];
+    color?: string; // accent color override
   };
 }
 
@@ -40,6 +41,7 @@ export interface QueueNode {
   properties: {
     type?: 'kafka' | 'rabbitmq' | 'sqs';
     topic?: string;
+    color?: string; // accent color override
   };
 }
 
@@ -94,6 +96,7 @@ export interface CloudNode {
     region?: string;
     level?: C4Level;
     parent?: string;
+    color?: string; // accent color override
   };
   connections: string[];
 }
@@ -109,6 +112,7 @@ export interface ClassNode {
     methods?: string[];
     level?: C4Level;
     parent?: string;
+    color?: string; // accent color override
   };
   connections: string[];
 }
