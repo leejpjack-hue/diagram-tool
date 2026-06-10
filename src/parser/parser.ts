@@ -315,6 +315,16 @@ export class Parser {
             node.properties.parent = (v.value as string).toLowerCase().replace(/[^a-z0-9]/g, '_');
             break;
           }
+          case 'color': {
+            const v = this.advance();
+            node.properties.color = String(v.value);
+            break;
+          }
+          case 'icon': {
+            const v = this.advance();
+            node.properties.icon = String(v.value);
+            break;
+          }
           case 'connects': {
             // Don't consume token - parseConnectionList will read identifiers
             const connections = this.parseConnectionList();

@@ -823,4 +823,262 @@ PaymentFlow -> Fulfillment
 Fulfillment -> OrderComplete
 `,
   },
+  {
+    id: 'presentation-saas-overview',
+    name: 'Presentation — SaaS Platform Overview',
+    description: 'Slide-ready platform overview with colour-coded emoji cards — ideal for pitches and docs.',
+    category: 'Architecture',
+    mode: 'architecture',
+    tags: ['presentation', 'cards', 'overview'],
+    dsl: `diagram: architecture
+title: SaaS Platform Overview
+direction: LR
+
+service Customers {
+  icon: "🧑‍💻"
+  color: "#0ea5e9"
+  tech: "Web + Mobile"
+  connects: Experience
+}
+
+service Experience {
+  icon: "✨"
+  color: "#6366f1"
+  tech: "React 19 SPA"
+  connects: Platform
+}
+
+service Platform {
+  icon: "⚙️"
+  color: "#8b5cf6"
+  tech: "API Gateway + Services"
+  connects: Intelligence, DataLake
+}
+
+service Intelligence {
+  icon: "🤖"
+  color: "#ec4899"
+  tech: "ML Pipelines"
+  connects: DataLake
+}
+
+service DataLake {
+  icon: "🗄️"
+  color: "#10b981"
+  tech: "Postgres + S3 Lake"
+}
+
+service Operations {
+  icon: "🛡️"
+  color: "#f59e0b"
+  tech: "Observability + SRE"
+  connects: Platform
+}
+
+group FrontOffice {
+  label: Customer Experience
+  color: "#6366f1"
+  contains: Customers, Experience
+}
+
+group BackOffice {
+  label: Core Platform
+  color: "#10b981"
+  contains: Platform, Intelligence, DataLake, Operations
+}`,
+  },
+  {
+    id: 'gantt-product-launch',
+    name: 'Product Launch Plan',
+    description: 'Three-phase launch roadmap — strategy, build, and go-to-market — with owners and milestones.',
+    category: 'Gantt',
+    mode: 'gantt',
+    tags: ['gantt', 'launch', 'roadmap'],
+    dsl: `diagram: gantt
+title: Product Launch Plan
+start: 2026-06-08
+
+group "Strategy" {
+  task "Market Research" {
+    start: 2026-06-08
+    end: 2026-06-19
+    assignee: "Maya"
+    progress: 40
+    color: "#3b82f6"
+  }
+
+  task "Positioning & Pricing" {
+    start: 2026-06-22
+    end: 2026-07-03
+    assignee: "Maya"
+    depends: "Market Research"
+    color: "#06b6d4"
+  }
+}
+
+group "Build" {
+  task "MVP Development" {
+    start: 2026-06-15
+    end: 2026-07-24
+    assignee: "Dev Team"
+    progress: 10
+    color: "#8b5cf6"
+  }
+
+  task "Beta Program" {
+    start: 2026-07-27
+    end: 2026-08-14
+    assignee: "Dev Team"
+    depends: "MVP Development"
+    color: "#ec4899"
+  }
+}
+
+group "Go-to-Market" {
+  task "Launch Campaign" {
+    start: 2026-08-03
+    end: 2026-08-21
+    assignee: "Marketing"
+    depends: "Positioning & Pricing"
+    color: "#f59e0b"
+  }
+
+  task "Public Launch" {
+    start: 2026-08-24
+    end: 2026-08-24
+    assignee: "All"
+    depends: "Beta Program"
+    milestone: true
+    color: "#ef4444"
+  }
+}`,
+  },
+  {
+    id: 'gantt-agile-sprint',
+    name: 'Agile Sprint (2 Weeks)',
+    description: 'A two-week sprint board on a timeline — planning, stories, review, and retro with owners.',
+    category: 'Gantt',
+    mode: 'gantt',
+    tags: ['gantt', 'sprint', 'agile'],
+    dsl: `diagram: gantt
+title: Sprint 24 — June 2026
+start: 2026-06-08
+
+task "Sprint Planning" {
+  start: 2026-06-08
+  end: 2026-06-08
+  assignee: "Team"
+  progress: 100
+  color: "#3b82f6"
+}
+
+task "Story: Checkout Flow" {
+  start: 2026-06-09
+  end: 2026-06-15
+  assignee: "Ana"
+  depends: "Sprint Planning"
+  progress: 60
+  color: "#8b5cf6"
+}
+
+task "Story: Search Filters" {
+  start: 2026-06-09
+  end: 2026-06-12
+  assignee: "Ben"
+  depends: "Sprint Planning"
+  progress: 80
+  color: "#10b981"
+}
+
+task "Story: Mobile Nav" {
+  start: 2026-06-11
+  end: 2026-06-17
+  assignee: "Chloe"
+  depends: "Sprint Planning"
+  progress: 30
+  color: "#06b6d4"
+}
+
+task "QA & Bug Bash" {
+  start: 2026-06-16
+  end: 2026-06-18
+  assignee: "Team"
+  depends: "Story: Checkout Flow"
+  color: "#f59e0b"
+}
+
+task "Sprint Review" {
+  start: 2026-06-19
+  end: 2026-06-19
+  assignee: "Team"
+  depends: "QA & Bug Bash"
+  milestone: true
+  color: "#ef4444"
+}`,
+  },
+  {
+    id: 'gantt-marketing-campaign',
+    name: 'Marketing Campaign',
+    description: 'Quarter campaign plan — creative, content, paid media, and launch week with dependencies.',
+    category: 'Gantt',
+    mode: 'gantt',
+    tags: ['gantt', 'marketing', 'campaign'],
+    dsl: `diagram: gantt
+title: Q3 Campaign — Summer Release
+start: 2026-06-15
+
+group "Creative" {
+  task "Brand Refresh" {
+    start: 2026-06-15
+    end: 2026-06-26
+    assignee: "Design"
+    progress: 20
+    color: "#ec4899"
+  }
+
+  task "Asset Production" {
+    start: 2026-06-29
+    end: 2026-07-17
+    assignee: "Design"
+    depends: "Brand Refresh"
+    color: "#8b5cf6"
+  }
+}
+
+group "Content" {
+  task "Landing Page" {
+    start: 2026-06-22
+    end: 2026-07-03
+    assignee: "Web"
+    color: "#3b82f6"
+  }
+
+  task "Email Sequence" {
+    start: 2026-07-06
+    end: 2026-07-15
+    assignee: "Lifecycle"
+    depends: "Landing Page"
+    color: "#06b6d4"
+  }
+}
+
+group "Media" {
+  task "Paid Social Setup" {
+    start: 2026-07-13
+    end: 2026-07-22
+    assignee: "Growth"
+    depends: "Asset Production"
+    color: "#10b981"
+  }
+
+  task "Campaign Live" {
+    start: 2026-07-27
+    end: 2026-07-27
+    assignee: "All"
+    depends: "Paid Social Setup"
+    milestone: true
+    color: "#ef4444"
+  }
+}`,
+  },
 ];

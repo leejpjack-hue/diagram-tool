@@ -35,6 +35,8 @@ const KEYWORDS = [
   'class', 'attributes', 'methods', 'stereotype',
   // Swimlanes
   'lane', 'color',
+  // Presentation cards
+  'icon',
 ];
 
 export class Lexer {

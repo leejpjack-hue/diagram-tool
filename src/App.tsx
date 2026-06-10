@@ -28,6 +28,7 @@ import { saveManager, type SavedDiagram, type SavedDiagramMode } from './utils/s
 import type { SimpleCSVRow } from './utils/csvParser';
 import { extractNodeDSL, insertNodeDSL, duplicateNodeDSL } from './utils/clipboardUtils';
 import { useMobile } from './hooks/useMobile';
+import { BrandLogo } from './components/BrandLogo';
 import './styles/gantt-fixes.css';
 
 const ARCHITECTURE_DSL = `diagram: architecture
@@ -511,10 +512,14 @@ function App() {
     setDiagramMode(tpl.mode);
     setActiveTab(tpl.mode);
     setSaveStatus('unsaved');
-    try {
-      setParsedDiagram(parseDiagram(tpl.dsl));
-    } catch (err) {
-      console.error('Template parse error:', err);
+    // Gantt DSL is parsed by the gantt effect watching dslText; the generic
+    // parser only understands architecture/flow DSL.
+    if (tpl.mode !== 'gantt') {
+      try {
+        setParsedDiagram(parseDiagram(tpl.dsl));
+      } catch (err) {
+        console.error('Template parse error:', err);
+      }
     }
     toast.success(`Loaded template: ${tpl.name}`);
   };
@@ -686,8 +691,11 @@ task "Testing & Docs" {
       <header className="professional-header">
         {/* Logo & Title */}
         <a href="#" className="header-logo">
-          <div className="header-logo-icon">D</div>
-          <span>DiagramTool</span>
+          <BrandLogo size={32} />
+          <span className="header-logo-text">
+            DiagramTool
+            <span className="header-logo-tagline">Diagrams from text</span>
+          </span>
         </a>
         
         {/* Mode Tabs */}

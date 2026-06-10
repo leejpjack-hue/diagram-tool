@@ -10,7 +10,17 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
   const isAPI = nodeData.type === 'api';
   const iconKey = isAPI ? 'api' : 'service';
   const { target, source } = useLayoutHandles();
-  
+
+  // Presentation-style accent: a `color:` in the DSL overrides the default
+  // api/service palette; `icon:` swaps the SVG glyph for an emoji.
+  const accent = nodeData.color || (isAPI ? '#3B82F6' : '#8B5CF6');
+  const softBg = nodeData.color
+    ? `color-mix(in srgb, ${accent} 12%, white)`
+    : (isAPI ? '#DBEAFE' : '#E9D5FF');
+  const titleColor = nodeData.color
+    ? `color-mix(in srgb, ${accent} 70%, black)`
+    : (isAPI ? '#1E40AF' : '#6B21A8');
+
   return (
     <div
       className={`
@@ -19,26 +29,28 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
         min-w-[180px]
       `}
       style={{
-        background: isAPI ? '#DBEAFE' : '#E9D5FF',
-        borderColor: selected ? (isAPI ? '#3B82F6' : '#8B5CF6') : (isAPI ? '#3B82F6' : '#8B5CF6'),
-        boxShadow: selected 
-          ? (isAPI ? '0 0 0 3px rgba(59, 130, 246, 0.2)' : '0 0 0 3px rgba(139, 92, 246, 0.2)')
+        background: softBg,
+        borderColor: accent,
+        boxShadow: selected
+          ? `0 0 0 3px color-mix(in srgb, ${accent} 20%, transparent)`
           : '0 2px 8px rgba(0,0,0,0.1)'
       }}
     >
       <Handle type="target" position={target} className="!bg-electric-blue" />
-      
+
       <div className="flex items-center gap-3 mb-1">
         <div
           className="w-11 h-11 rounded-lg flex items-center justify-center text-white font-bold shrink-0"
           style={{
-            background: isAPI ? '#3B82F6' : '#8B5CF6',
+            background: accent,
             fontSize: 26,
             lineHeight: 1,
             boxShadow: '0 1px 2px rgba(0,0,0,0.18)',
           }}
         >
-          {hasNodeIcon(iconKey) ? (
+          {nodeData.icon ? (
+            <span style={{ fontSize: 24 }}>{nodeData.icon}</span>
+          ) : hasNodeIcon(iconKey) ? (
             <NodeIcon name={iconKey} size={28} />
           ) : (
             isAPI ? '⚡' : '⚙️'
@@ -46,31 +58,31 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
         </div>
         <div
           className="font-semibold text-base"
-          style={{ color: isAPI ? '#1E40AF' : '#6B21A8' }}
+          style={{ color: titleColor }}
         >
           {nodeData.label}
         </div>
       </div>
-      
+
       {nodeData.tech && (
-        <div 
+        <div
           className="text-xs font-mono"
-          style={{ color: isAPI ? '#3B82F6' : '#8B5CF6' }}
+          style={{ color: accent }}
         >
           {nodeData.tech}
         </div>
       )}
-      
+
       {nodeData.type && (
-        <div 
+        <div
           className="text-xs mt-1 capitalize"
-          style={{ color: isAPI ? '#1E40AF' : '#6B21A8', opacity: 0.7 }}
+          style={{ color: titleColor, opacity: 0.7 }}
         >
           {nodeData.type}
         </div>
       )}
-      
-      <Handle type="source" position={source} style={{ background: isAPI ? '#3B82F6' : '#8B5CF6' }} />
+
+      <Handle type="source" position={source} style={{ background: accent }} />
     </div>
   );
 });

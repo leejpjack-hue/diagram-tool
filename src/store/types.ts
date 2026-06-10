@@ -17,6 +17,8 @@ export interface ServiceNode {
     replicas?: number;
     level?: C4Level;
     parent?: string;
+    color?: string; // accent color for presentation-style cards
+    icon?: string; // emoji icon for presentation-style cards
   };
   connections: string[];
 }
