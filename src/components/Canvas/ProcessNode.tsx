@@ -3,6 +3,9 @@ import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
 import { useLayoutHandles } from './layoutDirection';
+import { cardStyle, TITLE_COLOR, MUTED_COLOR } from './cardStyle';
+
+const ACCENT = '#3b82f6';
 
 export const ProcessNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
@@ -11,43 +14,31 @@ export const ProcessNode = memo(({ data, selected }: NodeProps) => {
   return (
     <div
       className={`
-        px-4 py-3 rounded-lg border-2 shadow-md transition-all duration-200
-        ${selected ? 'scale-105 shadow-xl' : 'hover:shadow-lg hover:scale-102'}
+        px-4 py-3 transition-all duration-200
+        ${selected ? 'scale-105' : 'hover:scale-102'}
         min-w-[140px]
       `}
-      style={{
-        background: '#DBEAFE',
-        borderColor: selected ? '#3B82F6' : '#3B82F6',
-        boxShadow: selected 
-          ? '0 0 0 3px rgba(59, 130, 246, 0.2)'
-          : '0 2px 8px rgba(0,0,0,0.1)'
-      }}
+      style={cardStyle(ACCENT, !!selected)}
     >
-      <Handle type="target" position={target} style={{ background: '#3B82F6' }} />
-      
-      <div 
-        className="font-semibold text-sm text-center"
-        style={{ color: '#1E40AF' }}
-      >
+      <Handle type="target" position={target} style={{ background: ACCENT }} />
+
+      <div className="font-semibold text-sm text-center" style={{ color: TITLE_COLOR }}>
         {nodeData.label}
       </div>
-      
+
       {nodeData.system && (
-        <div 
-          className="text-xs font-mono text-center mt-1"
-          style={{ color: '#3B82F6' }}
-        >
+        <div className="text-[11px] font-mono text-center mt-1" style={{ color: ACCENT }}>
           {nodeData.system}
         </div>
       )}
-      
+
       {nodeData.duration && (
-        <div className="text-xs text-center mt-0.5" style={{ color: '#1E40AF', opacity: 0.7 }}>
+        <div className="text-[11px] text-center mt-0.5" style={{ color: MUTED_COLOR }}>
           ⏱️ {nodeData.duration}
         </div>
       )}
-      
-      <Handle type="source" position={source} style={{ background: '#3B82F6' }} />
+
+      <Handle type="source" position={source} style={{ background: ACCENT }} />
     </div>
   );
 });

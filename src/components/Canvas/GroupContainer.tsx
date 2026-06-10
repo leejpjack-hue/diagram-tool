@@ -33,8 +33,8 @@ export const GroupContainerNode = memo(({ data }: NodeProps) => {
       style={{
         width: d.width,
         height: d.height,
-        border: `2px dashed ${color}`,
-        borderRadius: 12,
+        border: `1.5px solid ${hexWithAlpha(color, 0.35)}`,
+        borderRadius: 16,
         background: fill,
         position: 'relative',
         // Pointer events stay on the outer rect so the user can grab it for
@@ -47,16 +47,19 @@ export const GroupContainerNode = memo(({ data }: NodeProps) => {
       <div
         style={{
           position: 'absolute',
-          top: -10,
-          left: 16,
+          top: -12,
+          left: 14,
           background: 'white',
-          padding: '0 8px',
-          fontSize: 12,
-          fontWeight: 600,
+          border: `1px solid ${hexWithAlpha(color, 0.35)}`,
+          padding: '2px 10px',
+          fontSize: 11,
+          fontWeight: 700,
           color,
-          letterSpacing: 0.2,
-          lineHeight: '20px',
-          borderRadius: 4,
+          letterSpacing: 0.4,
+          textTransform: 'uppercase',
+          lineHeight: '18px',
+          borderRadius: 999,
+          boxShadow: '0 1px 3px rgba(15,23,42,0.08)',
         }}
       >
         {d.label}

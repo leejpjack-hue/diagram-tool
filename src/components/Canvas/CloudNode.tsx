@@ -4,6 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import type { CloudNodeData } from './types';
 import { ProviderIcon, KindIcon, hasKindIcon } from './icons';
 import { useLayoutHandles } from './layoutDirection';
+import { cardStyle, chipStyle, badgeStyle, TITLE_COLOR, MUTED_COLOR } from './cardStyle';
 
 // Provider visual identity — colored badges with stylized geometric glyphs.
 // Glyphs themselves now live as standalone .svg files in ./icons/providers/.
@@ -43,61 +44,49 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
   return (
     <div
       className={`
-        px-4 py-3 rounded-lg border-2 shadow-md transition-all duration-200
-        ${selected ? 'scale-105 shadow-xl' : 'hover:shadow-lg hover:scale-102'}
+        px-4 py-3 transition-all duration-200
+        ${selected ? 'scale-105' : 'hover:scale-102'}
         min-w-[180px]
       `}
-      style={{
-        background: meta.bg,
-        borderColor: meta.pill,
-        boxShadow: selected
-          ? `0 0 0 3px ${meta.pill}40`
-          : '0 2px 8px rgba(0,0,0,0.1)',
-      }}
+      style={cardStyle(meta.pill, !!selected)}
     >
       <Handle type="target" position={target} style={{ background: meta.pill }} />
 
       <div className="flex items-center gap-3 mb-1">
         <div
-          className="rounded-lg flex items-center justify-center font-bold shrink-0"
-          style={{
-            background: meta.pill,
-            color: meta.pillFg,
-            width: 44,
-            height: 44,
-            boxShadow: '0 1px 2px rgba(0,0,0,0.18)',
-          }}
+          className="rounded-[10px] flex items-center justify-center font-bold shrink-0 w-10 h-10"
+          style={{ ...chipStyle(meta.pill), color: meta.pillFg }}
           title={meta.label}
         >
           {customKind ? (
-            <KindIcon name={kindKey} size={28} />
+            <KindIcon name={kindKey} size={24} />
           ) : kindBadge ? (
-            <span style={{ fontSize: kindBadge.length > 2 ? 13 : 16, lineHeight: 1 }}>{kindBadge}</span>
+            <span style={{ fontSize: kindBadge.length > 2 ? 12 : 15, lineHeight: 1 }}>{kindBadge}</span>
           ) : (
-            <ProviderIcon name={provider} size={28} fallback={<span className="text-[11px] font-bold">?</span>} />
+            <ProviderIcon name={provider} size={24} fallback={<span className="text-[11px] font-bold">?</span>} />
           )}
         </div>
-        <div className="font-semibold text-base" style={{ color: meta.fg }}>
+        <div className="font-semibold text-[15px]" style={{ color: TITLE_COLOR }}>
           {nodeData.label}
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 mt-1.5">
         <span
-          className="text-[10px] font-mono px-1.5 py-0.5 rounded"
-          style={{ background: meta.pill + '20', color: meta.fg }}
+          className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded"
+          style={badgeStyle(meta.pill)}
         >
           {meta.label}
         </span>
         {nodeData.kind && (
-          <span className="text-xs" style={{ color: meta.fg, opacity: 0.8 }}>
+          <span className="text-[11px]" style={{ color: MUTED_COLOR }}>
             {kindLabel(nodeData.kind)}
           </span>
         )}
       </div>
 
       {(nodeData.tech || nodeData.region) && (
-        <div className="text-[11px] mt-1" style={{ color: meta.fg, opacity: 0.7 }}>
+        <div className="text-[11px] mt-1" style={{ color: MUTED_COLOR }}>
           {nodeData.tech}{nodeData.tech && nodeData.region ? ' • ' : ''}{nodeData.region}
         </div>
       )}

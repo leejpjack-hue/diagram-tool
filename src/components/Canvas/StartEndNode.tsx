@@ -12,19 +12,21 @@ export const StartEndNode = memo(({ data, selected }: NodeProps) => {
   
   const bgColor = isStart ? '#10B981' : '#EF4444';
   const ringColor = isStart ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)';
-  
+  const gradient = isStart
+    ? 'linear-gradient(135deg, #10b981, #059669)'
+    : 'linear-gradient(135deg, #ef4444, #dc2626)';
+
   return (
     <div
       className={`
-        px-5 py-2 rounded-full border-2 shadow-md transition-all duration-200
-        ${selected ? 'scale-110 shadow-xl' : 'hover:shadow-lg hover:scale-105'}
+        px-5 py-2 rounded-full transition-all duration-200
+        ${selected ? 'scale-110' : 'hover:scale-105'}
       `}
       style={{
-        background: bgColor,
-        borderColor: bgColor,
-        boxShadow: selected 
-          ? `0 0 0 3px ${ringColor}`
-          : '0 2px 8px rgba(0,0,0,0.2)'
+        background: gradient,
+        boxShadow: selected
+          ? `0 0 0 3px ${ringColor}, 0 8px 20px ${ringColor}`
+          : `0 2px 6px ${ringColor}, 0 4px 14px rgba(15,23,42,0.12)`
       }}
     >
       {isStart && <Handle type="source" position={source} style={{ background: 'white' }} />}

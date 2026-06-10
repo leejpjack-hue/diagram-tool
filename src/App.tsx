@@ -258,13 +258,21 @@ function App() {
   const handleTabChange = (tab: 'architecture' | 'flow' | 'gantt') => {
     setActiveTab(tab);
     setDiagramMode(tab);
-    
-    if (tab === 'architecture') {
-      setDslText(ARCHITECTURE_DSL);
-    } else if (tab === 'flow') {
-      setDslText(FLOW_DSL);
-    } else if (tab === 'gantt') {
-      setDslText(GANTT_DSL);
+
+    const sampleDsl =
+      tab === 'architecture' ? ARCHITECTURE_DSL :
+      tab === 'flow' ? FLOW_DSL :
+      GANTT_DSL;
+    setDslText(sampleDsl);
+    // Parse immediately — Monaco's onChange doesn't fire for programmatic
+    // value swaps, so without this the canvas keeps the previous diagram.
+    // Gantt DSL is handled by the gantt effect watching dslText instead.
+    if (tab !== 'gantt') {
+      try {
+        setParsedDiagram(parseDiagram(sampleDsl));
+      } catch (err) {
+        console.error('Sample parse error:', err);
+      }
     }
   };
   

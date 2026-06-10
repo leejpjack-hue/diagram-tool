@@ -24,28 +24,32 @@ export const ClassNode = memo(({ data, selected }: NodeProps) => {
 
   return (
     <div
-      className={`bg-white border-2 rounded shadow-md transition-all duration-200 ${
-        selected ? 'scale-105 shadow-xl' : 'hover:shadow-lg'
+      className={`bg-white overflow-hidden transition-all duration-200 ${
+        selected ? 'scale-105' : ''
       }`}
       style={{
-        borderColor: '#0F766E',
+        border: selected ? '1px solid #0d9488' : '1px solid #e2e8f0',
+        borderTop: '3px solid #0d9488',
+        borderRadius: 12,
         minWidth: 200,
-        boxShadow: selected ? '0 0 0 3px rgba(15,118,110,0.25)' : '0 2px 8px rgba(0,0,0,0.1)',
+        boxShadow: selected
+          ? '0 0 0 3px rgba(13,148,136,0.18), 0 8px 24px rgba(15,23,42,0.14)'
+          : '0 1px 2px rgba(15,23,42,0.05), 0 4px 14px rgba(15,23,42,0.08)',
       }}
     >
-      <Handle type="target" position={target} style={{ background: '#0F766E' }} />
+      <Handle type="target" position={target} style={{ background: '#0d9488' }} />
 
-      <div className="px-3 py-2 text-center" style={{ background: '#CCFBF1', borderBottom: '1px solid #0F766E' }}>
+      <div className="px-3 py-2 text-center" style={{ background: 'color-mix(in srgb, #0d9488 7%, white)', borderBottom: '1px solid #e2e8f0' }}>
         {d.stereotype && (
-          <div className="text-[10px] italic font-mono" style={{ color: '#115E59' }}>
+          <div className="text-[10px] italic font-mono" style={{ color: '#0f766e' }}>
             «{d.stereotype}»
           </div>
         )}
-        <div className="font-bold text-sm" style={{ color: '#134E4A' }}>{d.label}</div>
+        <div className="font-bold text-sm" style={{ color: '#0f172a' }}>{d.label}</div>
       </div>
 
       {attrs.length > 0 && (
-        <div className="px-3 py-1.5 text-xs font-mono" style={{ color: '#115E59', borderBottom: methods.length ? '1px solid #99F6E4' : 'none' }}>
+        <div className="px-3 py-1.5 text-xs font-mono" style={{ color: '#475569', borderBottom: methods.length ? '1px solid #e2e8f0' : 'none' }}>
           {attrs.map((a, i) => (
             <div key={i} className="leading-snug">{a}</div>
           ))}
@@ -53,7 +57,7 @@ export const ClassNode = memo(({ data, selected }: NodeProps) => {
       )}
 
       {methods.length > 0 && (
-        <div className="px-3 py-1.5 text-xs font-mono" style={{ color: '#115E59' }}>
+        <div className="px-3 py-1.5 text-xs font-mono" style={{ color: '#475569' }}>
           {methods.map((m, i) => (
             <div key={i} className="leading-snug">{m}</div>
           ))}

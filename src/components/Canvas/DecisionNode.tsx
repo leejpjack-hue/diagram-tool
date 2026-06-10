@@ -20,23 +20,24 @@ export const DecisionNode = memo(({ data, selected }: NodeProps) => {
       <div
         className={`
           absolute inset-0 transform rotate-45
-          border-2 shadow-md transition-all duration-200
+          border-2 transition-all duration-200
         `}
         style={{
-          background: '#FEF3C7',
-          borderColor: selected ? '#F59E0B' : '#F59E0B',
-          boxShadow: selected 
-            ? '0 0 0 3px rgba(245, 158, 11, 0.2)'
-            : '0 2px 8px rgba(0,0,0,0.1)'
+          background: 'color-mix(in srgb, #f59e0b 8%, white)',
+          borderColor: '#f59e0b',
+          borderRadius: 10,
+          boxShadow: selected
+            ? '0 0 0 3px rgba(245, 158, 11, 0.2), 0 8px 24px rgba(15,23,42,0.14)'
+            : '0 1px 2px rgba(15,23,42,0.05), 0 4px 14px rgba(15,23,42,0.08)'
         }}
       />
       
       {/* Text container (rotated back) */}
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="transform -rotate-45 text-center">
-          <div 
+          <div
             className="font-semibold text-xs"
-            style={{ color: '#92400E' }}
+            style={{ color: '#0f172a' }}
           >
             {nodeData.label}
           </div>
