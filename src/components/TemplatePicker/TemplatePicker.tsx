@@ -8,11 +8,12 @@ interface TemplatePickerProps {
   onPick: (tpl: DiagramTemplate) => void;
 }
 
-const CATEGORIES: (TemplateCategory | 'All')[] = ['All', 'Architecture', 'Flow', 'Gantt'];
+const CATEGORIES: (TemplateCategory | 'All')[] = ['All', 'Architecture', 'Flow', 'Sequence', 'Gantt'];
 
 const CATEGORY_BADGE: Record<TemplateCategory, string> = {
   Architecture: 'bg-purple-100 text-purple-700',
   Flow: 'bg-blue-100 text-blue-700',
+  Sequence: 'bg-sky-100 text-sky-700',
   Gantt: 'bg-emerald-100 text-emerald-700',
 };
 

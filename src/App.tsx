@@ -4,6 +4,7 @@ import { UndoRedoControls } from './components/Editor/UndoRedoControls';
 import { DiagramCanvas } from './components/Canvas/DiagramCanvas';
 import { GanttCanvas } from './components/Gantt/GanttCanvas';
 import { GanttBoardView } from './components/Gantt/GanttBoardView';
+import { SequenceCanvas } from './components/Sequence/SequenceCanvas';
 import { GanttPanel } from './components/Gantt/GanttPanel';
 import { GanttResourcePanel } from './components/Gantt/GanttResourcePanel';
 import { GanttFilterBar } from './components/Gantt/GanttFilterBar';
@@ -169,6 +170,27 @@ task Deployment {
   color: #ef4444
 }`;
 
+
+const SEQUENCE_DSL = `sequenceDiagram
+title Checkout — Payment Flow
+participant U as Customer
+participant W as Web App
+participant P as Payment API
+participant B as Bank
+
+U->>W: Place order
+W->>P: Create payment intent
+P->>B: Authorise card
+B-->>P: Authorised
+P-->>W: Payment confirmed
+Note over W,P: Receipt generated
+W-->>U: Order confirmation
+
+loop Every night
+  P->>B: Settle captured payments
+  B-->>P: Settlement report
+end`;
+
 type PanelType = 'none' | 'properties' | 'import' | 'export';
 
 function App() {
@@ -186,7 +208,7 @@ function App() {
   const { setTasks, addTask, updateTask, setDependencies, tasks, dependencies } = useGanttStore();
   
   // Initialize activeTab from saved diagram if available
-  const [activeTab, setActiveTab] = useState<'architecture' | 'flow' | 'gantt'>(() => {
+  const [activeTab, setActiveTab] = useState<'architecture' | 'flow' | 'sequence' | 'gantt'>(() => {
     const saved = saveManager.getCurrentDiagram();
     return (saved?.mode as 'architecture' | 'flow' | 'gantt') || 'architecture';
   });
@@ -257,19 +279,21 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, dependencies, diagramMode]);
 
-  const handleTabChange = (tab: 'architecture' | 'flow' | 'gantt') => {
+  const handleTabChange = (tab: 'architecture' | 'flow' | 'sequence' | 'gantt') => {
     setActiveTab(tab);
     setDiagramMode(tab);
 
     const sampleDsl =
       tab === 'architecture' ? ARCHITECTURE_DSL :
       tab === 'flow' ? FLOW_DSL :
+      tab === 'sequence' ? SEQUENCE_DSL :
       GANTT_DSL;
     setDslText(sampleDsl);
     // Parse immediately — Monaco's onChange doesn't fire for programmatic
     // value swaps, so without this the canvas keeps the previous diagram.
-    // Gantt DSL is handled by the gantt effect watching dslText instead.
-    if (tab !== 'gantt') {
+    // Gantt DSL is parsed by the gantt effect; sequence (Mermaid format)
+    // is parsed inside SequenceCanvas.
+    if (tab !== 'gantt' && tab !== 'sequence') {
       try {
         setParsedDiagram(parseDiagram(sampleDsl));
       } catch (err) {
@@ -522,9 +546,10 @@ function App() {
     setDiagramMode(tpl.mode);
     setActiveTab(tpl.mode);
     setSaveStatus('unsaved');
-    // Gantt DSL is parsed by the gantt effect watching dslText; the generic
-    // parser only understands architecture/flow DSL.
-    if (tpl.mode !== 'gantt') {
+    // Gantt DSL is parsed by the gantt effect watching dslText; sequence
+    // (Mermaid format) is parsed inside SequenceCanvas. The generic parser
+    // only understands architecture/flow DSL.
+    if (tpl.mode !== 'gantt' && tpl.mode !== 'sequence') {
       try {
         setParsedDiagram(parseDiagram(tpl.dsl));
       } catch (err) {
@@ -615,6 +640,15 @@ function App() {
             Flow
           </button>
           <button
+            onClick={() => handleTabChange('sequence')}
+            className={`tab-button ${activeTab === 'sequence' ? 'active' : ''}`}
+          >
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M7 8h10M17 14H7" />
+            </svg>
+            Sequence
+          </button>
+          <button
             onClick={() => handleTabChange('gantt')}
             className={`tab-button ${activeTab === 'gantt' ? 'active' : ''}`}
           >
@@ -680,8 +714,8 @@ function App() {
             Export
           </button>
           
-          {/* Gantt has its own task editor; this panel reads the diagram store */}
-          {activeTab !== 'gantt' && (
+          {/* Gantt/sequence have no node selection; this panel reads the diagram store */}
+          {activeTab !== 'gantt' && activeTab !== 'sequence' && (
             <button
               onClick={() => togglePanel('properties')}
               className={`btn ${activePanel === 'properties' ? 'btn-primary' : 'btn-secondary'}`}
@@ -818,6 +852,8 @@ function App() {
               (!isMobile || mobileView === 'timeline')
                 ? (ganttView === 'board' ? <GanttBoardView /> : <GanttCanvas />)
                 : null
+            ) : activeTab === 'sequence' ? (
+              <SequenceCanvas />
             ) : (
               <DiagramCanvas />
             )}
@@ -825,7 +861,7 @@ function App() {
         </div>
         
         {/* Side Panel - shared across all tabs, including Gantt */}
-        {activePanel !== 'none' && !(activePanel === 'properties' && activeTab === 'gantt') && (
+        {activePanel !== 'none' && !(activePanel === 'properties' && (activeTab === 'gantt' || activeTab === 'sequence')) && (
           <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white">
             {activePanel === 'properties' && <PropertiesPanel />}
             {activePanel === 'import' && <ImportPanel onImport={handleCSVImport} />}

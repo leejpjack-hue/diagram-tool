@@ -12,10 +12,12 @@ type ThumbKind =
   | 'swimlane'
   | 'bpmn'
   | 'gantt'
-  | 'cards';
+  | 'cards'
+  | 'sequence';
 
 function thumbKindFor(t: DiagramTemplate): ThumbKind {
   if (t.mode === 'gantt') return 'gantt';
+  if (t.mode === 'sequence') return 'sequence';
   const has = (tag: string) => t.tags.includes(tag);
   if (has('presentation') || has('cards')) return 'cards';
   if (has('uml') || has('er') || has('class')) return 'class';
@@ -159,6 +161,28 @@ function Cards() {
   );
 }
 
+function Sequence() {
+  const xs = [56, 145, 234];
+  const colors = ['#6366f1', '#0ea5e9', '#10b981'];
+  return (
+    <>
+      {xs.map((x, i) => (
+        <g key={x}>
+          <rect x={x - 28} y={10} width={56} height={18} rx={6} fill={colors[i]} />
+          <rect x={x - 28} y={84} width={56} height={18} rx={6} fill={colors[i]} opacity={0.85} />
+          <path d={`M${x} 28 V84`} stroke={colors[i]} strokeOpacity={0.4} strokeDasharray="4 4" />
+        </g>
+      ))}
+      <path d="M56 42 H140" stroke="#6366f1" strokeWidth="1.8" />
+      <path d="M140 42 l-7 -4 v8 Z" fill="#6366f1" />
+      <path d="M145 56 H229" stroke="#0ea5e9" strokeWidth="1.8" />
+      <path d="M229 56 l-7 -4 v8 Z" fill="#0ea5e9" />
+      <path d="M234 70 H61" stroke="#10b981" strokeWidth="1.8" strokeDasharray="6 4" />
+      <path d="M61 70 l7 -4 v8 Z" fill="#10b981" />
+    </>
+  );
+}
+
 const THUMBS: Record<ThumbKind, () => ReactElement> = {
   tiers: Tiers,
   flow: Flow,
@@ -169,6 +193,7 @@ const THUMBS: Record<ThumbKind, () => ReactElement> = {
   bpmn: Bpmn,
   gantt: Gantt,
   cards: Cards,
+  sequence: Sequence,
 };
 
 export function TemplateThumb({ template }: { template: DiagramTemplate }) {

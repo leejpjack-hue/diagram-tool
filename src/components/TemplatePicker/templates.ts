@@ -1,11 +1,11 @@
-export type TemplateCategory = 'Architecture' | 'Flow' | 'Gantt';
+export type TemplateCategory = 'Architecture' | 'Flow' | 'Sequence' | 'Gantt';
 
 export interface DiagramTemplate {
   id: string;
   name: string;
   description: string;
   category: TemplateCategory;
-  mode: 'architecture' | 'flow' | 'gantt';
+  mode: 'architecture' | 'flow' | 'sequence' | 'gantt';
   tags: string[];
   dsl: string;
 }
@@ -1158,5 +1158,67 @@ group "Media" {
     color: "#ef4444"
   }
 }`,
+  },
+  {
+    id: 'sequence-oauth-login',
+    name: 'Sequence — OAuth Login',
+    description: 'Login with an identity provider — auth code exchange, token grant, and session start.',
+    category: 'Sequence',
+    mode: 'sequence',
+    tags: ['sequence', 'mermaid', 'auth'],
+    dsl: `sequenceDiagram
+title Sign in with OAuth 2.0
+participant U as User
+participant A as Web App
+participant I as Identity Provider
+participant R as Resource API
+
+U->>A: Click "Sign in"
+A->>I: Redirect to /authorize
+I-->>U: Login & consent screen
+U->>I: Approve
+I-->>A: Authorization code
+A->>I: Exchange code for tokens
+I-->>A: Access + refresh token
+A->>R: GET /profile (Bearer token)
+R-->>A: Profile data
+A-->>U: Signed in
+
+opt Token expired
+  A->>I: Refresh token
+  I-->>A: New access token
+end`,
+  },
+  {
+    id: 'sequence-payment',
+    name: 'Sequence — Card Payment',
+    description: 'Card checkout with gateway authorisation, 3-D Secure challenge, and capture.',
+    category: 'Sequence',
+    mode: 'sequence',
+    tags: ['sequence', 'mermaid', 'payments'],
+    dsl: `sequenceDiagram
+title Card Payment Authorisation
+participant C as Customer
+participant M as Merchant Site
+participant G as Payment Gateway
+participant B as Issuing Bank
+
+C->>M: Confirm order
+M->>G: Authorise £49.99
+G->>B: Authorisation request
+
+alt 3-D Secure required
+  B-->>C: Challenge (OTP)
+  C->>B: Submit OTP
+  B-->>G: Authenticated
+else Frictionless
+  B-->>G: Risk check passed
+end
+
+G-->>M: Authorised (auth code)
+M->>G: Capture payment
+G-->>M: Captured
+Note over M,G: Settlement runs nightly
+M-->>C: Order confirmed`,
   },
 ];

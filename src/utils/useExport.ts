@@ -34,7 +34,9 @@ export const useExport = () => {
   };
 
   const getCanvas = () =>
-    document.querySelector('.react-flow') as HTMLElement | null;
+    document.querySelector(
+      diagramMode === 'sequence' ? '.sequence-canvas svg' : '.react-flow',
+    ) as HTMLElement | null;
 
   // Render the canvas to a raster data URL, hiding the editor-only overlays
   // (minimap / controls / attribution) for the duration of the capture.

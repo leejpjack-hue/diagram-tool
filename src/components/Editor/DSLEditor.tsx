@@ -4,16 +4,21 @@ import { useDiagramStore } from '../../store/diagramStore';
 import { parseDiagram } from '../../parser/parser';
 
 export function DSLEditor() {
-  const { dslText, setDslText, setParsedDiagram, setError, setLoading } = useDiagramStore();
+  const { dslText, setDslText, setParsedDiagram, setError, setLoading, diagramMode } = useDiagramStore();
+
+  // Sequence mode uses Mermaid syntax parsed inside SequenceCanvas; running
+  // the generic parser on it would reset the mode to architecture.
+  const skipGenericParse = diagramMode === 'sequence';
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (value !== undefined) {
       setDslText(value);
-      
+      if (skipGenericParse) return;
+
       // Parse the diagram
       setLoading(true);
       setError(null);
-      
+
       try {
         const parsed = parseDiagram(value);
         setParsedDiagram(parsed);
@@ -24,10 +29,11 @@ export function DSLEditor() {
         setLoading(false);
       }
     }
-  }, [setDslText, setParsedDiagram, setError, setLoading]);
+  }, [setDslText, setParsedDiagram, setError, setLoading, skipGenericParse]);
 
   // Parse initial text
   useEffect(() => {
+    if (skipGenericParse) return;
     try {
       const parsed = parseDiagram(dslText);
       setParsedDiagram(parsed);
