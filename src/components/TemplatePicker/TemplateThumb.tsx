@@ -108,13 +108,19 @@ function Network() {
 function Swimlane() {
   return (
     <>
-      <rect x="16" y="12" width="258" height="28" rx="4" fill="#eff6ff" stroke="#bfdbfe" />
-      <rect x="16" y="42" width="258" height="28" rx="4" fill="#f5f3ff" stroke="#ddd6fe" />
-      <rect x="16" y="72" width="258" height="28" rx="4" fill="#ecfdf5" stroke="#a7f3d0" />
-      <rect x="40" y="18" width="44" height="16" rx="8" fill="#bfdbfe" stroke="#3b82f6" />
-      <rect x="120" y="48" width="44" height="16" rx="3" fill="#ddd6fe" stroke="#8b5cf6" />
-      <rect x="200" y="78" width="44" height="16" rx="8" fill="#bbf7d0" stroke="#10b981" />
-      <path d="M84 26 L120 52 M164 60 L200 82" stroke={STROKE} fill="none" />
+      {/* tinted bands with solid colour header strips, like the canvas */}
+      <rect x="16" y="12" width="258" height="28" fill="#eff6ff" />
+      <rect x="16" y="40" width="258" height="28" fill="#f5f3ff" />
+      <rect x="16" y="68" width="258" height="28" fill="#ecfdf5" />
+      <rect x="16" y="12" width="14" height="28" fill="#3b82f6" />
+      <rect x="16" y="40" width="14" height="28" fill="#8b5cf6" />
+      <rect x="16" y="68" width="14" height="28" fill="#10b981" />
+      <rect x="16" y="12" width="258" height="84" rx="4" fill="none" stroke="#cbd5e1" />
+      <path d="M16 40 H274 M16 68 H274" stroke="#cbd5e1" />
+      <rect x="48" y="18" width="44" height="16" rx="8" fill="#bfdbfe" stroke="#3b82f6" />
+      <rect x="124" y="46" width="44" height="16" rx="3" fill="#ddd6fe" stroke="#8b5cf6" />
+      <rect x="204" y="74" width="44" height="16" rx="8" fill="#bbf7d0" stroke="#10b981" />
+      <path d="M92 26 H146 V46 M168 62 V82 H204" stroke={STROKE} fill="none" />
     </>
   );
 }

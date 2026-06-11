@@ -17,9 +17,9 @@ import { useLayoutHandles } from './layoutDirection';
  */
 
 const SIZE = { w: 160, h: 60 };
-const STROKE = '#3B82F6';
-const FILL = '#DBEAFE';
-const TEXT = '#1E40AF';
+const STROKE = '#3b82f6';
+const FILL = 'color-mix(in srgb, #3b82f6 7%, white)';
+const TEXT = '#0f172a';
 
 type ShapeProps = NodeProps;
 
@@ -30,7 +30,9 @@ function Wrapper({ children, selected }: { children: React.ReactNode; selected?:
       style={{
         width: SIZE.w,
         height: SIZE.h,
-        filter: selected ? 'drop-shadow(0 0 0 3px rgba(59,130,246,0.25))' : 'drop-shadow(0 2px 6px rgba(0,0,0,0.12))',
+        filter: selected
+          ? 'drop-shadow(0 0 6px rgba(59,130,246,0.35))'
+          : 'drop-shadow(0 1px 2px rgba(15,23,42,0.06)) drop-shadow(0 4px 10px rgba(15,23,42,0.08))',
         transform: selected ? 'scale(1.05)' : undefined,
       }}
     >
@@ -46,7 +48,7 @@ function LabelLayer({ data }: { data: FlowNodeData }) {
       style={{ color: TEXT }}
     >
       <div className="font-semibold text-sm leading-tight">{data.label}</div>
-      {data.system && <div className="text-[10px] font-mono mt-0.5 opacity-80">{data.system}</div>}
+      {data.system && <div className="text-[10px] font-mono mt-0.5" style={{ color: '#64748b' }}>{data.system}</div>}
     </div>
   );
 }
@@ -62,7 +64,7 @@ export const DataNode = memo(({ data, selected }: ShapeProps) => {
             points={`20,2 ${SIZE.w - 2},2 ${SIZE.w - 20},${SIZE.h - 2} 2,${SIZE.h - 2}`}
             fill={FILL}
             stroke={STROKE}
-            strokeWidth={2}
+            strokeWidth={1.5}
           />
         </svg>
         <LabelLayer data={d} />
@@ -89,7 +91,7 @@ export const DocumentNode = memo(({ data, selected }: ShapeProps) => {
     <Wrapper selected={selected}>
       <div className="relative" style={{ width: w, height: h }}>
         <svg width={w} height={h + 6} style={{ display: 'block' }}>
-          <path d={path} fill={FILL} stroke={STROKE} strokeWidth={2} strokeLinejoin="round" />
+          <path d={path} fill={FILL} stroke={STROKE} strokeWidth={1.5} strokeLinejoin="round" />
         </svg>
         <LabelLayer data={d} />
         <Handle type="target" position={target} style={{ background: STROKE, ...centerStyle(w, h) }} />
@@ -112,7 +114,7 @@ export const ManualInputNode = memo(({ data, selected }: ShapeProps) => {
             points={`2,20 ${w - 2},2 ${w - 2},${h - 2} 2,${h - 2}`}
             fill={FILL}
             stroke={STROKE}
-            strokeWidth={2}
+            strokeWidth={1.5}
           />
         </svg>
         <LabelLayer data={d} />
@@ -129,18 +131,20 @@ export const TerminatorNode = memo(({ data, selected }: ShapeProps) => {
   const { target, source } = useLayoutHandles();
   return (
     <div
-      className={`px-5 py-2 rounded-full border-2 shadow-md transition-all duration-200 ${
-        selected ? 'scale-110 shadow-xl' : 'hover:shadow-lg hover:scale-105'
+      className={`px-5 py-2 rounded-full transition-all duration-200 ${
+        selected ? 'scale-110' : 'hover:scale-105'
       }`}
       style={{
-        background: '#F1F5F9',
-        borderColor: '#64748B',
-        boxShadow: selected ? '0 0 0 3px rgba(100,116,139,0.3)' : '0 2px 8px rgba(0,0,0,0.1)',
+        background: 'color-mix(in srgb, #64748b 7%, white)',
+        border: '1.5px solid #94a3b8',
+        boxShadow: selected
+          ? '0 0 0 3px rgba(100,116,139,0.2), 0 8px 20px rgba(15,23,42,0.12)'
+          : '0 1px 2px rgba(15,23,42,0.06), 0 4px 10px rgba(15,23,42,0.08)',
       }}
     >
-      <Handle type="target" position={target} style={{ background: '#64748B' }} />
-      <div className="font-semibold text-sm" style={{ color: '#334155' }}>{d.label}</div>
-      <Handle type="source" position={source} style={{ background: '#64748B' }} />
+      <Handle type="target" position={target} style={{ background: '#64748b' }} />
+      <div className="font-semibold text-sm" style={{ color: '#0f172a' }}>{d.label}</div>
+      <Handle type="source" position={source} style={{ background: '#64748b' }} />
     </div>
   );
 });

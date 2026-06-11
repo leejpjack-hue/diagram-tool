@@ -12,7 +12,7 @@ export class Parser {
   private title: string = 'Untitled Diagram';
   private mode: DiagramMode = 'architecture';
   private direction: LayoutDirection = 'TB';
-  private edgeStyle: EdgeStyle = 'curved';
+  private edgeStyle: EdgeStyle | undefined; // undefined until the DSL declares `edges:`
   private startNode: string | undefined;
   private endNode: string | undefined;
   private flowNodes: Map<string, FlowNode> = new Map();

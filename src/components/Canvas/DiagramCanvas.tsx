@@ -61,11 +61,11 @@ const flowNodeTypes = {
   swimlane: SwimlaneNode,
 };
 
-// Lane layout constants
-const LANE_HEADER_W = 120;
+// Lane layout constants — header strip matches SwimlaneNode's HEADER_W
+const LANE_HEADER_W = 56;
 const LANE_HEIGHT = 180;
-const LANE_NODE_X_START = LANE_HEADER_W + 40;
-const LANE_NODE_X_STEP = 200;
+const LANE_NODE_X_START = LANE_HEADER_W + 60;
+const LANE_NODE_X_STEP = 210;
 
 // C4 level ordering used for drill-down navigation (parent → next level).
 const C4_ORDER: C4Level[] = ['context', 'container', 'component', 'code'];
@@ -181,14 +181,19 @@ function DiagramCanvasInternal() {
         const maxLaneCount = Math.max(1, ...Array.from(occupancy.values()));
         const totalWidth = LANE_HEADER_W + 80 + maxLaneCount * LANE_NODE_X_STEP;
 
-        // Lane band nodes (zIndex behind real nodes)
+        // Lane band nodes (zIndex behind real nodes). Lanes without an
+        // explicit color cycle through the brand palette so every band
+        // reads as a distinct role (Figma swimlane style).
+        const LANE_FALLBACKS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#06b6d4', '#ec4899'];
         const laneBandNodes: Node[] = lanes.map((lane, i) => ({
           id: `__lane_${lane.id}`,
           type: 'swimlane',
           position: { x: 0, y: i * LANE_HEIGHT + 40 },
           data: {
             label: lane.name,
-            color: lane.color,
+            color: lane.color || LANE_FALLBACKS[i % LANE_FALLBACKS.length],
+            isFirst: i === 0,
+            isLast: i === lanes.length - 1,
             width: totalWidth,
             height: LANE_HEIGHT,
           },
@@ -373,7 +378,9 @@ function DiagramCanvasInternal() {
     if (!parsedDiagram) return [];
 
     const getEdgeColor = (mode: string) => {
-      if (mode === 'flow') return '#3B82F6';
+      // Flow connectors stay neutral (Figma-style) so the coloured lanes and
+      // shapes carry the meaning; architecture keeps the brand violet.
+      if (mode === 'flow') return '#64748b';
       return '#8B5CF6';
     };
 
@@ -403,11 +410,10 @@ function DiagramCanvasInternal() {
     }
 
     // Translate the DSL edge-style keyword into React Flow's built-in edge
-    // types. Flow mode keeps the smooth default (animated dashed pulses
-    // look weird on hard 90° corners); architecture honours the keyword.
-    const edgeStyle = parsedDiagram.edgeStyle ?? 'curved';
+    // types. Flow mode defaults to rounded orthogonal connectors (the
+    // standard flowchart look); architecture honours the keyword.
+    const edgeStyle = parsedDiagram.edgeStyle ?? (diagramMode === 'flow' ? 'orthogonal' : 'curved');
     const rfEdgeType: string | undefined =
-      diagramMode === 'flow' ? undefined :
       edgeStyle === 'orthogonal' ? 'smoothstep' :
       edgeStyle === 'step' ? 'step' :
       edgeStyle === 'straight' ? 'straight' :
@@ -418,11 +424,12 @@ function DiagramCanvasInternal() {
       source: edge.from,
       target: edge.to,
       label: edge.label,
-      animated: diagramMode === 'flow',
+      animated: false,
       type: rfEdgeType,
+      ...(rfEdgeType === 'smoothstep' ? { pathOptions: { borderRadius: 14 } } : {}),
       style: {
         stroke: edgeColor,
-        strokeWidth: 2,
+        strokeWidth: diagramMode === 'flow' ? 1.8 : 2,
       },
       labelStyle: { 
         fill: '#1E293B', 
