@@ -55,7 +55,12 @@ export const useExport = () => {
       hideControls();
       // Wait a bit for DOM to update
       await new Promise(resolve => setTimeout(resolve, 100));
-      return await encoder(canvas, { backgroundColor, pixelRatio, quality: 0.95 });
+      // skipFonts: html-to-image otherwise scans every document stylesheet to
+      // inline @font-face rules, which throws SecurityError/SyntaxError on
+      // cross-origin sheets (Google Fonts, the Monaco CDN CSS) and spams the
+      // console. The canvas fonts (Inter) are already loaded in the page, so
+      // foreignObject rasterization still renders them correctly.
+      return await encoder(canvas, { backgroundColor, pixelRatio, quality: 0.95, skipFonts: true });
     } finally {
       showControls();
     }
