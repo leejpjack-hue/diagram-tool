@@ -3,43 +3,37 @@ import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
 import { useLayoutHandles } from './layoutDirection';
+import { FLOW_COLORS, flowShapeStyle } from './flowShapeStyle';
 
 export const StartEndNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
   const isStart = nodeData.isStart;
   const isEnd = nodeData.isEnd;
   const { target, source } = useLayoutHandles();
-  
-  const bgColor = isStart ? '#10B981' : '#EF4444';
-  const ringColor = isStart ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)';
-  const gradient = isStart
-    ? 'linear-gradient(135deg, #10b981, #059669)'
-    : 'linear-gradient(135deg, #ef4444, #dc2626)';
+
+  // Start = green stadium, end = red stadium, anything else neutral.
+  const c = isStart ? FLOW_COLORS.green : isEnd ? FLOW_COLORS.red : FLOW_COLORS.slate;
 
   return (
     <div
       className={`
-        px-5 py-2 rounded-full transition-all duration-200
-        ${selected ? 'scale-110' : 'hover:scale-105'}
+        px-6 py-2.5 rounded-full transition-all duration-200
+        ${selected ? 'scale-105' : 'hover:scale-105'}
+        min-w-[110px] text-center
       `}
-      style={{
-        background: gradient,
-        boxShadow: selected
-          ? `0 0 0 3px ${ringColor}, 0 8px 20px ${ringColor}`
-          : `0 2px 6px ${ringColor}, 0 4px 14px rgba(15,23,42,0.12)`
-      }}
+      style={flowShapeStyle(c, !!selected)}
     >
-      {isStart && <Handle type="source" position={source} style={{ background: 'white' }} />}
-      {isEnd && <Handle type="target" position={target} style={{ background: 'white' }} />}
-      
-      <div className="font-semibold text-sm text-white">
+      {isStart && <Handle type="source" position={source} style={{ background: c.border }} />}
+      {isEnd && <Handle type="target" position={target} style={{ background: c.border }} />}
+
+      <div className="font-semibold text-sm" style={{ color: c.text }}>
         {nodeData.label}
       </div>
-      
+
       {!isStart && !isEnd && (
         <>
-          <Handle type="target" position={target} style={{ background: bgColor }} />
-          <Handle type="source" position={source} style={{ background: bgColor }} />
+          <Handle type="target" position={target} style={{ background: c.border }} />
+          <Handle type="source" position={source} style={{ background: c.border }} />
         </>
       )}
     </div>

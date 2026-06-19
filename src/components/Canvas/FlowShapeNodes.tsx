@@ -18,8 +18,8 @@ import { useLayoutHandles } from './layoutDirection';
 
 const SIZE = { w: 160, h: 60 };
 const STROKE = '#3b82f6';
-const FILL = 'color-mix(in srgb, #3b82f6 7%, white)';
-const TEXT = '#0f172a';
+const FILL = '#bfdbfe';
+const TEXT = '#1e40af';
 
 type ShapeProps = NodeProps;
 
@@ -31,8 +31,8 @@ function Wrapper({ children, selected }: { children: React.ReactNode; selected?:
         width: SIZE.w,
         height: SIZE.h,
         filter: selected
-          ? 'drop-shadow(0 0 6px rgba(59,130,246,0.35))'
-          : 'drop-shadow(0 1px 2px rgba(15,23,42,0.06)) drop-shadow(0 4px 10px rgba(15,23,42,0.08))',
+          ? 'drop-shadow(0 0 5px rgba(59,130,246,0.4))'
+          : 'drop-shadow(0 1px 1px rgba(15,23,42,0.06))',
         transform: selected ? 'scale(1.05)' : undefined,
       }}
     >
@@ -64,7 +64,7 @@ export const DataNode = memo(({ data, selected }: ShapeProps) => {
             points={`20,2 ${SIZE.w - 2},2 ${SIZE.w - 20},${SIZE.h - 2} 2,${SIZE.h - 2}`}
             fill={FILL}
             stroke={STROKE}
-            strokeWidth={1.5}
+            strokeWidth={2}
           />
         </svg>
         <LabelLayer data={d} />
@@ -91,7 +91,7 @@ export const DocumentNode = memo(({ data, selected }: ShapeProps) => {
     <Wrapper selected={selected}>
       <div className="relative" style={{ width: w, height: h }}>
         <svg width={w} height={h + 6} style={{ display: 'block' }}>
-          <path d={path} fill={FILL} stroke={STROKE} strokeWidth={1.5} strokeLinejoin="round" />
+          <path d={path} fill={FILL} stroke={STROKE} strokeWidth={2} strokeLinejoin="round" />
         </svg>
         <LabelLayer data={d} />
         <Handle type="target" position={target} style={{ background: STROKE, ...centerStyle(w, h) }} />
@@ -114,7 +114,7 @@ export const ManualInputNode = memo(({ data, selected }: ShapeProps) => {
             points={`2,20 ${w - 2},2 ${w - 2},${h - 2} 2,${h - 2}`}
             fill={FILL}
             stroke={STROKE}
-            strokeWidth={1.5}
+            strokeWidth={2}
           />
         </svg>
         <LabelLayer data={d} />
@@ -131,20 +131,20 @@ export const TerminatorNode = memo(({ data, selected }: ShapeProps) => {
   const { target, source } = useLayoutHandles();
   return (
     <div
-      className={`px-5 py-2 rounded-full transition-all duration-200 ${
-        selected ? 'scale-110' : 'hover:scale-105'
+      className={`px-6 py-2.5 rounded-full transition-all duration-200 ${
+        selected ? 'scale-105' : 'hover:scale-105'
       }`}
       style={{
-        background: 'color-mix(in srgb, #64748b 7%, white)',
-        border: '1.5px solid #94a3b8',
+        background: '#e2e8f0',
+        border: '2px solid #94a3b8',
         boxShadow: selected
-          ? '0 0 0 3px rgba(100,116,139,0.2), 0 8px 20px rgba(15,23,42,0.12)'
-          : '0 1px 2px rgba(15,23,42,0.06), 0 4px 10px rgba(15,23,42,0.08)',
+          ? '0 0 0 3px rgba(148,163,184,0.3)'
+          : '0 1px 2px rgba(15,23,42,0.06)',
       }}
     >
-      <Handle type="target" position={target} style={{ background: '#64748b' }} />
-      <div className="font-semibold text-sm" style={{ color: '#0f172a' }}>{d.label}</div>
-      <Handle type="source" position={source} style={{ background: '#64748b' }} />
+      <Handle type="target" position={target} style={{ background: '#94a3b8' }} />
+      <div className="font-semibold text-sm" style={{ color: '#334155' }}>{d.label}</div>
+      <Handle type="source" position={source} style={{ background: '#94a3b8' }} />
     </div>
   );
 });
