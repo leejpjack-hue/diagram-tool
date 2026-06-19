@@ -238,6 +238,25 @@ service FraudService {
 }`,
   },
   {
+    id: 'flow-mermaid-incident',
+    name: 'Mermaid Flowchart — Incident Response',
+    description: 'Written in Mermaid `flowchart` syntax — paste any Mermaid flowchart and it just renders.',
+    category: 'Flow',
+    mode: 'flow',
+    tags: ['flowchart', 'mermaid'],
+    dsl: `flowchart TD
+  A([Alert fires]) --> B{Severity?}
+  B -->|SEV1| C[Page on-call]
+  B -->|SEV2/3| D[Create ticket]
+  C --> E[Open incident channel]
+  E --> F{Mitigated?}
+  F -->|No| G[Escalate to lead]
+  G --> F
+  F -->|Yes| H[Write postmortem]
+  D --> H
+  H --> I([Close incident])`,
+  },
+  {
     id: 'flow-user-signup',
     name: 'Flowchart — User Signup',
     description: 'Standard flowchart using start/end, process, decision, data, and document shapes.',

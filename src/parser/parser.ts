@@ -1,6 +1,7 @@
 import { Lexer, TokenType } from './lexer';
 import type { Token } from './lexer';
 import type { DiagramNode, Edge, Group, Lane, ParsedDiagram, DiagramMode, FlowNode, CloudProvider, C4Level, ClassNode, LayoutDirection, EdgeStyle } from '../store/types';
+import { isMermaidFlow, mermaidFlowToDSL } from './mermaidFlow';
 
 export class Parser {
   private tokens: Token[];
@@ -1061,6 +1062,9 @@ export class Parser {
 }
 
 export function parseDiagram(text: string): ParsedDiagram {
-  const parser = new Parser(text);
+  // Mermaid `flowchart`/`graph` syntax is transpiled to the native flow DSL
+  // so it flows through the same parser and renderer.
+  const source = isMermaidFlow(text) ? mermaidFlowToDSL(text) : text;
+  const parser = new Parser(source);
   return parser.parse();
 }
