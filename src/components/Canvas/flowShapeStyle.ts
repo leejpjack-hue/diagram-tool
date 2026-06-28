@@ -1,30 +1,46 @@
 import type { CSSProperties } from 'react';
 
-// Flat flowchart shape language: a soft pastel fill, a 2px saturated border,
-// dark readable label, and no heavy shadow — matching the clean reference
-// design. Shared by every flow-mode shape so the canvas stays consistent.
+// Workflow shape language (Diagram Kit reference): process/decision shapes are
+// white cards with a soft colour-coded border and a saturated, darkened label;
+// terminators are lightly tinted pills with an uppercase label. Shared by the
+// flow-mode shapes so the canvas reads consistently.
+
+export const TITLE_FONT = "'Plus Jakarta Sans', Inter, system-ui, sans-serif";
+export const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
 
 export interface FlowPalette {
-  fill: string;
+  /** soft border colour */
   border: string;
+  /** saturated, darkened text colour */
   text: string;
+  /** very light fill for terminator pills */
+  tint: string;
 }
 
 export const FLOW_COLORS = {
-  green: { fill: '#bbf7d0', border: '#22c55e', text: '#166534' },
-  blue: { fill: '#bfdbfe', border: '#3b82f6', text: '#1e40af' },
-  amber: { fill: '#fde68a', border: '#f59e0b', text: '#92400e' },
-  red: { fill: '#fecaca', border: '#ef4444', text: '#991b1b' },
-  slate: { fill: '#e2e8f0', border: '#94a3b8', text: '#334155' },
+  green: { border: '#86efac', text: '#15803d', tint: '#f0fdf4' },
+  blue: { border: '#93c5fd', text: '#1d4ed8', tint: '#eff6ff' },
+  amber: { border: '#fcd34d', text: '#b45309', tint: '#fffbeb' },
+  red: { border: '#fca5a5', text: '#b91c1c', tint: '#fef2f2' },
+  slate: { border: '#cbd5e1', text: '#334155', tint: '#f8fafc' },
 } as const satisfies Record<string, FlowPalette>;
 
-// Outer-div style for box/pill shapes (process, terminator, start/end).
+const SHADOW = '0 1px 2px rgba(17,24,39,0.05), 0 8px 18px -12px rgba(17,24,39,0.25)';
+
+// White card with a soft colour border — process, decision, data, etc.
 export function flowShapeStyle(p: FlowPalette, selected: boolean): CSSProperties {
   return {
-    background: p.fill,
-    border: `2px solid ${p.border}`,
-    boxShadow: selected
-      ? `0 0 0 3px color-mix(in srgb, ${p.border} 22%, transparent)`
-      : '0 1px 2px rgba(15,23,42,0.06)',
+    background: '#ffffff',
+    border: `1.5px solid ${selected ? p.text : p.border}`,
+    boxShadow: selected ? `0 0 0 3px color-mix(in srgb, ${p.text} 18%, transparent), ${SHADOW}` : SHADOW,
+  };
+}
+
+// Lightly tinted pill — start / end terminators.
+export function flowPillStyle(p: FlowPalette, selected: boolean): CSSProperties {
+  return {
+    background: p.tint,
+    border: `1.5px solid ${selected ? p.text : p.border}`,
+    boxShadow: selected ? `0 0 0 3px color-mix(in srgb, ${p.text} 18%, transparent), ${SHADOW}` : SHADOW,
   };
 }

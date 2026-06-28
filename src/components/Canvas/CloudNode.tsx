@@ -4,7 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import type { CloudNodeData } from './types';
 import { ProviderIcon, KindIcon, hasKindIcon } from './icons';
 import { useLayoutHandles } from './layoutDirection';
-import { cardStyle, chipStyle, badgeStyle, TITLE_COLOR, MUTED_COLOR } from './cardStyle';
+import { cardStyle, chipStyle, badgeStyle, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
 
 // Provider visual identity — colored badges with stylized geometric glyphs.
 // Glyphs themselves now live as standalone .svg files in ./icons/providers/.
@@ -56,19 +56,19 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
 
       <div className="flex items-center gap-3 mb-1">
         <div
-          className="rounded-[10px] flex items-center justify-center font-bold shrink-0 w-10 h-10"
-          style={{ ...chipStyle(accent), color: meta.pillFg }}
+          className="rounded-[9px] flex items-center justify-center font-bold shrink-0 w-9 h-9"
+          style={chipStyle(accent)}
           title={meta.label}
         >
           {customKind ? (
-            <KindIcon name={kindKey} size={24} />
+            <KindIcon name={kindKey} size={22} />
           ) : kindBadge ? (
-            <span style={{ fontSize: kindBadge.length > 2 ? 12 : 15, lineHeight: 1 }}>{kindBadge}</span>
+            <span style={{ fontSize: kindBadge.length > 2 ? 11 : 14, lineHeight: 1, fontFamily: MONO_FONT }}>{kindBadge}</span>
           ) : (
-            <ProviderIcon name={provider} size={24} fallback={<span className="text-[11px] font-bold">?</span>} />
+            <ProviderIcon name={provider} size={22} fallback={<span className="text-[11px] font-bold">?</span>} />
           )}
         </div>
-        <div className="font-semibold text-[15px]" style={{ color: TITLE_COLOR }}>
+        <div className="font-semibold text-[14px]" style={{ color: TITLE_COLOR, fontFamily: TITLE_FONT }}>
           {nodeData.label}
         </div>
       </div>
@@ -76,19 +76,19 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
       <div className="flex items-center gap-1.5 mt-1.5">
         <span
           className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded"
-          style={badgeStyle(accent)}
+          style={{ ...badgeStyle(accent), fontFamily: MONO_FONT }}
         >
           {meta.label}
         </span>
         {nodeData.kind && (
-          <span className="text-[11px]" style={{ color: MUTED_COLOR }}>
+          <span className="text-[11px]" style={{ color: MUTED_COLOR, fontFamily: MONO_FONT }}>
             {kindLabel(nodeData.kind)}
           </span>
         )}
       </div>
 
       {(nodeData.tech || nodeData.region) && (
-        <div className="text-[11px] mt-1" style={{ color: MUTED_COLOR }}>
+        <div className="text-[11px] mt-1" style={{ color: MUTED_COLOR, fontFamily: MONO_FONT }}>
           {nodeData.tech}{nodeData.tech && nodeData.region ? ' • ' : ''}{nodeData.region}
         </div>
       )}

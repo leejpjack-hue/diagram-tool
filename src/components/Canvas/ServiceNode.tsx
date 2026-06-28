@@ -4,7 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import type { ServiceNodeData } from './types';
 import { NodeIcon, hasNodeIcon } from './icons';
 import { useLayoutHandles } from './layoutDirection';
-import { cardStyle, chipStyle, badgeStyle, TITLE_COLOR, MUTED_COLOR } from './cardStyle';
+import { cardStyle, chipStyle, badgeStyle, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
 
 export const ServiceNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as ServiceNodeData;
@@ -29,18 +29,18 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
 
       <div className="flex items-center gap-3 mb-1">
         <div
-          className="w-10 h-10 rounded-[10px] flex items-center justify-center text-white font-bold shrink-0"
+          className="w-9 h-9 rounded-[9px] flex items-center justify-center font-bold shrink-0"
           style={chipStyle(accent)}
         >
           {nodeData.icon ? (
-            <span style={{ fontSize: 22, lineHeight: 1 }}>{nodeData.icon}</span>
+            <span style={{ fontSize: 20, lineHeight: 1 }}>{nodeData.icon}</span>
           ) : hasNodeIcon(iconKey) ? (
-            <NodeIcon name={iconKey} size={24} />
+            <NodeIcon name={iconKey} size={22} />
           ) : (
-            <span style={{ fontSize: 22, lineHeight: 1 }}>{isAPI ? '⚡' : '⚙️'}</span>
+            <span style={{ fontSize: 20, lineHeight: 1 }}>{isAPI ? '⚡' : '⚙️'}</span>
           )}
         </div>
-        <div className="font-semibold text-[15px]" style={{ color: TITLE_COLOR }}>
+        <div className="font-semibold text-[14px]" style={{ color: TITLE_COLOR, fontFamily: TITLE_FONT }}>
           {nodeData.label}
         </div>
       </div>
@@ -49,13 +49,13 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
         {nodeData.type && (
           <span
             className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded"
-            style={badgeStyle(accent)}
+            style={{ ...badgeStyle(accent), fontFamily: MONO_FONT }}
           >
             {nodeData.type}
           </span>
         )}
         {nodeData.tech && (
-          <span className="text-[11px] font-mono" style={{ color: MUTED_COLOR }}>
+          <span className="text-[11px]" style={{ color: MUTED_COLOR, fontFamily: MONO_FONT }}>
             {nodeData.tech}
           </span>
         )}

@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
-import { FLOW_COLORS } from './flowShapeStyle';
+import { FLOW_COLORS, TITLE_FONT } from './flowShapeStyle';
 
 const C = FLOW_COLORS.amber;
 
@@ -16,23 +16,23 @@ export const DecisionNode = memo(({ data, selected }: NodeProps) => {
         ${selected ? 'scale-105' : 'hover:scale-105'}
       `}
     >
-      {/* Diamond shape — flat pastel fill with a 2px border */}
+      {/* Diamond shape — white card with a soft amber border */}
       <div
         className="absolute inset-0 transform rotate-45 transition-all duration-200"
         style={{
-          background: C.fill,
-          border: `2px solid ${C.border}`,
-          borderRadius: 8,
+          background: '#ffffff',
+          border: `1.5px solid ${selected ? C.text : C.border}`,
+          borderRadius: 12,
           boxShadow: selected
-            ? `0 0 0 3px color-mix(in srgb, ${C.border} 22%, transparent)`
-            : '0 1px 2px rgba(15,23,42,0.06)',
+            ? `0 0 0 3px color-mix(in srgb, ${C.text} 18%, transparent), 0 10px 20px -14px rgba(17,24,39,0.3)`
+            : '0 1px 2px rgba(17,24,39,0.05), 0 10px 20px -14px rgba(17,24,39,0.3)',
         }}
       />
 
       {/* Text container (rotated back) */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="transform -rotate-45 text-center px-1">
-          <div className="font-semibold text-xs" style={{ color: C.text }}>
+        <div className="transform -rotate-45 text-center px-2">
+          <div className="font-semibold text-[11.5px] leading-tight" style={{ color: C.text, fontFamily: TITLE_FONT }}>
             {nodeData.label}
           </div>
         </div>

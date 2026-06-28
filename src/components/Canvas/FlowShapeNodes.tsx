@@ -3,6 +3,7 @@ import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
 import { useLayoutHandles } from './layoutDirection';
+import { FLOW_COLORS, TITLE_FONT, MONO_FONT } from './flowShapeStyle';
 
 /**
  * Standard flowchart shapes beyond process/decision/start/end.
@@ -12,14 +13,14 @@ import { useLayoutHandles } from './layoutDirection';
  * - Manual Input (trapezoid) — keyboard/manual input step
  * - Terminator (rounded pill) — generic terminator (neutral color)
  *
- * All share the same palette as ProcessNode (blue) for visual consistency
- * with the rest of the flowchart.
+ * White card with a soft colour border + saturated label, matching the
+ * process node (blue) so the flowchart reads consistently.
  */
 
 const SIZE = { w: 160, h: 60 };
-const STROKE = '#3b82f6';
-const FILL = '#bfdbfe';
-const TEXT = '#1e40af';
+const STROKE = FLOW_COLORS.blue.border;
+const FILL = '#ffffff';
+const TEXT = FLOW_COLORS.blue.text;
 
 type ShapeProps = NodeProps;
 
@@ -47,8 +48,8 @@ function LabelLayer({ data }: { data: FlowNodeData }) {
       className="absolute inset-0 flex flex-col items-center justify-center text-center px-3 pointer-events-none"
       style={{ color: TEXT }}
     >
-      <div className="font-semibold text-sm leading-tight">{data.label}</div>
-      {data.system && <div className="text-[10px] font-mono mt-0.5" style={{ color: '#64748b' }}>{data.system}</div>}
+      <div className="font-semibold text-[13px] leading-tight" style={{ fontFamily: TITLE_FONT }}>{data.label}</div>
+      {data.system && <div className="text-[10px] mt-0.5" style={{ color: '#64748b', fontFamily: MONO_FONT }}>{data.system}</div>}
     </div>
   );
 }
@@ -135,16 +136,16 @@ export const TerminatorNode = memo(({ data, selected }: ShapeProps) => {
         selected ? 'scale-105' : 'hover:scale-105'
       }`}
       style={{
-        background: '#e2e8f0',
-        border: '2px solid #94a3b8',
+        background: FLOW_COLORS.slate.tint,
+        border: `1.5px solid ${selected ? FLOW_COLORS.slate.text : FLOW_COLORS.slate.border}`,
         boxShadow: selected
-          ? '0 0 0 3px rgba(148,163,184,0.3)'
-          : '0 1px 2px rgba(15,23,42,0.06)',
+          ? `0 0 0 3px color-mix(in srgb, ${FLOW_COLORS.slate.text} 18%, transparent), 0 8px 18px -12px rgba(17,24,39,0.25)`
+          : '0 1px 2px rgba(17,24,39,0.05), 0 8px 18px -12px rgba(17,24,39,0.25)',
       }}
     >
-      <Handle type="target" position={target} style={{ background: '#94a3b8' }} />
-      <div className="font-semibold text-sm" style={{ color: '#334155' }}>{d.label}</div>
-      <Handle type="source" position={source} style={{ background: '#94a3b8' }} />
+      <Handle type="target" position={target} style={{ background: FLOW_COLORS.slate.border }} />
+      <div className="font-semibold text-[13px]" style={{ color: FLOW_COLORS.slate.text, fontFamily: TITLE_FONT }}>{d.label}</div>
+      <Handle type="source" position={source} style={{ background: FLOW_COLORS.slate.border }} />
     </div>
   );
 });
