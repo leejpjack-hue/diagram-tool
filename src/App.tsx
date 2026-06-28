@@ -42,6 +42,7 @@ service Client {
   icon: "USR"
   color: "#ec4899"
   tech: "client"
+  at: 40, 312
   connects: CDN, Gateway
 }
 
@@ -49,6 +50,7 @@ cloud CDN {
   icon: "CDN"
   color: "#f97316"
   tech: "static · cache"
+  at: 290, 180
   connects: Gateway
 }
 
@@ -56,6 +58,7 @@ cloud Gateway {
   icon: "GW"
   color: "#8b5cf6"
   tech: "tls · rate-limit"
+  at: 285, 440
   connects: Auth, Orders, Payments
 }
 
@@ -63,6 +66,7 @@ service Auth {
   icon: "API"
   color: "#3b82f6"
   tech: "svc · :8081"
+  at: 560, 120
   connects: Postgres
 }
 
@@ -70,6 +74,7 @@ service Orders {
   icon: "API"
   color: "#3b82f6"
   tech: "svc · :8082"
+  at: 560, 300
   connects: Postgres, Redis, Events
 }
 
@@ -77,23 +82,27 @@ service Payments {
   icon: "API"
   color: "#3b82f6"
   tech: "svc · :8083"
+  at: 560, 480
   connects: Postgres
 }
 
 database Postgres {
   color: "#a855f7"
   type: primary
+  at: 840, 100
 }
 
 database Redis {
   color: "#06b6d4"
   type: cache
+  at: 840, 260
 }
 
 queue Events {
   icon: "MQ"
   color: "#0ea5e9"
   topic: kafka
+  at: 840, 430
   connects: Worker
 }
 
@@ -101,6 +110,7 @@ service Worker {
   icon: "WK"
   color: "#3b82f6"
   tech: "consumer"
+  at: 840, 580
   connects: ObjectStore, Analytics
 }
 
@@ -108,30 +118,38 @@ cloud ObjectStore {
   icon: "S3"
   color: "#f97316"
   tech: "bucket"
+  at: 1060, 240
 }
 
 cloud Analytics {
   icon: "AN"
   color: "#a855f7"
   tech: "warehouse"
+  at: 1060, 420
 }
 
 group Edge {
   label: "Edge · cdn + ingress"
   color: "#f97316"
+  at: 250, 150
+  size: 260, 380
   contains: CDN, Gateway
 }
 
 group Services {
   label: "Services · k8s"
   color: "#3b82f6"
-  contains: Auth, Orders, Payments, Worker
+  at: 535, 85
+  size: 215, 470
+  contains: Auth, Orders, Payments
 }
 
 group Data {
   label: "Data & Processing"
   color: "#a855f7"
-  contains: Postgres, Redis, Events, ObjectStore, Analytics
+  at: 815, 75
+  size: 405, 600
+  contains: Postgres, Redis, Events, Worker, ObjectStore, Analytics
 }
 
 note "All ingress terminates TLS & is rate-limited at the gateway." {
@@ -162,46 +180,56 @@ end Rejected
 
 node Begin {
   label: Start
+  at: 30, 268
 }
 
 node Submit {
   label: Submit Request
+  at: 195, 262
 }
 
 node InfoComplete {
   type: decision
   label: "Info complete?"
+  at: 400, 239
 }
 
 node Return {
   label: "Return to Customer"
   color: "#ef4444"
+  at: 375, 80
 }
 
 node AmountCheck {
   type: decision
   label: "Amount > $5k?"
+  at: 590, 239
 }
 
 node AutoApprove {
   label: Auto-Approve
+  at: 770, 120
 }
 
 node ManagerReview {
   label: Manager Review
+  at: 770, 420
 }
 
 node ApprovedCheck {
   type: decision
   label: "Approved?"
+  at: 990, 395
 }
 
 node Approved {
   color: "#22c55e"
+  at: 1095, 120
 }
 
 node Rejected {
   color: "#ef4444"
+  at: 1095, 423
 }
 
 note "High-value orders route to a human for manual review." {

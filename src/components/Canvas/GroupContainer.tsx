@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { NodeResizer } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 
 /**
@@ -23,9 +24,12 @@ export type GroupContainerData = {
   width: number;
   height: number;
   color?: string;
+  groupId?: string;
+  // Persist a resize back into the DSL (`at:` + `size:`).
+  onResize?: (groupId: string, x: number, y: number, w: number, h: number) => void;
 };
 
-export const GroupContainerNode = memo(({ data }: NodeProps) => {
+export const GroupContainerNode = memo(({ data, selected, positionAbsoluteX, positionAbsoluteY }: NodeProps) => {
   const d = data as unknown as GroupContainerData;
   const color = d.color ?? '#64748B';
   // Tint the fill very lightly so the area reads as a region without
@@ -33,6 +37,19 @@ export const GroupContainerNode = memo(({ data }: NodeProps) => {
   const fill = hexWithAlpha(color, 0.06);
 
   return (
+    <>
+      <NodeResizer
+        isVisible={!!selected}
+        minWidth={140}
+        minHeight={100}
+        lineStyle={{ borderColor: hexWithAlpha(color, 0.6) }}
+        handleStyle={{ width: 8, height: 8, borderRadius: 2, background: '#fff', border: `1.5px solid ${hexWithAlpha(color, 0.8)}` }}
+        onResizeEnd={(_e, params) => {
+          if (d.groupId && d.onResize) {
+            d.onResize(d.groupId, positionAbsoluteX ?? params.x, positionAbsoluteY ?? params.y, params.width, params.height);
+          }
+        }}
+      />
     <div
       style={{
         width: d.width,
@@ -70,6 +87,7 @@ export const GroupContainerNode = memo(({ data }: NodeProps) => {
         {d.label}
       </div>
     </div>
+    </>
   );
 });
 

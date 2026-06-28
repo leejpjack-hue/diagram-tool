@@ -159,6 +159,12 @@ export interface Group {
   contains: string[];
   label?: string; // optional display label; defaults to `name`
   color?: string; // optional dashed-border color; defaults to slate
+  // Pinned geometry from `at:`/`size:` — when present the container is drawn
+  // at these coords instead of being computed from member positions.
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
 }
 
 // Connecting-line style for architecture/flow edges.
@@ -183,6 +189,9 @@ export interface ParsedDiagram {
   endNode?: string;
   direction?: LayoutDirection;
   edgeStyle?: EdgeStyle;
+  // Pinned node positions from `at: x, y`, keyed by node id. Honoured by the
+  // renderer in place of auto-layout for those nodes.
+  pins?: Record<string, { x: number; y: number }>;
 }
 
 // Clipboard types for copy/paste

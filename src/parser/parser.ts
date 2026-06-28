@@ -17,6 +17,19 @@ export class Parser {
   private startNode: string | undefined;
   private endNode: string | undefined;
   private flowNodes: Map<string, FlowNode> = new Map();
+  // Pinned node positions from `at: x, y` blocks, keyed by node id.
+  private pins: Record<string, { x: number; y: number }> = {};
+
+  // Read `N , N` or `N N` (used by `at:` and `size:`). Returns null on NaN.
+  private readNumberPair(): { a: number; b: number } | null {
+    const xs = this.advance();
+    const a = Number(xs.value);
+    if (this.peek().type === TokenType.COMMA) this.advance();
+    const ys = this.advance();
+    const b = Number(ys.value);
+    if (Number.isNaN(a) || Number.isNaN(b)) return null;
+    return { a, b };
+  }
 
   constructor(text: string) {
     const lexer = new Lexer(text);
@@ -156,6 +169,7 @@ export class Parser {
       endNode: this.endNode,
       direction: this.direction,
       edgeStyle: this.edgeStyle,
+      pins: Object.keys(this.pins).length > 0 ? this.pins : undefined,
     };
   }
 
@@ -327,6 +341,11 @@ export class Parser {
             node.properties.color = String(v.value);
             break;
           }
+          case 'at': {
+            const p = this.readNumberPair();
+            if (p) this.pins[id] = { x: p.a, y: p.b };
+            break;
+          }
           case 'icon': {
             const v = this.advance();
             node.properties.icon = String(v.value);
@@ -391,6 +410,11 @@ export class Parser {
           });
           continue;
         }
+        if (key === 'at') {
+          const p = this.readNumberPair();
+          if (p) this.pins[id] = { x: p.a, y: p.b };
+          continue;
+        }
 
         const valueToken = this.advance();
 
@@ -448,6 +472,11 @@ export class Parser {
             const targetId = target.toLowerCase().replace(/[^a-z0-9]/g, '_');
             this.edges.push({ id: `${id}_to_${targetId}`, from: id, to: targetId });
           });
+          continue;
+        }
+        if (key === 'at') {
+          const p = this.readNumberPair();
+          if (p) this.pins[id] = { x: p.a, y: p.b };
           continue;
         }
 
@@ -536,6 +565,11 @@ export class Parser {
           case 'color': {
             const v = this.advance();
             node.properties.color = String(v.value);
+            break;
+          }
+          case 'at': {
+            const p = this.readNumberPair();
+            if (p) this.pins[id] = { x: p.a, y: p.b };
             break;
           }
           case 'icon': {
@@ -640,6 +674,11 @@ export class Parser {
           case 'color': {
             const v = this.advance();
             node.properties.color = String(v.value);
+            break;
+          }
+          case 'at': {
+            const p = this.readNumberPair();
+            if (p) this.pins[id] = { x: p.a, y: p.b };
             break;
           }
           case 'connects': {
@@ -946,6 +985,16 @@ export class Parser {
           }
         }
         if (parts.length > 0) group.label = parts.join(' ');
+      } else if (propKey === 'at') {
+        this.advance();
+        this.expect(TokenType.COLON);
+        const p = this.readNumberPair();
+        if (p) { group.x = p.a; group.y = p.b; }
+      } else if (propKey === 'size') {
+        this.advance();
+        this.expect(TokenType.COLON);
+        const p = this.readNumberPair();
+        if (p) { group.width = p.a; group.height = p.b; }
       } else if (propKey === 'color') {
         this.advance();
         this.expect(TokenType.COLON);
@@ -1202,6 +1251,13 @@ export class Parser {
           case 'color':
             nodeData.properties!.color = fullValue;
             break;
+          case 'at': {
+            // valueParts holds the two coordinate numbers (comma skipped).
+            const x = Number(valueParts[0]);
+            const y = Number(valueParts[1]);
+            if (!Number.isNaN(x) && !Number.isNaN(y)) this.pins[id] = { x, y };
+            break;
+          }
         }
       } else {
         this.advance();

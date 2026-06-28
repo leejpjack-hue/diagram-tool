@@ -39,6 +39,8 @@ const KEYWORDS = [
   'icon',
   // Annotation sticky notes — `note "text" { ... }` plus its properties
   'note', 'text', 'at',
+  // Pinned geometry — `at: x, y` (position) and `size: w, h` (group box)
+  'size',
   // Labelled architecture edges — `edge Client -> CDN { label: "REST" }`
   'edge', 'label',
 ];

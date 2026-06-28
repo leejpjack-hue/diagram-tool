@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useCallback, useState } from 'react';
+import { useMemo, useEffect, useCallback, useState, useRef } from 'react';
 import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider, useReactFlow, BackgroundVariant, ViewportPortal } from '@xyflow/react';
 import type { Node, Edge, Viewport, Connection } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -28,6 +28,7 @@ import { useDiagramStore } from '../../store/diagramStore';
 import type { FlowNode, C4Level, ServiceNode as ServiceNodeType, CloudNode as CloudNodeType, ClassNode as ClassNodeType, AnnotationNode as AnnotationNodeType } from '../../store/types';
 import { calculateAutoLayout, resolveGroupOverlaps } from '../../utils/autoLayout';
 import { addConnectionDSL } from '../../utils/connectDSL';
+import { setNodePin, setGroupPin } from '../../utils/pinUtils';
 import { parseDiagram } from '../../parser/parser';
 import { getHelperLines, type HelperLineResult } from './helperLines';
 import { LayoutDirectionContext } from './layoutDirection';
@@ -88,6 +89,15 @@ function DiagramCanvasInternal() {
   // drillParent stores the parent id; null means no drill is active.
   const [drillParent, setDrillParent] = useState<string | null>(null);
   const [drillParentName, setDrillParentName] = useState<string>('');
+
+  // Stable resize callback injected into group containers. The real impl
+  // (onGroupResize) is defined later and kept fresh via this ref, so the
+  // node memo can depend on a stable reference.
+  const onGroupResizeRef = useRef<(gid: string, x: number, y: number, w: number, h: number) => void>(() => {});
+  const stableGroupResize = useCallback(
+    (gid: string, x: number, y: number, w: number, h: number) => onGroupResizeRef.current(gid, x, y, w, h),
+    [],
+  );
 
   // Architecture nodes can declare a C4 level; collect the unique set so the
   // switcher only offers levels actually present.
@@ -271,9 +281,13 @@ function DiagramCanvasInternal() {
         .filter(n => n.type !== 'annotation')
         .map((node) => {
           const { type, data } = flowNodeFor(node);
+          const pin = parsedDiagram.pins?.[node.id];
           let x: number;
           let y: number;
-          if (isLR) {
+          if (pin) {
+            x = pin.x;
+            y = pin.y;
+          } else if (isLR) {
             x = xOffset;
             y = 220;
             xOffset += 220;
@@ -324,10 +338,17 @@ function DiagramCanvasInternal() {
       const graphNodesForLayout = visibleNodes.filter(n => n.type !== 'annotation');
       let positions = calculateAutoLayout(graphNodesForLayout, visibleEdges, layoutDirection);
 
-      // If sub-system grouping containers exist, push overlapping groups
-      // apart so their dashed bounding boxes don't cross through each other.
+      // Pinned `at:` coordinates override auto-layout for those nodes.
+      const pins = parsedDiagram.pins;
+      if (pins) {
+        for (const [id, p] of Object.entries(pins)) positions.set(id, p);
+      }
+
+      // If sub-system grouping containers exist, push overlapping groups apart
+      // so their bounding boxes don't cross — but only when nothing is pinned
+      // (pins are authoritative, so we never shift them).
       const groupsForLayout = parsedDiagram.groups ?? [];
-      if (groupsForLayout.length >= 2) {
+      if (groupsForLayout.length >= 2 && !pins) {
         positions = resolveGroupOverlaps(
           positions,
           groupsForLayout,
@@ -360,7 +381,8 @@ function DiagramCanvasInternal() {
             },
           };
         }
-        const pos = positions.get(node.id) || { x: 100, y: 100 };
+        // Pinned `at:` coordinates win over auto-layout.
+        const pos = parsedDiagram.pins?.[node.id] ?? positions.get(node.id) ?? { x: 100, y: 100 };
 
         return {
           id: node.id,
@@ -391,26 +413,39 @@ function DiagramCanvasInternal() {
           const memberIds = g.contains.filter((id) => visibleIds.has(id));
           if (memberIds.length === 0) return;
 
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          memberIds.forEach((id) => {
-            const p = positions.get(id);
-            if (!p) return;
-            minX = Math.min(minX, p.x);
-            minY = Math.min(minY, p.y);
-            maxX = Math.max(maxX, p.x + NODE_W);
-            maxY = Math.max(maxY, p.y + NODE_H);
-          });
-          if (!isFinite(minX)) return;
+          // Pinned geometry (`at:` + `size:`) wins; otherwise compute the
+          // bounding box from member positions and pad it.
+          let gx: number, gy: number, gw: number, gh: number;
+          if (g.x != null && g.y != null && g.width != null && g.height != null) {
+            gx = g.x; gy = g.y; gw = g.width; gh = g.height;
+          } else {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            memberIds.forEach((id) => {
+              const p = positions.get(id);
+              if (!p) return;
+              minX = Math.min(minX, p.x);
+              minY = Math.min(minY, p.y);
+              maxX = Math.max(maxX, p.x + NODE_W);
+              maxY = Math.max(maxY, p.y + NODE_H);
+            });
+            if (!isFinite(minX)) return;
+            gx = minX - PADDING;
+            gy = minY - PADDING - HEADER;
+            gw = maxX - minX + PADDING * 2;
+            gh = maxY - minY + PADDING * 2 + HEADER;
+          }
 
           groupNodes.push({
             id: `__group_${g.id}`,
             type: 'groupcontainer',
-            position: { x: minX - PADDING, y: minY - PADDING - HEADER },
+            position: { x: gx, y: gy },
             data: {
               label: g.label ?? g.name,
-              width: maxX - minX + PADDING * 2,
-              height: maxY - minY + PADDING * 2 + HEADER,
+              width: gw,
+              height: gh,
               color: g.color,
+              groupId: g.id,
+              onResize: stableGroupResize,
               // Pre-bake the member id list so the drag-follow handler
               // (handleNodesChange below) can move them all in one batch.
               memberIds: g.contains.filter((id) => visibleIds.has(id)),
@@ -429,7 +464,7 @@ function DiagramCanvasInternal() {
       // Render groups first so they sit behind the actual component nodes.
       return [...groupNodes, ...archNodes];
     }
-  }, [parsedDiagram, diagramMode, c4Level, drillParent, layoutDirection, isLR, directionalNodeProps]);
+  }, [parsedDiagram, diagramMode, c4Level, drillParent, layoutDirection, isLR, directionalNodeProps, stableGroupResize]);
 
   const initialEdges = useMemo((): Edge[] => {
     if (!parsedDiagram) return [];
@@ -702,6 +737,55 @@ function DiagramCanvasInternal() {
     }
   }, [parsedDiagram, dslText, diagramMode, setDslText, setParsedDiagram]);
 
+  // Persist a drag (node or group) back into the DSL as `at:` / `size:` pins
+  // so manual placement survives reload and is captured on export.
+  const onNodeDragStop = useCallback((_e: unknown, node: Node) => {
+    if (!parsedDiagram) return;
+    let next = dslText;
+    if (node.id.startsWith('__group_')) {
+      const gid = node.id.slice('__group_'.length);
+      const group = parsedDiagram.groups?.find(g => g.id === gid);
+      if (!group) return;
+      const w = Number((node.data as { width?: number }).width) || 200;
+      const h = Number((node.data as { height?: number }).height) || 120;
+      next = setGroupPin(next, group.name, node.position.x, node.position.y, w, h);
+      // The drag-follow handler moved members too — persist their new spots.
+      const memberIds = (node.data as { memberIds?: string[] }).memberIds ?? [];
+      for (const mid of memberIds) {
+        const rf = nodes.find(n => n.id === mid);
+        const meta = parsedDiagram.nodes.find(n => n.id === mid);
+        if (rf && meta) next = setNodePin(next, meta.name, rf.position.x, rf.position.y);
+      }
+    } else {
+      const meta = parsedDiagram.nodes.find(n => n.id === node.id);
+      if (!meta) return;
+      next = setNodePin(next, meta.name, node.position.x, node.position.y);
+    }
+    if (next === dslText) return;
+    setDslText(next);
+    try {
+      setParsedDiagram(parseDiagram(next));
+    } catch (err) {
+      console.error('Pin parse error:', err);
+    }
+  }, [parsedDiagram, dslText, nodes, setDslText, setParsedDiagram]);
+
+  // Persist a group resize (from NodeResizer) into the DSL.
+  const onGroupResize = useCallback((groupId: string, x: number, y: number, w: number, h: number) => {
+    if (!parsedDiagram) return;
+    const group = parsedDiagram.groups?.find(g => g.id === groupId);
+    if (!group) return;
+    const next = setGroupPin(dslText, group.name, x, y, w, h);
+    if (next === dslText) return;
+    setDslText(next);
+    try {
+      setParsedDiagram(parseDiagram(next));
+    } catch (err) {
+      console.error('Resize parse error:', err);
+    }
+  }, [parsedDiagram, dslText, setDslText, setParsedDiagram]);
+  onGroupResizeRef.current = onGroupResize;
+
   if (!parsedDiagram) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-canvas-white">
@@ -725,6 +809,7 @@ function DiagramCanvasInternal() {
         onMoveEnd={handleMoveEnd}
         onSelectionChange={onSelectionChange}
         onNodeClick={onNodeClick}
+        onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         snapToGrid
         snapGrid={[10, 10]}
