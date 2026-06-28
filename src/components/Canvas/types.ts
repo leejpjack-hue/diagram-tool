@@ -39,6 +39,7 @@ export interface FlowNodeData {
   isStart?: boolean;
   isEnd?: boolean;
   lane?: string;
+  color?: string; // accent override for the shape
 }
 
 export interface CloudNodeData {

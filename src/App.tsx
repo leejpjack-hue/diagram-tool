@@ -34,78 +34,165 @@ import { BrandLogo } from './components/BrandLogo';
 import './styles/gantt-fixes.css';
 
 const ARCHITECTURE_DSL = `diagram: architecture
-title: Insurance Claims Platform
+title: Request Path — Services to Data
+edges: orthogonal
 
-service ClaimsAPI {
+service Client {
+  icon: "👤"
+  color: "#ec4899"
+  tech: "web · mobile"
+  connects: CDN, Gateway
+}
+
+cloud CDN {
+  color: "#f97316"
+  provider: aws
+  kind: cloudfront
+  tech: "static · cache"
+  connects: Gateway
+}
+
+cloud Gateway {
+  color: "#8b5cf6"
+  provider: aws
+  kind: apigateway
+  tech: "tls · rate-limit"
+  connects: Auth, Orders, Payments
+}
+
+service Auth {
+  color: "#3b82f6"
   type: api
-  tech: Node.js
-  port: 3000
-  connects: ClaimsService, PolicyService
+  tech: ":8081"
+  connects: Postgres
 }
 
-service ClaimsService {
-  type: microservice
-  tech: Java
-  replicas: 3
-  connects: ClaimsDB, EventQueue
+service Orders {
+  color: "#3b82f6"
+  type: api
+  tech: ":8082"
+  connects: Postgres, Redis, Events
 }
 
-service PolicyService {
-  type: microservice
-  tech: Python
-  connects: PolicyDB
+service Payments {
+  color: "#3b82f6"
+  type: api
+  tech: ":8083"
+  connects: Postgres
 }
 
-database ClaimsDB {
+database Postgres {
+  color: "#a855f7"
   type: postgresql
-  data: claims, claim_events
 }
 
-database PolicyDB {
-  type: mongodb
-  data: policies, customers
+database Redis {
+  color: "#06b6d4"
+  type: redis
 }
 
-queue EventQueue {
+queue Events {
+  color: "#14b8a6"
   type: kafka
-  topic: claim-events
+  topic: events
+  connects: Worker
+}
+
+service Worker {
+  color: "#3b82f6"
+  tech: "consumer"
+  connects: ObjectStore, Analytics
+}
+
+cloud ObjectStore {
+  color: "#f97316"
+  provider: aws
+  kind: s3
+}
+
+cloud Analytics {
+  color: "#a855f7"
+  provider: gcp
+  kind: bigquery
+}
+
+group Edge {
+  label: "Edge · cdn + ingress"
+  color: "#f97316"
+  contains: CDN, Gateway
+}
+
+group Services {
+  label: "Services · k8s"
+  color: "#8b5cf6"
+  contains: Auth, Orders, Payments, Worker
+}
+
+group Data {
+  label: "Data & Processing"
+  color: "#a855f7"
+  contains: Postgres, Redis, Events, ObjectStore, Analytics
 }`;
 
 const FLOW_DSL = `diagram: flow
-title: Claims Processing Flow
+title: Order Approval
+direction: LR
 
-start FNOL
+start Start
 
-FNOL -> Intake
-Intake -> Assignment
-Assignment -> Investigation
+Start -> Submit
+Submit -> InfoComplete
+InfoComplete ->|No| Return
+InfoComplete ->|Yes| AmountCheck
+Return -> Submit
+AmountCheck ->|< $5k| AutoApprove
+AmountCheck ->|>= $5k| ManagerReview
+AutoApprove -> Approved
+ManagerReview -> ApprovedCheck
+ApprovedCheck ->|Yes| Approved
+ApprovedCheck ->|No| Rejected
 
-Investigation ->|Fraud Detected| SpecialInvestigation
-Investigation ->|No Fraud| Evaluation
+end Approved
+end Rejected
 
-SpecialInvestigation -> Evaluation
-
-Evaluation ->|Approved| Settlement
-Evaluation ->|Denied| Closure
-
-Settlement -> Payment -> Closure
-
-end Closure
-
-node FNOL {
-  label: First Notice of Loss
-  system: ClaimsAPI
-  duration: 1d
+node Submit {
+  label: Submit Request
 }
 
-node Investigation {
-  assignee: ClaimsAdjuster
-  duration: 5d
+node InfoComplete {
+  type: decision
+  label: "Info complete?"
 }
 
-node Payment {
-  system: PaymentGateway
-  type: external
+node Return {
+  label: "Return to Customer"
+  color: "#ef4444"
+}
+
+node AmountCheck {
+  type: decision
+  label: "Amount > $5k?"
+}
+
+node AutoApprove {
+  label: Auto-Approve
+}
+
+node ManagerReview {
+  label: Manager Review
+}
+
+node ApprovedCheck {
+  type: decision
+  label: "Approved?"
+}
+
+node Approved {
+  color: "#22c55e"
+}
+
+node Rejected {
+  color: "#ef4444"
 }`;
 
 const GANTT_DSL = `diagram: gantt

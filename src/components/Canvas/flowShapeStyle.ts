@@ -27,6 +27,15 @@ export const FLOW_COLORS = {
 
 const SHADOW = '0 1px 2px rgba(17,24,39,0.05), 0 8px 18px -12px rgba(17,24,39,0.25)';
 
+// Derive a flow palette from an arbitrary hex/colour (DSL `color:` override).
+export function paletteFromColor(color: string): FlowPalette {
+  return {
+    border: `color-mix(in srgb, ${color} 50%, white)`,
+    text: `color-mix(in srgb, ${color} 72%, #0f172a)`,
+    tint: `color-mix(in srgb, ${color} 12%, white)`,
+  };
+}
+
 // White card with a soft colour border — process, decision, data, etc.
 export function flowShapeStyle(p: FlowPalette, selected: boolean): CSSProperties {
   return {

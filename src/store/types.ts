@@ -78,6 +78,7 @@ export interface FlowNode {
     assignee?: string;
     nodeType?: FlowNodeKind;
     lane?: string; // resolved lane id (set during parsing)
+    color?: string; // accent override for the shape
   };
   isStart?: boolean;
   isEnd?: boolean;

@@ -3,7 +3,7 @@ import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
 import { useLayoutHandles } from './layoutDirection';
-import { FLOW_COLORS, flowPillStyle, TITLE_FONT } from './flowShapeStyle';
+import { FLOW_COLORS, flowPillStyle, paletteFromColor, TITLE_FONT } from './flowShapeStyle';
 
 export const StartEndNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
@@ -11,8 +11,10 @@ export const StartEndNode = memo(({ data, selected }: NodeProps) => {
   const isEnd = nodeData.isEnd;
   const { target, source } = useLayoutHandles();
 
-  // Start = green pill, end = red pill, anything else neutral.
-  const c = isStart ? FLOW_COLORS.green : isEnd ? FLOW_COLORS.red : FLOW_COLORS.slate;
+  // A `color:` override wins; otherwise start = green, end = red, else neutral.
+  const c = nodeData.color
+    ? paletteFromColor(nodeData.color)
+    : isStart ? FLOW_COLORS.green : isEnd ? FLOW_COLORS.red : FLOW_COLORS.slate;
 
   return (
     <div

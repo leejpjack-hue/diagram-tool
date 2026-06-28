@@ -2,12 +2,11 @@ import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
-import { FLOW_COLORS, TITLE_FONT } from './flowShapeStyle';
-
-const C = FLOW_COLORS.amber;
+import { FLOW_COLORS, paletteFromColor, TITLE_FONT } from './flowShapeStyle';
 
 export const DecisionNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
+  const C = nodeData.color ? paletteFromColor(nodeData.color) : FLOW_COLORS.amber;
 
   return (
     <div

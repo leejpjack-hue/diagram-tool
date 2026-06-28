@@ -3,13 +3,12 @@ import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
 import { useLayoutHandles } from './layoutDirection';
-import { FLOW_COLORS, flowShapeStyle, TITLE_FONT, MONO_FONT } from './flowShapeStyle';
-
-const C = FLOW_COLORS.blue;
+import { FLOW_COLORS, flowShapeStyle, paletteFromColor, TITLE_FONT, MONO_FONT } from './flowShapeStyle';
 
 export const ProcessNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
   const { target, source } = useLayoutHandles();
+  const C = nodeData.color ? paletteFromColor(nodeData.color) : FLOW_COLORS.blue;
 
   return (
     <div

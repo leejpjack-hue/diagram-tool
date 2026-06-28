@@ -1036,6 +1036,9 @@ export class Parser {
             nodeData.properties!.nodeType = raw as FlowNode['properties']['nodeType'];
             break;
           }
+          case 'color':
+            nodeData.properties!.color = fullValue;
+            break;
         }
       } else {
         this.advance();
