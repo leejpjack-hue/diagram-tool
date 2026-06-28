@@ -35,6 +35,7 @@ import './styles/gantt-fixes.css';
 
 const ARCHITECTURE_DSL = `diagram: architecture
 title: Request Path — Services to Data
+direction: LR
 edges: orthogonal
 
 service Client {

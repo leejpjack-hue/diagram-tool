@@ -15,10 +15,12 @@ export const DecisionNode = memo(({ data, selected }: NodeProps) => {
         ${selected ? 'scale-105' : 'hover:scale-105'}
       `}
     >
-      {/* Diamond shape — white card with a soft amber border */}
+      {/* Diamond shape — a rotated square inset so its points meet the node
+          box edges (where the handles sit), matching the reference size. */}
       <div
-        className="absolute inset-0 transform rotate-45 transition-all duration-200"
+        className="absolute transform rotate-45 transition-all duration-200"
         style={{
+          inset: 15,
           background: '#ffffff',
           border: `1.5px solid ${selected ? C.text : C.border}`,
           borderRadius: 12,
