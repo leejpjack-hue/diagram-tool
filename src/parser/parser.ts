@@ -1,6 +1,6 @@
 import { Lexer, TokenType } from './lexer';
 import type { Token } from './lexer';
-import type { DiagramNode, Edge, Group, Lane, ParsedDiagram, DiagramMode, FlowNode, CloudProvider, C4Level, ClassNode, LayoutDirection, EdgeStyle } from '../store/types';
+import type { DiagramNode, Edge, Group, Lane, ParsedDiagram, DiagramMode, FlowNode, CloudProvider, C4Level, ClassNode, AnnotationNode, LayoutDirection, EdgeStyle } from '../store/types';
 import { isMermaidFlow, mermaidFlowToDSL } from './mermaidFlow';
 
 export class Parser {
@@ -94,6 +94,9 @@ export class Parser {
             break;
           case 'class':
             this.parseClass();
+            break;
+          case 'note':
+            this.parseAnnotation();
             break;
           case 'group':
             this.parseGroup();
@@ -659,6 +662,89 @@ export class Parser {
 
     this.expect(TokenType.RBRACE);
     this.nodes.push(node);
+  }
+
+  // Parse `note "text body" { color: #fbbf24, at: 240, 560 }` — an
+  // annotation sticky note. Accepts either a quoted body or a single-line
+  // identifier-based body for backwards compatibility.
+  private parseAnnotation(): void {
+    this.advance(); // consume 'note'
+
+    let text = '';
+    // Body is the next non-empty token: either a STRING (preferred) or a
+    // single bare identifier / keyword if the user forgot to quote.
+    const body = this.peek();
+    if (body.type === TokenType.STRING) {
+      text = String(this.advance().value);
+    } else if (body.type === TokenType.IDENTIFIER || body.type === TokenType.KEYWORD) {
+      text = String(this.advance().value);
+      // keep reading bare tokens until we hit `{` so unquoted bodies work too
+      while (
+        this.peek().type !== TokenType.LBRACE &&
+        this.peek().type !== TokenType.NEWLINE &&
+        this.peek().type !== TokenType.EOF
+      ) {
+        text += ' ' + String(this.advance().value);
+      }
+      text = text.trim();
+    } else if (body.type === TokenType.LBRACE) {
+      // anonymous note — body supplied by the property block, not the header
+    }
+
+    // Anchor id off the body text so re-typing a note reuses the same id
+    const idBase = (text || 'note').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'note';
+    let id = idBase;
+    let suffix = 1;
+    while (this.nodes.some(n => n.id === id)) {
+      id = `${idBase}_${suffix++}`;
+    }
+
+    const annotation: AnnotationNode = {
+      type: 'annotation',
+      id,
+      name: idBase,
+      properties: { text },
+    };
+
+    // Optional `{ ... }` block with color / position overrides.
+    if (this.peek().type === TokenType.LBRACE) {
+      this.expect(TokenType.LBRACE);
+      this.skipNewlines();
+      while (this.peek().type !== TokenType.RBRACE && this.peek().type !== TokenType.EOF) {
+        this.skipNewlines();
+        if (this.peek().type === TokenType.RBRACE) break;
+
+        const propToken = this.peek();
+        if (propToken.type === TokenType.KEYWORD) {
+          this.advance();
+          this.expect(TokenType.COLON);
+          const key = String(propToken.value).toLowerCase();
+          if (key === 'color') {
+            const v = this.advance();
+            annotation.properties.color = String(v.value);
+          } else if (key === 'at') {
+            // at: 240, 560   or   at: 240 560
+            const xs = this.advance();
+            const x = Number(xs.value);
+            if (this.peek().type === TokenType.COMMA) { this.advance(); }
+            const ys = this.advance();
+            const y = Number(ys.value);
+            if (!Number.isNaN(x)) annotation.properties.x = x;
+            if (!Number.isNaN(y)) annotation.properties.y = y;
+          } else if (key === 'text') {
+            const v = this.advance();
+            annotation.properties.text = String(v.value);
+          } else {
+            this.advance();
+          }
+        } else {
+          this.advance();
+        }
+      }
+      this.expect(TokenType.RBRACE);
+    }
+
+    this.nodes.push(annotation);
   }
 
   // Read tokens until the next newline/rbrace/eof and split on commas. Each item

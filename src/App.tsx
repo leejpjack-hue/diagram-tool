@@ -132,6 +132,11 @@ group Data {
   label: "Data & Processing"
   color: "#a855f7"
   contains: Postgres, Redis, Events, ObjectStore, Analytics
+}
+
+note "All ingress terminates TLS & is rate-limited at the gateway." {
+  color: "#fbbf24"
+  at: 280, 560
 }`;
 
 const FLOW_DSL = `diagram: flow
@@ -197,6 +202,11 @@ node Approved {
 
 node Rejected {
   color: "#ef4444"
+}
+
+note "High-value orders route to a human for manual review." {
+  color: "#fbbf24"
+  at: 780, 510
 }`;
 
 const GANTT_DSL = `diagram: gantt

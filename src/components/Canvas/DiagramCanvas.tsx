@@ -19,11 +19,13 @@ import {
 } from './BpmnShapes';
 import { SwimlaneNode } from './SwimlaneOverlay';
 import { GroupContainerNode } from './GroupContainer';
+import { AnnotationNode } from './AnnotationNode';
 import { C4LevelSwitcher } from './C4LevelSwitcher';
 import { ZoomControls } from './ZoomControls';
 import { ShapeLibrary } from '../Panel/ShapeLibrary';
+import { ColorLegend } from './ColorLegend';
 import { useDiagramStore } from '../../store/diagramStore';
-import type { FlowNode, C4Level, ServiceNode as ServiceNodeType, CloudNode as CloudNodeType, ClassNode as ClassNodeType } from '../../store/types';
+import type { FlowNode, C4Level, ServiceNode as ServiceNodeType, CloudNode as CloudNodeType, ClassNode as ClassNodeType, AnnotationNode as AnnotationNodeType } from '../../store/types';
 import { calculateAutoLayout, resolveGroupOverlaps } from '../../utils/autoLayout';
 import { addConnectionDSL } from '../../utils/connectDSL';
 import { parseDiagram } from '../../parser/parser';
@@ -38,6 +40,7 @@ const architectureNodeTypes = {
   cloud: CloudNode,
   class: ClassNode,
   groupcontainer: GroupContainerNode,
+  annotation: AnnotationNode,
 };
 
 const flowNodeTypes = {
@@ -59,6 +62,9 @@ const flowNodeTypes = {
   subprocesscollapsed: SubprocessNode,
   subprocessexpanded: SubprocessExpandedNode,
   swimlane: SwimlaneNode,
+  // Annotations are overlay nodes — registered in both architecture and flow
+  // so a sticky note in either diagram type renders correctly.
+  annotation: AnnotationNode,
 };
 
 // Lane layout constants — header strip matches SwimlaneNode's HEADER_W
@@ -127,6 +133,22 @@ function DiagramCanvasInternal() {
       const lanes = parsedDiagram.lanes ?? [];
       const hasLanes = lanes.length > 0;
 
+      // Annotation sticky notes float on top of the canvas and never participate
+      // in the autolayout pass. We render them after the graph so the user can
+      // drag them to taste without disturbing the layout below.
+      const annotationNodes: Node[] = parsedDiagram.nodes
+        .filter((n): n is AnnotationNodeType => n.type === 'annotation')
+        .map((a, i) => ({
+          id: a.id,
+          type: 'annotation',
+          position: { x: a.properties.x ?? 40, y: a.properties.y ?? 80 + i * 90 },
+          data: {
+            label: a.name,
+            text: a.properties.text,
+            color: a.properties.color,
+          },
+        }));
+
       const flowNodeFor = (node: typeof parsedDiagram.nodes[0]): { type: string; data: Record<string, unknown> } => {
         let nodeType = 'flow';
         const flowNode = node as FlowNode;
@@ -172,6 +194,7 @@ function DiagramCanvasInternal() {
         // Compute total width by max lane occupancy
         const occupancy = new Map<string, number>();
         parsedDiagram.nodes.forEach(n => {
+          if (n.type === 'annotation') return;
           const flowN = n as FlowNode;
           const lid = flowN.properties?.lane;
           if (lid && laneIndex.has(lid)) {
@@ -203,70 +226,77 @@ function DiagramCanvasInternal() {
           style: { zIndex: -1 },
         }));
 
-        const flowReactNodes: Node[] = parsedDiagram.nodes.map(node => {
-          const { type, data } = flowNodeFor(node);
-          const flowN = node as FlowNode;
-          const lid = flowN.properties?.lane;
-          let row = 0;
-          let col = 0;
+        const flowReactNodes: Node[] = parsedDiagram.nodes
+          .filter(n => n.type !== 'annotation')
+          .map(node => {
+            const { type, data } = flowNodeFor(node);
+            const flowN = node as FlowNode;
+            const lid = flowN.properties?.lane;
+            let row = 0;
+            let col = 0;
 
-          if (lid && laneIndex.has(lid)) {
-            row = laneIndex.get(lid)!;
-            col = perLaneCounter.get(lid) ?? 0;
-            perLaneCounter.set(lid, col + 1);
-          } else {
-            // Place orphans in a virtual row below all lanes
-            row = totalLanes;
-            col = orphanCounter.v++;
-          }
+            if (lid && laneIndex.has(lid)) {
+              row = laneIndex.get(lid)!;
+              col = perLaneCounter.get(lid) ?? 0;
+              perLaneCounter.set(lid, col + 1);
+            } else {
+              // Place orphans in a virtual row below all lanes
+              row = totalLanes;
+              col = orphanCounter.v++;
+            }
 
-          return {
-            id: node.id,
-            type,
-            position: {
-              x: LANE_NODE_X_START + col * LANE_NODE_X_STEP,
-              y: row * LANE_HEIGHT + 40 + (LANE_HEIGHT / 2 - 35),
-            },
-            data,
-            // Lanes are intrinsically left→right, so always anchor edges
-            // horizontally regardless of the global direction setting.
-            sourcePosition: Position.Right,
-            targetPosition: Position.Left,
-          };
-        });
+            return {
+              id: node.id,
+              type,
+              position: {
+                x: LANE_NODE_X_START + col * LANE_NODE_X_STEP,
+                y: row * LANE_HEIGHT + 40 + (LANE_HEIGHT / 2 - 35),
+              },
+              data,
+              // Lanes are intrinsically left→right, so always anchor edges
+              // horizontally regardless of the global direction setting.
+              sourcePosition: Position.Right,
+              targetPosition: Position.Left,
+            };
+          });
 
-        return [...laneBandNodes, ...flowReactNodes];
+        return [...laneBandNodes, ...flowReactNodes, ...annotationNodes];
       }
 
       // No lanes: stack along the active layout axis.
       // TB → vertical column; LR → horizontal row.
       let yOffset = 100;
       let xOffset = 100;
-      return parsedDiagram.nodes.map((node) => {
-        const { type, data } = flowNodeFor(node);
-        let x: number;
-        let y: number;
-        if (isLR) {
-          x = xOffset;
-          y = 220;
-          xOffset += 220;
-        } else {
-          x = 400;
-          y = yOffset;
-          yOffset += 120;
-        }
-        return {
-          id: node.id,
-          type,
-          position: { x, y },
-          data,
-          ...directionalNodeProps,
-        };
-      });
+      const flowReactNodes = parsedDiagram.nodes
+        .filter(n => n.type !== 'annotation')
+        .map((node) => {
+          const { type, data } = flowNodeFor(node);
+          let x: number;
+          let y: number;
+          if (isLR) {
+            x = xOffset;
+            y = 220;
+            xOffset += 220;
+          } else {
+            x = 400;
+            y = yOffset;
+            yOffset += 120;
+          }
+          return {
+            id: node.id,
+            type,
+            position: { x, y },
+            data,
+            ...directionalNodeProps,
+          };
+        });
+      return [...flowReactNodes, ...annotationNodes];
     } else {
       // Architecture mode - apply C4 level filter and (optional) drill-down filter,
       // then auto-layout the visible subset.
       const visibleNodes = parsedDiagram.nodes.filter((node) => {
+        // Annotations are overlays — they're never hidden by drill-down or C4 filtering.
+        if (node.type === 'annotation') return true;
         // Drill-down: when a parent is selected, show only its direct children.
         if (drillParent) {
           if (node.type === 'service' || node.type === 'cloud' || node.type === 'class') {
@@ -288,7 +318,11 @@ function DiagramCanvasInternal() {
       const visibleIds = new Set(visibleNodes.map(n => n.id));
       const visibleEdges = parsedDiagram.edges.filter(e => visibleIds.has(e.from) && visibleIds.has(e.to));
 
-      let positions = calculateAutoLayout(visibleNodes, visibleEdges, layoutDirection);
+      // Autolayout only runs on graph nodes — annotations sit outside the
+      // graph and either honour their DSL `at:` coordinates or keep their
+      // current canvas position.
+      const graphNodesForLayout = visibleNodes.filter(n => n.type !== 'annotation');
+      let positions = calculateAutoLayout(graphNodesForLayout, visibleEdges, layoutDirection);
 
       // If sub-system grouping containers exist, push overlapping groups
       // apart so their dashed bounding boxes don't cross through each other.
@@ -302,7 +336,30 @@ function DiagramCanvasInternal() {
         );
       }
 
+      // Find an empty corner of the canvas for annotations that don't declare
+      // explicit coordinates — this keeps them out of the way of the layout
+      // and lets the user drag them to taste.
+      const ANNOTATION_DEFAULT_X = 60;
+      const ANNOTATION_DEFAULT_Y_STEP = 90;
+      let annotationCursor = 60;
+
       const archNodes: Node[] = visibleNodes.map((node) => {
+        if (node.type === 'annotation') {
+          const a = node as AnnotationNodeType;
+          const x = a.properties.x ?? ANNOTATION_DEFAULT_X;
+          const y = a.properties.y ?? annotationCursor;
+          annotationCursor += ANNOTATION_DEFAULT_Y_STEP;
+          return {
+            id: node.id,
+            type: 'annotation',
+            position: { x, y },
+            data: {
+              label: node.name,
+              text: a.properties.text,
+              color: a.properties.color,
+            },
+          };
+        }
         const pos = positions.get(node.id) || { x: 100, y: 100 };
 
         return {
@@ -388,10 +445,19 @@ function DiagramCanvasInternal() {
 
     // Filter edges by C4 level / drill-down so they don't dangle when nodes are hidden.
     let edges = parsedDiagram.edges;
+    // Annotation nodes are sticky notes — they don't participate in edges at all,
+    // so any edge that happens to mention an annotation id is dropped.
+    const annotationIds = new Set(
+      parsedDiagram.nodes.filter(n => n.type === 'annotation').map(n => n.id)
+    );
+    if (annotationIds.size > 0) {
+      edges = edges.filter(e => !annotationIds.has(e.from) && !annotationIds.has(e.to));
+    }
     if (diagramMode !== 'flow' && (c4Level !== 'all' || drillParent)) {
       const visibleIds = new Set(
         parsedDiagram.nodes
           .filter(n => {
+            if (n.type === 'annotation') return true;
             if (drillParent) {
               if (n.type === 'service' || n.type === 'cloud' || n.type === 'class') {
                 return (n as ServiceNodeType | CloudNodeType | ClassNodeType).properties?.parent === drillParent;
@@ -419,16 +485,16 @@ function DiagramCanvasInternal() {
       edgeStyle === 'straight' ? 'straight' :
       undefined; // 'curved' uses React Flow's default bezier
 
-    // In flow mode, branch edges take on a semantic colour from their label:
-    // positive paths (yes / </approve) go green, negative (no / ≥/reject) red,
-    // everything else stays neutral — matching the reference workflow.
-    const branchColor = (label?: string): string | null => {
-      if (diagramMode !== 'flow' || !label) return null;
-      const l = label.toLowerCase();
-      if (/\b(yes|approve|approved|accept|ok|success|pass|valid|low)\b/.test(l) || l.includes('<')) return '#16a34a';
-      if (/\b(no|reject|rejected|deny|denied|fail|failed|invalid|high)\b/.test(l) || l.includes('≥') || l.includes('>=') || l.includes('>')) return '#dc2626';
-      return null;
-    };
+// In flow mode, branch edges take on a semantic colour from their label:
+  // positive paths (yes / </approve) go green, negative (no / ≥/reject) red,
+  // everything else stays neutral — matching the reference workflow.
+  const branchColor = (label?: string): string | null => {
+    if (diagramMode !== 'flow' || !label) return null;
+    const l = label.toLowerCase();
+    if (/\b(yes|approve|approved|accept|ok|success|pass|valid|low)\b/.test(l) || l.includes('<')) return '#16a34a';
+    if (/\b(no|reject|rejected|deny|denied|fail|failed|invalid|high)\b/.test(l) || l.includes('≥') || l.includes('>=') || l.includes('>')) return '#dc2626';
+    return null;
+  };
 
     return edges.map((edge) => {
       const branch = branchColor(edge.label);
@@ -618,6 +684,8 @@ function DiagramCanvasInternal() {
     const src = parsedDiagram.nodes.find(n => n.id === conn.source);
     const tgt = parsedDiagram.nodes.find(n => n.id === conn.target);
     if (!src || !tgt) return;
+    // Annotation nodes are sticky notes — they don't accept or emit connections.
+    if (src.type === 'annotation' || tgt.type === 'annotation') return;
 
     const next = addConnectionDSL(
       dslText,
@@ -763,6 +831,11 @@ function DiagramCanvasInternal() {
           onChange={handleLevelChange}
         />
       )}
+
+      {/* Color-coded role legend at the top of the canvas. Mirrors the
+          chip strip from the Diagram Kit reference — process / service /
+          data / decision. Architecture mode only. */}
+      {diagramMode !== 'flow' && <ColorLegend />}
 
       {/* Drill-down breadcrumb (architecture mode, only when drilled in) */}
       {diagramMode !== 'flow' && drillParent && (

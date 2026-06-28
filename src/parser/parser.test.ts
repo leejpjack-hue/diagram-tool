@@ -167,4 +167,64 @@ database Main_DB {
     expect(result.nodes[0].id).toBe('myapi_gateway');
     expect(result.nodes[1].id).toBe('main_db');
   });
+
+  describe('Annotation sticky notes', () => {
+    it('parses a quoted annotation with default accent', () => {
+      const dsl = `note "All ingress terminates TLS at the gateway."`;
+      const result = parseDiagram(dsl);
+      expect(result.nodes).toHaveLength(1);
+      const n = result.nodes[0];
+      expect(n.type).toBe('annotation');
+      if (n.type === 'annotation') {
+        expect(n.properties.text).toBe('All ingress terminates TLS at the gateway.');
+        expect(n.properties.color).toBeUndefined();
+        expect(n.properties.x).toBeUndefined();
+        expect(n.properties.y).toBeUndefined();
+      }
+    });
+
+    it('parses an annotation with color and position overrides', () => {
+      const dsl = `note "Watch the retry budget here." {
+  color: "#fbbf24"
+  at: 240, 560
+}`;
+      const result = parseDiagram(dsl);
+      const n = result.nodes[0];
+      if (n.type === 'annotation') {
+        expect(n.properties.text).toBe('Watch the retry budget here.');
+        expect(n.properties.color).toBe('#fbbf24');
+        expect(n.properties.x).toBe(240);
+        expect(n.properties.y).toBe(560);
+      } else {
+        throw new Error('expected annotation node');
+      }
+    });
+
+    it('annotations do not generate any edges', () => {
+      const dsl = `
+service Frontend {
+  connects: Backend
+}
+service Backend {}
+note "Reads only" {}
+`;
+      const result = parseDiagram(dsl);
+      expect(result.nodes).toHaveLength(3);
+      // Only the one connects: edge should exist
+      expect(result.edges).toHaveLength(1);
+      expect(result.edges[0].from).toBe('frontend');
+      expect(result.edges[0].to).toBe('backend');
+    });
+
+    it('generates unique ids when two notes share the same body', () => {
+      const dsl = `
+note "Same body"
+note "Same body"
+`;
+      const result = parseDiagram(dsl);
+      expect(result.nodes).toHaveLength(2);
+      const ids = new Set(result.nodes.map(n => n.id));
+      expect(ids.size).toBe(2);
+    });
+  });
 });

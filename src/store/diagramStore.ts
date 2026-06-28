@@ -47,43 +47,113 @@ interface DiagramStore {
 }
 
 export const useDiagramStore = create<DiagramStore>((set, get) => ({
-  // Initial state
+  // Initial state — the Diagram Kit reference sample (Web/Mobile → CDN → Gateway
+  // → Services → Data). Loaded the first time the app runs, before autosave
+  // restores any user-saved diagram.
   dslText: `diagram: architecture
-title: Insurance Claims Platform
+title: Request Path — Services to Data
+direction: LR
+edges: orthogonal
 
-service ClaimsAPI {
-  type: api
-  tech: Node.js
-  port: 3000
-  connects: ClaimsService, PolicyService
+service Client {
+  icon: "USR"
+  color: "#ec4899"
+  tech: "client"
+  connects: CDN, Gateway
 }
 
-service ClaimsService {
-  type: microservice
-  tech: Java
-  replicas: 3
-  connects: ClaimsDB, EventQueue
+cloud CDN {
+  icon: "CDN"
+  color: "#f97316"
+  tech: "static · cache"
+  connects: Gateway
 }
 
-service PolicyService {
-  type: microservice
-  tech: Python
-  connects: PolicyDB
+cloud Gateway {
+  icon: "GW"
+  color: "#8b5cf6"
+  tech: "tls · rate-limit"
+  connects: Auth, Orders, Payments
 }
 
-database ClaimsDB {
-  type: postgresql
-  data: claims, claim_events
+service Auth {
+  icon: "API"
+  color: "#3b82f6"
+  tech: "svc · :8081"
+  connects: Postgres
 }
 
-database PolicyDB {
-  type: mongodb
-  data: policies, customers
+service Orders {
+  icon: "API"
+  color: "#3b82f6"
+  tech: "svc · :8082"
+  connects: Postgres, Redis, Events
 }
 
-queue EventQueue {
-  type: kafka
-  topic: claim-events
+service Payments {
+  icon: "API"
+  color: "#3b82f6"
+  tech: "svc · :8083"
+  connects: Postgres
+}
+
+database Postgres {
+  color: "#a855f7"
+  type: primary
+}
+
+database Redis {
+  color: "#06b6d4"
+  type: cache
+}
+
+queue Events {
+  icon: "MQ"
+  color: "#0ea5e9"
+  topic: kafka
+  connects: Worker
+}
+
+service Worker {
+  icon: "WK"
+  color: "#3b82f6"
+  tech: "consumer"
+  connects: ObjectStore, Analytics
+}
+
+cloud ObjectStore {
+  icon: "S3"
+  color: "#f97316"
+  tech: "bucket"
+}
+
+cloud Analytics {
+  icon: "AN"
+  color: "#a855f7"
+  tech: "warehouse"
+}
+
+group Edge {
+  label: "Edge · cdn + ingress"
+  color: "#f97316"
+  contains: CDN, Gateway
+}
+
+group Services {
+  label: "Services · k8s"
+  color: "#3b82f6"
+  contains: Auth, Orders, Payments, Worker
+}
+
+group Data {
+  label: "Data & Processing"
+  color: "#a855f7"
+  contains: Postgres, Redis, Events, ObjectStore, Analytics
+}
+
+note "All ingress terminates TLS & is rate-limited at the gateway." {
+  color: "#fbbf24"
+  at: 280, 560
 }`,
   parsedDiagram: null,
   selectedNodeId: null,

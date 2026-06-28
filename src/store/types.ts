@@ -120,7 +120,23 @@ export interface ClassNode {
   connections: string[];
 }
 
-export type DiagramNode = ServiceNode | DatabaseNode | QueueNode | CloudNode | ClassNode | FlowNode;
+// Annotation node — sticky-note callout that floats over the canvas to call
+// out a risk, a decision, or a piece of extra context. It carries no edges and
+// isn't part of the autolayout graph; users position it with x:/y: in the DSL
+// or by dragging on the canvas.
+export interface AnnotationNode {
+  type: 'annotation';
+  id: string;
+  name: string; // short label shown in the property panel / a11y
+  properties: {
+    text: string; // body of the sticky note
+    color?: string; // accent colour override (defaults to amber)
+    x?: number; // optional initial x position (overrides autolayout)
+    y?: number;
+  };
+}
+
+export type DiagramNode = ServiceNode | DatabaseNode | QueueNode | CloudNode | ClassNode | FlowNode | AnnotationNode;
 
 // Swimlane: a horizontal band that visually groups flow nodes by actor/role.
 export interface Lane {

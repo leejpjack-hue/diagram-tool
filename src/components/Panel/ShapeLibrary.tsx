@@ -22,6 +22,8 @@ const ARCHITECTURE_SHAPES: ShapeDef[] = [
   { label: 'Cloud', glyph: '☁️', accent: '#f59e0b', dsl: n => `cloud ${n} {\n  provider: aws\n  kind: lambda\n}` },
   { label: 'Class', glyph: '📦', accent: '#0d9488', dsl: n => `class ${n} {\n  attributes: id: int\n  methods: run(): void\n}` },
   { label: 'Card', glyph: '✨', accent: '#6366f1', dsl: n => `service ${n} {\n  icon: "✨"\n  color: "#6366f1"\n  tech: "Edit me"\n}` },
+  // Sticky-note annotation — call out a risk, decision, or piece of context.
+  { label: 'Note', glyph: '📝', accent: '#fbbf24', dsl: n => `note "${n.replace(/^NewNote/, 'Add a note…')}" {\n  color: "#fbbf24"\n}` },
 ];
 
 const FLOW_SHAPES: ShapeDef[] = [

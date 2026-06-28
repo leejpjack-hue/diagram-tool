@@ -37,6 +37,8 @@ const KEYWORDS = [
   'lane', 'color',
   // Presentation cards
   'icon',
+  // Annotation sticky notes — `note "text" { ... }` plus its properties
+  'note', 'text', 'at',
 ];
 
 export class Lexer {

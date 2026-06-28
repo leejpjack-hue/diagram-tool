@@ -13,6 +13,10 @@ import type { NodeProps } from '@xyflow/react';
  *     color: '#3B82F6'              # optional, defaults to slate
  *     contains: AuthApi, OrdersApi, OrdersDb
  *   }
+ *
+ * Visual treatment mirrors the Diagram Kit reference: a soft dashed outline,
+ * a 5%-tinted fill, and a pill-shaped monospace label badge pinned to the
+ * top-left corner that reads like "EDGE · cdn + ingress".
  */
 export type GroupContainerData = {
   label: string;
@@ -33,7 +37,7 @@ export const GroupContainerNode = memo(({ data }: NodeProps) => {
       style={{
         width: d.width,
         height: d.height,
-        border: `1.5px solid ${hexWithAlpha(color, 0.35)}`,
+        border: `1.4px dashed ${hexWithAlpha(color, 0.45)}`,
         borderRadius: 16,
         background: fill,
         position: 'relative',
@@ -47,19 +51,20 @@ export const GroupContainerNode = memo(({ data }: NodeProps) => {
       <div
         style={{
           position: 'absolute',
-          top: -12,
-          left: 14,
+          top: -11,
+          left: 18,
           background: 'white',
-          border: `1px solid ${hexWithAlpha(color, 0.35)}`,
-          padding: '2px 10px',
-          fontSize: 11,
-          fontWeight: 700,
-          color,
-          letterSpacing: 0.4,
+          border: `1.2px solid ${hexWithAlpha(color, 0.45)}`,
+          padding: '3px 10px',
+          fontSize: 10,
+          fontWeight: 600,
+          color: hexWithAlpha(color, 0.95),
+          letterSpacing: '0.04em',
           textTransform: 'uppercase',
-          lineHeight: '18px',
-          borderRadius: 999,
-          boxShadow: '0 1px 3px rgba(15,23,42,0.08)',
+          lineHeight: '16px',
+          borderRadius: 8,
+          boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
+          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
         }}
       >
         {d.label}
