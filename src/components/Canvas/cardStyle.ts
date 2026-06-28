@@ -39,6 +39,12 @@ export function chipStyle(accent: string): CSSProperties {
   };
 }
 
+// A short alphanumeric `icon:` (e.g. "API", "GW") is rendered as a mono code;
+// anything else (emoji/symbol) is rendered as a glyph.
+export function isCode(icon: string): boolean {
+  return /^[A-Za-z0-9]{1,4}$/.test(icon.trim());
+}
+
 export function badgeStyle(accent: string): CSSProperties {
   return {
     background: `color-mix(in srgb, ${accent} 12%, white)`,

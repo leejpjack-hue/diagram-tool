@@ -38,82 +38,81 @@ title: Request Path — Services to Data
 edges: orthogonal
 
 service Client {
-  icon: "👤"
+  icon: "USR"
   color: "#ec4899"
-  tech: "web · mobile"
+  tech: "client"
   connects: CDN, Gateway
 }
 
 cloud CDN {
+  icon: "CDN"
   color: "#f97316"
-  provider: aws
-  kind: cloudfront
   tech: "static · cache"
   connects: Gateway
 }
 
 cloud Gateway {
+  icon: "GW"
   color: "#8b5cf6"
-  provider: aws
-  kind: apigateway
   tech: "tls · rate-limit"
   connects: Auth, Orders, Payments
 }
 
 service Auth {
+  icon: "API"
   color: "#3b82f6"
-  type: api
-  tech: ":8081"
+  tech: "svc · :8081"
   connects: Postgres
 }
 
 service Orders {
+  icon: "API"
   color: "#3b82f6"
-  type: api
-  tech: ":8082"
+  tech: "svc · :8082"
   connects: Postgres, Redis, Events
 }
 
 service Payments {
+  icon: "API"
   color: "#3b82f6"
-  type: api
-  tech: ":8083"
+  tech: "svc · :8083"
   connects: Postgres
 }
 
 database Postgres {
   color: "#a855f7"
-  type: postgresql
+  type: primary
 }
 
 database Redis {
   color: "#06b6d4"
-  type: redis
+  type: cache
 }
 
 queue Events {
-  color: "#14b8a6"
-  type: kafka
-  topic: events
+  icon: "MQ"
+  color: "#0ea5e9"
+  topic: kafka
   connects: Worker
 }
 
 service Worker {
+  icon: "WK"
   color: "#3b82f6"
   tech: "consumer"
   connects: ObjectStore, Analytics
 }
 
 cloud ObjectStore {
+  icon: "S3"
   color: "#f97316"
-  provider: aws
-  kind: s3
+  tech: "bucket"
 }
 
 cloud Analytics {
+  icon: "AN"
   color: "#a855f7"
-  provider: gcp
-  kind: bigquery
+  tech: "warehouse"
 }
 
 group Edge {

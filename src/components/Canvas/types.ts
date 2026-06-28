@@ -24,6 +24,7 @@ export interface QueueNodeData {
   type?: 'kafka' | 'rabbitmq' | 'sqs';
   topic?: string;
   color?: string; // accent color override
+  icon?: string; // short code/emoji shown in the chip
 }
 
 export interface FlowNodeData {
@@ -51,6 +52,7 @@ export interface CloudNodeData {
   level?: C4Level;
   parent?: string;
   color?: string; // accent color override
+  icon?: string; // short code/emoji shown in the chip
 }
 
 export interface ClassNodeData {

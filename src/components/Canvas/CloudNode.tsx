@@ -4,7 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import type { CloudNodeData } from './types';
 import { ProviderIcon, KindIcon, hasKindIcon } from './icons';
 import { useLayoutHandles } from './layoutDirection';
-import { cardStyle, chipStyle, badgeStyle, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
+import { cardStyle, chipStyle, badgeStyle, isCode, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
 
 // Provider visual identity — colored badges with stylized geometric glyphs.
 // Glyphs themselves now live as standalone .svg files in ./icons/providers/.
@@ -60,7 +60,13 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
           style={chipStyle(accent)}
           title={meta.label}
         >
-          {customKind ? (
+          {nodeData.icon ? (
+            isCode(nodeData.icon) ? (
+              <span style={{ fontFamily: MONO_FONT, fontWeight: 700, fontSize: nodeData.icon.length > 2 ? 10 : 13, lineHeight: 1 }}>{nodeData.icon}</span>
+            ) : (
+              <span style={{ fontSize: 20, lineHeight: 1 }}>{nodeData.icon}</span>
+            )
+          ) : customKind ? (
             <KindIcon name={kindKey} size={22} />
           ) : kindBadge ? (
             <span style={{ fontSize: kindBadge.length > 2 ? 11 : 14, lineHeight: 1, fontFamily: MONO_FONT }}>{kindBadge}</span>
@@ -73,19 +79,24 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 mt-1.5">
-        <span
-          className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded"
-          style={{ ...badgeStyle(accent), fontFamily: MONO_FONT }}
-        >
-          {meta.label}
-        </span>
-        {nodeData.kind && (
-          <span className="text-[11px]" style={{ color: MUTED_COLOR, fontFamily: MONO_FONT }}>
-            {kindLabel(nodeData.kind)}
-          </span>
-        )}
-      </div>
+      {/* Provider badge only when a provider/kind is explicitly declared. */}
+      {(nodeData.provider || nodeData.kind) && (
+        <div className="flex items-center gap-1.5 mt-1.5">
+          {nodeData.provider && (
+            <span
+              className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded"
+              style={{ ...badgeStyle(accent), fontFamily: MONO_FONT }}
+            >
+              {meta.label}
+            </span>
+          )}
+          {nodeData.kind && (
+            <span className="text-[11px]" style={{ color: MUTED_COLOR, fontFamily: MONO_FONT }}>
+              {kindLabel(nodeData.kind)}
+            </span>
+          )}
+        </div>
+      )}
 
       {(nodeData.tech || nodeData.region) && (
         <div className="text-[11px] mt-1" style={{ color: MUTED_COLOR, fontFamily: MONO_FONT }}>

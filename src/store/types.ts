@@ -42,6 +42,7 @@ export interface QueueNode {
     type?: 'kafka' | 'rabbitmq' | 'sqs';
     topic?: string;
     color?: string; // accent color override
+    icon?: string; // short code/emoji shown in the chip
   };
 }
 
@@ -98,6 +99,7 @@ export interface CloudNode {
     level?: C4Level;
     parent?: string;
     color?: string; // accent color override
+    icon?: string; // short code/emoji shown in the chip
   };
   connections: string[];
 }

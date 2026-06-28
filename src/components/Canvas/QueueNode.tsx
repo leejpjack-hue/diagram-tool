@@ -4,7 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import type { QueueNodeData } from './types';
 import { NodeIcon, hasNodeIcon } from './icons';
 import { useLayoutHandles } from './layoutDirection';
-import { cardStyle, chipStyle, badgeStyle, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
+import { cardStyle, chipStyle, badgeStyle, isCode, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
 
 const DEFAULT_ACCENT = '#10b981';
 
@@ -29,7 +29,13 @@ export const QueueNode = memo(({ data, selected }: NodeProps) => {
           className="w-9 h-9 rounded-[9px] flex items-center justify-center font-bold shrink-0"
           style={chipStyle(accent)}
         >
-          {hasNodeIcon('queue') ? (
+          {nodeData.icon ? (
+            isCode(nodeData.icon) ? (
+              <span style={{ fontFamily: MONO_FONT, fontWeight: 700, fontSize: nodeData.icon.length > 2 ? 10 : 13, lineHeight: 1 }}>{nodeData.icon}</span>
+            ) : (
+              <span style={{ fontSize: 20, lineHeight: 1 }}>{nodeData.icon}</span>
+            )
+          ) : hasNodeIcon('queue') ? (
             <NodeIcon name="queue" size={22} />
           ) : (
             <span style={{ fontSize: 20, lineHeight: 1 }}>📨</span>

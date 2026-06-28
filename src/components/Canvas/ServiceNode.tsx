@@ -4,7 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import type { ServiceNodeData } from './types';
 import { NodeIcon, hasNodeIcon } from './icons';
 import { useLayoutHandles } from './layoutDirection';
-import { cardStyle, chipStyle, badgeStyle, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
+import { cardStyle, chipStyle, badgeStyle, isCode, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
 
 export const ServiceNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as ServiceNodeData;
@@ -33,7 +33,11 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
           style={chipStyle(accent)}
         >
           {nodeData.icon ? (
-            <span style={{ fontSize: 20, lineHeight: 1 }}>{nodeData.icon}</span>
+            isCode(nodeData.icon) ? (
+              <span style={{ fontFamily: MONO_FONT, fontWeight: 700, fontSize: nodeData.icon.length > 2 ? 10 : 13, lineHeight: 1 }}>{nodeData.icon}</span>
+            ) : (
+              <span style={{ fontSize: 20, lineHeight: 1 }}>{nodeData.icon}</span>
+            )
           ) : hasNodeIcon(iconKey) ? (
             <NodeIcon name={iconKey} size={22} />
           ) : (

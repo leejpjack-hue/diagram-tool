@@ -457,6 +457,9 @@ export class Parser {
           case 'color':
             node.properties.color = String(valueToken.value);
             break;
+          case 'icon':
+            node.properties.icon = String(valueToken.value);
+            break;
         }
       } else {
         this.advance();
@@ -527,6 +530,11 @@ export class Parser {
           case 'color': {
             const v = this.advance();
             node.properties.color = String(v.value);
+            break;
+          }
+          case 'icon': {
+            const v = this.advance();
+            node.properties.icon = String(v.value);
             break;
           }
           case 'connects': {

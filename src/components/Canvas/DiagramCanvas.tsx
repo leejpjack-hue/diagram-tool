@@ -419,38 +419,53 @@ function DiagramCanvasInternal() {
       edgeStyle === 'straight' ? 'straight' :
       undefined; // 'curved' uses React Flow's default bezier
 
-    return edges.map((edge) => ({
-      id: edge.id,
-      source: edge.from,
-      target: edge.to,
-      label: edge.label,
-      animated: false,
-      type: rfEdgeType,
-      ...(rfEdgeType === 'smoothstep' ? { pathOptions: { borderRadius: 14 } } : {}),
-      style: {
-        stroke: edgeColor,
-        strokeWidth: diagramMode === 'flow' ? 1.8 : 2,
-      },
-      labelStyle: { 
-        fill: '#1E293B', 
-        fontWeight: 600, 
-        fontSize: 11,
-        fontFamily: 'Inter, sans-serif'
-      },
-      labelBgStyle: { 
-        fill: '#FDFDFD', 
-        fillOpacity: 0.95,
-        stroke: edgeColor,
-        strokeOpacity: 0.3,
-        strokeWidth: 1,
-      },
-      labelBgPadding: [6, 8] as [number, number],
-      labelBgBorderRadius: 6,
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: edgeColor,
-      },
-    }));
+    // In flow mode, branch edges take on a semantic colour from their label:
+    // positive paths (yes / </approve) go green, negative (no / ≥/reject) red,
+    // everything else stays neutral — matching the reference workflow.
+    const branchColor = (label?: string): string | null => {
+      if (diagramMode !== 'flow' || !label) return null;
+      const l = label.toLowerCase();
+      if (/\b(yes|approve|approved|accept|ok|success|pass|valid|low)\b/.test(l) || l.includes('<')) return '#16a34a';
+      if (/\b(no|reject|rejected|deny|denied|fail|failed|invalid|high)\b/.test(l) || l.includes('≥') || l.includes('>=') || l.includes('>')) return '#dc2626';
+      return null;
+    };
+
+    return edges.map((edge) => {
+      const branch = branchColor(edge.label);
+      const stroke = branch ?? edgeColor;
+      return {
+        id: edge.id,
+        source: edge.from,
+        target: edge.to,
+        label: edge.label,
+        animated: false,
+        type: rfEdgeType,
+        ...(rfEdgeType === 'smoothstep' ? { pathOptions: { borderRadius: 14 } } : {}),
+        style: {
+          stroke,
+          strokeWidth: diagramMode === 'flow' ? 1.8 : 2,
+        },
+        labelStyle: {
+          fill: branch ?? '#1E293B',
+          fontWeight: 700,
+          fontSize: 11,
+          fontFamily: "'JetBrains Mono', monospace",
+        },
+        labelBgStyle: {
+          fill: branch ? `color-mix(in srgb, ${branch} 12%, white)` : '#FDFDFD',
+          fillOpacity: 0.97,
+          stroke,
+          strokeOpacity: 0.4,
+          strokeWidth: 1,
+        },
+        labelBgPadding: [6, 8] as [number, number],
+        labelBgBorderRadius: 6,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: stroke,
+        },
+      };
+    });
   }, [parsedDiagram, diagramMode, c4Level, drillParent]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
