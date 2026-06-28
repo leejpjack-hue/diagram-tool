@@ -227,4 +227,60 @@ note "Same body"
       expect(ids.size).toBe(2);
     });
   });
+
+  describe('Architecture edge labels', () => {
+    it('parses a bare edge without a block', () => {
+      const dsl = `
+service Client {}
+service CDN {}
+edge Client -> CDN
+`;
+      const result = parseDiagram(dsl);
+      expect(result.edges).toHaveLength(1);
+      expect(result.edges[0].from).toBe('client');
+      expect(result.edges[0].to).toBe('cdn');
+      expect(result.edges[0].label).toBeUndefined();
+    });
+
+    it('attaches a label to an existing connects: edge', () => {
+      const dsl = `
+service Client {
+  connects: CDN
+}
+service CDN {}
+edge Client -> CDN { label: "REST" }
+`;
+      const result = parseDiagram(dsl);
+      // One edge total — labelled, not duplicated.
+      expect(result.edges).toHaveLength(1);
+      expect(result.edges[0].label).toBe('REST');
+    });
+
+    it('creates a new labelled edge between nodes that were not connected', () => {
+      const dsl = `
+service Events {}
+service Worker {}
+edge Events -> Worker { label: "consume" }
+`;
+      const result = parseDiagram(dsl);
+      expect(result.edges).toHaveLength(1);
+      expect(result.edges[0].from).toBe('events');
+      expect(result.edges[0].to).toBe('worker');
+      expect(result.edges[0].label).toBe('consume');
+    });
+
+    it('handles multiple labelled edges in one diagram', () => {
+      const dsl = `
+service Client {}
+service CDN {}
+service Gateway {}
+edge Client -> CDN { label: "REST" }
+edge CDN -> Gateway { label: "dynamic" }
+`;
+      const result = parseDiagram(dsl);
+      expect(result.edges).toHaveLength(2);
+      const labels = result.edges.map(e => e.label).sort();
+      expect(labels).toEqual(['REST', 'dynamic']);
+    });
+  });
 });

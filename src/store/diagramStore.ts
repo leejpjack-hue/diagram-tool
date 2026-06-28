@@ -154,7 +154,14 @@ group Data {
 note "All ingress terminates TLS & is rate-limited at the gateway." {
   color: "#fbbf24"
   at: 280, 560
-}`,
+}
+
+# Labelled edges — pull a few specific connections out of the diagram so they
+# carry a meaningful verb (REST / dynamic / consume) instead of an anonymous
+# arrow. The other connections stay declared inline on each node.
+edge Client -> CDN { label: "REST" }
+edge CDN -> Gateway { label: "dynamic" }
+edge Events -> Worker { label: "consume" }`,
   parsedDiagram: null,
   selectedNodeId: null,
   diagramMode: 'architecture',

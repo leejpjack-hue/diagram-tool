@@ -3,10 +3,45 @@ import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
 import { FLOW_COLORS, paletteFromColor, TITLE_FONT } from './flowShapeStyle';
+import { useLayoutHandles } from './layoutDirection';
+
+// Decision diamond — a rotated square. Four connection points so a branch can
+// always exit to the right place, but the primary target/source follow the
+// current layout direction (TB → top/bottom, LR → left/right) so the diamond
+// "points" along the flow axis. Without this, an LR diagram with TB-default
+// anchors draws lines that hit the diamond's flat sides instead of its points.
+// Pin a handle to the matching point of the diamond so its anchor sits exactly
+// on the rotated square's corner. Without this, every handle would share one
+// (left/top, right/bottom) axis and the LR-mode right-pointing handle would
+// land at the wrong y, breaking the edge geometry.
+function diamondHandleStyle(position: Position, color: string): React.CSSProperties {
+  const base: React.CSSProperties = { background: color };
+  switch (position) {
+    case Position.Left:
+      return { ...base, left: 0, top: '50%', transform: 'translateY(-50%)' };
+    case Position.Right:
+      return { ...base, right: 0, top: '50%', transform: 'translateY(-50%)' };
+    case Position.Top:
+      return { ...base, top: 0, left: '50%', transform: 'translateX(-50%)' };
+    case Position.Bottom:
+      return { ...base, bottom: 0, left: '50%', transform: 'translateX(-50%)' };
+  }
+}
 
 export const DecisionNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
   const C = nodeData.color ? paletteFromColor(nodeData.color) : FLOW_COLORS.amber;
+  const { target, source, direction } = useLayoutHandles();
+  const isLR = direction === 'LR';
+
+  // Two primary handles sit on the layout axis:
+  //   TB → target on Top,    source on Bottom (perpendicular exit = Right)
+  //   LR → target on Left,   source on Right  (perpendicular exit = Bottom)
+  // A second handle on the perpendicular axis (with an explicit id) acts as
+  // the side branch so a labelled connection like `A -> Decision ->|No| B`
+  // can still anchor to the diamond cleanly.
+  const exitA = isLR ? Position.Right : Position.Bottom;
+  const exitB = isLR ? Position.Bottom : Position.Right;
 
   return (
     <div
@@ -39,28 +74,31 @@ export const DecisionNode = memo(({ data, selected }: NodeProps) => {
         </div>
       </div>
 
-      {/* Handles on diamond points */}
+      {/* Primary target — sits on the diamond's leading point along the flow. */}
       <Handle
         type="target"
-        position={Position.Top}
-        style={{ background: C.border, top: 0, left: '50%', transform: 'translateX(-50%)' }}
+        position={target}
+        style={diamondHandleStyle(target, C.border)}
       />
+      {/* Primary source — trailing point along the flow. */}
       <Handle
         type="source"
-        position={Position.Bottom}
-        style={{ background: C.border, bottom: 0, left: '50%', transform: 'translateX(-50%)' }}
+        position={source}
+        style={diamondHandleStyle(source, C.border)}
       />
+      {/* Exit A — natural continuation on the perpendicular axis. */}
       <Handle
         type="source"
-        position={Position.Left}
-        id="left"
-        style={{ background: C.border, left: 0, top: '50%', transform: 'translateY(-50%)' }}
+        position={exitA}
+        id="exit-a"
+        style={diamondHandleStyle(exitA, C.border)}
       />
+      {/* Exit B — the side branch. */}
       <Handle
         type="source"
-        position={Position.Right}
-        id="right"
-        style={{ background: C.border, right: 0, top: '50%', transform: 'translateY(-50%)' }}
+        position={exitB}
+        id="exit-b"
+        style={diamondHandleStyle(exitB, C.border)}
       />
     </div>
   );

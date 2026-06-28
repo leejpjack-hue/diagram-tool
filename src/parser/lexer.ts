@@ -39,6 +39,8 @@ const KEYWORDS = [
   'icon',
   // Annotation sticky notes — `note "text" { ... }` plus its properties
   'note', 'text', 'at',
+  // Labelled architecture edges — `edge Client -> CDN { label: "REST" }`
+  'edge', 'label',
 ];
 
 export class Lexer {
@@ -110,8 +112,17 @@ export class Lexer {
 
     while (this.pos < this.text.length) {
       this.skipWhitespace();
-      
+
       const char = this.peek();
+
+      // Hash-style line comments: `# ...` to end of line. Lets users annotate
+      // their DSL without breaking the parser on stray identifiers.
+      if (char === '#') {
+        while (this.peek() !== null && this.peek() !== '\n') {
+          this.advance();
+        }
+        continue;
+      }
       
       if (!char) break;
 

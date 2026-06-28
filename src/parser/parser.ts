@@ -98,6 +98,9 @@ export class Parser {
           case 'note':
             this.parseAnnotation();
             break;
+          case 'edge':
+            this.parseArchitectureEdge();
+            break;
           case 'group':
             this.parseGroup();
             break;
@@ -745,6 +748,72 @@ export class Parser {
     }
 
     this.nodes.push(annotation);
+  }
+
+  // Parse `edge Client -> CDN { label: "REST" }` — a labelled connection
+  // between two already-declared architecture nodes. Re-declaring a `connects:`
+  // edge only adds/replaces its label; the edge itself is not duplicated.
+  //
+  // Also accepts the bare form `edge Client -> CDN` (no block) — in that case
+  // we just add a label-less edge if one doesn't already exist.
+  private parseArchitectureEdge(): void {
+    this.advance(); // consume 'edge'
+
+    const fromName = String(this.expectName().value);
+    const fromId = fromName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+    // Expect an arrow
+    if (this.peek().type !== TokenType.ARROW) {
+      this.advance(); // unknown token — bail out gracefully
+      return;
+    }
+    this.advance(); // consume '->'
+
+    const toName = String(this.expectName().value);
+    const toId = toName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+    let label: string | undefined;
+
+    // Optional `{ label: "..." }` block — supports quoted strings and bare
+    // identifiers so users can write either `label: "REST"` or `label: REST`.
+    if (this.peek().type === TokenType.LBRACE) {
+      this.advance(); // consume '{'
+      this.skipNewlines();
+      while (this.peek().type !== TokenType.RBRACE && this.peek().type !== TokenType.EOF) {
+        this.skipNewlines();
+        if (this.peek().type === TokenType.RBRACE) break;
+        const keyTok = this.peek();
+        if (keyTok.type === TokenType.KEYWORD &&
+            String(keyTok.value).toLowerCase() === 'label') {
+          this.advance(); // consume 'label'
+          this.expect(TokenType.COLON);
+          const v = this.advance();
+          label = String(v.value);
+        } else {
+          this.advance();
+        }
+      }
+      if (this.peek().type === TokenType.RBRACE) {
+        this.advance();
+      }
+    }
+
+    // Find an existing edge between these two nodes (created by an earlier
+    // `connects:` declaration) and either add a label or replace an empty one.
+    // If no edge exists yet, create one.
+    const existing = this.edges.find(
+      e => e.from === fromId && e.to === toId
+    );
+    if (existing) {
+      if (label !== undefined) existing.label = label;
+    } else {
+      this.edges.push({
+        id: `${fromId}_to_${toId}_${this.edges.length}`,
+        from: fromId,
+        to: toId,
+        label,
+      });
+    }
   }
 
   // Read tokens until the next newline/rbrace/eof and split on commas. Each item
