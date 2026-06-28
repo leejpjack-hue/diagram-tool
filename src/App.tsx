@@ -124,7 +124,7 @@ group Edge {
 
 group Services {
   label: "Services · k8s"
-  color: "#8b5cf6"
+  color: "#3b82f6"
   contains: Auth, Orders, Payments, Worker
 }
 
@@ -138,9 +138,9 @@ const FLOW_DSL = `diagram: flow
 title: Order Approval
 direction: LR
 
-start Start
+start Begin
 
-Start -> Submit
+Begin -> Submit
 Submit -> InfoComplete
 InfoComplete ->|No| Return
 InfoComplete ->|Yes| AmountCheck
@@ -154,6 +154,10 @@ ApprovedCheck ->|No| Rejected
 
 end Approved
 end Rejected
+
+node Begin {
+  label: Start
+}
 
 node Submit {
   label: Submit Request

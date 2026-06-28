@@ -378,10 +378,10 @@ function DiagramCanvasInternal() {
     if (!parsedDiagram) return [];
 
     const getEdgeColor = (mode: string) => {
-      // Flow connectors stay neutral (Figma-style) so the coloured lanes and
-      // shapes carry the meaning; architecture keeps the brand violet.
+      // Neutral grey connectors (per the Diagram Kit reference) so the
+      // coloured nodes, cylinders and groups carry the meaning.
       if (mode === 'flow') return '#64748b';
-      return '#8B5CF6';
+      return '#94a3b8';
     };
 
     const edgeColor = getEdgeColor(diagramMode);
