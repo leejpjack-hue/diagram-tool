@@ -66,3 +66,15 @@ describe('mermaidFlowToDSL → parseDiagram', () => {
     expect(parsed.edges.find(e => e.from === 'a' && e.to === 'b')?.label).toBe('submits');
   });
 });
+
+describe('mermaid position pins', () => {
+  it('honours `%% at <id> x y` comments', () => {
+    const mermaid = `flowchart TD
+  A[Start] --> B{Ok?}
+%% at A 200 80
+%% at B 400 160`;
+    const parsed = parseDiagram(mermaid);
+    expect(parsed.pins?.a).toEqual({ x: 200, y: 80 });
+    expect(parsed.pins?.b).toEqual({ x: 400, y: 160 });
+  });
+});

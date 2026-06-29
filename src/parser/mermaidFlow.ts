@@ -108,6 +108,9 @@ export function mermaidFlowToDSL(text: string): string {
   const edges: Edge[] = [];
   const lanes: { name: string; ids: string[] }[] = [];
   const laneStack: { name: string; ids: string[] }[] = [];
+  // Position pins carried in `%% at <id> <x> <y>` comments — written when the
+  // user drags a node on a Mermaid-format flowchart so placement persists.
+  const posPins: Record<string, { x: number; y: number }> = {};
 
   const recordNode = (n: NodeDef) => {
     const existing = nodes.get(n.id);
@@ -126,6 +129,13 @@ export function mermaidFlowToDSL(text: string): string {
   for (const raw of lines) {
     let line = raw.trim();
     if (!line) continue;
+    // Position pin comment: `%% at <id> <x> <y>` (intercept before the
+    // generic comment strip below).
+    const posM = /^%%\s*at\s+(\S+)\s+(-?\d+)\s+(-?\d+)\s*$/i.exec(line);
+    if (posM) {
+      posPins[posM[1]] = { x: Number(posM[2]), y: Number(posM[3]) };
+      continue;
+    }
     // Strip trailing comments / whole-line comments.
     const cm = line.indexOf('%%');
     if (cm !== -1) line = line.slice(0, cm).trim();
@@ -223,10 +233,12 @@ export function mermaidFlowToDSL(text: string): string {
   for (const n of nodes.values()) {
     const type = n.shape ? SHAPE_TO_TYPE[n.shape] : undefined;
     const label = n.text && n.text !== n.id ? n.text : undefined;
-    if (!type && !label) continue; // nothing to declare; bare id is fine
+    const pin = posPins[n.id];
+    if (!type && !label && !pin) continue; // nothing to declare; bare id is fine
     const body: string[] = [];
     if (label) body.push(`  label: ${quote(label)}`);
     if (type) body.push(`  type: ${type}`);
+    if (pin) body.push(`  at: ${pin.x}, ${pin.y}`);
     out.push(`node ${n.id} {`, ...body, '}', '');
   }
 

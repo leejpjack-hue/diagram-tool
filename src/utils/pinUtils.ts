@@ -36,6 +36,19 @@ export function setNodePin(dsl: string, name: string, x: number, y: number): str
   return `${dsl.replace(/\s+$/, '')}\n\nnode ${name} {\n  at: ${X}, ${Y}\n}\n`;
 }
 
+/**
+ * Mermaid flowcharts keep their Mermaid source, so positions are stored as
+ * `%% at <id> <x> <y>` comments that the transpiler reads (writing a native
+ * `node {}` block would be ignored on re-parse). Upserts the comment line.
+ */
+export function setMermaidNodePin(dsl: string, id: string, x: number, y: number): string {
+  const X = Math.round(x);
+  const Y = Math.round(y);
+  const re = new RegExp(`^%%[ \\t]*at[ \\t]+${escapeRegex(id)}[ \\t]+-?\\d+[ \\t]+-?\\d+[ \\t]*$`, 'm');
+  const line = `%% at ${id} ${X} ${Y}`;
+  return re.test(dsl) ? dsl.replace(re, line) : `${dsl.replace(/\s+$/, '')}\n${line}\n`;
+}
+
 /** Write `at:` and `size:` into a `group` block. */
 export function setGroupPin(
   dsl: string,

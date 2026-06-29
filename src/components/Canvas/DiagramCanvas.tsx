@@ -28,7 +28,8 @@ import { useDiagramStore } from '../../store/diagramStore';
 import type { FlowNode, C4Level, ServiceNode as ServiceNodeType, CloudNode as CloudNodeType, ClassNode as ClassNodeType, AnnotationNode as AnnotationNodeType } from '../../store/types';
 import { calculateAutoLayout, resolveGroupOverlaps } from '../../utils/autoLayout';
 import { addConnectionDSL } from '../../utils/connectDSL';
-import { setNodePin, setGroupPin } from '../../utils/pinUtils';
+import { setNodePin, setGroupPin, setMermaidNodePin } from '../../utils/pinUtils';
+import { isMermaidFlow } from '../../parser/mermaidFlow';
 import { parseDiagram } from '../../parser/parser';
 import { getHelperLines, type HelperLineResult } from './helperLines';
 import { LayoutDirectionContext } from './layoutDirection';
@@ -255,10 +256,11 @@ function DiagramCanvasInternal() {
               col = orphanCounter.v++;
             }
 
+            const lanePin = parsedDiagram.pins?.[node.id];
             return {
               id: node.id,
               type,
-              position: {
+              position: lanePin ?? {
                 x: LANE_NODE_X_START + col * LANE_NODE_X_STEP,
                 y: row * LANE_HEIGHT + 40 + (LANE_HEIGHT / 2 - 35),
               },
@@ -759,7 +761,11 @@ function DiagramCanvasInternal() {
     } else {
       const meta = parsedDiagram.nodes.find(n => n.id === node.id);
       if (!meta) return;
-      next = setNodePin(next, meta.name, node.position.x, node.position.y);
+      // Mermaid-format flowcharts store positions as `%% at` comments; native
+      // DSL stores them as an `at:` line inside the node block.
+      next = isMermaidFlow(dslText)
+        ? setMermaidNodePin(next, meta.name, node.position.x, node.position.y)
+        : setNodePin(next, meta.name, node.position.x, node.position.y);
     }
     if (next === dslText) return;
     setDslText(next);
