@@ -56,7 +56,7 @@ function LabelLayer({ data }: { data: FlowNodeData }) {
 
 export const DataNode = memo(({ data, selected }: ShapeProps) => {
   const d = data as unknown as FlowNodeData;
-  const { target, source, centerStyle } = useLayoutHandles();
+  const { target, source, centerStyle } = useLayoutHandles(!!d.reversed);
   return (
     <Wrapper selected={selected}>
       <div className="relative" style={{ width: SIZE.w, height: SIZE.h }}>
@@ -81,7 +81,7 @@ export const DocumentNode = memo(({ data, selected }: ShapeProps) => {
   const d = data as unknown as FlowNodeData;
   const w = SIZE.w, h = SIZE.h;
   const path = `M 2 2 L ${w - 2} 2 L ${w - 2} ${h - 12} Q ${(w * 0.75)} ${h + 2} ${w / 2} ${h - 10} Q ${w * 0.25} ${h - 18} 2 ${h - 10} Z`;
-  const { target, source, centerStyle, direction } = useLayoutHandles();
+  const { target, source, centerStyle, direction } = useLayoutHandles(!!d.reversed);
   // The wavy bottom drops a few px below baseline; in TB we pin the source
   // handle slightly higher so it sits on the wave's apex. In LR the source
   // is on the right edge and that adjustment doesn't apply.
@@ -106,7 +106,7 @@ DocumentNode.displayName = 'DocumentNode';
 export const ManualInputNode = memo(({ data, selected }: ShapeProps) => {
   const d = data as unknown as FlowNodeData;
   const w = SIZE.w, h = SIZE.h;
-  const { target, source, centerStyle } = useLayoutHandles();
+  const { target, source, centerStyle } = useLayoutHandles(!!d.reversed);
   return (
     <Wrapper selected={selected}>
       <div className="relative" style={{ width: w, height: h }}>
@@ -129,7 +129,7 @@ ManualInputNode.displayName = 'ManualInputNode';
 
 export const TerminatorNode = memo(({ data, selected }: ShapeProps) => {
   const d = data as unknown as FlowNodeData;
-  const { target, source } = useLayoutHandles();
+  const { target, source } = useLayoutHandles(!!d.reversed);
   return (
     <div
       className={`px-6 py-2.5 rounded-full transition-all duration-200 ${

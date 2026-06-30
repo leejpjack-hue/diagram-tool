@@ -7,7 +7,7 @@ import { FLOW_COLORS, flowShapeStyle, paletteFromColor, TITLE_FONT, MONO_FONT } 
 
 export const ProcessNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
-  const { target, source } = useLayoutHandles();
+  const { target, source } = useLayoutHandles(!!nodeData.reversed);
   const C = nodeData.color ? paletteFromColor(nodeData.color) : FLOW_COLORS.blue;
 
   return (

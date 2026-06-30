@@ -28,6 +28,7 @@ import { useDiagramStore } from '../../store/diagramStore';
 import type { FlowNode, C4Level, ServiceNode as ServiceNodeType, CloudNode as CloudNodeType, ClassNode as ClassNodeType, AnnotationNode as AnnotationNodeType } from '../../store/types';
 import { calculateAutoLayout, resolveGroupOverlaps } from '../../utils/autoLayout';
 import { addConnectionDSL } from '../../utils/connectDSL';
+import { setReverseDSL } from '../../utils/flowDSL';
 import { setNodePin, setGroupPin, setMermaidNodePin } from '../../utils/pinUtils';
 import { isMermaidFlow } from '../../parser/mermaidFlow';
 import { parseDiagram } from '../../parser/parser';
@@ -649,6 +650,26 @@ function DiagramCanvasInternal() {
     setDrillParentName('');
   }, [parsedDiagram]);
 
+  // Double-click a flow node to flip its input/output direction. Useful for
+  // "return" paths in an LR diagram where the default left→right flow would
+  // double back across the canvas and overlap the incoming edge.
+  // The toggle is written back to the DSL (source of truth) and re-parsed.
+  const onNodeDoubleClick = useCallback((_e: unknown, node: Node) => {
+    if (diagramMode !== 'flow' || !parsedDiagram) return;
+    const clicked = parsedDiagram.nodes.find(n => n.id === node.id);
+    if (!clicked || clicked.type !== 'flow') return;
+
+    const next = !clicked.properties.reversed;
+    const updated = setReverseDSL(dslText, clicked.name, next);
+    if (!updated) return;
+    setDslText(updated);
+    try {
+      setParsedDiagram(parseDiagram(updated));
+    } catch (err) {
+      console.error('Reverse toggle parse error:', err);
+    }
+  }, [diagramMode, parsedDiagram, dslText, setDslText, setParsedDiagram]);
+
   // Click a parent node to drill into its children at the next C4 level.
   // No-op when there are no children with parent = clicked node id.
   const onNodeClick = useCallback((_e: unknown, node: Node) => {
@@ -815,6 +836,7 @@ function DiagramCanvasInternal() {
         onMoveEnd={handleMoveEnd}
         onSelectionChange={onSelectionChange}
         onNodeClick={onNodeClick}
+        onNodeDoubleClick={onNodeDoubleClick}
         onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         snapToGrid

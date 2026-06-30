@@ -9,7 +9,7 @@ export const StartEndNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
   const isStart = nodeData.isStart;
   const isEnd = nodeData.isEnd;
-  const { target, source } = useLayoutHandles();
+  const { target, source } = useLayoutHandles(!!nodeData.reversed);
 
   // A `color:` override wins; otherwise start = green, end = red, else neutral.
   const c = nodeData.color

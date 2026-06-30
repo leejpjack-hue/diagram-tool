@@ -20,9 +20,9 @@ import { useLayoutHandles } from './layoutDirection';
 const GATE = { size: 80, stroke: '#F59E0B', fill: '#FEF3C7', text: '#92400E' };
 const EVT = { size: 64, stroke: '#10B981', fill: '#D1FAE5', text: '#065F46' };
 
-function GatewayShell({ glyph, selected, label }: { glyph: string; selected?: boolean; label?: string }) {
+function GatewayShell({ glyph, selected, label, reversed }: { glyph: string; selected?: boolean; label?: string; reversed?: boolean }) {
   const s = GATE.size;
-  const { target, source, direction } = useLayoutHandles();
+  const { target, source, direction } = useLayoutHandles(reversed);
   // Auxiliary branch handles — the two perpendicular sides keep Y/N branches
   // accessible by id ('left'/'right' in TB, 'top'/'bottom' in LR).
   const isLR = direction === 'LR';
@@ -91,27 +91,27 @@ function GatewayShell({ glyph, selected, label }: { glyph: string; selected?: bo
 
 export const GatewayExclusiveNode = memo(({ data, selected }: NodeProps) => {
   const d = data as unknown as FlowNodeData;
-  return <GatewayShell glyph="✕" selected={selected} label={d.label} />;
+  return <GatewayShell glyph="✕" selected={selected} label={d.label} reversed={!!d.reversed} />;
 });
 GatewayExclusiveNode.displayName = 'GatewayExclusiveNode';
 
 export const GatewayParallelNode = memo(({ data, selected }: NodeProps) => {
   const d = data as unknown as FlowNodeData;
-  return <GatewayShell glyph="+" selected={selected} label={d.label} />;
+  return <GatewayShell glyph="+" selected={selected} label={d.label} reversed={!!d.reversed} />;
 });
 GatewayParallelNode.displayName = 'GatewayParallelNode';
 
 export const GatewayInclusiveNode = memo(({ data, selected }: NodeProps) => {
   const d = data as unknown as FlowNodeData;
-  return <GatewayShell glyph="○" selected={selected} label={d.label} />;
+  return <GatewayShell glyph="○" selected={selected} label={d.label} reversed={!!d.reversed} />;
 });
 GatewayInclusiveNode.displayName = 'GatewayInclusiveNode';
 
 function EventShell({
-  glyph, selected, label, ringWidth = 2,
-}: { glyph: string; selected?: boolean; label?: string; ringWidth?: number }) {
+  glyph, selected, label, ringWidth = 2, reversed = false,
+}: { glyph: string; selected?: boolean; label?: string; ringWidth?: number; reversed?: boolean }) {
   const s = EVT.size;
-  const { target, source, centerStyle } = useLayoutHandles();
+  const { target, source, centerStyle } = useLayoutHandles(reversed);
   return (
     <div
       className="relative transition-all duration-200"
@@ -151,25 +151,25 @@ function EventShell({
 
 export const EventStartNode = memo(({ data, selected }: NodeProps) => {
   const d = data as unknown as FlowNodeData;
-  return <EventShell glyph="" selected={selected} label={d.label} ringWidth={2} />;
+  return <EventShell glyph="" selected={selected} label={d.label} ringWidth={2} reversed={!!d.reversed} />;
 });
 EventStartNode.displayName = 'EventStartNode';
 
 export const EventEndNode = memo(({ data, selected }: NodeProps) => {
   const d = data as unknown as FlowNodeData;
-  return <EventShell glyph="" selected={selected} label={d.label} ringWidth={5} />;
+  return <EventShell glyph="" selected={selected} label={d.label} ringWidth={5} reversed={!!d.reversed} />;
 });
 EventEndNode.displayName = 'EventEndNode';
 
 export const EventTimerNode = memo(({ data, selected }: NodeProps) => {
   const d = data as unknown as FlowNodeData;
-  return <EventShell glyph="⏱" selected={selected} label={d.label} ringWidth={2} />;
+  return <EventShell glyph="⏱" selected={selected} label={d.label} ringWidth={2} reversed={!!d.reversed} />;
 });
 EventTimerNode.displayName = 'EventTimerNode';
 
 export const EventMessageNode = memo(({ data, selected }: NodeProps) => {
   const d = data as unknown as FlowNodeData;
-  return <EventShell glyph="✉" selected={selected} label={d.label} ringWidth={2} />;
+  return <EventShell glyph="✉" selected={selected} label={d.label} ringWidth={2} reversed={!!d.reversed} />;
 });
 EventMessageNode.displayName = 'EventMessageNode';
 
@@ -180,8 +180,8 @@ EventMessageNode.displayName = 'EventMessageNode';
  */
 const SUB = { w: 180, h: 80, stroke: '#3B82F6', fill: '#EFF6FF', text: '#1E40AF' };
 
-function SubprocessShell({ glyph, selected, label, system }: { glyph: '+' | '−'; selected?: boolean; label?: string; system?: string }) {
-  const { target, source, direction } = useLayoutHandles();
+function SubprocessShell({ glyph, selected, label, system, reversed = false }: { glyph: '+' | '−'; selected?: boolean; label?: string; system?: string; reversed?: boolean }) {
+  const { target, source, direction } = useLayoutHandles(reversed);
   // Source handle hangs slightly below the box edge in TB so the marker badge
   // doesn't visually swallow it; in LR we let it sit flush on the right edge.
   const sourceStyle = direction === 'LR'
@@ -235,12 +235,12 @@ function SubprocessShell({ glyph, selected, label, system }: { glyph: '+' | '−
 
 export const SubprocessNode = memo(({ data, selected }: NodeProps) => {
   const d = data as unknown as FlowNodeData;
-  return <SubprocessShell glyph="+" selected={selected} label={d.label} system={d.system} />;
+  return <SubprocessShell glyph="+" selected={selected} label={d.label} system={d.system} reversed={!!d.reversed} />;
 });
 SubprocessNode.displayName = 'SubprocessNode';
 
 export const SubprocessExpandedNode = memo(({ data, selected }: NodeProps) => {
   const d = data as unknown as FlowNodeData;
-  return <SubprocessShell glyph="−" selected={selected} label={d.label} system={d.system} />;
+  return <SubprocessShell glyph="−" selected={selected} label={d.label} system={d.system} reversed={!!d.reversed} />;
 });
 SubprocessExpandedNode.displayName = 'SubprocessExpandedNode';

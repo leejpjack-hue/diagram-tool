@@ -80,6 +80,12 @@ export interface FlowNode {
     nodeType?: FlowNodeKind;
     lane?: string; // resolved lane id (set during parsing)
     color?: string; // accent override for the shape
+    /**
+     * Flip the input/output handles — useful in LR layouts where a "return"
+     * path would otherwise double back and overlap the incoming edge. Set
+     * via `reverse: true` in the DSL or by double-clicking the node.
+     */
+    reversed?: boolean;
   };
   isStart?: boolean;
   isEnd?: boolean;

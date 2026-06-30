@@ -1251,6 +1251,13 @@ export class Parser {
           case 'color':
             nodeData.properties!.color = fullValue;
             break;
+          case 'reverse':
+          case 'reversed':
+            // Flip input/output direction. Accepts `reverse: true|false` or
+            // bare `reverse:` (defaults to true). Mirrors the double-click
+            // toggle on the canvas.
+            nodeData.properties!.reversed = firstValue === '' ? true : firstValue.toLowerCase() !== 'false';
+            break;
           case 'at': {
             // valueParts holds the two coordinate numbers (comma skipped).
             const x = Number(valueParts[0]);

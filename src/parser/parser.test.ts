@@ -283,4 +283,72 @@ edge CDN -> Gateway { label: "dynamic" }
       expect(labels).toEqual(['REST', 'dynamic']);
     });
   });
+
+  describe('Flow node reverse flag', () => {
+    it('parses `reverse: true` inside a node block', () => {
+      const dsl = `
+diagram: flow
+direction: LR
+A -> B
+node B {
+  reverse: true
+}
+`;
+      const result = parseDiagram(dsl);
+      const b = result.nodes.find(n => n.id === 'b');
+      expect(b).toBeDefined();
+      if (b && b.type === 'flow') {
+        expect(b.properties.reversed).toBe(true);
+      }
+    });
+
+    it('accepts bare `reverse:` (defaults to true)', () => {
+      const dsl = `
+diagram: flow
+direction: LR
+A -> B
+node B {
+  label: B
+  reverse:
+}
+`;
+      const result = parseDiagram(dsl);
+      const b = result.nodes.find(n => n.id === 'b');
+      if (b && b.type === 'flow') {
+        expect(b.properties.reversed).toBe(true);
+      }
+    });
+
+    it('parses `reverse: false` to clear the flag', () => {
+      const dsl = `
+diagram: flow
+direction: LR
+A -> B
+node B {
+  reverse: false
+}
+`;
+      const result = parseDiagram(dsl);
+      const b = result.nodes.find(n => n.id === 'b');
+      if (b && b.type === 'flow') {
+        expect(b.properties.reversed).toBe(false);
+      }
+    });
+
+    it('accepts `reversed` as an alias', () => {
+      const dsl = `
+diagram: flow
+direction: LR
+A -> B
+node B {
+  reversed: true
+}
+`;
+      const result = parseDiagram(dsl);
+      const b = result.nodes.find(n => n.id === 'b');
+      if (b && b.type === 'flow') {
+        expect(b.properties.reversed).toBe(true);
+      }
+    });
+  });
 });

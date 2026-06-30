@@ -43,6 +43,8 @@ const KEYWORDS = [
   'size',
   // Labelled architecture edges — `edge Client -> CDN { label: "REST" }`
   'edge', 'label',
+  // Reverse a flow node's input/output direction (handle flip)
+  'reverse', 'reversed',
 ];
 
 export class Lexer {

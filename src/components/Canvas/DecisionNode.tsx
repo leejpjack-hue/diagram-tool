@@ -31,7 +31,7 @@ function diamondHandleStyle(position: Position, color: string): React.CSSPropert
 export const DecisionNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
   const C = nodeData.color ? paletteFromColor(nodeData.color) : FLOW_COLORS.amber;
-  const { target, source, direction } = useLayoutHandles();
+  const { target, source, direction } = useLayoutHandles(!!nodeData.reversed);
   const isLR = direction === 'LR';
 
   // Two primary handles sit on the layout axis:

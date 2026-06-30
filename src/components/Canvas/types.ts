@@ -41,6 +41,7 @@ export interface FlowNodeData {
   isEnd?: boolean;
   lane?: string;
   color?: string; // accent override for the shape
+  reversed?: boolean; // flip target/source handles — set by double-click or `reverse: true`
 }
 
 export interface CloudNodeData {
