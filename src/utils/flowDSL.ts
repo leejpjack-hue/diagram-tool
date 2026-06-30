@@ -42,3 +42,36 @@ export function setReverseDSL(dsl: string, nodeName: string, reversed: boolean):
   // next time around.
   return `${dsl.replace(/\s+$/, '')}\n\nnode ${nodeName} {\n  reverse: ${reversed ? 'true' : 'false'}\n}\n`;
 }
+
+// Toggle the `reverse:` flag for a node declared in Mermaid flowchart syntax.
+// Mermaid has no native reverse concept, so we use a side-channel `%% reverse <id>`
+// comment that the Mermaid→native transpiler picks up and carries into the
+// generated `node X { reverse: true }` block.
+//
+//   reversed: true  → add `%% reverse <id>` (or leave an existing one)
+//   reversed: false → remove any existing `%% reverse <id>` line
+//
+// Returns the updated DSL, or null if the input isn't Mermaid.
+export function setReverseMermaidDSL(dsl: string, nodeName: string, reversed: boolean): string | null {
+  if (!/^\s*(?:flowchart|graph)\b/im.test(dsl)) return null;
+
+  const lines = dsl.split('\n');
+  const targetLine = `%% reverse ${nodeName}`;
+  const hasExisting = lines.some(l => new RegExp(`^%%\\s*reverse\\s+${escapeRegex(nodeName)}\\s*$`, 'i').test(l));
+
+  if (reversed && !hasExisting) {
+    // Insert the comment near the top (right after the flowchart header) so
+    // it stays grouped with the rest of the metadata comments.
+    const insertAt = lines.findIndex(l => /^\s*(?:flowchart|graph)\b/i.test(l));
+    const idx = insertAt >= 0 ? insertAt + 1 : 0;
+    lines.splice(idx, 0, targetLine);
+    return lines.join('\n');
+  }
+  if (!reversed && hasExisting) {
+    const filtered = lines.filter(l => !new RegExp(`^%%\\s*reverse\\s+${escapeRegex(nodeName)}\\s*$`, 'i').test(l));
+    return filtered.join('\n');
+  }
+  // No-op (already in the desired state) — return the original text so the
+  // caller can still re-parse to refresh the canvas.
+  return dsl;
+}

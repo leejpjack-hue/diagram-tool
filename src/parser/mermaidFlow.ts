@@ -112,6 +112,11 @@ export function mermaidFlowToDSL(text: string): string {
   // user drags a node on a Mermaid-format flowchart so placement persists.
   const posPins: Record<string, { x: number; y: number }> = {};
 
+  // Reversed-input flags carried in `%% reverse <id>` comments — written when
+  // the user double-clicks a flow node on a Mermaid-format flowchart so the
+  // toggle survives the Mermaid→native transpilation round-trip.
+  const reverses = new Set<string>();
+
   const recordNode = (n: NodeDef) => {
     const existing = nodes.get(n.id);
     if (!existing) {
@@ -134,6 +139,12 @@ export function mermaidFlowToDSL(text: string): string {
     const posM = /^%%\s*at\s+(\S+)\s+(-?\d+)\s+(-?\d+)\s*$/i.exec(line);
     if (posM) {
       posPins[posM[1]] = { x: Number(posM[2]), y: Number(posM[3]) };
+      continue;
+    }
+    // Reverse flag comment: `%% reverse <id>` (presence = flipped).
+    const revM = /^%%\s*reverse\s+(\S+)\s*$/i.exec(line);
+    if (revM) {
+      reverses.add(revM[1]);
       continue;
     }
     // Strip trailing comments / whole-line comments.
@@ -234,11 +245,13 @@ export function mermaidFlowToDSL(text: string): string {
     const type = n.shape ? SHAPE_TO_TYPE[n.shape] : undefined;
     const label = n.text && n.text !== n.id ? n.text : undefined;
     const pin = posPins[n.id];
-    if (!type && !label && !pin) continue; // nothing to declare; bare id is fine
+    const reversed = reverses.has(n.id);
+    if (!type && !label && !pin && !reversed) continue; // nothing to declare; bare id is fine
     const body: string[] = [];
     if (label) body.push(`  label: ${quote(label)}`);
     if (type) body.push(`  type: ${type}`);
     if (pin) body.push(`  at: ${pin.x}, ${pin.y}`);
+    if (reversed) body.push('  reverse: true');
     out.push(`node ${n.id} {`, ...body, '}', '');
   }
 

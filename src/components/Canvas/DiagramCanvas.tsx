@@ -28,7 +28,7 @@ import { useDiagramStore } from '../../store/diagramStore';
 import type { FlowNode, C4Level, ServiceNode as ServiceNodeType, CloudNode as CloudNodeType, ClassNode as ClassNodeType, AnnotationNode as AnnotationNodeType } from '../../store/types';
 import { calculateAutoLayout, resolveGroupOverlaps } from '../../utils/autoLayout';
 import { addConnectionDSL } from '../../utils/connectDSL';
-import { setReverseDSL } from '../../utils/flowDSL';
+import { setReverseDSL, setReverseMermaidDSL } from '../../utils/flowDSL';
 import { setNodePin, setGroupPin, setMermaidNodePin } from '../../utils/pinUtils';
 import { isMermaidFlow } from '../../parser/mermaidFlow';
 import { parseDiagram } from '../../parser/parser';
@@ -654,13 +654,19 @@ function DiagramCanvasInternal() {
   // "return" paths in an LR diagram where the default left→right flow would
   // double back across the canvas and overlap the incoming edge.
   // The toggle is written back to the DSL (source of truth) and re-parsed.
+  // For Mermaid-format flowcharts the toggle rides along as a `%% reverse <id>`
+  // comment so it survives the Mermaid→native transpilation round-trip.
   const onNodeDoubleClick = useCallback((_e: unknown, node: Node) => {
     if (diagramMode !== 'flow' || !parsedDiagram) return;
     const clicked = parsedDiagram.nodes.find(n => n.id === node.id);
     if (!clicked || clicked.type !== 'flow') return;
 
     const next = !clicked.properties.reversed;
-    const updated = setReverseDSL(dslText, clicked.name, next);
+    // Prefer the Mermaid-aware setter so a Mermaid-format flowchart doesn't
+    // have its reverse flag swallowed by the transpiler. Fall back to the
+    // native setter if the input is mixed/ambiguous.
+    const updated = setReverseMermaidDSL(dslText, clicked.name, next) ??
+                    setReverseDSL(dslText, clicked.name, next);
     if (!updated) return;
     setDslText(updated);
     try {

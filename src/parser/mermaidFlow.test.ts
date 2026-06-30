@@ -78,3 +78,30 @@ describe('mermaid position pins', () => {
     expect(parsed.pins?.b).toEqual({ x: 400, y: 160 });
   });
 });
+
+describe('mermaid reverse comments', () => {
+  it('carries `%% reverse <id>` through to the parsed flow node', () => {
+    const mermaid = `flowchart LR
+  A[Start] --> B[Process]
+  B --> C[End]
+%% reverse B`;
+    const parsed = parseDiagram(mermaid);
+    const b = parsed.nodes.find(n => n.id === 'b');
+    expect(b).toBeDefined();
+    if (b && b.type === 'flow') {
+      expect(b.properties.reversed).toBe(true);
+    }
+  });
+
+  it('only flips the named node, not the whole diagram', () => {
+    const mermaid = `flowchart LR
+  A[Start] --> B[Process]
+  B --> C[End]
+%% reverse B`;
+    const parsed = parseDiagram(mermaid);
+    const a = parsed.nodes.find(n => n.id === 'a');
+    const c = parsed.nodes.find(n => n.id === 'c');
+    expect(a && a.type === 'flow' && a.properties.reversed).toBeFalsy();
+    expect(c && c.type === 'flow' && c.properties.reversed).toBeFalsy();
+  });
+});
