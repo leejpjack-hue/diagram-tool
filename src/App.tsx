@@ -657,6 +657,14 @@ function App() {
     setDslText(diagram.dslText);
     setDiagramMode(diagram.mode);
     setActiveTab(diagram.mode);
+    // Monaco's onChange doesn't fire for programmatic value swaps, so re-parse
+    // here or the canvas keeps the previous diagram. Saved diagrams are only
+    // architecture/flow, both handled by the generic parser.
+    try {
+      setParsedDiagram(parseDiagram(diagram.dslText));
+    } catch (err) {
+      console.error('Load parse error:', err);
+    }
     setLastSaved(new Date(diagram.updatedAt));
     setSaveStatus('saved');
     toast.success(`Loaded: ${diagram.title}`);
@@ -666,6 +674,11 @@ function App() {
     setDslText(ARCHITECTURE_DSL);
     setDiagramMode('architecture');
     setActiveTab('architecture');
+    try {
+      setParsedDiagram(parseDiagram(ARCHITECTURE_DSL));
+    } catch (err) {
+      console.error('New diagram parse error:', err);
+    }
     setSaveStatus('unsaved');
     toast.info('Created new diagram');
   };
