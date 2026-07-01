@@ -198,17 +198,20 @@ export function applyForceDirectedLayout(
     edges.forEach(edge => {
       const pos1 = newPositions.get(edge.from);
       const pos2 = newPositions.get(edge.to);
-      
+
       if (!pos1 || !pos2) return;
-      
+
       const dx = pos2.x - pos1.x;
       const dy = pos2.y - pos1.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
+      // Guard against distance = 0 (coincident starting positions from the
+      // hierarchical pass) — without the +1 the force vector becomes
+      // 0/0 = NaN and the NaN propagates through every node in one step.
+      const distance = Math.sqrt(dx * dx + dy * dy) + 1;
+
       const force = (distance - idealDistance) * attractionStrength;
       const fx = (dx / distance) * force;
       const fy = (dy / distance) * force;
-      
+
       forces.get(edge.from)!.x += fx;
       forces.get(edge.from)!.y += fy;
       forces.get(edge.to)!.x -= fx;

@@ -36,6 +36,18 @@ export const GroupContainerNode = memo(({ data, selected, positionAbsoluteX, pos
   // overwhelming the contained nodes.
   const fill = hexWithAlpha(color, 0.06);
 
+  // Defensive defaults — the data is built in DiagramCanvas where width and
+  // height are computed from member positions, but if those calculations
+  // fail (e.g. pins-only diagrams) we still need finite numbers for the
+  // <NodeResizer>'s internal SVG to render. Without this fallback the
+  // resizer's path d="..." attributes come out as "MNaN,NaN…" and React
+  // throws a flood of attribute errors that block the whole container from
+  // painting.
+  const width = Number.isFinite(d.width) ? d.width : 320;
+  const height = Number.isFinite(d.height) ? d.height : 200;
+  const x = Number.isFinite(positionAbsoluteX) ? positionAbsoluteX : 0;
+  const y = Number.isFinite(positionAbsoluteY) ? positionAbsoluteY : 0;
+
   return (
     <>
       <NodeResizer
@@ -46,14 +58,14 @@ export const GroupContainerNode = memo(({ data, selected, positionAbsoluteX, pos
         handleStyle={{ width: 8, height: 8, borderRadius: 2, background: '#fff', border: `1.5px solid ${hexWithAlpha(color, 0.8)}` }}
         onResizeEnd={(_e, params) => {
           if (d.groupId && d.onResize) {
-            d.onResize(d.groupId, positionAbsoluteX ?? params.x, positionAbsoluteY ?? params.y, params.width, params.height);
+            d.onResize(d.groupId, x, y, params.width, params.height);
           }
         }}
       />
     <div
       style={{
-        width: d.width,
-        height: d.height,
+        width,
+        height,
         border: `1.4px dashed ${hexWithAlpha(color, 0.45)}`,
         borderRadius: 16,
         background: fill,
