@@ -1,0 +1,25 @@
+{
+  "name": "diagram-tool-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for the diagram-tool DSL — lets AI agents (claude code, opencode, Claude Desktop) author, edit, verify, and export diagrams.",
+  "type": "module",
+  "main": "dist/server.js",
+  "bin": {
+    "diagram-tool-mcp": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts",
+    "test": "tsx src/server.test.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "~5.9.3"
+  }
+}
