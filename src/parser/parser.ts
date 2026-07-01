@@ -153,9 +153,15 @@ export class Parser {
       this.assignLaneMembership();
     }
 
-    // Convert flowNodes map to array if in flow mode
+    // Convert flowNodes map to array if in flow mode. Annotations live on
+    // `this.nodes` (alongside the architecture kinds) regardless of mode, so
+    // merge them in here — otherwise `note "..." { ... }` blocks would be
+    // silently dropped from flow diagrams.
     const allNodes = this.mode === 'flow'
-      ? Array.from(this.flowNodes.values())
+      ? [
+          ...Array.from(this.flowNodes.values()),
+          ...this.nodes.filter(n => n.type === 'annotation'),
+        ]
       : this.nodes;
 
     return {

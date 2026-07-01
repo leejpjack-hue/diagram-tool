@@ -350,5 +350,26 @@ node B {
         expect(b.properties.reversed).toBe(true);
       }
     });
+
+    it('surfaces a flow-mode `note` block as an annotation node', () => {
+      const dsl = `
+diagram: flow
+direction: LR
+A -> B
+note "Watch the retry budget here." {
+  color: "#fbbf24"
+  at: 200, 300
+}
+`;
+      const result = parseDiagram(dsl);
+      const annotations = result.nodes.filter(n => n.type === 'annotation');
+      expect(annotations).toHaveLength(1);
+      if (annotations[0]?.type === 'annotation') {
+        expect(annotations[0].properties.text).toBe('Watch the retry budget here.');
+        expect(annotations[0].properties.color).toBe('#fbbf24');
+        expect(annotations[0].properties.x).toBe(200);
+        expect(annotations[0].properties.y).toBe(300);
+      }
+    });
   });
 });
