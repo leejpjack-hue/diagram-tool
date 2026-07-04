@@ -37,7 +37,29 @@ export interface SequenceDiagramModel {
   items: SequenceItem[];
 }
 
-const MESSAGE_RE = /^([\w "]+?)\s*(-{1,2})(>>|>|\)|[xX])\s*([+-]?)\s*([\w "]+?)\s*:\s*(.*)$/;
+export const MESSAGE_RE = /^([\w "]+?)\s*(-{1,2})(>>|>|\)|[xX])\s*([+-]?)\s*([\w "]+?)\s*:\s*(.*)$/;
+
+// Lines the parser consumes before it ever tests MESSAGE_RE. Kept in sync
+// with parseSequenceDiagram so edit utilities can locate the nth message
+// line in the raw text reliably.
+const NON_MESSAGE_PREFIX = /^(sequenceDiagram|autonumber|activate|deactivate|title|participant|actor|note|loop|alt|opt|par|critical|break|else|and|end)\b/i;
+
+/**
+ * Indices (into text.split('\n')) of the lines that parse as messages, in
+ * document order — messages[i] of the parsed model comes from line
+ * messageLineIndices(text)[i].
+ */
+export function messageLineIndices(text: string): number[] {
+  const out: number[] = [];
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line || line.startsWith('%%') || line.startsWith('#')) continue;
+    if (NON_MESSAGE_PREFIX.test(line)) continue;
+    if (MESSAGE_RE.test(line)) out.push(i);
+  }
+  return out;
+}
 
 function cleanId(raw: string): string {
   return raw.trim().replace(/^"|"$/g, '');
