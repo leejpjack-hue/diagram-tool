@@ -25,12 +25,21 @@ function useResize(itemId: string, onResize: (id: string, w: number, h: number) 
     e.stopPropagation();
     e.preventDefault();
     const handle = (e.currentTarget as HTMLElement).dataset.handle ?? 'se';
-    const target = e.currentTarget as HTMLElement;
     const startX = e.clientX;
     const startY = e.clientY;
-    const initialSize: Size = JSON.parse(target.dataset.size || '{"w":0,"h":0}');
-    target.setPointerCapture(e.pointerId);
+    let initialSize: Size;
+    try {
+      initialSize = JSON.parse((e.currentTarget as HTMLElement).dataset.size || '{"w":0,"h":0}');
+    } catch {
+      initialSize = { w: 0, h: 0 };
+    }
 
+    // Listen on window — not on the tiny 12×12 handle. As the user drags
+    // outward, the cursor leaves the handle within a few pixels and
+    // per-element listeners stop firing; setPointerCapture is unreliable
+    // here because React re-renders mid-drag and swaps the DOM node.
+    // Window-level listeners capture every move / up until the user
+    // releases the mouse button.
     const move = (ev: PointerEvent) => {
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
@@ -43,12 +52,11 @@ function useResize(itemId: string, onResize: (id: string, w: number, h: number) 
       onResize(itemId, w, h);
     };
     const up = () => {
-      target.releasePointerCapture(e.pointerId);
-      target.removeEventListener('pointermove', move);
-      target.removeEventListener('pointerup', up);
+      window.removeEventListener('pointermove', move as unknown as EventListener);
+      window.removeEventListener('pointerup', up as unknown as EventListener);
     };
-    target.addEventListener('pointermove', move);
-    target.addEventListener('pointerup', up);
+    window.addEventListener('pointermove', move as unknown as EventListener);
+    window.addEventListener('pointerup', up as unknown as EventListener);
   };
 }
 
@@ -61,23 +69,21 @@ function useDrag(
     // Ignore drags that originate on a resize handle.
     if ((e.target as HTMLElement).dataset.handle) return;
     e.preventDefault();
-    const target = e.currentTarget as HTMLElement;
-    target.setPointerCapture(e.pointerId);
     const startX = e.clientX;
     const startY = e.clientY;
 
+    // Window-level listeners — same reasoning as useResize above.
     const move = (ev: PointerEvent) => {
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
       onMove(itemId, initial.x + dx, initial.y + dy);
     };
     const up = () => {
-      target.releasePointerCapture(e.pointerId);
-      target.removeEventListener('pointermove', move);
-      target.removeEventListener('pointerup', up);
+      window.removeEventListener('pointermove', move as unknown as EventListener);
+      window.removeEventListener('pointerup', up as unknown as EventListener);
     };
-    target.addEventListener('pointermove', move);
-    target.addEventListener('pointerup', up);
+    window.addEventListener('pointermove', move as unknown as EventListener);
+    window.addEventListener('pointerup', up as unknown as EventListener);
   };
 }
 
