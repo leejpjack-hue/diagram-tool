@@ -400,6 +400,7 @@ export function GanttCanvas() {
     <div
       ref={containerRef}
       className="w-full h-full overflow-auto bg-white relative"
+      data-canvas-target="primary"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}

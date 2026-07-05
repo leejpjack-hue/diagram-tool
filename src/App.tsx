@@ -726,18 +726,28 @@ function App() {
     // click "Add current diagram" from the deck once they open the editor.
     let captured: string | null = null;
     if (view === 'editor') {
-      const canvas = document.querySelector('.react-flow') as HTMLElement | null;
-      if (canvas) {
+      // For ReactFlow modes (architecture / flow) capture the inner
+      // `.react-flow__viewport` so we only get the diagram the user
+      // actually sees, not the inflated coordinate-space wrapper that
+      // ReactFlow uses internally. For other modes fall back to the
+      // canvas target attribute.
+      const target = (
+        document.querySelector('.react-flow__viewport')
+        ?? document.querySelector('[data-canvas-target="primary"]')
+      ) as HTMLElement | null;
+      if (target) {
         try {
           const { toPng } = await import('html-to-image');
-          captured = await toPng(canvas, {
-            backgroundColor: '#FDFDFD',
+          captured = await toPng(target, {
+            backgroundColor: '#ffffff',
             pixelRatio: 2,
             skipFonts: true,
           });
         } catch (err) {
           toast.error(err instanceof Error ? `Capture failed: ${err.message}` : 'Capture failed.');
         }
+      } else {
+        toast.error('No active canvas found to capture.');
       }
     }
 

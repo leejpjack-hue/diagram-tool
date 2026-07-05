@@ -832,7 +832,7 @@ function DiagramCanvasInternal() {
 
   return (
     <LayoutDirectionContext.Provider value={layoutDirection}>
-    <div className="w-full h-full bg-white relative">
+    <div className="w-full h-full overflow-hidden bg-white relative" data-canvas-target="primary">
       <ReactFlow
         nodes={nodes}
         edges={edges}

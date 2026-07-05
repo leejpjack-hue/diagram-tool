@@ -233,7 +233,7 @@ A-->>U: 200 OK`}
     });
 
   return (
-    <div className="sequence-canvas relative w-full h-full bg-white">
+    <div className="sequence-canvas relative w-full h-full bg-white" data-canvas-target="primary">
       <div ref={scrollRef} className="w-full h-full overflow-auto">
         <svg
           width={layout.width * zoom}
