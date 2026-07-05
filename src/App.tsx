@@ -31,6 +31,8 @@ import type { SimpleCSVRow } from './utils/csvParser';
 import { extractNodeDSL, insertNodeDSL, duplicateNodeDSL } from './utils/clipboardUtils';
 import { useMobile } from './hooks/useMobile';
 import { BrandLogo } from './components/BrandLogo';
+import { Dashboard } from './components/Dashboard/Dashboard';
+import { boardManager, type Board, type BoardMode } from './utils/boardManager';
 import './styles/gantt-fixes.css';
 
 const ARCHITECTURE_DSL = `diagram: architecture
@@ -342,6 +344,10 @@ function App() {
     return (saved?.mode as 'architecture' | 'flow' | 'gantt') || 'architecture';
   });
   const [activePanel, setActivePanel] = useState<PanelType>('none');
+  // Miro-style home: the board dashboard is the landing view; opening or
+  // creating a board switches to the editor.
+  const [view, setView] = useState<'dashboard' | 'editor'>('dashboard');
+  const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
   const [showTaskPanel, setShowTaskPanel] = useState(true);
   const [showDelayImpactPanel, setShowDelayImpactPanel] = useState(false);
@@ -653,6 +659,54 @@ function App() {
     }
   }, [setDslText, setDiagramMode]);
 
+  // ---- Board dashboard (Miro-style home) ----
+
+  const openBoard = (board: Board) => {
+    setCurrentBoardId(board.id);
+    setDslText(board.dslText);
+    setDiagramMode(board.mode);
+    setActiveTab(board.mode);
+    // Gantt parses via its own effect; sequence parses inside SequenceCanvas;
+    // architecture/flow need an explicit re-parse (Monaco won't fire onChange).
+    if (board.mode !== 'gantt' && board.mode !== 'sequence') {
+      try {
+        setParsedDiagram(parseDiagram(board.dslText));
+      } catch (err) {
+        console.error('Board parse error:', err);
+      }
+    }
+    setView('editor');
+  };
+
+  const createBoard = (mode: BoardMode) => {
+    const sample =
+      mode === 'architecture' ? ARCHITECTURE_DSL :
+      mode === 'flow' ? FLOW_DSL :
+      mode === 'sequence' ? SEQUENCE_DSL :
+      GANTT_DSL;
+    const board = boardManager.create({ title: 'Untitled board', mode, dslText: sample });
+    openBoard(board);
+    toast.success('Board created — rename it from the dashboard');
+  };
+
+  const backToDashboard = () => {
+    // Flush the latest text into the board before leaving the editor.
+    if (currentBoardId) {
+      boardManager.update(currentBoardId, { dslText, mode: activeTab });
+    }
+    setView('dashboard');
+  };
+
+  // Live autosave: while editing a board, write changes back to it (debounced)
+  // so the dashboard always holds the latest version — like Miro.
+  useEffect(() => {
+    if (view !== 'editor' || !currentBoardId) return;
+    const t = setTimeout(() => {
+      boardManager.update(currentBoardId, { dslText, mode: activeTab });
+    }, 800);
+    return () => clearTimeout(t);
+  }, [dslText, activeTab, currentBoardId, view]);
+
   const handleLoadDiagram = (diagram: SavedDiagram) => {
     setDslText(diagram.dslText);
     setDiagramMode(diagram.mode);
@@ -753,14 +807,31 @@ function App() {
       {/* Header */}
       <header className="professional-header">
         {/* Logo & Title */}
-        <a href="#" className="header-logo">
+        <a
+          href="#"
+          className="header-logo"
+          onClick={(e) => { e.preventDefault(); if (view === 'editor') backToDashboard(); }}
+          title="Back to your boards"
+        >
           <BrandLogo size={32} />
           <span className="header-logo-text">
             DiagramTool
             <span className="header-logo-tagline">Diagrams from text</span>
           </span>
         </a>
-        
+
+        {view === 'editor' && (
+        <button
+          onClick={backToDashboard}
+          className="btn btn-secondary"
+          title="Back to the board dashboard"
+        >
+          ⌂ Boards
+        </button>
+        )}
+
+        {view === 'editor' && (
+        <>
         {/* Mode Tabs */}
         <div className="tab-group">
           <button
@@ -866,13 +937,25 @@ function App() {
             </button>
           )}
         </div>
+        </>
+        )}
       </header>
-      
+
+      {/* Board dashboard (home) */}
+      {view === 'dashboard' && (
+        <Dashboard
+          onOpen={openBoard}
+          onCreate={createBoard}
+          notify={(type, msg) => (type === 'success' ? toast.success(msg) : toast.error(msg))}
+        />
+      )}
+
       {/* Main Content */}
-      <div 
-        ref={containerRef} 
-        className="flex-1 flex overflow-hidden" 
-        style={{ 
+      {view === 'editor' && (
+      <div
+        ref={containerRef}
+        className="flex-1 flex overflow-hidden"
+        style={{
           height: 'calc(100vh - 64px)',
           minHeight: 'calc(100vh - 64px)',
           maxHeight: 'calc(100vh - 64px)'
@@ -1100,11 +1183,14 @@ function App() {
           </button>
         )}
       </div>
-      
+      )}
+
       {/* Footer - Minimal */}
+      {view === 'editor' && (
       <footer className="app-footer">
         <span className="font-semibold text-gray-900">{diagramMode.charAt(0).toUpperCase() + diagramMode.slice(1)} Mode</span>
       </footer>
+      )}
       
       {/* Toast Notifications */}
       <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
