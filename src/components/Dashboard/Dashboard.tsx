@@ -11,6 +11,7 @@ import type { DiagramTemplate, TemplateCategory } from '../TemplatePicker/templa
 interface DashboardProps {
   onOpen: (board: Board) => void;
   onCreate: (mode: BoardMode) => void;
+  onPublish: (board: Board) => void;
   notify: (type: 'success' | 'error', message: string) => void;
 }
 
@@ -47,7 +48,7 @@ function boardAsTemplate(b: Board): DiagramTemplate {
   };
 }
 
-export function Dashboard({ onOpen, onCreate, notify }: DashboardProps) {
+export function Dashboard({ onOpen, onCreate, onPublish, notify }: DashboardProps) {
   const [boards, setBoards] = useState<Board[]>(() => boardManager.list());
   const [query, setQuery] = useState('');
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -253,6 +254,14 @@ export function Dashboard({ onOpen, onCreate, notify }: DashboardProps) {
                       {menuFor === b.id && (
                         <div className="absolute right-0 bottom-full mb-1 w-44 bg-white border border-slate-200 rounded-lg shadow-lg z-20 overflow-hidden py-1 text-sm">
                           <button className="w-full px-3 py-1.5 text-left hover:bg-slate-100" onClick={() => { setMenuFor(null); onOpen(b); }}>Open</button>
+                          <button
+                            className="w-full px-3 py-1.5 text-left hover:bg-slate-100 flex items-center gap-2"
+                            onClick={() => { setMenuFor(null); onPublish(b); }}
+                            title="Arrange diagrams and notes on a publishable canvas"
+                          >
+                            <span className="w-2 h-2 rounded-sm bg-emerald-500" />
+                            Publish / present
+                          </button>
                           <button className="w-full px-3 py-1.5 text-left hover:bg-slate-100" onClick={() => { boardManager.exportBoard(b); setMenuFor(null); }}>Save to file</button>
                           <button className="w-full px-3 py-1.5 text-left hover:bg-slate-100" onClick={() => { boardManager.duplicate(b.id); setMenuFor(null); refresh(); }}>Duplicate</button>
                           <button className="w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50" onClick={() => handleDelete(b)}>Delete</button>

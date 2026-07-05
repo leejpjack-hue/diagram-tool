@@ -97,3 +97,50 @@ describe('boardManager import', () => {
     await expect(boardManager.importFromFile(new File(['not json'], 'x.board'))).rejects.toThrow();
   });
 });
+
+describe('boardManager presentation', () => {
+  it('persists items on a board and survives a re-list', () => {
+    const a = make();
+    const items = [
+      { id: 'i1', type: 'image' as const, title: 'slide 1', content: 'data:png;base64,...', x: 50, y: 80, width: 480, height: 320 },
+      { id: 'i2', type: 'note' as const, title: 'Speaker note', content: 'open with the pain point', x: 600, y: 80, width: 220, height: 140 },
+    ];
+    boardManager.setPresentation(a.id, items);
+    const after = boardManager.get(a.id);
+    expect(after?.presentation?.items).toHaveLength(2);
+    expect(after?.presentation?.items[0].title).toBe('slide 1');
+    expect(after?.presentation?.items[1].type).toBe('note');
+  });
+
+  it('upserts an item by id (replace) or appends if new', () => {
+    const a = make();
+    boardManager.upsertPresentationItem(a.id, {
+      id: 'i1', type: 'image', title: 'first', content: 'a', x: 0, y: 0, width: 100, height: 100,
+    });
+    boardManager.upsertPresentationItem(a.id, {
+      id: 'i1', type: 'image', title: 'first (edited)', content: 'a', x: 0, y: 0, width: 100, height: 100,
+    });
+    boardManager.upsertPresentationItem(a.id, {
+      id: 'i2', type: 'note', title: 'n', content: '', x: 0, y: 0, width: 100, height: 100,
+    });
+    const list = boardManager.get(a.id)?.presentation?.items ?? [];
+    expect(list).toHaveLength(2);
+    expect(list.find(i => i.id === 'i1')!.title).toBe('first (edited)');
+    expect(list.find(i => i.id === 'i2')!.type).toBe('note');
+  });
+
+  it('returns null when upserting on a missing board', () => {
+    expect(boardManager.upsertPresentationItem('no-such-id', {
+      id: 'x', type: 'image', content: '', x: 0, y: 0, width: 1, height: 1,
+    })).toBeNull();
+  });
+
+  it('does not carry the presentation over when duplicating a board', () => {
+    const a = make('Source');
+    boardManager.setPresentation(a.id, [
+      { id: 'i1', type: 'image', content: '', x: 0, y: 0, width: 100, height: 100 },
+    ]);
+    const copy = boardManager.duplicate(a.id)!;
+    expect(copy.presentation).toBeUndefined();
+  });
+});

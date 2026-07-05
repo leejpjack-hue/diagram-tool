@@ -14,6 +14,34 @@ export interface Board {
   dslText: string;
   createdAt: string;
   updatedAt: string;
+  /** Optional presentation canvas — a list of draggable/resizable images and
+   *  notes the user has composed for publication. Persisted with the board
+   *  so a "deck" lives next to the diagram that produced it. */
+  presentation?: Presentation;
+}
+
+/**
+ * One item on a board's presentation canvas. `image` items are a rendered
+ * PNG of a diagram (captured via html-to-image). `note` items are speaker
+ * notes / labels the user adds directly.
+ */
+export interface PresentationItem {
+  id: string;
+  type: 'image' | 'note';
+  /** Free-form title shown above the item in the editor and on the card. */
+  title?: string;
+  /** For images: a PNG data URL. For notes: the note body. */
+  content: string;
+  /** Pixel position of the top-left corner on the presentation canvas. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface Presentation {
+  items: PresentationItem[];
+  updatedAt: string;
 }
 
 /** Single-board file: { version, exportedAt, board } → <title>.board */
@@ -90,9 +118,45 @@ class BoardManager {
     writeAll(readAll().filter(b => b.id !== id));
   }
 
+  /**
+   * Save the presentation canvas for a board. Pass an empty `items` array
+   * to clear it. No-op if the board doesn't exist.
+   */
+  setPresentation(boardId: string, items: PresentationItem[]): void {
+    const boards = readAll();
+    const idx = boards.findIndex(b => b.id === boardId);
+    if (idx === -1) return;
+    boards[idx] = {
+      ...boards[idx],
+      presentation: { items, updatedAt: new Date().toISOString() },
+      updatedAt: new Date().toISOString(),
+    };
+    writeAll(boards);
+  }
+
+  /**
+   * Convenience: append (or replace if same id) one item on a board's
+   * presentation. Returns the new full items list, or null if the board
+   * doesn't exist.
+   */
+  upsertPresentationItem(boardId: string, item: PresentationItem): PresentationItem[] | null {
+    const boards = readAll();
+    const board = boards.find(b => b.id === boardId);
+    if (!board) return null;
+    const existing = board.presentation?.items ?? [];
+    const idx = existing.findIndex(i => i.id === item.id);
+    const items = idx >= 0
+      ? existing.map((i, n) => n === idx ? item : i)
+      : [...existing, item];
+    this.setPresentation(boardId, items);
+    return items;
+  }
+
   duplicate(id: string): Board | undefined {
     const src = this.get(id);
     if (!src) return undefined;
+    // Don't copy the publication canvas — it's a per-board asset, not part
+    // of the diagram itself.
     return this.create({
       title: `${src.title} (copy)`,
       description: src.description,

@@ -32,6 +32,7 @@ import { extractNodeDSL, insertNodeDSL, duplicateNodeDSL } from './utils/clipboa
 import { useMobile } from './hooks/useMobile';
 import { BrandLogo } from './components/BrandLogo';
 import { Dashboard } from './components/Dashboard/Dashboard';
+import { PresentationCanvas } from './components/Dashboard/PresentationCanvas';
 import { boardManager, type Board, type BoardMode } from './utils/boardManager';
 import './styles/gantt-fixes.css';
 
@@ -345,9 +346,13 @@ function App() {
   });
   const [activePanel, setActivePanel] = useState<PanelType>('none');
   // Miro-style home: the board dashboard is the landing view; opening or
-  // creating a board switches to the editor.
-  const [view, setView] = useState<'dashboard' | 'editor'>('dashboard');
+  // creating a board switches to the editor. A third view, `presentation`,
+  // shows the per-board compose canvas for publication.
+  const [view, setView] = useState<'dashboard' | 'editor' | 'presentation'>('dashboard');
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
+  // Board being presented and the freshly-rendered image of its diagram.
+  const [presentationFor, setPresentationFor] = useState<Board | null>(null);
+  const [currentDiagramImage, setCurrentDiagramImage] = useState<string | null>(null);
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
   const [showTaskPanel, setShowTaskPanel] = useState(true);
   const [showDelayImpactPanel, setShowDelayImpactPanel] = useState(false);
@@ -697,6 +702,57 @@ function App() {
     setView('dashboard');
   };
 
+  // Capture the current React Flow canvas → PNG → open the per-board
+  // presentation deck with the image ready to drop. Used by both the
+  // "View deck" button in the editor header and the Dashboard's
+  // "Publish / present" menu entry.
+  const openPresentation = async (board?: Board) => {
+    const target: Board | undefined = board
+      ? board
+      : (currentBoardId
+          ? (() => {
+              // Flush current edits first so the PNG matches what's saved.
+              boardManager.update(currentBoardId, { dslText, mode: activeTab });
+              return boardManager.get(currentBoardId);
+            })()
+          : undefined);
+    if (!target) {
+      toast.error('Open a board first.');
+      return;
+    }
+
+    // If we're already in the editor, capture the live canvas. If we got
+    // here from the dashboard, there's no live canvas yet — the user can
+    // click "Add current diagram" from the deck once they open the editor.
+    let captured: string | null = null;
+    if (view === 'editor') {
+      const canvas = document.querySelector('.react-flow') as HTMLElement | null;
+      if (canvas) {
+        try {
+          const { toPng } = await import('html-to-image');
+          captured = await toPng(canvas, {
+            backgroundColor: '#FDFDFD',
+            pixelRatio: 2,
+            skipFonts: true,
+          });
+        } catch (err) {
+          toast.error(err instanceof Error ? `Capture failed: ${err.message}` : 'Capture failed.');
+        }
+      }
+    }
+
+    setPresentationFor(target);
+    setCurrentDiagramImage(captured);
+    setView('presentation');
+    if (captured) toast.success('Captured the diagram — drag and resize on the deck.');
+  };
+
+  const closePresentation = () => {
+    setPresentationFor(null);
+    setCurrentDiagramImage(null);
+    setView(currentBoardId ? 'editor' : 'dashboard');
+  };
+
   // Live autosave: while editing a board, write changes back to it (debounced)
   // so the dashboard always holds the latest version — like Miro.
   useEffect(() => {
@@ -830,6 +886,16 @@ function App() {
         </button>
         )}
 
+        {view === 'editor' && currentBoardId && (
+          <button
+            onClick={() => openPresentation()}
+            className="btn btn-secondary"
+            title="Capture this diagram and open the per-board presentation deck"
+          >
+            📊 View deck
+          </button>
+        )}
+
         {view === 'editor' && (
         <>
         {/* Mode Tabs */}
@@ -946,6 +1012,25 @@ function App() {
         <Dashboard
           onOpen={openBoard}
           onCreate={createBoard}
+          onPublish={openPresentation}
+          notify={(type, msg) => (type === 'success' ? toast.success(msg) : toast.error(msg))}
+        />
+      )}
+
+      {view === 'presentation' && presentationFor && (
+        <PresentationCanvas
+          board={presentationFor}
+          currentDiagramImage={currentDiagramImage}
+          onCaptureCurrentDiagram={() => {
+            // After the user clicks "Add current diagram", the screenshot is
+            // already in state; nothing more to do here — keep the trigger
+            // hook so the host can react later if needed.
+          }}
+          onItemsChange={() => {
+            // Items persist via boardManager.setPresentation inside the
+            // canvas — this callback is reserved for cross-cutting updates.
+          }}
+          onClose={closePresentation}
           notify={(type, msg) => (type === 'success' ? toast.success(msg) : toast.error(msg))}
         />
       )}
