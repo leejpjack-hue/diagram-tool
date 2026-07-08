@@ -368,9 +368,19 @@ function App() {
   });
   const containerRef = useRef<HTMLDivElement>(null);
   const ganttCanvasRef = useRef<HTMLDivElement>(null);
+  const thumbnailCaptureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const thumbnailCaptureInFlightRef = useRef(false);
   
   const { exportPNG, exportJPG, exportPDF, exportJSON, exportCSV } = useExport();
   const toast = useToast();
+
+  useEffect(() => {
+    return () => {
+      if (thumbnailCaptureTimerRef.current) {
+        clearTimeout(thumbnailCaptureTimerRef.current);
+      }
+    };
+  }, []);
   
   // Parse Gantt DSL when it changes
   useEffect(() => {
@@ -559,6 +569,21 @@ function App() {
     };
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
+  const captureAndStoreBoardThumbnail = useCallback(async (boardId: string, mode: BoardMode) => {
+    if (thumbnailCaptureInFlightRef.current) return;
+    thumbnailCaptureInFlightRef.current = true;
+    try {
+      const thumbnail = await captureDiagramThumbnail(mode);
+      if (thumbnail) {
+        boardManager.update(boardId, { thumbnail });
+      }
+    } catch (err) {
+      console.warn('Dashboard thumbnail capture failed:', err);
+    } finally {
+      thumbnailCaptureInFlightRef.current = false;
+    }
+  }, []);
+
   const handleSave = useCallback(() => {
     setSaveStatus('saving');
     
@@ -569,6 +594,10 @@ function App() {
           ? diagramMode 
           : 'architecture';
         saveManager.saveDiagram({ title, dslText, mode });
+        if (currentBoardId) {
+          boardManager.update(currentBoardId, { dslText, mode: activeTab });
+          void captureAndStoreBoardThumbnail(currentBoardId, activeTab);
+        }
         setSaveStatus('saved');
         setLastSaved(new Date());
         toast.success(`Saved: ${title}`);
@@ -577,7 +606,7 @@ function App() {
         setSaveStatus('unsaved');
       }
     }, 300);
-  }, [dslText, diagramMode, toast]);
+  }, [dslText, diagramMode, currentBoardId, activeTab, captureAndStoreBoardThumbnail, toast]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -694,10 +723,19 @@ function App() {
     toast.success('Board created — rename it from the dashboard');
   };
 
-  const backToDashboard = () => {
+  const backToDashboard = async () => {
     // Flush the latest text into the board before leaving the editor.
     if (currentBoardId) {
-      boardManager.update(currentBoardId, { dslText, mode: activeTab });
+      if (thumbnailCaptureTimerRef.current) {
+        clearTimeout(thumbnailCaptureTimerRef.current);
+        thumbnailCaptureTimerRef.current = null;
+      }
+      const thumbnail = await captureDiagramThumbnail(activeTab);
+      boardManager.update(currentBoardId, {
+        dslText,
+        mode: activeTab,
+        ...(thumbnail ? { thumbnail } : {}),
+      });
     }
     setView('dashboard');
   };
@@ -731,10 +769,7 @@ function App() {
       // actually sees, not the inflated coordinate-space wrapper that
       // ReactFlow uses internally. For other modes fall back to the
       // canvas target attribute.
-      const target = (
-        document.querySelector('.react-flow__viewport')
-        ?? document.querySelector('[data-canvas-target="primary"]')
-      ) as HTMLElement | null;
+      const target = getDiagramCaptureTarget(activeTab);
       if (target) {
         try {
           const { toPng } = await import('html-to-image');
@@ -769,9 +804,15 @@ function App() {
     if (view !== 'editor' || !currentBoardId) return;
     const t = setTimeout(() => {
       boardManager.update(currentBoardId, { dslText, mode: activeTab });
+      if (thumbnailCaptureTimerRef.current) {
+        clearTimeout(thumbnailCaptureTimerRef.current);
+      }
+      thumbnailCaptureTimerRef.current = setTimeout(() => {
+        void captureAndStoreBoardThumbnail(currentBoardId, activeTab);
+      }, 1200);
     }, 800);
     return () => clearTimeout(t);
-  }, [dslText, activeTab, currentBoardId, view]);
+  }, [dslText, activeTab, currentBoardId, view, captureAndStoreBoardThumbnail]);
 
   const handleLoadDiagram = (diagram: SavedDiagram) => {
     setDslText(diagram.dslText);
@@ -1316,6 +1357,108 @@ function formatTimeAgo(date: Date): string {
   if (diffMins < 120) return '1h ago';
   
   return date.toLocaleTimeString();
+}
+
+function getDiagramCaptureTarget(mode: BoardMode): HTMLElement | null {
+  if (mode === 'sequence') {
+    return (
+      document.querySelector('.sequence-canvas svg')
+      ?? document.querySelector('[data-canvas-target="primary"]')
+    ) as HTMLElement | null;
+  }
+
+  if (mode === 'gantt') {
+    return (
+      document.querySelector('[data-canvas-target="primary"] svg')
+      ?? document.querySelector('[data-canvas-target="primary"]')
+    ) as HTMLElement | null;
+  }
+
+  return (
+    document.querySelector('.react-flow__viewport')
+    ?? document.querySelector('.react-flow')
+  ) as HTMLElement | null;
+}
+
+async function captureDiagramThumbnail(mode: BoardMode): Promise<string | null> {
+  const target = getDiagramCaptureTarget(mode);
+  if (!target) return null;
+
+  await waitForPaint();
+  const restoreChrome = hideReactFlowChrome();
+
+  try {
+    const { toPng } = await import('html-to-image');
+    const dataUrl = await toPng(target, {
+      backgroundColor: '#ffffff',
+      pixelRatio: mode === 'gantt' ? 1 : 1.5,
+      cacheBust: true,
+      skipFonts: true,
+      filter: node => {
+        const el = node as HTMLElement;
+        return !(
+          el.classList?.contains('react-flow__controls')
+          || el.classList?.contains('react-flow__minimap')
+          || el.classList?.contains('react-flow__attribution')
+        );
+      },
+    });
+    return await downscaleDataUrl(dataUrl, 720, 450);
+  } finally {
+    restoreChrome();
+  }
+}
+
+function hideReactFlowChrome(): () => void {
+  const selectors = ['.react-flow__controls', '.react-flow__minimap', '.react-flow__attribution'];
+  const previous: Array<[HTMLElement, string]> = [];
+
+  selectors.forEach(selector => {
+    document.querySelectorAll<HTMLElement>(selector).forEach(el => {
+      previous.push([el, el.style.display]);
+      el.style.display = 'none';
+    });
+  });
+
+  return () => {
+    previous.forEach(([el, display]) => {
+      el.style.display = display;
+    });
+  };
+}
+
+function waitForPaint(): Promise<void> {
+  return new Promise(resolve => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+function downscaleDataUrl(dataUrl: string, maxWidth: number, maxHeight: number): Promise<string> {
+  return new Promise(resolve => {
+    const image = new Image();
+    image.onload = () => {
+      const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(image, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    image.onerror = () => resolve(dataUrl);
+    image.src = dataUrl;
+  });
 }
 
 export default App;

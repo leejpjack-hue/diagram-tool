@@ -18,6 +18,10 @@ function clamp<T extends number>(n: T, min: number, max: number): T {
   return Math.max(min, Math.min(max, n)) as T;
 }
 
+function sortPresentationItems(items: PresentationItem[]): PresentationItem[] {
+  return [...items].sort((a, b) => (a.type === b.type ? 0 : a.type === 'image' ? -1 : 1));
+}
+
 // Translate pointer events on a handle into a new size for the item. The
 // handle element exposes `data-handle` (nw, ne, sw, se, n, s, e, w).
 function useResize(itemId: string, onResize: (id: string, w: number, h: number) => void) {
@@ -92,6 +96,7 @@ function useDrag(
 // ---------------------------------------------------------------------------
 
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const;
+const CONTROL_BUTTON = 'px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-100';
 
 function ResizeHandles({ item, onResize }: { item: PresentationItem; onResize: (id: string, w: number, h: number) => void }) {
   const handle = useResize(item.id, onResize);
@@ -141,20 +146,96 @@ function ItemRenderer({
     return (
       <div
         data-item-id={item.id}
-        onPointerDown={(e) => { drag(e); onSelect(item.id); }}
+        onPointerDown={(e) => { e.stopPropagation(); drag(e); onSelect(item.id); }}
+        onClick={(e) => e.stopPropagation()}
         className={`absolute bg-white shadow-md rounded-lg overflow-hidden cursor-move
           ${selected ? 'ring-2 ring-indigo-500' : 'ring-1 ring-slate-200'}`}
         style={{ left: item.x, top: item.y, width: item.width, height: item.height }}
       >
         <img src={item.content} alt={item.title ?? ''}
-          className="w-full h-full object-contain select-none pointer-events-none bg-slate-50"
+          className="w-full h-full object-contain select-none pointer-events-none bg-white"
           draggable={false}
         />
         {item.title && (
-          <div className="absolute top-0 left-0 right-0 px-2 py-1 bg-gradient-to-b from-black/60 to-transparent text-white text-xs truncate">
+          <div className="absolute top-2 left-2 max-w-[calc(100%-16px)] px-2 py-1 bg-white text-slate-950 text-xs font-medium truncate rounded border border-slate-200 shadow-sm">
             {item.title}
           </div>
         )}
+        {selected && <ResizeHandles item={item} onResize={onResize} />}
+        {selected && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => onDelete(item.id)}
+            className="absolute -top-3 -right-3 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold shadow"
+            title="Delete"
+          >
+            ×
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (item.type === 'arrow') {
+    const markerId = `arrowhead-${item.id}`;
+    const stroke = item.content || '#111827';
+    return (
+      <div
+        data-item-id={item.id}
+        onPointerDown={(e) => { e.stopPropagation(); drag(e); onSelect(item.id); }}
+        onClick={(e) => e.stopPropagation()}
+        className={`absolute cursor-move ${selected ? 'ring-2 ring-indigo-500' : ''}`}
+        style={{ left: item.x, top: item.y, width: item.width, height: item.height }}
+      >
+        <svg className="w-full h-full overflow-visible pointer-events-none" viewBox={`0 0 ${item.width} ${item.height}`} preserveAspectRatio="none">
+          <defs>
+            <marker id={markerId} markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill={stroke} />
+            </marker>
+          </defs>
+          <line
+            x1="8"
+            y1={item.height / 2}
+            x2={Math.max(16, item.width - 12)}
+            y2={item.height / 2}
+            stroke={stroke}
+            strokeWidth="4"
+            strokeLinecap="round"
+            markerEnd={`url(#${markerId})`}
+          />
+        </svg>
+        {selected && <ResizeHandles item={item} onResize={onResize} />}
+        {selected && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => onDelete(item.id)}
+            className="absolute -top-3 -right-3 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold shadow"
+            title="Delete"
+          >
+            ×
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (item.type === 'text') {
+    return (
+      <div
+        data-item-id={item.id}
+        onPointerDown={(e) => { e.stopPropagation(); drag(e); onSelect(item.id); }}
+        onClick={(e) => e.stopPropagation()}
+        className={`absolute bg-transparent cursor-move p-1 flex flex-col
+          ${selected ? 'ring-2 ring-indigo-500 rounded-md' : ''}`}
+        style={{ left: item.x, top: item.y, width: item.width, height: item.height }}
+      >
+        <textarea
+          value={item.content}
+          onChange={(e) => onTextChange(item.id, e.target.value)}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="flex-1 bg-transparent border-0 outline-none resize-none text-2xl font-semibold leading-tight text-slate-950 placeholder-slate-400"
+          placeholder="Add wording..."
+        />
         {selected && <ResizeHandles item={item} onResize={onResize} />}
         {selected && (
           <button
@@ -174,7 +255,8 @@ function ItemRenderer({
   return (
     <div
       data-item-id={item.id}
-      onPointerDown={(e) => { drag(e); onSelect(item.id); }}
+      onPointerDown={(e) => { e.stopPropagation(); drag(e); onSelect(item.id); }}
+      onClick={(e) => e.stopPropagation()}
       className={`absolute bg-amber-100 border-2 rounded-md shadow-md cursor-move p-3 flex flex-col
         ${selected ? 'border-indigo-500' : 'border-amber-300'}`}
       style={{ left: item.x, top: item.y, width: item.width, height: item.height }}
@@ -237,6 +319,10 @@ export function PresentationCanvas({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
   const [panning, setPanning] = useState<{ x: number; y: number; vx: number; vy: number } | null>(null);
+  const selectedItem = useMemo(
+    () => items.find(item => item.id === selectedId) ?? null,
+    [items, selectedId],
+  );
 
   // Persist on every change so a reload brings the user back to where they
   // were. Last-write-wins via boardManager.
@@ -288,6 +374,36 @@ export function PresentationCanvas({
     setSelectedId(note.id);
   };
 
+  const handleAddText = () => {
+    const text: PresentationItem = {
+      id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type: 'text',
+      title: 'Wording',
+      content: 'Add wording',
+      x: 120,
+      y: 120,
+      width: 280,
+      height: 90,
+    };
+    setItems(prev => [...prev, text]);
+    setSelectedId(text.id);
+  };
+
+  const handleAddArrow = () => {
+    const arrow: PresentationItem = {
+      id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type: 'arrow',
+      title: 'Arrow',
+      content: '#111827',
+      x: 160,
+      y: 180,
+      width: 220,
+      height: 80,
+    };
+    setItems(prev => [...prev, arrow]);
+    setSelectedId(arrow.id);
+  };
+
   const handleDelete = (id: string) => {
     setItems(prev => prev.filter(i => i.id !== id));
     setSelectedId(prev => prev === id ? null : prev);
@@ -299,6 +415,10 @@ export function PresentationCanvas({
 
   const handleResize = (id: string, w: number, h: number) => {
     setItems(prev => prev.map(i => i.id === id ? { ...i, width: w, height: h } : i));
+  };
+
+  const handleTitleChange = (id: string, title: string) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, title } : i));
   };
 
   const handleTextChange = (id: string, content: string) => {
@@ -336,17 +456,16 @@ export function PresentationCanvas({
     }));
   };
 
-  // Export the whole stage (background included) as PNG.
+  // Export the composed board as PNG. Render directly to canvas instead of
+  // rasterizing the DOM, which is more reliable for editable text and arrows.
   const exportPng = async () => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    const { default: htmlToImage } = await import('html-to-image');
+    if (items.length === 0) {
+      notify('error', 'Add something to the presentation before exporting.');
+      return;
+    }
+
     try {
-      const dataUrl = await htmlToImage.toPng(stage, {
-        backgroundColor: '#ffffff',
-        pixelRatio: 2,
-        cacheBust: true,
-      });
+      const dataUrl = await renderPresentationPng(items);
       const a = document.createElement('a');
       a.download = `${slug(board.title)}-deck.png`;
       a.href = dataUrl;
@@ -357,13 +476,10 @@ export function PresentationCanvas({
     }
   };
 
-  const sortedItems = useMemo(
-    () => [...items].sort((a, b) => (a.type === b.type ? 0 : a.type === 'image' ? -1 : 1)),
-    [items],
-  );
+  const sortedItems = useMemo(() => sortPresentationItems(items), [items]);
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-100">
+    <div className="flex-1 flex flex-col bg-white">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-slate-200 shadow-sm">
         <button
@@ -387,14 +503,26 @@ export function PresentationCanvas({
             + Add current diagram
           </button>
           <button
+            onClick={handleAddText}
+            className={CONTROL_BUTTON}
+          >
+            + Wording
+          </button>
+          <button
+            onClick={handleAddArrow}
+            className={CONTROL_BUTTON}
+          >
+            + Arrow
+          </button>
+          <button
             onClick={handleAddNote}
-            className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-100"
+            className={CONTROL_BUTTON}
           >
             + Note
           </button>
           <button
             onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })}
-            className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-100"
+            className={CONTROL_BUTTON}
             title="Reset view (100%)"
           >
             100%
@@ -408,18 +536,68 @@ export function PresentationCanvas({
         </div>
       </div>
 
+      {selectedItem && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-white border-b border-slate-200 text-sm">
+          <div className="font-semibold text-slate-700 w-24">
+            {selectedItem.type === 'image' ? 'Diagram' : selectedItem.type === 'text' ? 'Wording' : selectedItem.type === 'arrow' ? 'Arrow' : 'Note'}
+          </div>
+          <label className="flex items-center gap-2 text-slate-600">
+            Title
+            <input
+              value={selectedItem.title ?? ''}
+              onChange={e => handleTitleChange(selectedItem.id, e.target.value)}
+              className="w-56 px-2 py-1 border border-slate-200 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder={selectedItem.type === 'image' ? 'Diagram title' : `${selectedItem.type} title`}
+            />
+          </label>
+          {selectedItem.type === 'arrow' && (
+            <label className="flex items-center gap-2 text-slate-600">
+              Color
+              <input
+                type="color"
+                value={selectedItem.content || '#111827'}
+                onChange={e => handleTextChange(selectedItem.id, e.target.value)}
+                className="w-10 h-8 p-1 border border-slate-200 rounded-md bg-white"
+              />
+            </label>
+          )}
+          <label className="flex items-center gap-2 text-slate-600">
+            W
+            <input
+              type="number"
+              min={80}
+              value={Math.round(selectedItem.width)}
+              onChange={e => handleResize(selectedItem.id, Math.max(80, Number(e.target.value) || 80), selectedItem.height)}
+              className="w-20 px-2 py-1 border border-slate-200 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-slate-600">
+            H
+            <input
+              type="number"
+              min={60}
+              value={Math.round(selectedItem.height)}
+              onChange={e => handleResize(selectedItem.id, selectedItem.width, Math.max(60, Number(e.target.value) || 60))}
+              className="w-20 px-2 py-1 border border-slate-200 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </label>
+          <button
+            onClick={() => handleDelete(selectedItem.id)}
+            className="ml-auto px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-100 rounded-md hover:bg-red-100"
+          >
+            Delete
+          </button>
+        </div>
+      )}
+
       {/* Stage */}
       <div
         ref={stageRef}
         onPointerDown={beginPan}
         onWheel={onWheel}
         onClick={() => setSelectedId(null)}
-        className="flex-1 relative overflow-hidden bg-slate-100"
+        className="flex-1 relative overflow-hidden bg-white"
         style={{
-          backgroundImage:
-            'radial-gradient(circle at 1px 1px, rgba(15,23,42,0.08) 1px, transparent 0)',
-          backgroundSize: `${20 * viewport.zoom}px ${20 * viewport.zoom}px`,
-          backgroundPosition: `${viewport.x * viewport.zoom}px ${viewport.y * viewport.zoom}px`,
           cursor: panning ? 'grabbing' : 'grab',
         }}
       >
@@ -461,4 +639,233 @@ export function PresentationCanvas({
 
 function slug(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'deck';
+}
+
+async function renderPresentationPng(items: PresentationItem[]): Promise<string> {
+  const padding = 56;
+  const bounds = getItemsBounds(items, padding);
+  const pixelRatio = 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(bounds.width * pixelRatio);
+  canvas.height = Math.ceil(bounds.height * pixelRatio);
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not create PNG canvas.');
+
+  ctx.scale(pixelRatio, pixelRatio);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, bounds.width, bounds.height);
+  ctx.translate(-bounds.x, -bounds.y);
+
+  for (const item of sortPresentationItems(items)) {
+    await drawPresentationItem(ctx, item);
+  }
+
+  return canvas.toDataURL('image/png');
+}
+
+function getItemsBounds(items: PresentationItem[], padding: number) {
+  const minX = Math.min(...items.map(item => item.x));
+  const minY = Math.min(...items.map(item => item.y));
+  const maxX = Math.max(...items.map(item => item.x + item.width));
+  const maxY = Math.max(...items.map(item => item.y + item.height));
+
+  return {
+    x: minX - padding,
+    y: minY - padding,
+    width: Math.max(1, maxX - minX + padding * 2),
+    height: Math.max(1, maxY - minY + padding * 2),
+  };
+}
+
+async function drawPresentationItem(ctx: CanvasRenderingContext2D, item: PresentationItem): Promise<void> {
+  if (item.type === 'image') {
+    await drawImageItem(ctx, item);
+  } else if (item.type === 'arrow') {
+    drawArrowItem(ctx, item);
+  } else if (item.type === 'text') {
+    drawTextItem(ctx, item);
+  } else {
+    drawNoteItem(ctx, item);
+  }
+}
+
+async function drawImageItem(ctx: CanvasRenderingContext2D, item: PresentationItem): Promise<void> {
+  ctx.save();
+  roundRect(ctx, item.x, item.y, item.width, item.height, 8);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.strokeStyle = '#e2e8f0';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.clip();
+
+  try {
+    const image = await loadImage(item.content);
+    const fit = containRect(image.width, image.height, item.width, item.height);
+    ctx.drawImage(image, item.x + fit.x, item.y + fit.y, fit.width, fit.height);
+  } catch {
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(item.x, item.y, item.width, item.height);
+    ctx.fillStyle = '#64748b';
+    ctx.font = '14px Inter, Arial, sans-serif';
+    ctx.fillText('Image could not be exported', item.x + 16, item.y + 28);
+  }
+
+  if (item.title) {
+    ctx.font = '600 13px Inter, Arial, sans-serif';
+    const text = truncateForWidth(ctx, item.title, item.width - 32);
+    const labelWidth = Math.min(item.width - 16, ctx.measureText(text).width + 18);
+    roundRect(ctx, item.x + 8, item.y + 8, labelWidth, 26, 6);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.stroke();
+    ctx.fillStyle = '#020617';
+    ctx.fillText(text, item.x + 17, item.y + 26);
+  }
+
+  ctx.restore();
+}
+
+function drawArrowItem(ctx: CanvasRenderingContext2D, item: PresentationItem): void {
+  const stroke = item.content || '#111827';
+  const y = item.y + item.height / 2;
+  const startX = item.x + 8;
+  const endX = item.x + Math.max(18, item.width - 14);
+
+  ctx.save();
+  ctx.strokeStyle = stroke;
+  ctx.fillStyle = stroke;
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(startX, y);
+  ctx.lineTo(endX, y);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(endX, y);
+  ctx.lineTo(endX - 14, y - 8);
+  ctx.lineTo(endX - 14, y + 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawTextItem(ctx: CanvasRenderingContext2D, item: PresentationItem): void {
+  ctx.save();
+  ctx.fillStyle = '#020617';
+  ctx.font = '700 26px Inter, Arial, sans-serif';
+  drawWrappedText(ctx, item.content || 'Add wording', item.x + 4, item.y + 30, item.width - 8, 31, item.height - 8);
+  ctx.restore();
+}
+
+function drawNoteItem(ctx: CanvasRenderingContext2D, item: PresentationItem): void {
+  ctx.save();
+  roundRect(ctx, item.x, item.y, item.width, item.height, 6);
+  ctx.fillStyle = '#fef3c7';
+  ctx.fill();
+  ctx.strokeStyle = '#fcd34d';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  let textY = item.y + 18;
+  if (item.title) {
+    ctx.fillStyle = '#92400e';
+    ctx.font = '700 11px Inter, Arial, sans-serif';
+    ctx.fillText(item.title.toUpperCase(), item.x + 12, textY);
+    textY += 18;
+  }
+
+  ctx.fillStyle = '#78350f';
+  ctx.font = '14px Inter, Arial, sans-serif';
+  drawWrappedText(ctx, item.content || '', item.x + 12, textY, item.width - 24, 18, item.height - (textY - item.y) - 8);
+  ctx.restore();
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+function containRect(sourceWidth: number, sourceHeight: number, targetWidth: number, targetHeight: number) {
+  const scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight);
+  const width = sourceWidth * scale;
+  const height = sourceHeight * scale;
+  return {
+    x: (targetWidth - width) / 2,
+    y: (targetHeight - height) / 2,
+    width,
+    height,
+  };
+}
+
+function drawWrappedText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxHeight: number,
+): void {
+  const paragraphs = text.split('\n');
+  let cursorY = y;
+
+  for (const paragraph of paragraphs) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    let line = '';
+
+    if (words.length === 0) {
+      cursorY += lineHeight;
+      continue;
+    }
+
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width > maxWidth && line) {
+        if (cursorY - y + lineHeight > maxHeight) return;
+        ctx.fillText(line, x, cursorY);
+        line = word;
+        cursorY += lineHeight;
+      } else {
+        line = test;
+      }
+    }
+
+    if (line) {
+      if (cursorY - y + lineHeight > maxHeight) return;
+      ctx.fillText(line, x, cursorY);
+      cursorY += lineHeight;
+    }
+  }
+}
+
+function truncateForWidth(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let out = text;
+  while (out.length > 1 && ctx.measureText(`${out}...`).width > maxWidth) {
+    out = out.slice(0, -1);
+  }
+  return `${out}...`;
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
 }

@@ -12,6 +12,8 @@ export interface Board {
   description: string;
   mode: BoardMode;
   dslText: string;
+  /** Small captured preview shown on the dashboard card. */
+  thumbnail?: string;
   createdAt: string;
   updatedAt: string;
   /** Optional presentation canvas — a list of draggable/resizable images and
@@ -22,15 +24,15 @@ export interface Board {
 
 /**
  * One item on a board's presentation canvas. `image` items are a rendered
- * PNG of a diagram (captured via html-to-image). `note` items are speaker
- * notes / labels the user adds directly.
+ * PNG of a diagram (captured via html-to-image). `note`, `text`, and `arrow`
+ * items are annotation components the user adds directly.
  */
 export interface PresentationItem {
   id: string;
-  type: 'image' | 'note';
+  type: 'image' | 'note' | 'text' | 'arrow';
   /** Free-form title shown above the item in the editor and on the card. */
   title?: string;
-  /** For images: a PNG data URL. For notes: the note body. */
+  /** For images: a PNG data URL. For notes/text: editable body. For arrows: stroke color. */
   content: string;
   /** Pixel position of the top-left corner on the presentation canvas. */
   x: number;
@@ -90,7 +92,7 @@ class BoardManager {
     return readAll().find(b => b.id === id);
   }
 
-  create(input: { title: string; description?: string; mode: BoardMode; dslText: string }): Board {
+  create(input: { title: string; description?: string; mode: BoardMode; dslText: string; thumbnail?: string }): Board {
     const now = new Date().toISOString();
     const board: Board = {
       id: generateId(),
@@ -98,6 +100,7 @@ class BoardManager {
       description: input.description ?? '',
       mode: input.mode,
       dslText: input.dslText,
+      thumbnail: input.thumbnail,
       createdAt: now,
       updatedAt: now,
     };
@@ -105,7 +108,7 @@ class BoardManager {
     return board;
   }
 
-  update(id: string, patch: Partial<Pick<Board, 'title' | 'description' | 'mode' | 'dslText'>>): Board | undefined {
+  update(id: string, patch: Partial<Pick<Board, 'title' | 'description' | 'mode' | 'dslText' | 'thumbnail'>>): Board | undefined {
     const boards = readAll();
     const idx = boards.findIndex(b => b.id === id);
     if (idx === -1) return undefined;
@@ -162,6 +165,7 @@ class BoardManager {
       description: src.description,
       mode: src.mode,
       dslText: src.dslText,
+      thumbnail: src.thumbnail,
     });
   }
 
@@ -214,6 +218,7 @@ class BoardManager {
         description: c.description ?? '',
         mode: c.mode,
         dslText: c.dslText,
+        thumbnail: typeof c.thumbnail === 'string' ? c.thumbnail : undefined,
       }));
     }
     if (imported.length === 0) throw new Error('No boards found in that file.');

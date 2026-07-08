@@ -48,6 +48,23 @@ function boardAsTemplate(b: Board): DiagramTemplate {
   };
 }
 
+function BoardThumbnail({ board }: { board: Board }) {
+  if (board.thumbnail) {
+    return (
+      <div className="aspect-[16/10] w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+        <img
+          src={board.thumbnail}
+          alt={`Preview of ${board.title}`}
+          className="w-full h-full object-cover"
+          draggable={false}
+        />
+      </div>
+    );
+  }
+
+  return <TemplateThumb template={boardAsTemplate(board)} />;
+}
+
 export function Dashboard({ onOpen, onCreate, onPublish, notify }: DashboardProps) {
   const [boards, setBoards] = useState<Board[]>(() => boardManager.list());
   const [query, setQuery] = useState('');
@@ -189,7 +206,7 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify }: DashboardProp
               >
                 {/* Thumbnail opens the board */}
                 <button className="block w-full text-left p-3 pb-0" onClick={() => onOpen(b)} title={`Open "${b.title}"`}>
-                  <TemplateThumb template={boardAsTemplate(b)} />
+                  <BoardThumbnail board={b} />
                 </button>
 
                 <div className="p-3">

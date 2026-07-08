@@ -37,18 +37,21 @@ describe('boardManager CRUD', () => {
   it('updates title/description/dsl and bumps updatedAt', () => {
     const a = make();
     const before = a.updatedAt;
-    const out = boardManager.update(a.id, { title: 'Renamed', description: 'desc' })!;
+    const out = boardManager.update(a.id, { title: 'Renamed', description: 'desc', thumbnail: 'data:image/jpeg;base64,abc' })!;
     expect(out.title).toBe('Renamed');
     expect(out.description).toBe('desc');
+    expect(out.thumbnail).toBe('data:image/jpeg;base64,abc');
     expect(out.updatedAt >= before).toBe(true);
   });
 
   it('duplicates with a (copy) title and fresh id', () => {
     const a = make('Orig');
+    boardManager.update(a.id, { thumbnail: 'data:image/jpeg;base64,abc' });
     const copy = boardManager.duplicate(a.id)!;
     expect(copy.id).not.toBe(a.id);
     expect(copy.title).toBe('Orig (copy)');
     expect(copy.dslText).toBe(a.dslText);
+    expect(copy.thumbnail).toBe('data:image/jpeg;base64,abc');
     expect(boardManager.list()).toHaveLength(2);
   });
 
@@ -65,10 +68,11 @@ describe('boardManager import', () => {
 
   it('imports a whole-dashboard .boards file with fresh ids', async () => {
     const src = make('Original');
-    const payload = { version: '1.0', exportedAt: 'now', boards: [{ ...src, id: 'stale-id' }] };
+    const payload = { version: '1.0', exportedAt: 'now', boards: [{ ...src, id: 'stale-id', thumbnail: 'data:image/jpeg;base64,abc' }] };
     const imported = await boardManager.importFromFile(asFile(payload));
     expect(imported).toHaveLength(1);
     expect(imported[0].id).not.toBe('stale-id');
+    expect(imported[0].thumbnail).toBe('data:image/jpeg;base64,abc');
     expect(boardManager.list()).toHaveLength(2);
   });
 
