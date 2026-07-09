@@ -96,7 +96,92 @@ function useDrag(
 // ---------------------------------------------------------------------------
 
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const;
-const CONTROL_BUTTON = 'px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-100';
+type ToolIconName = 'diagram' | 'text' | 'arrow' | 'note' | 'reset' | 'export' | 'back';
+
+function ToolIcon({ name }: { name: ToolIconName }) {
+  if (name === 'diagram') {
+    return (
+      <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <rect x="4" y="5" width="16" height="14" rx="2" strokeWidth={2} />
+        <path d="M8 10h8M8 14h5" strokeWidth={2} strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (name === 'text') {
+    return (
+      <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M5 6h14M12 6v12M9 18h6" strokeWidth={2} strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (name === 'arrow') {
+    return (
+      <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M5 12h13M13 7l5 5-5 5" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (name === 'note') {
+    return (
+      <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M6 4h9l3 3v13H6z" strokeWidth={2} strokeLinejoin="round" />
+        <path d="M15 4v4h4M9 12h6M9 16h4" strokeWidth={2} strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (name === 'reset') {
+    return (
+      <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M4 4v6h6M20 20v-6h-6M5 15a7 7 0 0 0 11 3M19 9A7 7 0 0 0 8 6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (name === 'export') {
+    return (
+      <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M12 4v10M8 10l4 4 4-4M5 20h14" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path d="M15 18l-6-6 6-6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ToolButton({
+  icon,
+  label,
+  onClick,
+  variant = 'secondary',
+  disabled,
+  title,
+}: {
+  icon: ToolIconName;
+  label: string;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary' | 'success';
+  disabled?: boolean;
+  title?: string;
+}) {
+  const variantClass =
+    variant === 'primary' ? 'btn-primary' :
+    variant === 'success' ? 'btn-success' :
+    'btn-secondary';
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`btn btn-sm ${variantClass} ${disabled ? 'opacity-50 cursor-not-allowed hover:transform-none' : ''}`}
+    >
+      <ToolIcon name={icon} />
+      {label}
+    </button>
+  );
+}
 
 function ResizeHandles({ item, onResize }: { item: PresentationItem; onResize: (id: string, w: number, h: number) => void }) {
   const handle = useResize(item.id, onResize);
@@ -229,11 +314,21 @@ function ItemRenderer({
           ${selected ? 'ring-2 ring-indigo-500 rounded-md' : ''}`}
         style={{ left: item.x, top: item.y, width: item.width, height: item.height }}
       >
+        {selected && (
+          <div
+            onPointerDown={(e) => { e.stopPropagation(); onSelect(item.id); drag(e); }}
+            className="absolute -top-8 left-0 px-2 py-1 rounded-md bg-white border border-slate-200 shadow-sm text-[11px] font-semibold text-slate-600 cursor-move select-none"
+            title="Drag to move wording"
+          >
+            Move
+          </div>
+        )}
         <textarea
           value={item.content}
           onChange={(e) => onTextChange(item.id, e.target.value)}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="flex-1 bg-transparent border-0 outline-none resize-none text-2xl font-semibold leading-tight text-slate-950 placeholder-slate-400"
+          onPointerDown={(e) => { e.stopPropagation(); onSelect(item.id); }}
+          onFocus={() => onSelect(item.id)}
+          className="flex-1 bg-transparent border-0 outline-none resize-none text-2xl font-semibold leading-tight text-slate-950 placeholder-slate-400 cursor-text"
           placeholder="Add wording..."
         />
         {selected && <ResizeHandles item={item} onResize={onResize} />}
@@ -269,7 +364,8 @@ function ItemRenderer({
       <textarea
         value={item.content}
         onChange={(e) => onTextChange(item.id, e.target.value)}
-        onPointerDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => { e.stopPropagation(); onSelect(item.id); }}
+        onFocus={() => onSelect(item.id)}
         className="flex-1 bg-transparent border-0 outline-none resize-none text-sm text-amber-900 placeholder-amber-700/50"
         placeholder="Speaker note…"
       />
@@ -481,109 +577,106 @@ export function PresentationCanvas({
   return (
     <div className="flex-1 flex flex-col bg-white">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-slate-200 shadow-sm">
+      <div className="flex items-center gap-4 px-4 py-2 bg-white border-b border-slate-200 shadow-sm">
         <button
           onClick={onClose}
-          className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-100"
+          className="btn btn-secondary btn-sm"
         >
-          ← Back
+          <ToolIcon name="back" />
+          Back
         </button>
-        <div className="ml-1">
+        <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-900">Presentation · {board.title}</div>
           <div className="text-[11px] text-slate-500">{items.length} item{items.length === 1 ? '' : 's'} · saved with the board</div>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={handleCapture}
-            disabled={!currentDiagramImage}
-            title={currentDiagramImage ? 'Add the current diagram as an image' : 'Open a diagram first, then publish'}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed"
-          >
-            + Add current diagram
-          </button>
-          <button
-            onClick={handleAddText}
-            className={CONTROL_BUTTON}
-          >
-            + Wording
-          </button>
-          <button
-            onClick={handleAddArrow}
-            className={CONTROL_BUTTON}
-          >
-            + Arrow
-          </button>
-          <button
-            onClick={handleAddNote}
-            className={CONTROL_BUTTON}
-          >
-            + Note
-          </button>
-          <button
-            onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })}
-            className={CONTROL_BUTTON}
-            title="Reset view (100%)"
-          >
-            100%
-          </button>
-          <button
-            onClick={exportPng}
-            className="px-3 py-1.5 text-sm font-semibold text-white bg-emerald-600 rounded-md hover:bg-emerald-700"
-          >
-            Export PNG
-          </button>
+        <div className="ml-auto flex items-center gap-3">
+          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 shadow-xs">
+            <span className="px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Insert
+            </span>
+            <ToolButton
+              icon="diagram"
+              label="Diagram"
+              variant="primary"
+              onClick={handleCapture}
+              disabled={!currentDiagramImage}
+              title={currentDiagramImage ? 'Add the current diagram as an image' : 'Open a diagram first, then publish'}
+            />
+            <ToolButton icon="text" label="Wording" onClick={handleAddText} />
+            <ToolButton icon="arrow" label="Arrow" onClick={handleAddArrow} />
+            <ToolButton icon="note" label="Note" onClick={handleAddNote} />
+          </div>
+
+          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 shadow-xs">
+            <span className="px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Canvas
+            </span>
+            <ToolButton
+              icon="reset"
+              label="100%"
+              onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })}
+              title="Reset view (100%)"
+            />
+          </div>
+
+          <ToolButton icon="export" label="Export PNG" variant="success" onClick={exportPng} />
         </div>
       </div>
 
       {selectedItem && (
-        <div className="flex items-center gap-3 px-4 py-2 bg-white border-b border-slate-200 text-sm">
-          <div className="font-semibold text-slate-700 w-24">
-            {selectedItem.type === 'image' ? 'Diagram' : selectedItem.type === 'text' ? 'Wording' : selectedItem.type === 'arrow' ? 'Arrow' : 'Note'}
+        <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 border-b border-slate-200 text-sm shadow-xs">
+          <div className="flex items-center gap-2 min-w-40">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Edit
+            </span>
+            <span className="px-2 py-1 rounded-md bg-white border border-slate-200 text-xs font-semibold text-indigo-600 shadow-xs">
+              {selectedItem.type === 'image' ? 'Diagram' : selectedItem.type === 'text' ? 'Wording' : selectedItem.type === 'arrow' ? 'Arrow' : 'Note'}
+            </span>
           </div>
-          <label className="flex items-center gap-2 text-slate-600">
+          <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Title
             <input
               value={selectedItem.title ?? ''}
               onChange={e => handleTitleChange(selectedItem.id, e.target.value)}
-              className="w-56 px-2 py-1 border border-slate-200 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-56 px-2 py-1.5 border border-slate-200 rounded-md bg-white text-sm font-medium normal-case tracking-normal text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder={selectedItem.type === 'image' ? 'Diagram title' : `${selectedItem.type} title`}
             />
           </label>
           {selectedItem.type === 'arrow' && (
-            <label className="flex items-center gap-2 text-slate-600">
+            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               Color
               <input
                 type="color"
                 value={selectedItem.content || '#111827'}
                 onChange={e => handleTextChange(selectedItem.id, e.target.value)}
-                className="w-10 h-8 p-1 border border-slate-200 rounded-md bg-white"
+                className="w-10 h-8 p-1 border border-slate-200 rounded-md bg-white shadow-xs"
               />
             </label>
           )}
-          <label className="flex items-center gap-2 text-slate-600">
+          <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             W
             <input
               type="number"
               min={80}
               value={Math.round(selectedItem.width)}
               onChange={e => handleResize(selectedItem.id, Math.max(80, Number(e.target.value) || 80), selectedItem.height)}
-              className="w-20 px-2 py-1 border border-slate-200 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-20 px-2 py-1.5 border border-slate-200 rounded-md bg-white text-sm font-medium normal-case tracking-normal text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </label>
-          <label className="flex items-center gap-2 text-slate-600">
+          <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             H
             <input
               type="number"
               min={60}
               value={Math.round(selectedItem.height)}
               onChange={e => handleResize(selectedItem.id, selectedItem.width, Math.max(60, Number(e.target.value) || 60))}
-              className="w-20 px-2 py-1 border border-slate-200 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-20 px-2 py-1.5 border border-slate-200 rounded-md bg-white text-sm font-medium normal-case tracking-normal text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </label>
           <button
             onClick={() => handleDelete(selectedItem.id)}
-            className="ml-auto px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-100 rounded-md hover:bg-red-100"
+            className="btn btn-danger btn-sm ml-auto"
           >
             Delete
           </button>
