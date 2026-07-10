@@ -1,0 +1,68 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy diagram.teqcon.uk
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      DEPLOY_SERVICE: ${{ secrets.DEPLOY_SERVICE }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Install deploy tools
+        run: sudo apt-get update && sudo apt-get install -y sshpass rsync
+
+      - name: Add server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload dist to temporary folder
+        env:
+          SSHPASS: ${{ secrets.DEPLOY_PASSWORD }}
+        run: |
+          sshpass -e ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && rm -rf .deploy-dist-new && mkdir .deploy-dist-new"
+          sshpass -e rsync -az --delete dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/.deploy-dist-new/"
+
+      - name: Activate build and restart service
+        env:
+          SSHPASS: ${{ secrets.DEPLOY_PASSWORD }}
+        run: |
+          sshpass -e ssh "$DEPLOY_USER@$DEPLOY_HOST" "
+            set -e
+            cd '$DEPLOY_PATH'
+            test -f .deploy-dist-new/index.html
+            stamp=\$(date +%Y%m%d%H%M%S)
+            cp -a dist \"dist.backup.\$stamp\"
+            rm -rf dist.previous
+            mv dist dist.previous
+            mv .deploy-dist-new dist
+            rm -rf dist.previous
+            systemctl --user restart '$DEPLOY_SERVICE'
+            systemctl --user is-active '$DEPLOY_SERVICE'
+          "
