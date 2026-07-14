@@ -1,20 +1,19 @@
 import { memo } from 'react';
-import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { ServiceNodeData } from './types';
 import { NodeIcon, hasNodeIcon } from './icons';
-import { useLayoutHandles } from './layoutDirection';
 import { cardStyle, chipStyle, badgeStyle, isCode, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
+import { ArchitectureHandles, type ArchitectureHandleSlots } from './ArchitectureHandles';
 
 export const ServiceNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as ServiceNodeData;
   const isAPI = nodeData.type === 'api';
   const iconKey = isAPI ? 'api' : 'service';
-  const { target, source } = useLayoutHandles();
 
   // Presentation-style accent: a `color:` in the DSL overrides the default
   // api/service palette; `icon:` swaps the SVG glyph for an emoji.
   const accent = nodeData.color || (isAPI ? '#3b82f6' : '#8b5cf6');
+  const connectionHandles = (data as { connectionHandles?: ArchitectureHandleSlots }).connectionHandles;
 
   return (
     <div
@@ -25,7 +24,7 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
       `}
       style={cardStyle(accent, !!selected)}
     >
-      <Handle type="target" position={target} style={{ background: accent }} />
+      <ArchitectureHandles accent={accent} slots={connectionHandles} />
 
       <div className="flex items-center gap-3 mb-1">
         <div
@@ -64,8 +63,6 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
           </span>
         )}
       </div>
-
-      <Handle type="source" position={source} style={{ background: accent }} />
     </div>
   );
 });

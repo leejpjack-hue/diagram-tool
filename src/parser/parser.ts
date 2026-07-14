@@ -1,6 +1,6 @@
 import { Lexer, TokenType } from './lexer';
 import type { Token } from './lexer';
-import type { DiagramNode, Edge, Group, Lane, ParsedDiagram, DiagramMode, FlowNode, CloudProvider, C4Level, ClassNode, AnnotationNode, LayoutDirection, EdgeStyle } from '../store/types';
+import type { DiagramNode, Edge, Group, Lane, ParsedDiagram, DiagramMode, FlowNode, CloudProvider, C4Level, ClassNode, AnnotationNode, LayoutDirection, EdgeStyle, ConnectionSide } from '../store/types';
 import { isMermaidFlow, mermaidFlowToDSL } from './mermaidFlow';
 
 export class Parser {
@@ -71,6 +71,12 @@ export class Parser {
     while (this.peek().type === TokenType.NEWLINE) {
       this.advance();
     }
+  }
+
+  private parseConnectionSide(value: string | number): ConnectionSide | undefined {
+    const side = String(value).toLowerCase();
+    if (side === 'top' || side === 'right' || side === 'bottom' || side === 'left') return side;
+    return undefined;
   }
 
   parse(): ParsedDiagram {
@@ -795,9 +801,10 @@ export class Parser {
     this.nodes.push(annotation);
   }
 
-  // Parse `edge Client -> CDN { label: "REST" }` — a labelled connection
-  // between two already-declared architecture nodes. Re-declaring a `connects:`
-  // edge only adds/replaces its label; the edge itself is not duplicated.
+  // Parse `edge Client -> CDN { label: "REST" color: "#2563eb" from: right to: left }`
+  // — a labelled/configured connection between two already-declared architecture
+  // nodes. Re-declaring a `connects:` edge adds/replaces its display settings;
+  // the edge itself is not duplicated.
   //
   // Also accepts the bare form `edge Client -> CDN` (no block) — in that case
   // we just add a label-less edge if one doesn't already exist.
@@ -818,9 +825,12 @@ export class Parser {
     const toId = toName.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
     let label: string | undefined;
+    let color: string | undefined;
+    let sourceSide: ConnectionSide | undefined;
+    let targetSide: ConnectionSide | undefined;
 
-    // Optional `{ label: "..." }` block — supports quoted strings and bare
-    // identifiers so users can write either `label: "REST"` or `label: REST`.
+    // Optional settings block — supports quoted strings and bare identifiers so
+    // users can write either `label: "REST"` or `label: REST`.
     if (this.peek().type === TokenType.LBRACE) {
       this.advance(); // consume '{'
       this.skipNewlines();
@@ -828,12 +838,20 @@ export class Parser {
         this.skipNewlines();
         if (this.peek().type === TokenType.RBRACE) break;
         const keyTok = this.peek();
-        if (keyTok.type === TokenType.KEYWORD &&
-            String(keyTok.value).toLowerCase() === 'label') {
-          this.advance(); // consume 'label'
+        if (keyTok.type === TokenType.KEYWORD || keyTok.type === TokenType.IDENTIFIER) {
+          this.advance(); // consume key
           this.expect(TokenType.COLON);
           const v = this.advance();
-          label = String(v.value);
+          const key = String(keyTok.value).toLowerCase();
+          if (key === 'label') {
+            label = String(v.value);
+          } else if (key === 'color' || key === 'colour') {
+            color = String(v.value);
+          } else if (key === 'from' || key === 'source' || key === 'sourceside' || key === 'sourceport') {
+            sourceSide = this.parseConnectionSide(v.value);
+          } else if (key === 'to' || key === 'target' || key === 'targetside' || key === 'targetport') {
+            targetSide = this.parseConnectionSide(v.value);
+          }
         } else {
           this.advance();
         }
@@ -851,12 +869,18 @@ export class Parser {
     );
     if (existing) {
       if (label !== undefined) existing.label = label;
+      if (color !== undefined) existing.color = color;
+      if (sourceSide !== undefined) existing.sourceSide = sourceSide;
+      if (targetSide !== undefined) existing.targetSide = targetSide;
     } else {
       this.edges.push({
         id: `${fromId}_to_${toId}_${this.edges.length}`,
         from: fromId,
         to: toId,
         label,
+        color,
+        sourceSide,
+        targetSide,
       });
     }
   }

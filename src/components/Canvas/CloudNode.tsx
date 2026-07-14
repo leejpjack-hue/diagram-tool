@@ -1,10 +1,9 @@
 import { memo } from 'react';
-import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { CloudNodeData } from './types';
 import { ProviderIcon, KindIcon, hasKindIcon } from './icons';
-import { useLayoutHandles } from './layoutDirection';
 import { cardStyle, chipStyle, badgeStyle, isCode, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
+import { ArchitectureHandles, type ArchitectureHandleSlots } from './ArchitectureHandles';
 
 // Provider visual identity — colored badges with stylized geometric glyphs.
 // Glyphs themselves now live as standalone .svg files in ./icons/providers/.
@@ -35,13 +34,13 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as CloudNodeData;
   const provider = nodeData.provider || 'aws';
   const meta = PROVIDER_META[provider] ?? PROVIDER_META.aws;
-  const { target, source } = useLayoutHandles();
   const kindKey = (nodeData.kind || '').replace(/-/g, '');
   // Priority: custom kind SVG (designer-supplied) → unicode kind glyph → provider SVG glyph.
   const kindBadge = KIND_ICON[kindKey];
   const customKind = hasKindIcon(kindKey);
   // A `color:` in the DSL overrides the provider accent.
   const accent = nodeData.color || meta.pill;
+  const connectionHandles = (data as { connectionHandles?: ArchitectureHandleSlots }).connectionHandles;
 
   return (
     <div
@@ -52,7 +51,7 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
       `}
       style={cardStyle(accent, !!selected)}
     >
-      <Handle type="target" position={target} style={{ background: accent }} />
+      <ArchitectureHandles accent={accent} slots={connectionHandles} />
 
       <div className="flex items-center gap-3 mb-1">
         <div
@@ -103,8 +102,6 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
           {nodeData.tech}{nodeData.tech && nodeData.region ? ' • ' : ''}{nodeData.region}
         </div>
       )}
-
-      <Handle type="source" position={source} style={{ background: accent }} />
     </div>
   );
 });

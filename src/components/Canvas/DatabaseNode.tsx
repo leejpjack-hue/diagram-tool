@@ -1,9 +1,8 @@
 import { memo } from 'react';
-import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { DatabaseNodeData } from './types';
-import { useLayoutHandles } from './layoutDirection';
 import { TITLE_FONT, MONO_FONT, accentDark } from './cardStyle';
+import { ArchitectureHandles, type ArchitectureHandleSlots } from './ArchitectureHandles';
 
 const DEFAULT_ACCENT = '#a855f7';
 
@@ -12,8 +11,8 @@ const DEFAULT_ACCENT = '#a855f7';
 // driving border + label. Title centred with a mono type sublabel.
 export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as DatabaseNodeData;
-  const { target, source } = useLayoutHandles();
   const accent = nodeData.color || DEFAULT_ACCENT;
+  const connectionHandles = (data as { connectionHandles?: ArchitectureHandleSlots }).connectionHandles;
 
   const W = 150;
   const H = 86;
@@ -33,7 +32,7 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
           : 'drop-shadow(0 1px 2px rgba(17,24,39,0.05)) drop-shadow(0 8px 18px rgba(17,24,39,0.06))',
       }}
     >
-      <Handle type="target" position={target} style={{ background: accent }} />
+      <ArchitectureHandles accent={accent} slots={connectionHandles} />
 
       {/* body + side borders */}
       <div style={{ position: 'absolute', left: 0, right: 0, top: CAP / 2, bottom: 0, background: body, borderLeft: border, borderRight: border }} />
@@ -53,8 +52,6 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
           </div>
         )}
       </div>
-
-      <Handle type="source" position={source} style={{ background: accent }} />
     </div>
   );
 });

@@ -157,7 +157,12 @@ export interface Edge {
   from: string;
   to: string;
   label?: string;
+  color?: string;
+  sourceSide?: ConnectionSide;
+  targetSide?: ConnectionSide;
 }
+
+export type ConnectionSide = 'top' | 'right' | 'bottom' | 'left';
 
 export interface Group {
   id: string;

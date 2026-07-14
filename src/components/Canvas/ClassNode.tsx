@@ -1,9 +1,8 @@
 import { memo } from 'react';
-import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { ClassNodeData } from './types';
-import { useLayoutHandles } from './layoutDirection';
 import { cardStyle, TITLE_COLOR, TITLE_FONT, MONO_FONT, accentDark } from './cardStyle';
+import { ArchitectureHandles, type ArchitectureHandleSlots } from './ArchitectureHandles';
 
 /**
  * UML class diagram node — three-section box:
@@ -21,9 +20,9 @@ export const ClassNode = memo(({ data, selected }: NodeProps) => {
   const d = data as unknown as ClassNodeData;
   const attrs = d.attributes ?? [];
   const methods = d.methods ?? [];
-  const { target, source } = useLayoutHandles();
   // A `color:` in the DSL overrides the default teal accent.
   const accent = d.color || '#0d9488';
+  const connectionHandles = (data as { connectionHandles?: ArchitectureHandleSlots }).connectionHandles;
 
   return (
     <div
@@ -32,7 +31,7 @@ export const ClassNode = memo(({ data, selected }: NodeProps) => {
       }`}
       style={{ ...cardStyle(accent, !!selected), minWidth: 200 }}
     >
-      <Handle type="target" position={target} style={{ background: accent }} />
+      <ArchitectureHandles accent={accent} slots={connectionHandles} />
 
       <div className="px-3 py-2 text-center" style={{ background: `color-mix(in srgb, ${accent} 8%, white)`, borderBottom: `1px solid color-mix(in srgb, ${accent} 30%, white)` }}>
         {d.stereotype && (
@@ -58,8 +57,6 @@ export const ClassNode = memo(({ data, selected }: NodeProps) => {
           ))}
         </div>
       )}
-
-      <Handle type="source" position={source} style={{ background: accent }} />
     </div>
   );
 });

@@ -59,6 +59,7 @@ service Client {
   icon: "USR"
   color: "#ec4899"
   tech: "client"
+  at: 40, 312
   connects: CDN, Gateway
 }
 
@@ -66,6 +67,7 @@ cloud CDN {
   icon: "CDN"
   color: "#f97316"
   tech: "static · cache"
+  at: 290, 180
   connects: Gateway
 }
 
@@ -73,6 +75,7 @@ cloud Gateway {
   icon: "GW"
   color: "#8b5cf6"
   tech: "tls · rate-limit"
+  at: 285, 440
   connects: Auth, Orders, Payments
 }
 
@@ -80,6 +83,7 @@ service Auth {
   icon: "API"
   color: "#3b82f6"
   tech: "svc · :8081"
+  at: 560, 120
   connects: Postgres
 }
 
@@ -87,6 +91,7 @@ service Orders {
   icon: "API"
   color: "#3b82f6"
   tech: "svc · :8082"
+  at: 560, 300
   connects: Postgres, Redis, Events
 }
 
@@ -94,23 +99,27 @@ service Payments {
   icon: "API"
   color: "#3b82f6"
   tech: "svc · :8083"
+  at: 560, 480
   connects: Postgres
 }
 
 database Postgres {
   color: "#a855f7"
   type: primary
+  at: 840, 100
 }
 
 database Redis {
   color: "#06b6d4"
   type: cache
+  at: 840, 260
 }
 
 queue Events {
   icon: "MQ"
   color: "#0ea5e9"
   topic: kafka
+  at: 840, 430
   connects: Worker
 }
 
@@ -118,6 +127,7 @@ service Worker {
   icon: "WK"
   color: "#3b82f6"
   tech: "consumer"
+  at: 840, 580
   connects: ObjectStore, Analytics
 }
 
@@ -125,29 +135,37 @@ cloud ObjectStore {
   icon: "S3"
   color: "#f97316"
   tech: "bucket"
+  at: 1060, 240
 }
 
 cloud Analytics {
   icon: "AN"
   color: "#a855f7"
   tech: "warehouse"
+  at: 1060, 420
 }
 
 group Edge {
   label: "Edge · cdn + ingress"
   color: "#f97316"
+  at: 250, 150
+  size: 260, 380
   contains: CDN, Gateway
 }
 
 group Services {
   label: "Services · k8s"
   color: "#3b82f6"
+  at: 535, 85
+  size: 215, 470
   contains: Auth, Orders, Payments, Worker
 }
 
 group Data {
   label: "Data & Processing"
   color: "#a855f7"
+  at: 815, 75
+  size: 405, 600
   contains: Postgres, Redis, Events, ObjectStore, Analytics
 }
 
@@ -156,12 +174,11 @@ note "All ingress terminates TLS & is rate-limited at the gateway." {
   at: 280, 560
 }
 
-# Labelled edges — pull a few specific connections out of the diagram so they
-# carry a meaningful verb (REST / dynamic / consume) instead of an anonymous
-# arrow. The other connections stay declared inline on each node.
-edge Client -> CDN { label: "REST" }
-edge CDN -> Gateway { label: "dynamic" }
-edge Events -> Worker { label: "consume" }`,
+# Connector colour + connection-point demo:
+# use color/colour plus from/to: top, right, bottom, or left.
+edge Client -> CDN { label: "REST" color: "#ef4444" from: right to: left }
+edge CDN -> Gateway { label: "dynamic" color: "#22c55e" from: bottom to: top }
+edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`,
   parsedDiagram: null,
   selectedNodeId: null,
   diagramMode: 'architecture',

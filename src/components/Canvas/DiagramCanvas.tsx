@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useCallback, useState, useRef } from 'react';
 import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider, useReactFlow, BackgroundVariant, ViewportPortal } from '@xyflow/react';
-import type { Node, Edge, Viewport, Connection } from '@xyflow/react';
+import type { Node, Edge as ReactFlowEdge, Viewport, Connection } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { ServiceNode } from './ServiceNode';
@@ -35,6 +35,9 @@ import { parseDiagram } from '../../parser/parser';
 import { getHelperLines, type HelperLineResult } from './helperLines';
 import { LayoutDirectionContext } from './layoutDirection';
 import { Position } from '@xyflow/react';
+import { type ArchitectureHandleSlots } from './ArchitectureHandles';
+import { architectureHandleId } from './architectureHandleIds';
+import type { ConnectionSide, Edge as DiagramEdge } from '../../store/types';
 
 const architectureNodeTypes = {
   service: ServiceNode,
@@ -82,6 +85,104 @@ const nextC4Level = (lvl: C4Level): C4Level | null => {
   const i = C4_ORDER.indexOf(lvl);
   return i >= 0 && i < C4_ORDER.length - 1 ? C4_ORDER[i + 1] : null;
 };
+
+interface ArchitectureEdgeRoute {
+  sourceHandle: string;
+  targetHandle: string;
+}
+
+interface ArchitectureRouting {
+  edgeRoutes: Map<string, ArchitectureEdgeRoute>;
+  nodeSlots: Map<string, ArchitectureHandleSlots>;
+}
+
+const EMPTY_ARCHITECTURE_ROUTING: ArchitectureRouting = {
+  edgeRoutes: new Map(),
+  nodeSlots: new Map(),
+};
+
+function oppositeSide(side: ConnectionSide): ConnectionSide {
+  switch (side) {
+    case 'top':
+      return 'bottom';
+    case 'right':
+      return 'left';
+    case 'bottom':
+      return 'top';
+    case 'left':
+      return 'right';
+  }
+}
+
+function inferConnectionSides(edge: DiagramEdge, sourceNode: Node, targetNode: Node): { sourceSide: ConnectionSide; targetSide: ConnectionSide } {
+  if (edge.sourceSide && edge.targetSide) {
+    return { sourceSide: edge.sourceSide, targetSide: edge.targetSide };
+  }
+  if (edge.sourceSide) {
+    return { sourceSide: edge.sourceSide, targetSide: oppositeSide(edge.sourceSide) };
+  }
+  if (edge.targetSide) {
+    return { sourceSide: oppositeSide(edge.targetSide), targetSide: edge.targetSide };
+  }
+
+  const dx = targetNode.position.x - sourceNode.position.x;
+  const dy = targetNode.position.y - sourceNode.position.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    const sourceSide: ConnectionSide = dx >= 0 ? 'right' : 'left';
+    return { sourceSide, targetSide: oppositeSide(sourceSide) };
+  }
+
+  const sourceSide: ConnectionSide = dy >= 0 ? 'bottom' : 'top';
+  return { sourceSide, targetSide: oppositeSide(sourceSide) };
+}
+
+function ensureSlotBucket(slots: Map<string, ArchitectureHandleSlots>, nodeId: string): ArchitectureHandleSlots {
+  const existing = slots.get(nodeId);
+  if (existing) return existing;
+  const next: ArchitectureHandleSlots = { source: {}, target: {} };
+  slots.set(nodeId, next);
+  return next;
+}
+
+function computeArchitectureRouting(diagramMode: string, diagramEdges: DiagramEdge[], nodes: Node[]): ArchitectureRouting {
+  if (diagramMode === 'flow' || diagramEdges.length === 0 || nodes.length === 0) {
+    return EMPTY_ARCHITECTURE_ROUTING;
+  }
+
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const nextSlotByEndpoint = new Map<string, number>();
+  const edgeRoutes = new Map<string, ArchitectureEdgeRoute>();
+  const nodeSlots = new Map<string, ArchitectureHandleSlots>();
+
+  const takeSlot = (nodeId: string, kind: 'source' | 'target', side: ConnectionSide) => {
+    const key = `${nodeId}:${kind}:${side}`;
+    const slot = nextSlotByEndpoint.get(key) ?? 0;
+    nextSlotByEndpoint.set(key, slot + 1);
+
+    const bucket = ensureSlotBucket(nodeSlots, nodeId);
+    const sideCounts = bucket[kind] ?? {};
+    sideCounts[side] = Math.max(sideCounts[side] ?? 0, slot + 1);
+    bucket[kind] = sideCounts;
+
+    return slot;
+  };
+
+  for (const edge of diagramEdges) {
+    const sourceNode = nodesById.get(edge.from);
+    const targetNode = nodesById.get(edge.to);
+    if (!sourceNode || !targetNode) continue;
+
+    const { sourceSide, targetSide } = inferConnectionSides(edge, sourceNode, targetNode);
+    const sourceSlot = takeSlot(edge.from, 'source', sourceSide);
+    const targetSlot = takeSlot(edge.to, 'target', targetSide);
+    edgeRoutes.set(edge.id, {
+      sourceHandle: architectureHandleId('source', sourceSide, sourceSlot),
+      targetHandle: architectureHandleId('target', targetSide, targetSlot),
+    });
+  }
+
+  return { edgeRoutes, nodeSlots };
+}
 
 function DiagramCanvasInternal() {
   const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode, dslText, setDslText, setParsedDiagram } = useDiagramStore();
@@ -469,7 +570,30 @@ function DiagramCanvasInternal() {
     }
   }, [parsedDiagram, diagramMode, c4Level, drillParent, layoutDirection, isLR, directionalNodeProps, stableGroupResize]);
 
-  const initialEdges = useMemo((): Edge[] => {
+  const architectureRouting = useMemo(
+    () => computeArchitectureRouting(diagramMode, parsedDiagram?.edges ?? [], initialNodes),
+    [diagramMode, parsedDiagram, initialNodes],
+  );
+
+  const routedNodes = useMemo((): Node[] => {
+    if (diagramMode === 'flow' || architectureRouting.nodeSlots.size === 0) {
+      return initialNodes;
+    }
+
+    return initialNodes.map((node) => {
+      const connectionHandles = architectureRouting.nodeSlots.get(node.id);
+      if (!connectionHandles) return node;
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          connectionHandles,
+        },
+      };
+    });
+  }, [diagramMode, initialNodes, architectureRouting]);
+
+  const initialEdges = useMemo((): ReactFlowEdge[] => {
     if (!parsedDiagram) return [];
 
     const getEdgeColor = (mode: string) => {
@@ -536,11 +660,14 @@ function DiagramCanvasInternal() {
 
     return edges.map((edge) => {
       const branch = branchColor(edge.label);
-      const stroke = branch ?? edgeColor;
+      const stroke = edge.color ?? branch ?? edgeColor;
+      const route = architectureRouting.edgeRoutes.get(edge.id);
       return {
         id: edge.id,
         source: edge.from,
         target: edge.to,
+        sourceHandle: route?.sourceHandle,
+        targetHandle: route?.targetHandle,
         label: edge.label,
         animated: false,
         type: rfEdgeType,
@@ -570,9 +697,9 @@ function DiagramCanvasInternal() {
         },
       };
     });
-  }, [parsedDiagram, diagramMode, c4Level, drillParent]);
+  }, [parsedDiagram, diagramMode, c4Level, drillParent, architectureRouting]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [nodes, setNodes, onNodesChange] = useNodesState(routedNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   // Alignment guides shown while dragging a node.
@@ -637,11 +764,11 @@ function DiagramCanvasInternal() {
   
   // Update nodes/edges when parsedDiagram changes
   useEffect(() => {
-    if (initialNodes.length > 0) {
-      setNodes(initialNodes);
+    if (routedNodes.length > 0) {
+      setNodes(routedNodes);
       setEdges(initialEdges);
     }
-  }, [initialNodes, initialEdges, setNodes, setEdges]);
+  }, [routedNodes, initialEdges, setNodes, setEdges]);
 
   // Reset the C4 level filter and drill-down whenever a new diagram is loaded.
   useEffect(() => {
@@ -771,6 +898,18 @@ function DiagramCanvasInternal() {
   const onNodeDragStop = useCallback((_e: unknown, node: Node) => {
     if (!parsedDiagram) return;
     let next = dslText;
+
+    const pinAllVisibleArchitectureNodes = (sourceDsl: string, overrides: Map<string, { x: number; y: number }>) => {
+      let pinnedDsl = sourceDsl;
+      for (const meta of parsedDiagram.nodes) {
+        if (meta.type === 'annotation') continue;
+        const position = overrides.get(meta.id) ?? nodes.find(n => n.id === meta.id)?.position;
+        if (!position) continue;
+        pinnedDsl = setNodePin(pinnedDsl, meta.name, position.x, position.y);
+      }
+      return pinnedDsl;
+    };
+
     if (node.id.startsWith('__group_')) {
       const gid = node.id.slice('__group_'.length);
       const group = parsedDiagram.groups?.find(g => g.id === gid);
@@ -780,19 +919,31 @@ function DiagramCanvasInternal() {
       next = setGroupPin(next, group.name, node.position.x, node.position.y, w, h);
       // The drag-follow handler moved members too — persist their new spots.
       const memberIds = (node.data as { memberIds?: string[] }).memberIds ?? [];
+      const memberOverrides = new Map<string, { x: number; y: number }>();
       for (const mid of memberIds) {
         const rf = nodes.find(n => n.id === mid);
         const meta = parsedDiagram.nodes.find(n => n.id === mid);
-        if (rf && meta) next = setNodePin(next, meta.name, rf.position.x, rf.position.y);
+        if (rf && meta) {
+          memberOverrides.set(mid, rf.position);
+          next = setNodePin(next, meta.name, rf.position.x, rf.position.y);
+        }
+      }
+      if (diagramMode !== 'flow') {
+        next = pinAllVisibleArchitectureNodes(next, memberOverrides);
       }
     } else {
       const meta = parsedDiagram.nodes.find(n => n.id === node.id);
       if (!meta) return;
+      if (meta.type === 'annotation') return;
       // Mermaid-format flowcharts store positions as `%% at` comments; native
       // DSL stores them as an `at:` line inside the node block.
-      next = isMermaidFlow(dslText)
+      if (diagramMode !== 'flow') {
+        next = pinAllVisibleArchitectureNodes(next, new Map([[node.id, node.position]]));
+      } else {
+        next = isMermaidFlow(dslText)
         ? setMermaidNodePin(next, meta.name, node.position.x, node.position.y)
         : setNodePin(next, meta.name, node.position.x, node.position.y);
+      }
     }
     if (next === dslText) return;
     setDslText(next);
@@ -801,7 +952,7 @@ function DiagramCanvasInternal() {
     } catch (err) {
       console.error('Pin parse error:', err);
     }
-  }, [parsedDiagram, dslText, nodes, setDslText, setParsedDiagram]);
+  }, [parsedDiagram, dslText, diagramMode, nodes, setDslText, setParsedDiagram]);
 
   // Persist a group resize (from NodeResizer) into the DSL.
   const onGroupResize = useCallback((groupId: string, x: number, y: number, w: number, h: number) => {
@@ -849,6 +1000,7 @@ function DiagramCanvasInternal() {
         snapGrid={[10, 10]}
         connectionRadius={28}
         connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '6 4' }}
+        panActivationKeyCode={null}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         attributionPosition="bottom-left"

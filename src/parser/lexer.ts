@@ -111,6 +111,17 @@ export class Lexer {
     return parseInt(value, 10);
   }
 
+  private readHexColor(): string | null {
+    const rest = this.text.slice(this.pos);
+    const match = rest.match(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})(?![0-9a-fA-F])/);
+    if (!match) return null;
+    const value = match[0];
+    for (let i = 0; i < value.length; i++) {
+      this.advance();
+    }
+    return value;
+  }
+
   tokenize(): Token[] {
     const tokens: Token[] = [];
 
@@ -119,9 +130,19 @@ export class Lexer {
 
       const char = this.peek();
 
-      // Hash-style line comments: `# ...` to end of line. Lets users annotate
-      // their DSL without breaking the parser on stray identifiers.
       if (char === '#') {
+        const color = this.readHexColor();
+        if (color) {
+          tokens.push({
+            type: TokenType.STRING,
+            value: color,
+            line: this.line,
+            column: this.column - color.length,
+          });
+          continue;
+        }
+        // Hash-style line comments: `# ...` to end of line. Lets users annotate
+        // their DSL without breaking the parser on stray identifiers.
         while (this.peek() !== null && this.peek() !== '\n') {
           this.advance();
         }

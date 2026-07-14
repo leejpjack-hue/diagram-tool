@@ -1,17 +1,16 @@
 import { memo } from 'react';
-import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { QueueNodeData } from './types';
 import { NodeIcon, hasNodeIcon } from './icons';
-import { useLayoutHandles } from './layoutDirection';
 import { cardStyle, chipStyle, badgeStyle, isCode, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
+import { ArchitectureHandles, type ArchitectureHandleSlots } from './ArchitectureHandles';
 
 const DEFAULT_ACCENT = '#10b981';
 
 export const QueueNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as QueueNodeData;
-  const { target, source } = useLayoutHandles();
   const accent = nodeData.color || DEFAULT_ACCENT;
+  const connectionHandles = (data as { connectionHandles?: ArchitectureHandleSlots }).connectionHandles;
 
   return (
     <div
@@ -22,7 +21,7 @@ export const QueueNode = memo(({ data, selected }: NodeProps) => {
       `}
       style={cardStyle(accent, !!selected)}
     >
-      <Handle type="target" position={target} style={{ background: accent }} />
+      <ArchitectureHandles accent={accent} slots={connectionHandles} />
 
       <div className="flex items-center gap-3 mb-1">
         <div
@@ -61,8 +60,6 @@ export const QueueNode = memo(({ data, selected }: NodeProps) => {
           </span>
         )}
       </div>
-
-      <Handle type="source" position={source} style={{ background: accent }} />
     </div>
   );
 });

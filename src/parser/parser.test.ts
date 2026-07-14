@@ -269,6 +269,40 @@ edge Events -> Worker { label: "consume" }
       expect(result.edges[0].label).toBe('consume');
     });
 
+    it('parses color and connection side settings on edge blocks', () => {
+      const dsl = `
+service API {
+  connects: SQLStore
+}
+database SQLStore {}
+edge API -> SQLStore {
+  label: "SQL"
+  color: "#ef4444"
+  from: right
+  to: left
+}
+`;
+      const result = parseDiagram(dsl);
+      expect(result.edges).toHaveLength(1);
+      expect(result.edges[0].label).toBe('SQL');
+      expect(result.edges[0].color).toBe('#ef4444');
+      expect(result.edges[0].sourceSide).toBe('right');
+      expect(result.edges[0].targetSide).toBe('left');
+    });
+
+    it('accepts unquoted hex connector colours', () => {
+      const dsl = `
+service API {}
+database SQLStore {}
+edge API -> SQLStore {
+  label: SQL
+  colour: #22c55e
+}
+`;
+      const result = parseDiagram(dsl);
+      expect(result.edges[0].color).toBe('#22c55e');
+    });
+
     it('handles multiple labelled edges in one diagram', () => {
       const dsl = `
 service Client {}

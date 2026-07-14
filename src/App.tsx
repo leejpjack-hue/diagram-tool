@@ -158,7 +158,13 @@ group Data {
 note "All ingress terminates TLS & is rate-limited at the gateway." {
   color: "#fbbf24"
   at: 280, 560
-}`;
+}
+
+# Connector colour + connection-point demo:
+# use color/colour plus from/to: top, right, bottom, or left.
+edge Client -> CDN { label: "REST" color: "#ef4444" from: right to: left }
+edge CDN -> Gateway { label: "dynamic" color: "#22c55e" from: bottom to: top }
+edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`;
 
 const FLOW_DSL = `diagram: flow
 title: Order Approval
