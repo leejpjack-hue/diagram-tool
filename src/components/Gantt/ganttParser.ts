@@ -328,8 +328,8 @@ function parseHours(str: string): number {
 /**
  * Sprint 12: Parse custom fields from string like "{ priority: high, storyPoints: 5 }"
  */
-function parseCustomFields(str: string): Record<string, any> {
-  const fields: Record<string, any> = {};
+function parseCustomFields(str: string): Record<string, string | number | boolean> {
+  const fields: Record<string, string | number | boolean> = {};
   
   // Remove braces if present
   let content = str.trim();
@@ -362,7 +362,7 @@ function parseCustomFields(str: string): Record<string, any> {
     const colonIndex = part.indexOf(':');
     if (colonIndex > 0) {
       const key = part.slice(0, colonIndex).trim();
-      let value: any = part.slice(colonIndex + 1).trim();
+      let value: string | number | boolean = part.slice(colonIndex + 1).trim();
       
       // Try to parse as number
       const numValue = parseFloat(value);

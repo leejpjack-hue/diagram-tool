@@ -8,7 +8,6 @@ import {
   levelResources,
   needsLeveling,
   previewLeveling,
-  type LevelingOptions,
 } from '../src/components/Gantt/resourceLeveling';
 import type { GanttTask, Dependency } from '../src/components/Gantt/types';
 

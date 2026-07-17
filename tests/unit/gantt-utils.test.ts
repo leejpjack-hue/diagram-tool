@@ -73,15 +73,6 @@ test.describe('Unit Tests - DSL Synchronization', () => {
         assignee: 'Jack',
       },
     ];
-    
-    // Expected DSL structure
-    const expectedDSL = `task "Test Task" {
-  start: 2026-03-01
-  end: 2026-03-03
-  progress: 50
-  assignee: "Jack"
-}`;
-    
     expect(tasks.length).toBe(1);
     expect(tasks[0].name).toBe('Test Task');
     

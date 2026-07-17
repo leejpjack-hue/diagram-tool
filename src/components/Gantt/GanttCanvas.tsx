@@ -4,6 +4,7 @@ import type { GanttTask, GanttZoomLevel, Dependency } from './types';
 import { isCritical } from './criticalPath';
 import { BulkOperationsPanel } from './BulkOperationsPanel';
 import { computeWbsCodes } from './wbsUtils';
+import type { DelayImpactResult } from './delayImpactUtils';
 
 // Constants
 const ROW_HEIGHT = 40;
@@ -52,7 +53,6 @@ export function GanttCanvas() {
     showCriticalPath,
     criticalPathResult,
     expandedGroups,
-    filter,
     setSelectedTask, 
     updateTask,
     toggleGroup,
@@ -65,7 +65,7 @@ export function GanttCanvas() {
   // State for delay impact visualization
   const [visualizationData, setVisualizationData] = useState<{
     enabled: boolean;
-    result: any;
+    result: DelayImpactResult;
   } | null>(() => {
     const data = localStorage.getItem('delayImpactVisualization');
     if (data) {
@@ -143,7 +143,7 @@ export function GanttCanvas() {
     
     filteredTasks.filter(t => !t.parentId).forEach(addTask);
     return result;
-  }, [tasks, filter, getFilteredTasks, expandedGroups]);
+  }, [getFilteredTasks, expandedGroups]);
 
   // WBS codes for all tasks (e.g. "1", "1.2", "1.2.3")
   const wbsCodes = useMemo(() => computeWbsCodes(tasks), [tasks]);
@@ -684,8 +684,8 @@ export function GanttCanvas() {
                     
                     {/* Delay Impact Visualization */}
                     {visualizationData && visualizationData.enabled && 
-                     visualizationData.result.affectedTasks.some((at: any) => at.task.id === task.id) && (() => {
-                      const affectedTask = visualizationData.result.affectedTasks.find((at: any) => at.task.id === task.id);
+                     visualizationData.result.affectedTasks.some((affected) => affected.task.id === task.id) && (() => {
+                      const affectedTask = visualizationData.result.affectedTasks.find((affected) => affected.task.id === task.id);
                       if (!affectedTask || affectedTask.delayDays === 0) return null;
                       
                       const color = affectedTask.impactLevel === 'direct' ? '#ef4444' : 

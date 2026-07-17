@@ -20,7 +20,7 @@ export interface ScheduleWarning {
   type: 'circular' | 'violation' | 'conflict' | 'overallocation';
   taskId: string;
   message: string;
-  details?: any;
+  details?: unknown;
 }
 
 /**

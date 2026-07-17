@@ -3,17 +3,20 @@ import Editor from '@monaco-editor/react';
 import { useDiagramStore } from '../../store/diagramStore';
 import { parseDiagram } from '../../parser/parser';
 
+const isGanttDSL = (text: string) => /^\s*diagram:\s*gantt\b/im.test(text);
+
 export function DSLEditor() {
   const { dslText, setDslText, setParsedDiagram, setError, setLoading, diagramMode } = useDiagramStore();
 
-  // Sequence mode uses Mermaid syntax parsed inside SequenceCanvas; running
-  // the generic parser on it would reset the mode to architecture.
-  const skipGenericParse = diagramMode === 'sequence';
+  // Sequence and Gantt each have their own parsers/canvases. Running the
+  // generic architecture/flow parser on those DSLs can clear the current mode
+  // during normal typing, so let their owning canvases/effects handle them.
+  const skipGenericParse = diagramMode === 'sequence' || diagramMode === 'gantt';
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (value !== undefined) {
       setDslText(value);
-      if (skipGenericParse) return;
+      if (skipGenericParse || isGanttDSL(value)) return;
 
       // Parse the diagram
       setLoading(true);

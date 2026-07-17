@@ -1,6 +1,7 @@
 import { toPng, toJpeg } from 'html-to-image';
 import { useDiagramStore } from '../store/diagramStore';
 import { useGanttStore } from '../components/Gantt/ganttStore';
+import type { DiagramNode } from '../store/types';
 
 export const useExport = () => {
   const { parsedDiagram, diagramMode } = useDiagramStore();
@@ -226,7 +227,7 @@ export const useExport = () => {
 
     const nodeById = new Map(parsedDiagram.nodes.map(n => [n.id, n]));
 
-    const protocolOf = (node: any): string => {
+    const protocolOf = (node?: DiagramNode): string => {
       if (!node) return '';
       if (node.type === 'database') return node.properties?.type || 'database';
       if (node.type === 'queue') return node.properties?.type || 'queue';
@@ -252,8 +253,8 @@ export const useExport = () => {
       });
     } else {
       parsedDiagram.nodes.forEach(node => {
-        if (node.type === 'service' && Array.isArray((node as any).connections)) {
-          (node as any).connections.forEach((targetId: string) => {
+        if (node.type === 'service' && Array.isArray(node.connections)) {
+          node.connections.forEach((targetId: string) => {
             const toNode = nodeById.get(targetId);
             rows.push([
               node.name,

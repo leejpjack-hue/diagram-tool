@@ -49,7 +49,7 @@ export function calculateDelayImpact(
   );
 
   // Calculate project delay
-  const projectDelay = calculateProjectDelay(affectedTasks, tasks);
+  const projectDelay = calculateProjectDelay(affectedTasks);
 
   // Check if critical path is impacted
   const criticalPathImpacted = checkCriticalPathImpact(affectedTasks);
@@ -160,8 +160,7 @@ function calculateAffectedTasks(
  * Calculate total project delay
  */
 function calculateProjectDelay(
-  affectedTasks: AffectedTask[],
-  _allTasks: GanttTask[]
+  affectedTasks: AffectedTask[]
 ): number {
   if (affectedTasks.length === 0) return 0;
 

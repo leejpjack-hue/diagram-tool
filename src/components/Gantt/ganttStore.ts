@@ -78,7 +78,7 @@ interface GanttState {
   // Sprint 9: Auto-scheduling
   runAutoSchedule: () => { success: boolean; message: string; changed: number };
   detectCycles: () => string[][];
-  checkViolations: () => any[];
+  checkViolations: () => ReturnType<typeof checkDependencyViolations>;
   expandAllGroups: () => void;
   collapseAllGroups: () => void;
   
@@ -541,7 +541,24 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   },
   
   // Project
-  setProject: (tasks, dependencies) => set({ tasks, dependencies }),
+  setProject: (tasks, dependencies) => set((state) => {
+    const nextTasks = recomputeGroupRollups(tasks);
+    const nextTaskIds = new Set(nextTasks.map(t => t.id));
+    const previousSelectedTask = state.tasks.find(t => t.id === state.selectedTaskId);
+    const selectedTaskId = state.selectedTaskId && nextTaskIds.has(state.selectedTaskId)
+      ? state.selectedTaskId
+      : nextTasks.find(t => previousSelectedTask && t.name === previousSelectedTask.name)?.id ?? null;
+    const selectedTaskIds = new Set(
+      Array.from(state.selectedTaskIds).filter(id => nextTaskIds.has(id)),
+    );
+
+    return {
+      tasks: nextTasks,
+      dependencies,
+      selectedTaskId,
+      selectedTaskIds,
+    };
+  }),
   
   // Sprint 13: Resource leveling
   runLeveling: (options) => {

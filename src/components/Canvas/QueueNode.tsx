@@ -1,7 +1,8 @@
 import { memo } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import type { QueueNodeData } from './types';
-import { NodeIcon, hasNodeIcon } from './icons';
+import { NodeIcon } from './icons';
+import { hasNodeIcon } from './icons/registry';
 import { cardStyle, chipStyle, badgeStyle, isCode, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
 import { ArchitectureHandles, type ArchitectureHandleSlots } from './ArchitectureHandles';
 

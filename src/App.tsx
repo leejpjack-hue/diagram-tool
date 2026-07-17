@@ -23,6 +23,7 @@ import { useGanttStore } from './components/Gantt/ganttStore';
 import { parseGanttDSL } from './components/Gantt/ganttParser';
 import { generateGanttDSL } from './components/Gantt/ganttGenerator';
 import { exportGanttChart } from './components/Gantt/exportUtils';
+import type { DelayImpactResult } from './components/Gantt/delayImpactUtils';
 import { useExport } from './utils/useExport';
 import { useToast } from './utils/useToast';
 import { csvToDSL, csvToDiagram } from './utils/csvToDiagram';
@@ -343,7 +344,7 @@ function App() {
     setClipboard 
   } = useDiagramStore();
   
-  const { setTasks, addTask, updateTask, setDependencies, tasks, dependencies } = useGanttStore();
+  const { addTask, updateTask, setProject, tasks, dependencies } = useGanttStore();
   
   // Initialize activeTab from saved diagram if available
   const [activeTab, setActiveTab] = useState<'architecture' | 'flow' | 'sequence' | 'gantt'>(() => {
@@ -376,6 +377,9 @@ function App() {
   const ganttCanvasRef = useRef<HTMLDivElement>(null);
   const thumbnailCaptureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const thumbnailCaptureInFlightRef = useRef(false);
+  // This flag prevents the UI-to-DSL sync effect from writing old Gantt state
+  // back over fresh editor text while a DSL parse is updating the Gantt store.
+  const isUpdatingFromDSL = useRef(false);
   
   const { exportPNG, exportJPG, exportPDF, exportJSON, exportCSV } = useExport();
   const toast = useToast();
@@ -390,29 +394,27 @@ function App() {
   
   // Parse Gantt DSL when it changes
   useEffect(() => {
-    if (diagramMode === 'gantt' && dslText.includes('diagram: gantt')) {
+    if (activeTab === 'gantt' && /^\s*diagram:\s*gantt\b/im.test(dslText)) {
       isUpdatingFromDSL.current = true;
       const project = parseGanttDSL(dslText);
-      if (project && project.tasks.length > 0) {
-        setTasks(project.tasks);
-        if (project.dependencies && project.dependencies.length > 0) {
-          setDependencies(project.dependencies);
-        }
-      }
-      // Reset flag after a short delay to allow the state update to complete
-      setTimeout(() => {
+      if (project) {
+        setProject(project.tasks, project.dependencies ?? []);
+      } else {
         isUpdatingFromDSL.current = false;
-      }, 100);
+      }
     }
-  }, [dslText, diagramMode, setTasks, setDependencies]);
+  }, [dslText, activeTab, setProject]);
   
   // Sync DSL when tasks or dependencies change from UI
   // This ensures DSL is always the single source of truth
-  const isUpdatingFromDSL = useRef(false);
-  
   useEffect(() => {
     // Don't sync if we're in non-gantt mode or if change came from DSL parsing
-    if (diagramMode !== 'gantt' || isUpdatingFromDSL.current) {
+    if (activeTab !== 'gantt') {
+      return;
+    }
+
+    if (isUpdatingFromDSL.current) {
+      isUpdatingFromDSL.current = false;
       return;
     }
     
@@ -428,12 +430,13 @@ function App() {
     // Update DSL text and mark as unsaved
     // This is a valid synchronization pattern - we're syncing UI state to DSL
     setDslText(updatedDSL);
-    setSaveStatus('unsaved');
+    const timer = window.setTimeout(() => setSaveStatus('unsaved'), 0);
+    return () => window.clearTimeout(timer);
     
     // Note: dslText is intentionally excluded to prevent infinite loops
     // extractTitle is stable and setDslText/setSaveStatus are stable setters
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, dependencies, diagramMode]);
+  }, [tasks, dependencies, activeTab]);
 
   const handleTabChange = (tab: 'architecture' | 'flow' | 'sequence' | 'gantt') => {
     setActiveTab(tab);
@@ -477,9 +480,9 @@ function App() {
   };
   
   // Handle delay impact apply
-  const handleApplyDelayImpact = (result: any) => {
+  const handleApplyDelayImpact = (result: DelayImpactResult) => {
     // Apply delay impact to tasks
-    result.affectedTasks.forEach((affectedTask: any) => {
+    result.affectedTasks.forEach((affectedTask) => {
       if (affectedTask.delayDays > 0) {
         const task = tasks.find(t => t.id === affectedTask.task.id);
         if (task) {
@@ -506,10 +509,10 @@ function App() {
     toast.success('✅ Delay impact applied! Tasks updated.');
   };
   
-  const updateDSLWithDelay = (result: any): string => {
+  const updateDSLWithDelay = (result: DelayImpactResult): string => {
     let updatedDSL = dslText;
     
-    result.affectedTasks.forEach((affectedTask: any) => {
+    result.affectedTasks.forEach((affectedTask) => {
       if (affectedTask.delayDays > 0) {
         const task = affectedTask.task;
         const newStartDate = new Date(task.startDate);

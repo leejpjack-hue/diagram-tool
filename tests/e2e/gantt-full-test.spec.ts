@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 const BASE_URL = 'http://localhost:8888';
 
@@ -159,7 +159,7 @@ test.describe('Gantt Chart - Full Feature Test', () => {
     
     // Verify position changed
     const newX = await taskBar.getAttribute('x');
-    // Position should have changed
+    expect(newX).not.toBe(initialX);
     
     console.log('✅ Task moved successfully');
   });

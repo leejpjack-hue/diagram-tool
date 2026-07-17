@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useCallback, useState, useRef } from 'react';
+import { useMemo, useEffect, useCallback, useState } from 'react';
 import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider, useReactFlow, BackgroundVariant, ViewportPortal } from '@xyflow/react';
 import type { Node, Edge as ReactFlowEdge, Viewport, Connection } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -193,15 +193,6 @@ function DiagramCanvasInternal() {
   const [drillParent, setDrillParent] = useState<string | null>(null);
   const [drillParentName, setDrillParentName] = useState<string>('');
 
-  // Stable resize callback injected into group containers. The real impl
-  // (onGroupResize) is defined later and kept fresh via this ref, so the
-  // node memo can depend on a stable reference.
-  const onGroupResizeRef = useRef<(gid: string, x: number, y: number, w: number, h: number) => void>(() => {});
-  const stableGroupResize = useCallback(
-    (gid: string, x: number, y: number, w: number, h: number) => onGroupResizeRef.current(gid, x, y, w, h),
-    [],
-  );
-
   // Architecture nodes can declare a C4 level; collect the unique set so the
   // switcher only offers levels actually present.
   const availableC4Levels = useMemo<C4Level[]>(() => {
@@ -230,6 +221,21 @@ function DiagramCanvasInternal() {
       : { sourcePosition: Position.Bottom, targetPosition: Position.Top }),
     [isLR],
   );
+
+  // Persist a group resize (from NodeResizer) into the DSL.
+  const onGroupResize = useCallback((groupId: string, x: number, y: number, w: number, h: number) => {
+    if (!parsedDiagram) return;
+    const group = parsedDiagram.groups?.find(g => g.id === groupId);
+    if (!group) return;
+    const next = setGroupPin(dslText, group.name, x, y, w, h);
+    if (next === dslText) return;
+    setDslText(next);
+    try {
+      setParsedDiagram(parseDiagram(next));
+    } catch (err) {
+      console.error('Resize parse error:', err);
+    }
+  }, [parsedDiagram, dslText, setDslText, setParsedDiagram]);
 
   const initialNodes = useMemo((): Node[] => {
     if (!parsedDiagram) {
@@ -549,7 +555,7 @@ function DiagramCanvasInternal() {
               height: gh,
               color: g.color,
               groupId: g.id,
-              onResize: stableGroupResize,
+              onResize: onGroupResize,
               // Pre-bake the member id list so the drag-follow handler
               // (handleNodesChange below) can move them all in one batch.
               memberIds: g.contains.filter((id) => visibleIds.has(id)),
@@ -568,7 +574,7 @@ function DiagramCanvasInternal() {
       // Render groups first so they sit behind the actual component nodes.
       return [...groupNodes, ...archNodes];
     }
-  }, [parsedDiagram, diagramMode, c4Level, drillParent, layoutDirection, isLR, directionalNodeProps, stableGroupResize]);
+  }, [parsedDiagram, diagramMode, c4Level, drillParent, layoutDirection, isLR, directionalNodeProps, onGroupResize]);
 
   const architectureRouting = useMemo(
     () => computeArchitectureRouting(diagramMode, parsedDiagram?.edges ?? [], initialNodes),
@@ -772,9 +778,12 @@ function DiagramCanvasInternal() {
 
   // Reset the C4 level filter and drill-down whenever a new diagram is loaded.
   useEffect(() => {
-    setC4Level('all');
-    setDrillParent(null);
-    setDrillParentName('');
+    const timer = window.setTimeout(() => {
+      setC4Level('all');
+      setDrillParent(null);
+      setDrillParentName('');
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [parsedDiagram]);
 
   // Double-click a flow node to flip its input/output direction. Useful for
@@ -953,22 +962,6 @@ function DiagramCanvasInternal() {
       console.error('Pin parse error:', err);
     }
   }, [parsedDiagram, dslText, diagramMode, nodes, setDslText, setParsedDiagram]);
-
-  // Persist a group resize (from NodeResizer) into the DSL.
-  const onGroupResize = useCallback((groupId: string, x: number, y: number, w: number, h: number) => {
-    if (!parsedDiagram) return;
-    const group = parsedDiagram.groups?.find(g => g.id === groupId);
-    if (!group) return;
-    const next = setGroupPin(dslText, group.name, x, y, w, h);
-    if (next === dslText) return;
-    setDslText(next);
-    try {
-      setParsedDiagram(parseDiagram(next));
-    } catch (err) {
-      console.error('Resize parse error:', err);
-    }
-  }, [parsedDiagram, dslText, setDslText, setParsedDiagram]);
-  onGroupResizeRef.current = onGroupResize;
 
   if (!parsedDiagram) {
     return (

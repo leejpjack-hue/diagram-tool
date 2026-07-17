@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { GanttCanvas } from './GanttCanvas';
 import { useGanttStore } from './ganttStore';
 import { useEffect } from 'react';

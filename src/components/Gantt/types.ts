@@ -39,7 +39,7 @@ export interface GanttTask {
   tags?: string[];
   
   // Sprint 12: Custom fields
-  customFields?: Record<string, any>;
+  customFields?: Record<string, string | number | boolean>;
   
   // Sprint 12: Time tracking
   timeTracking?: {
@@ -61,7 +61,7 @@ export interface CustomFieldDefinition {
   type: 'text' | 'number' | 'select' | 'multiselect' | 'date' | 'checkbox';
   options?: string[]; // for select/multiselect types
   required?: boolean;
-  defaultValue?: any;
+  defaultValue?: string | number | boolean;
 }
 
 // Sprint 12: Predefined custom fields

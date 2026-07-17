@@ -11,15 +11,43 @@ const serverPath = `${here}/server.ts`;
 interface JsonRpcResponse {
   jsonrpc: '2.0';
   id: number;
-  result?: any;
-  error?: any;
+  result?: unknown;
+  error?: unknown;
+}
+
+interface ToolListResult {
+  tools: { name: string }[];
+}
+
+interface ToolCallResponse extends JsonRpcResponse {
+  result: {
+    content: { text: string }[];
+  };
+}
+
+interface TemplateSummary {
+  id: string;
+}
+
+interface VerifyResult {
+  valid: boolean;
+  summary: {
+    nodes: number;
+    edges: number;
+  };
+  errors: unknown[];
+}
+
+interface MutationResult {
+  dsl: string;
+  verify: VerifyResult;
 }
 
 class StdioClient {
   private proc: ReturnType<typeof spawn>;
   private buffer = '';
   private nextId = 1;
-  private resolvers = new Map<number, (msg: any) => void>();
+  private resolvers = new Map<number, (msg: JsonRpcResponse) => void>();
 
   constructor() {
     this.proc = spawn('npx', ['tsx', serverPath], {
@@ -38,7 +66,7 @@ class StdioClient {
       this.buffer = this.buffer.slice(nl + 1);
       if (!line.trim()) continue;
       try {
-        const msg = JSON.parse(line);
+        const msg = JSON.parse(line) as JsonRpcResponse;
         if (typeof msg.id === 'number' && this.resolvers.has(msg.id)) {
           this.resolvers.get(msg.id)!(msg);
           this.resolvers.delete(msg.id);
@@ -49,7 +77,7 @@ class StdioClient {
     }
   }
 
-  async request(method: string, params: any): Promise<JsonRpcResponse> {
+  async request(method: string, params: unknown): Promise<JsonRpcResponse> {
     const id = this.nextId++;
     return new Promise(resolve => {
       this.resolvers.set(id, resolve);
@@ -57,8 +85,8 @@ class StdioClient {
     });
   }
 
-  async callTool(name: string, args: any): Promise<any> {
-    return this.request('tools/call', { name, arguments: args });
+  async callTool(name: string, args: unknown): Promise<ToolCallResponse> {
+    return this.request('tools/call', { name, arguments: args }) as Promise<ToolCallResponse>;
   }
 
   close() {
@@ -79,38 +107,38 @@ async function main() {
 
   // 2. List tools
   const list = await client.request('tools/list', {});
-  const tools = list.result?.tools ?? [];
-  console.log('tools/list:', tools.length, 'tools registered:', tools.map((t: any) => t.name).join(', '));
+  const tools = (list.result as ToolListResult | undefined)?.tools ?? [];
+  console.log('tools/list:', tools.length, 'tools registered:', tools.map((t) => t.name).join(', '));
 
   // 3. list_templates
-  const tpls: any = await client.callTool('list_templates', {});
-  const parsedTpls = JSON.parse(tpls.result.content[0].text);
+  const tpls = await client.callTool('list_templates', {});
+  const parsedTpls = JSON.parse(tpls.result.content[0].text) as TemplateSummary[];
   console.log('list_templates:', parsedTpls.length, 'templates');
 
   // 4. load_template
-  const templ: any = await client.callTool('load_template', { id: parsedTpls[0].id });
+  const templ = await client.callTool('load_template', { id: parsedTpls[0].id });
   const dsl = templ.result.content[0].text;
   console.log('load_template: returned', dsl.length, 'chars of DSL');
 
   // 5. verify_diagram (valid)
-  const valid: any = await client.callTool('verify_diagram', { dsl });
-  const validResult = JSON.parse(valid.result.content[0].text);
+  const valid = await client.callTool('verify_diagram', { dsl });
+  const validResult = JSON.parse(valid.result.content[0].text) as VerifyResult;
   console.log('verify_diagram (valid):', validResult.valid, '|', validResult.summary.nodes, 'nodes');
 
   // 6. verify_diagram (broken)
   const brokenDsl = 'service Foo {\n  type: badType\n}\n';
-  const invalid: any = await client.callTool('verify_diagram', { dsl: brokenDsl });
-  const invalidResult = JSON.parse(invalid.result.content[0].text);
+  const invalid = await client.callTool('verify_diagram', { dsl: brokenDsl });
+  const invalidResult = JSON.parse(invalid.result.content[0].text) as VerifyResult;
   console.log('verify_diagram (broken):', invalidResult.valid, '| errors:', invalidResult.errors.length);
 
   // 7. add_node
-  const addRes: any = await client.callTool('add_node', {
+  const addRes = await client.callTool('add_node', {
     dsl: 'diagram: architecture\n',
     kind: 'cloud',
     name: 'CDN',
     properties: { provider: 'aws', kind: 'cloudfront', color: '#f97316' },
   });
-  const addResult = JSON.parse(addRes.result.content[0].text);
+  const addResult = JSON.parse(addRes.result.content[0].text) as MutationResult;
   console.log('add_node: valid =', addResult.verify.valid, '| summary:', JSON.stringify(addResult.verify.summary));
 
   // 8. add_edge then verify
@@ -122,29 +150,29 @@ service Backend {
   type: microservice
 }
 `;
-  const edgeRes: any = await client.callTool('add_edge', {
+  const edgeRes = await client.callTool('add_edge', {
     dsl: nodeDsl,
     from: 'Frontend',
     to: 'Backend',
   });
-  const edgeResult = JSON.parse(edgeRes.result.content[0].text);
+  const edgeResult = JSON.parse(edgeRes.result.content[0].text) as MutationResult;
   console.log('add_edge: valid =', edgeResult.verify.valid, '| edges =', edgeResult.verify.summary.edges);
 
   // 9. label_edge
-  const labelRes: any = await client.callTool('label_edge', {
+  const labelRes = await client.callTool('label_edge', {
     dsl: nodeDsl,
     from: 'Frontend',
     to: 'Backend',
     label: 'REST',
   });
-  const labelResult = JSON.parse(labelRes.result.content[0].text);
+  const labelResult = JSON.parse(labelRes.result.content[0].text) as MutationResult;
   console.log('label_edge: valid =', labelResult.verify.valid, '| labelled edges =',
     labelResult.verify.summary.edges, '(should be 1)');
   const hasRest = labelResult.dsl.includes('REST');
   console.log('label_edge: DSL contains "REST" =', hasRest);
 
   // 10. export_diagram (summary)
-  const exportRes: any = await client.callTool('export_diagram', {
+  const exportRes = await client.callTool('export_diagram', {
     dsl,
     format: 'summary',
   });
@@ -152,7 +180,7 @@ service Backend {
   console.log('export_diagram (summary): length', summary.length, 'first line =', summary.split('\n')[0]);
 
   // 11. get_info
-  const infoRes: any = await client.callTool('get_info', { dsl });
+  const infoRes = await client.callTool('get_info', { dsl });
   const info = JSON.parse(infoRes.result.content[0].text);
   console.log('get_info:', info.summary);
 
@@ -164,12 +192,12 @@ node B {
   label: B
 }
 `;
-  const reverseRes: any = await client.callTool('set_reverse', {
+  const reverseRes = await client.callTool('set_reverse', {
     dsl: flowDsl,
     node: 'B',
     reversed: true,
   });
-  const reverseResult = JSON.parse(reverseRes.result.content[0].text);
+  const reverseResult = JSON.parse(reverseRes.result.content[0].text) as MutationResult;
   console.log('set_reverse: valid =', reverseResult.verify.valid, '| contains reverse =',
     reverseResult.dsl.includes('reverse: true'));
 

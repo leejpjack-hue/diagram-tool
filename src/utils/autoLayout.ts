@@ -93,7 +93,7 @@ export function calculateHierarchicalLayout(
     });
 
     // Disconnected nodes: stack to the right of the rightmost layer
-    let disconnectedX = startX;
+    const disconnectedX = startX;
     let disconnectedY = startY;
     nodes.forEach(node => {
       if (!positions.has(node.id)) {

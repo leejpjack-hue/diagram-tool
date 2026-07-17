@@ -56,7 +56,7 @@ function generateDependencyPath(
     case 'FF': // Finish-to-Finish: predecessor end → successor end
       return generateFFPath(x1, y1, endX + gap, y2, dayWidth);
     case 'SF': // Start-to-Finish: predecessor start → successor end
-      return generateSFPath(startX - gap, y1, endX + gap, y2, dayWidth);
+      return generateSFPath(startX - gap, y1, endX + gap, y2);
     default:
       return generateFSPath(x1, y1, x2, y2, dayWidth);
   }
@@ -85,7 +85,7 @@ function generateFFPath(x1: number, y1: number, x2: number, y2: number, dayWidth
   return `M ${x1} ${y1} L ${rightX} ${y1} L ${rightX} ${y2} L ${x2} ${y2}`;
 }
 
-function generateSFPath(x1: number, y1: number, x2: number, y2: number, _dayWidth: number): string {
+function generateSFPath(x1: number, y1: number, x2: number, y2: number): string {
   // Rarely used - simple diagonal
   return `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${(y1 + y2) / 2}, ${x2} ${y2}`;
 }
