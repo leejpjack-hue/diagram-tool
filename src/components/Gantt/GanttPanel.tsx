@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useGanttStore } from './ganttStore';
+import { applyGanttFilter, hasActiveGanttFilter, useGanttStore } from './ganttStore';
 import { computeWbsCodes } from './wbsUtils';
 import type { GanttTask, DependencyType } from './types';
 import './GanttPanel.css';
@@ -25,6 +25,8 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
   const {
     tasks,
     dependencies,
+    filter,
+    criticalPathResult,
     selectedTaskId,
     setSelectedTask,
     updateTask,
@@ -38,6 +40,25 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
 
   const wbsCodes = useMemo(() => computeWbsCodes(tasks), [tasks]);
   const hasGroups = useMemo(() => tasks.some(t => t.isGroup), [tasks]);
+  const hasFilter = hasActiveGanttFilter(filter);
+  const visibleTaskIds = useMemo(() => {
+    const filteredIds = new Set(applyGanttFilter(tasks, filter, criticalPathResult).map(task => task.id));
+    if (!hasFilter) return new Set(tasks.map(task => task.id));
+
+    const childrenByParent = new Map<string | undefined, GanttTask[]>();
+    tasks.forEach(task => {
+      const siblings = childrenByParent.get(task.parentId) ?? [];
+      siblings.push(task);
+      childrenByParent.set(task.parentId, siblings);
+    });
+
+    const shouldShow = (task: GanttTask): boolean => (
+      filteredIds.has(task.id) ||
+      (childrenByParent.get(task.id) ?? []).some(shouldShow)
+    );
+
+    return new Set(tasks.filter(shouldShow).map(task => task.id));
+  }, [tasks, filter, criticalPathResult, hasFilter]);
   
   const [isAdding, setIsAdding] = useState(false);
   const [isAddingDependency, setIsAddingDependency] = useState(false);
@@ -151,11 +172,13 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
         </div>
       )}
       <div className="task-list">
-        {tasks.filter(t => !t.parentId).map(task => (
+        {tasks.filter(t => !t.parentId && visibleTaskIds.has(t.id)).map(task => (
           <TaskListItem
             key={task.id}
             task={task}
             allTasks={tasks}
+            visibleTaskIds={visibleTaskIds}
+            forceExpand={hasFilter}
             selectedTaskId={selectedTaskId}
             onSelect={setSelectedTask}
             level={0}
@@ -255,7 +278,7 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
               min="0"
               max="100"
               value={selectedTask.progress}
-              onChange={(e) => handleProgressChange(parseInt(e.target.value, 10))}
+              onInput={(e) => handleProgressChange(parseInt(e.currentTarget.value, 10))}
               className="gantt-range-input"
             />
           </div>
@@ -268,7 +291,7 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
                 <input
                   type="date"
                   value={formatForInput(selectedTask.startDate)}
-                  onChange={(e) => updateTask(selectedTask.id, { startDate: new Date(e.target.value) })}
+                  onInput={(e) => updateTask(selectedTask.id, { startDate: new Date(e.currentTarget.value) })}
                   className="input input-sm"
                 />
               </div>
@@ -277,7 +300,7 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
                 <input
                   type="date"
                   value={formatForInput(selectedTask.endDate)}
-                  onChange={(e) => updateTask(selectedTask.id, { endDate: new Date(e.target.value) })}
+                  onInput={(e) => updateTask(selectedTask.id, { endDate: new Date(e.currentTarget.value) })}
                   className="input input-sm"
                 />
               </div>
@@ -316,7 +339,7 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
                   value={selectedTask.color || '#3b82f6'}
                   title="Custom colour"
                   aria-label="Custom colour"
-                  onChange={(e) => updateTask(selectedTask.id, { color: e.target.value })}
+                  onInput={(e) => updateTask(selectedTask.id, { color: e.currentTarget.value })}
                   style={{
                     width: 28,
                     height: 24,
@@ -382,8 +405,8 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
                             <input
                               type="number"
                               value={dep.lag}
-                              onChange={(e) => updateDependency(dep.predecessorId, dep.successorId, { 
-                                lag: parseInt(e.target.value, 10) || 0 
+                              onInput={(e) => updateDependency(dep.predecessorId, dep.successorId, { 
+                                lag: parseInt(e.currentTarget.value, 10) || 0 
                               })}
                               className="input input-sm gantt-lag-number"
                             />
@@ -436,9 +459,9 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
                         <input
                           type="number"
                           value={newDependency.lag}
-                          onChange={(e) => setNewDependency({ 
+                          onInput={(e) => setNewDependency({ 
                             ...newDependency, 
-                            lag: parseInt(e.target.value, 10) || 0 
+                            lag: parseInt(e.currentTarget.value, 10) || 0 
                           })}
                           className="input input-sm"
                         />
@@ -479,16 +502,27 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
 interface TaskListItemProps {
   task: GanttTask;
   allTasks: GanttTask[];
+  visibleTaskIds: Set<string>;
+  forceExpand: boolean;
   selectedTaskId: string | null;
   onSelect: (id: string) => void;
   level: number;
   wbsCodes: Map<string, string>;
 }
 
-function TaskListItem({ task, allTasks, selectedTaskId, onSelect, level, wbsCodes }: TaskListItemProps) {
+function TaskListItem({
+  task,
+  allTasks,
+  visibleTaskIds,
+  forceExpand,
+  selectedTaskId,
+  onSelect,
+  level,
+  wbsCodes,
+}: TaskListItemProps) {
   const { expandedGroups, toggleGroup } = useGanttStore();
-  const isExpanded = expandedGroups.has(task.id);
-  const children = allTasks.filter(t => t.parentId === task.id);
+  const isExpanded = forceExpand || expandedGroups.has(task.id);
+  const children = allTasks.filter(t => t.parentId === task.id && visibleTaskIds.has(t.id));
   const wbs = wbsCodes.get(task.id);
   
   return (
@@ -562,6 +596,8 @@ function TaskListItem({ task, allTasks, selectedTaskId, onSelect, level, wbsCode
           key={child.id}
           task={child}
           allTasks={allTasks}
+          visibleTaskIds={visibleTaskIds}
+          forceExpand={forceExpand}
           selectedTaskId={selectedTaskId}
           onSelect={onSelect}
           level={level + 1}

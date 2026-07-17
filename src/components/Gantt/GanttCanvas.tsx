@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
-import { useGanttStore } from './ganttStore';
+import { applyGanttFilter, hasActiveGanttFilter, useGanttStore } from './ganttStore';
 import type { GanttTask, GanttZoomLevel, Dependency } from './types';
 import { isCritical } from './criticalPath';
 import { BulkOperationsPanel } from './BulkOperationsPanel';
@@ -52,6 +52,7 @@ export function GanttCanvas() {
     widthScale,
     showCriticalPath,
     criticalPathResult,
+    filter,
     expandedGroups,
     setSelectedTask, 
     updateTask,
@@ -59,7 +60,6 @@ export function GanttCanvas() {
     toggleTaskSelection,
     clearSelection,
     recalculateCriticalPath,
-    getFilteredTasks,
   } = useGanttStore();
   
   // State for delay impact visualization
@@ -114,36 +114,47 @@ export function GanttCanvas() {
     }
   }, [tasks, dependencies, showCriticalPath, recalculateCriticalPath]);
 
-  // Filter out collapsed group children for display AND apply filter
+  // Filter out collapsed group children for display AND apply filter.
+  // Keep parent groups visible when a child matches, so search results are not hidden.
   const visibleTasks = useMemo(() => {
-    // First apply the filter from the store
-    const filteredTasks = getFilteredTasks();
-    
+    const filteredTasks = applyGanttFilter(tasks, filter, criticalPathResult);
+    const filteredIds = new Set(filteredTasks.map(task => task.id));
+    const hasFilter = hasActiveGanttFilter(filter);
+    const childrenByParent = new Map<string | undefined, GanttTask[]>();
+
+    tasks.forEach(task => {
+      const siblings = childrenByParent.get(task.parentId) ?? [];
+      siblings.push(task);
+      childrenByParent.set(task.parentId, siblings);
+    });
+
+    const hasVisibleMatch = (task: GanttTask): boolean => {
+      if (!hasFilter) return true;
+      if (filteredIds.has(task.id)) return true;
+      return (childrenByParent.get(task.id) ?? []).some(hasVisibleMatch);
+    };
+
     const result: GanttTask[] = [];
     
     const addTask = (task: GanttTask) => {
+      if (!hasVisibleMatch(task)) return;
+
       if (task.isGroup) {
         result.push(task);
-        if (expandedGroups.has(task.id) && task.children) {
+        if ((expandedGroups.has(task.id) || hasFilter) && task.children) {
           task.children.forEach(childId => {
-            const child = filteredTasks.find(t => t.id === childId);
+            const child = tasks.find(t => t.id === childId);
             if (child) addTask(child);
           });
         }
-      } else if (!task.parentId) {
+      } else if (!task.parentId || filteredIds.has(task.id)) {
         result.push(task);
-      } else {
-        // Has parent - only show if parent is expanded
-        const parent = filteredTasks.find(t => t.id === task.parentId);
-        if (parent && expandedGroups.has(parent.id)) {
-          result.push(task);
-        }
       }
     };
     
-    filteredTasks.filter(t => !t.parentId).forEach(addTask);
+    tasks.filter(t => !t.parentId).forEach(addTask);
     return result;
-  }, [getFilteredTasks, expandedGroups]);
+  }, [tasks, filter, criticalPathResult, expandedGroups]);
 
   // WBS codes for all tasks (e.g. "1", "1.2", "1.2.3")
   const wbsCodes = useMemo(() => computeWbsCodes(tasks), [tasks]);

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useGanttStore } from './ganttStore';
+import { applyGanttFilter, useGanttStore } from './ganttStore';
 import type { GanttTask } from './types';
 
 // Monday-style board view: tasks grouped into status columns by progress.
@@ -32,10 +32,13 @@ const fmt = (d: Date) =>
   d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 export function GanttBoardView() {
-  const { tasks, updateTask, setSelectedTask, selectedTaskId } = useGanttStore();
+  const { tasks, filter, criticalPathResult, updateTask, setSelectedTask, selectedTaskId } = useGanttStore();
   const [dragOver, setDragOver] = useState<ColumnKey | null>(null);
 
-  const cards = useMemo(() => tasks.filter(t => !t.isGroup), [tasks]);
+  const cards = useMemo(
+    () => applyGanttFilter(tasks, filter, criticalPathResult).filter(t => !t.isGroup),
+    [tasks, filter, criticalPathResult],
+  );
   const byColumn = useMemo(() => {
     const map: Record<ColumnKey, GanttTask[]> = { todo: [], doing: [], done: [] };
     cards.forEach(t => map[columnFor(t)].push(t));

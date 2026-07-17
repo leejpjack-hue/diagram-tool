@@ -114,7 +114,7 @@ export function BulkOperationsPanel({ onClose }: BulkOperationsPanelProps) {
             min="0"
             max="100"
             value={avgProgress}
-            onChange={(e) => handleProgressChange(parseInt(e.target.value, 10))}
+            onInput={(e) => handleProgressChange(parseInt(e.currentTarget.value, 10))}
             className="bulk-progress-slider"
           />
           <span className="bulk-progress-value">{avgProgress}%</span>

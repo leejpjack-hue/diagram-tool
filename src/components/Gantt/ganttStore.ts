@@ -114,6 +114,61 @@ const defaultFilter: GanttFilter = {
   criticalOnly: false,
 };
 
+export function hasActiveGanttFilter(filter: GanttFilter): boolean {
+  return Boolean(
+    filter.search.trim() ||
+    filter.assignee ||
+    filter.status !== 'all' ||
+    filter.criticalOnly ||
+    filter.dateRange.start ||
+    filter.dateRange.end,
+  );
+}
+
+export function applyGanttFilter(
+  tasks: GanttTask[],
+  filter: GanttFilter,
+  criticalPathResult: CriticalPathResult | null = null,
+): GanttTask[] {
+  let filtered = [...tasks];
+  const { search, assignee, status, dateRange, criticalOnly } = filter;
+  const searchTerm = search.trim().toLowerCase();
+
+  if (searchTerm) {
+    filtered = filtered.filter(t =>
+      t.name.toLowerCase().includes(searchTerm) ||
+      (t.assignee && t.assignee.toLowerCase().includes(searchTerm))
+    );
+  }
+
+  if (assignee) {
+    filtered = filtered.filter(t => t.assignee === assignee);
+  }
+
+  if (status !== 'all') {
+    if (status === 'not-started') {
+      filtered = filtered.filter(t => t.progress === 0);
+    } else if (status === 'in-progress') {
+      filtered = filtered.filter(t => t.progress > 0 && t.progress < 100);
+    } else if (status === 'complete') {
+      filtered = filtered.filter(t => t.progress === 100);
+    }
+  }
+
+  if (dateRange.start) {
+    filtered = filtered.filter(t => t.endDate >= dateRange.start!);
+  }
+  if (dateRange.end) {
+    filtered = filtered.filter(t => t.startDate <= dateRange.end!);
+  }
+
+  if (criticalOnly && criticalPathResult) {
+    filtered = filtered.filter(t => criticalPathResult.path.includes(t.id));
+  }
+
+  return filtered;
+}
+
 // Default sample tasks
 const today = new Date();
 today.setHours(0, 0, 0, 0);
@@ -319,23 +374,30 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   // Dependencies
   setDependencies: (deps) => set({ dependencies: deps }),
   
-  addDependency: (dep) => set((state) => ({
-    dependencies: [...state.dependencies, dep],
-  })),
+  addDependency: (dep) => set((state) => {
+    state.pushHistory();
+    return { dependencies: [...state.dependencies, dep] };
+  }),
   
-  updateDependency: (predecessorId, successorId, updates) => set((state) => ({
-    dependencies: state.dependencies.map((d) =>
-      d.predecessorId === predecessorId && d.successorId === successorId
-        ? { ...d, ...updates }
-        : d
-    ),
-  })),
+  updateDependency: (predecessorId, successorId, updates) => set((state) => {
+    state.pushHistory();
+    return {
+      dependencies: state.dependencies.map((d) =>
+        d.predecessorId === predecessorId && d.successorId === successorId
+          ? { ...d, ...updates }
+          : d
+      ),
+    };
+  }),
   
-  removeDependency: (predecessorId, successorId) => set((state) => ({
-    dependencies: state.dependencies.filter(
-      (d) => !(d.predecessorId === predecessorId && d.successorId === successorId)
-    ),
-  })),
+  removeDependency: (predecessorId, successorId) => set((state) => {
+    state.pushHistory();
+    return {
+      dependencies: state.dependencies.filter(
+        (d) => !(d.predecessorId === predecessorId && d.successorId === successorId)
+      ),
+    };
+  }),
   
   // Critical path
   toggleCriticalPath: () => set((state) => {
@@ -362,50 +424,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   
   getFilteredTasks: () => {
     const state = get();
-    let filtered = [...state.tasks];
-    const { search, assignee, status, dateRange, criticalOnly } = state.filter;
-    
-    // Search filter
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(t => 
-        t.name.toLowerCase().includes(searchLower) ||
-        (t.assignee && t.assignee.toLowerCase().includes(searchLower))
-      );
-    }
-    
-    // Assignee filter
-    if (assignee) {
-      filtered = filtered.filter(t => t.assignee === assignee);
-    }
-    
-    // Status filter
-    if (status !== 'all') {
-      if (status === 'not-started') {
-        filtered = filtered.filter(t => t.progress === 0);
-      } else if (status === 'in-progress') {
-        filtered = filtered.filter(t => t.progress > 0 && t.progress < 100);
-      } else if (status === 'complete') {
-        filtered = filtered.filter(t => t.progress === 100);
-      }
-    }
-    
-    // Date range filter
-    if (dateRange.start) {
-      filtered = filtered.filter(t => t.endDate >= dateRange.start!);
-    }
-    if (dateRange.end) {
-      filtered = filtered.filter(t => t.startDate <= dateRange.end!);
-    }
-    
-    // Critical path filter
-    if (criticalOnly && state.criticalPathResult) {
-      filtered = filtered.filter(t => 
-        state.criticalPathResult!.path.includes(t.id)
-      );
-    }
-    
-    return filtered;
+    return applyGanttFilter(state.tasks, state.filter, state.criticalPathResult);
   },
   
   // Groups
@@ -515,7 +534,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
     );
     
     return {
-      tasks: newTasks,
+      tasks: recomputeGroupRollups(newTasks),
       dependencies: newDependencies,
       selectedTaskIds: new Set(),
       selectedTaskId: null,
@@ -532,7 +551,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
       idsToUpdate.has(t.id) ? { ...t, ...updates } : t
     );
     
-    return { tasks: newTasks };
+    return { tasks: recomputeGroupRollups(newTasks) };
   }),
   
   getSelectedTasks: () => {

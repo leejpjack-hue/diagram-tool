@@ -210,10 +210,10 @@ export function GanttFilterBar({ onShowTemplates, onShowShortcuts }: GanttFilter
             <input
               type="date"
               value={filter.dateRange.start ? formatDateForInput(filter.dateRange.start) : ''}
-              onChange={(e) => setFilter({
+              onInput={(e) => setFilter({
                 dateRange: {
                   ...filter.dateRange,
-                  start: e.target.value ? new Date(e.target.value) : null,
+                  start: e.currentTarget.value ? new Date(e.currentTarget.value) : null,
                 },
               })}
               className="input input-sm"
@@ -225,10 +225,10 @@ export function GanttFilterBar({ onShowTemplates, onShowShortcuts }: GanttFilter
             <input
               type="date"
               value={filter.dateRange.end ? formatDateForInput(filter.dateRange.end) : ''}
-              onChange={(e) => setFilter({
+              onInput={(e) => setFilter({
                 dateRange: {
                   ...filter.dateRange,
-                  end: e.target.value ? new Date(e.target.value) : null,
+                  end: e.currentTarget.value ? new Date(e.currentTarget.value) : null,
                 },
               })}
               className="input input-sm"
