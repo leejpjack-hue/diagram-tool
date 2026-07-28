@@ -32,7 +32,7 @@ import type { SimpleCSVRow } from './utils/csvParser';
 import { extractNodeDSL, insertNodeDSL, duplicateNodeDSL } from './utils/clipboardUtils';
 import { useMobile } from './hooks/useMobile';
 import { BrandLogo } from './components/BrandLogo';
-import { Dashboard } from './components/Dashboard/Dashboard';
+import { Dashboard, type DashboardCreateRequest } from './components/Dashboard/Dashboard';
 import { PresentationCanvas } from './components/Dashboard/PresentationCanvas';
 import { boardManager, type Board, type BoardMode } from './utils/boardManager';
 import './styles/gantt-fixes.css';
@@ -330,6 +330,47 @@ loop Every night
   B-->>P: Settlement report
 end`;
 
+function blankBoardDsl(mode: BoardMode): string {
+  if (mode === 'architecture') {
+    return `diagram: architecture
+title: Untitled Architecture
+direction: LR
+edges: orthogonal
+
+service FirstService {
+  color: "#6366f1"
+  tech: "edit this in the DSL"
+}`;
+  }
+  if (mode === 'flow') {
+    return `diagram: flow
+title: Untitled Workflow
+direction: LR
+
+start Start
+Start -> NextStep
+NextStep -> Done
+end Done`;
+  }
+  if (mode === 'sequence') {
+    return `sequenceDiagram
+title Untitled Sequence
+participant A as Actor
+participant B as System
+A->>B: First message`;
+  }
+  return `diagram: gantt
+title: Untitled Timeline
+start: ${new Date().toISOString().slice(0, 10)}
+
+task FirstTask {
+  start: ${new Date().toISOString().slice(0, 10)}
+  end: ${new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10)}
+  progress: 0
+  color: #6366f1
+}`;
+}
+
 type PanelType = 'none' | 'properties' | 'import' | 'export';
 
 function App() {
@@ -584,7 +625,7 @@ function App() {
     try {
       const thumbnail = await captureDiagramThumbnail(mode);
       if (thumbnail) {
-        boardManager.update(boardId, { thumbnail });
+        await boardManager.update(boardId, { thumbnail });
       }
     } catch (err) {
       console.warn('Dashboard thumbnail capture failed:', err);
@@ -596,7 +637,7 @@ function App() {
   const handleSave = useCallback(() => {
     setSaveStatus('saving');
     
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         const title = extractTitle(dslText) || 'Untitled Diagram';
         const mode: SavedDiagramMode = (diagramMode === 'architecture' || diagramMode === 'flow') 
@@ -604,7 +645,7 @@ function App() {
           : 'architecture';
         saveManager.saveDiagram({ title, dslText, mode });
         if (currentBoardId) {
-          boardManager.update(currentBoardId, { dslText, mode: activeTab });
+          await boardManager.update(currentBoardId, { dslText, mode: activeTab });
           void captureAndStoreBoardThumbnail(currentBoardId, activeTab);
         }
         setSaveStatus('saved');
@@ -721,15 +762,16 @@ function App() {
     setView('editor');
   };
 
-  const createBoard = (mode: BoardMode) => {
-    const sample =
-      mode === 'architecture' ? ARCHITECTURE_DSL :
-      mode === 'flow' ? FLOW_DSL :
-      mode === 'sequence' ? SEQUENCE_DSL :
-      GANTT_DSL;
-    const board = boardManager.create({ title: 'Untitled board', mode, dslText: sample });
+  const createBoard = async (request: DashboardCreateRequest) => {
+    const board = await boardManager.create({
+      title: request.title || `Untitled ${request.mode}`,
+      mode: request.mode,
+      dslText: request.dslText ?? blankBoardDsl(request.mode),
+      templateSourceId: request.templateSourceId,
+      spaceId: request.spaceId,
+    });
     openBoard(board);
-    toast.success('Board created — rename it from the dashboard');
+    toast.success('Board created');
   };
 
   const backToDashboard = async () => {
@@ -740,7 +782,7 @@ function App() {
         thumbnailCaptureTimerRef.current = null;
       }
       const thumbnail = await captureDiagramThumbnail(activeTab);
-      boardManager.update(currentBoardId, {
+      await boardManager.update(currentBoardId, {
         dslText,
         mode: activeTab,
         ...(thumbnail ? { thumbnail } : {}),
@@ -754,15 +796,11 @@ function App() {
   // "View deck" button in the editor header and the Dashboard's
   // "Publish / present" menu entry.
   const openPresentation = async (board?: Board) => {
-    const target: Board | undefined = board
-      ? board
-      : (currentBoardId
-          ? (() => {
-              // Flush current edits first so the PNG matches what's saved.
-              boardManager.update(currentBoardId, { dslText, mode: activeTab });
-              return boardManager.get(currentBoardId);
-            })()
-          : undefined);
+    let target: Board | undefined = board;
+    if (!target && currentBoardId) {
+      await boardManager.update(currentBoardId, { dslText, mode: activeTab });
+      target = await boardManager.get(currentBoardId);
+    }
     if (!target) {
       toast.error('Open a board first.');
       return;
@@ -812,7 +850,9 @@ function App() {
   useEffect(() => {
     if (view !== 'editor' || !currentBoardId) return;
     const t = setTimeout(() => {
-      boardManager.update(currentBoardId, { dslText, mode: activeTab });
+      void boardManager.update(currentBoardId, { dslText, mode: activeTab }).then(() =>
+        boardManager.createVersion(currentBoardId, 'Automatic save', true),
+      );
       if (thumbnailCaptureTimerRef.current) {
         clearTimeout(thumbnailCaptureTimerRef.current);
       }
@@ -921,7 +961,7 @@ function App() {
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <header className="professional-header">
+      {view === 'editor' && <header className="professional-header">
         {/* Logo & Title */}
         <a
           href="#"
@@ -1065,7 +1105,7 @@ function App() {
         </div>
         </>
         )}
-      </header>
+      </header>}
 
       {/* Board dashboard (home) */}
       {view === 'dashboard' && (

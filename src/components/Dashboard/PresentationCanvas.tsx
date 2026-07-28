@@ -423,7 +423,7 @@ export function PresentationCanvas({
   // Persist on every change so a reload brings the user back to where they
   // were. Last-write-wins via boardManager.
   useEffect(() => {
-    boardManager.setPresentation(board.id, items);
+    void boardManager.setPresentation(board.id, items);
     onItemsChange?.(items);
     // We deliberately exclude onItemsChange to avoid feedback loops when the
     // host rerenders parent state on every change.
