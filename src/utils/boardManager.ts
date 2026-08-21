@@ -7,13 +7,32 @@ export type DashboardLayout = 'grid' | 'list';
 
 export interface PresentationItem {
   id: string;
-  type: 'image' | 'note' | 'text' | 'arrow';
+  type: 'image' | 'note' | 'text' | 'arrow' | 'shape' | 'drawing' | 'frame';
   title?: string;
   content: string;
   x: number;
   y: number;
   width: number;
   height: number;
+  locked?: boolean;
+  zIndex?: number;
+  style?: PresentationItemStyle;
+}
+
+export interface PresentationItemStyle {
+  fillColor?: string;
+  strokeColor?: string;
+  textColor?: string;
+  strokeWidth?: number;
+  opacity?: number;
+  fontSize?: number;
+  fontWeight?: 'normal' | 'semibold' | 'bold';
+  textAlign?: 'left' | 'center' | 'right';
+  lineStyle?: 'solid' | 'dashed' | 'dotted';
+  connectorType?: 'straight' | 'curved' | 'elbow';
+  arrowStart?: boolean;
+  arrowEnd?: boolean;
+  shape?: 'rectangle' | 'rounded' | 'circle' | 'diamond' | 'triangle';
 }
 
 export interface Presentation {

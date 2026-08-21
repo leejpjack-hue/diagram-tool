@@ -1,964 +1,336 @@
-// Per-board presentation canvas. Each board can carry its own "deck": a list
-// of draggable + resizable images (rendered diagram snapshots) and speaker
-// notes arranged on an infinite workspace, so the user can compose a
-// presentation out of their diagrams and export the whole thing as one
-// PNG for sharing.
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { boardManager, type Board, type PresentationItem, type PresentationItemStyle } from '../../utils/boardManager';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { boardManager, type Board, type PresentationItem } from '../../utils/boardManager';
+type CanvasTool = 'select' | 'hand' | 'text' | 'note' | 'shape' | 'line' | 'pen' | 'highlighter' | 'eraser' | 'frame';
+type ShapeKind = NonNullable<PresentationItemStyle['shape']>;
+type ConnectorType = NonNullable<PresentationItemStyle['connectorType']>;
+interface Point { x: number; y: number }
+interface ConnectorGeometry { start: Point; end: Point }
 
-// ---------------------------------------------------------------------------
-// Hooks + helpers
-// ---------------------------------------------------------------------------
+const SHAPES: Array<{ kind: ShapeKind; label: string }> = [
+  { kind: 'rectangle', label: 'Rectangle' }, { kind: 'rounded', label: 'Rounded rectangle' },
+  { kind: 'circle', label: 'Circle' }, { kind: 'diamond', label: 'Diamond' }, { kind: 'triangle', label: 'Triangle' },
+];
+const uid = () => `item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+const cloneItems = (items: PresentationItem[]) => items.map(item => ({ ...item, style: item.style ? { ...item.style } : undefined }));
+const itemZ = (item: PresentationItem) => item.zIndex ?? (item.type === 'frame' ? -100 : item.type === 'image' ? 0 : 10);
+const sortedItems = (items: PresentationItem[]) => [...items].sort((a, b) => itemZ(a) - itemZ(b));
 
-interface Size { w: number; h: number; }
-interface Pos { x: number; y: number; }
-
-function clamp<T extends number>(n: T, min: number, max: number): T {
-  return Math.max(min, Math.min(max, n)) as T;
+function styleFor(item: PresentationItem) {
+  const legacyArrowColor = item.type === 'arrow' && item.content.startsWith('#') ? item.content : undefined;
+  return {
+    fillColor: item.style?.fillColor ?? (item.type === 'note' ? '#fef3c7' : '#ffffff'),
+    strokeColor: item.style?.strokeColor ?? legacyArrowColor ?? '#334155',
+    textColor: item.style?.textColor ?? (item.type === 'note' ? '#78350f' : '#0f172a'),
+    strokeWidth: item.style?.strokeWidth ?? (item.type === 'arrow' || item.type === 'drawing' ? 3 : 2),
+    opacity: item.style?.opacity ?? 1,
+    fontSize: item.style?.fontSize ?? (item.type === 'text' ? 28 : 16),
+    fontWeight: item.style?.fontWeight ?? (item.type === 'text' ? 'bold' : 'normal'),
+    textAlign: item.style?.textAlign ?? 'center',
+    lineStyle: item.style?.lineStyle ?? 'solid',
+    connectorType: item.style?.connectorType ?? 'straight',
+    arrowStart: item.style?.arrowStart ?? false,
+    arrowEnd: item.style?.arrowEnd ?? item.type === 'arrow',
+    shape: item.style?.shape ?? 'rectangle',
+  } satisfies Required<PresentationItemStyle>;
 }
 
-function sortPresentationItems(items: PresentationItem[]): PresentationItem[] {
-  return [...items].sort((a, b) => (a.type === b.type ? 0 : a.type === 'image' ? -1 : 1));
+function dashArray(style: PresentationItemStyle['lineStyle'], width: number): string | undefined {
+  return style === 'dashed' ? `${width * 3} ${width * 2}` : style === 'dotted' ? `${width} ${width * 2}` : undefined;
 }
 
-// Translate pointer events on a handle into a new size for the item. The
-// handle element exposes `data-handle` (nw, ne, sw, se, n, s, e, w).
-function useResize(itemId: string, onResize: (id: string, w: number, h: number) => void) {
-  return (e: React.PointerEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    const handle = (e.currentTarget as HTMLElement).dataset.handle ?? 'se';
-    const startX = e.clientX;
-    const startY = e.clientY;
-    let initialSize: Size;
-    try {
-      initialSize = JSON.parse((e.currentTarget as HTMLElement).dataset.size || '{"w":0,"h":0}');
-    } catch {
-      initialSize = { w: 0, h: 0 };
+function parsePoints(item: PresentationItem): Point[] {
+  try {
+    const value = JSON.parse(item.content) as unknown;
+    return Array.isArray(value) ? value.filter((point): point is Point => Boolean(point) && typeof point.x === 'number' && typeof point.y === 'number') : [];
+  } catch { return []; }
+}
+
+function parseConnector(item: PresentationItem): ConnectorGeometry {
+  try {
+    const value = JSON.parse(item.content) as { start?: Point; end?: Point };
+    if (value.start && value.end && [value.start.x, value.start.y, value.end.x, value.end.y].every(Number.isFinite)) {
+      return { start: value.start, end: value.end };
     }
+  } catch { /* Legacy arrows stored their color or an empty string as content. */ }
+  return { start: { x: 9, y: item.height / 2 }, end: { x: Math.max(16, item.width - 10), y: item.height / 2 } };
+}
 
-    // Listen on window — not on the tiny 12×12 handle. As the user drags
-    // outward, the cursor leaves the handle within a few pixels and
-    // per-element listeners stop firing; setPointerCapture is unreliable
-    // here because React re-renders mid-drag and swaps the DOM node.
-    // Window-level listeners capture every move / up until the user
-    // releases the mouse button.
-    const move = (ev: PointerEvent) => {
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
-      let w = initialSize.w;
-      let h = initialSize.h;
-      if (handle.includes('e')) w = Math.max(80, initialSize.w + dx);
-      if (handle.includes('w')) w = Math.max(80, initialSize.w - dx);
-      if (handle.includes('s')) h = Math.max(60, initialSize.h + dy);
-      if (handle.includes('n')) h = Math.max(60, initialSize.h - dy);
-      onResize(itemId, w, h);
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move as unknown as EventListener);
-      window.removeEventListener('pointerup', up as unknown as EventListener);
-    };
-    window.addEventListener('pointermove', move as unknown as EventListener);
-    window.addEventListener('pointerup', up as unknown as EventListener);
+function connectorPath(geometry: ConnectorGeometry, type: ConnectorType): string {
+  const { start, end } = geometry;
+  if (type === 'straight') return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+  if (type === 'elbow') {
+    if (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y)) {
+      const midX = (start.x + end.x) / 2;
+      return `M ${start.x} ${start.y} H ${midX} V ${end.y} H ${end.x}`;
+    }
+    const midY = (start.y + end.y) / 2;
+    return `M ${start.x} ${start.y} V ${midY} H ${end.x} V ${end.y}`;
+  }
+  const dx = end.x - start.x; const dy = end.y - start.y;
+  if (Math.abs(dx) >= Math.abs(dy)) return `M ${start.x} ${start.y} C ${start.x + dx * 0.48} ${start.y}, ${end.x - dx * 0.48} ${end.y}, ${end.x} ${end.y}`;
+  return `M ${start.x} ${start.y} C ${start.x} ${start.y + dy * 0.48}, ${end.x} ${end.y - dy * 0.48}, ${end.x} ${end.y}`;
+}
+
+function connectorItem(start: Point, end: Point): PresentationItem {
+  const padding = 20; const x = Math.min(start.x, end.x) - padding; const y = Math.min(start.y, end.y) - padding;
+  return {
+    id: uid(), type: 'arrow', title: 'Connector',
+    content: JSON.stringify({ start: { x: start.x - x, y: start.y - y }, end: { x: end.x - x, y: end.y - y } }),
+    x, y, width: Math.max(40, Math.abs(end.x - start.x) + padding * 2), height: Math.max(40, Math.abs(end.y - start.y) + padding * 2),
+    style: { strokeColor: '#334155', strokeWidth: 3, arrowEnd: true, lineStyle: 'solid', connectorType: 'curved' },
   };
 }
 
-function useDrag(
-  itemId: string,
-  initial: Pos,
-  onMove: (id: string, x: number, y: number) => void,
-) {
-  return (e: React.PointerEvent) => {
-    // Ignore drags that originate on a resize handle.
-    if ((e.target as HTMLElement).dataset.handle) return;
-    e.preventDefault();
-    const startX = e.clientX;
-    const startY = e.clientY;
-
-    // Window-level listeners — same reasoning as useResize above.
-    const move = (ev: PointerEvent) => {
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
-      onMove(itemId, initial.x + dx, initial.y + dy);
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move as unknown as EventListener);
-      window.removeEventListener('pointerup', up as unknown as EventListener);
-    };
-    window.addEventListener('pointermove', move as unknown as EventListener);
-    window.addEventListener('pointerup', up as unknown as EventListener);
+function drawingItem(id: string, points: Point[], highlighter: boolean): PresentationItem {
+  const minX = Math.min(...points.map(point => point.x)); const minY = Math.min(...points.map(point => point.y));
+  const maxX = Math.max(...points.map(point => point.x)); const maxY = Math.max(...points.map(point => point.y));
+  return {
+    id, type: 'drawing', title: highlighter ? 'Highlighter' : 'Drawing',
+    content: JSON.stringify(points.map(point => ({ x: point.x - minX + 8, y: point.y - minY + 8 }))),
+    x: minX - 8, y: minY - 8, width: Math.max(16, maxX - minX + 16), height: Math.max(16, maxY - minY + 16),
+    style: { strokeColor: highlighter ? '#fde047' : '#111827', strokeWidth: highlighter ? 16 : 3, opacity: highlighter ? 0.45 : 1 },
   };
 }
 
-// ---------------------------------------------------------------------------
-// Render helpers
-// ---------------------------------------------------------------------------
+function useResize(item: PresentationItem, onStart: () => void, onResize: (id: string, x: number, y: number, width: number, height: number) => void, onEnd: () => void) {
+  return (event: React.PointerEvent) => {
+    event.stopPropagation(); event.preventDefault();
+    const handle = (event.currentTarget as HTMLElement).dataset.handle ?? 'se';
+    const start = { x: event.clientX, y: event.clientY }; const initial = { x: item.x, y: item.y, width: item.width, height: item.height };
+    onStart();
+    const move = (next: PointerEvent) => {
+      const dx = next.clientX - start.x; const dy = next.clientY - start.y; let { x, y, width, height } = initial;
+      if (handle.includes('e')) width = Math.max(24, initial.width + dx);
+      if (handle.includes('w')) { width = Math.max(24, initial.width - dx); x = initial.x + initial.width - width; }
+      if (handle.includes('s')) height = Math.max(24, initial.height + dy);
+      if (handle.includes('n')) { height = Math.max(24, initial.height - dy); y = initial.y + initial.height - height; }
+      onResize(item.id, x, y, width, height);
+    };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); onEnd(); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+}
+
+function useDrag(item: PresentationItem, onStart: () => void, onMove: (id: string, x: number, y: number) => void, onEnd: () => void) {
+  return (event: React.PointerEvent) => {
+    if ((event.target as HTMLElement).dataset.handle || item.locked) return;
+    event.stopPropagation(); event.preventDefault();
+    const start = { x: event.clientX, y: event.clientY, itemX: item.x, itemY: item.y }; onStart();
+    const move = (next: PointerEvent) => onMove(item.id, start.itemX + next.clientX - start.x, start.itemY + next.clientY - start.y);
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); onEnd(); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+}
 
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const;
-type ToolIconName = 'diagram' | 'text' | 'arrow' | 'note' | 'reset' | 'export' | 'back';
-
-function ToolIcon({ name }: { name: ToolIconName }) {
-  if (name === 'diagram') {
-    return (
-      <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <rect x="4" y="5" width="16" height="14" rx="2" strokeWidth={2} />
-        <path d="M8 10h8M8 14h5" strokeWidth={2} strokeLinecap="round" />
-      </svg>
-    );
-  }
-  if (name === 'text') {
-    return (
-      <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path d="M5 6h14M12 6v12M9 18h6" strokeWidth={2} strokeLinecap="round" />
-      </svg>
-    );
-  }
-  if (name === 'arrow') {
-    return (
-      <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path d="M5 12h13M13 7l5 5-5 5" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-  if (name === 'note') {
-    return (
-      <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path d="M6 4h9l3 3v13H6z" strokeWidth={2} strokeLinejoin="round" />
-        <path d="M15 4v4h4M9 12h6M9 16h4" strokeWidth={2} strokeLinecap="round" />
-      </svg>
-    );
-  }
-  if (name === 'reset') {
-    return (
-      <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path d="M4 4v6h6M20 20v-6h-6M5 15a7 7 0 0 0 11 3M19 9A7 7 0 0 0 8 6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-  if (name === 'export') {
-    return (
-      <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path d="M12 4v10M8 10l4 4 4-4M5 20h14" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-  return (
-    <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path d="M15 18l-6-6 6-6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+function ResizeHandles({ item, onStart, onResize, onEnd }: { item: PresentationItem; onStart: () => void; onResize: (id: string, x: number, y: number, width: number, height: number) => void; onEnd: () => void }) {
+  const resize = useResize(item, onStart, onResize, onEnd);
+  return <>{HANDLES.map(handle => <span key={handle} data-handle={handle} onPointerDown={resize} className={`absolute z-30 h-3 w-3 rounded-sm border-2 border-indigo-600 bg-white
+    ${handle === 'nw' ? '-left-1.5 -top-1.5 cursor-nw-resize' : ''} ${handle === 'n' ? 'left-1/2 -top-1.5 -translate-x-1/2 cursor-n-resize' : ''}
+    ${handle === 'ne' ? '-right-1.5 -top-1.5 cursor-ne-resize' : ''} ${handle === 'e' ? '-right-1.5 top-1/2 -translate-y-1/2 cursor-e-resize' : ''}
+    ${handle === 'se' ? '-bottom-1.5 -right-1.5 cursor-se-resize' : ''} ${handle === 's' ? '-bottom-1.5 left-1/2 -translate-x-1/2 cursor-s-resize' : ''}
+    ${handle === 'sw' ? '-bottom-1.5 -left-1.5 cursor-sw-resize' : ''} ${handle === 'w' ? '-left-1.5 top-1/2 -translate-y-1/2 cursor-w-resize' : ''}`}/>)}</>;
 }
 
-function ToolButton({
-  icon,
-  label,
-  onClick,
-  variant = 'secondary',
-  disabled,
-  title,
-}: {
-  icon: ToolIconName;
-  label: string;
-  onClick: () => void;
-  variant?: 'primary' | 'secondary' | 'success';
-  disabled?: boolean;
-  title?: string;
+function ShapeSvg({ item }: { item: PresentationItem }) {
+  const style = styleFor(item); const w = item.width; const h = item.height;
+  const common = { fill: style.fillColor, stroke: style.strokeColor, strokeWidth: style.strokeWidth, strokeDasharray: dashArray(style.lineStyle, style.strokeWidth) };
+  if (style.shape === 'circle') return <ellipse cx={w / 2} cy={h / 2} rx={Math.max(1, w / 2 - 3)} ry={Math.max(1, h / 2 - 3)} {...common}/>;
+  if (style.shape === 'diamond') return <polygon points={`${w / 2},3 ${w - 3},${h / 2} ${w / 2},${h - 3} 3,${h / 2}`} {...common}/>;
+  if (style.shape === 'triangle') return <polygon points={`${w / 2},3 ${w - 3},${h - 3} 3,${h - 3}`} {...common}/>;
+  return <rect x="3" y="3" width={Math.max(1, w - 6)} height={Math.max(1, h - 6)} rx={style.shape === 'rounded' ? 16 : 2} {...common}/>;
+}
+
+function ItemRenderer({ item, selected, connectorMode, onSelect, onConnectorPoint, onMove, onResize, onText, onStart, onEnd }: {
+  item: PresentationItem; selected: boolean; onSelect: (id: string) => void; onMove: (id: string, x: number, y: number) => void;
+  connectorMode: boolean; onConnectorPoint: (clientX: number, clientY: number) => void;
+  onResize: (id: string, x: number, y: number, width: number, height: number) => void; onText: (id: string, content: string) => void; onStart: () => void; onEnd: () => void;
 }) {
-  const variantClass =
-    variant === 'primary' ? 'btn-primary' :
-    variant === 'success' ? 'btn-success' :
-    'btn-secondary';
+  const drag = useDrag(item, onStart, onMove, onEnd); const style = styleFor(item);
+  const weight = style.fontWeight === 'bold' ? 700 : style.fontWeight === 'semibold' ? 600 : 400;
+  const wrapper = `absolute ${item.locked ? 'cursor-default' : 'cursor-move'} ${selected ? 'ring-2 ring-indigo-500 ring-offset-2' : ''}`;
+  const selectAndDrag = (event: React.PointerEvent) => { if (connectorMode) { event.stopPropagation(); event.preventDefault(); onConnectorPoint(event.clientX, event.clientY); return; } onSelect(item.id); drag(event); };
+  const selectEditable = (event: React.PointerEvent) => { event.stopPropagation(); if (connectorMode) { event.preventDefault(); onConnectorPoint(event.clientX, event.clientY); } else onSelect(item.id); };
+  const handles = selected && !item.locked ? <ResizeHandles item={item} onStart={onStart} onResize={onResize} onEnd={onEnd}/> : null;
+  const commonStyle = { left: item.x, top: item.y, width: item.width, height: item.height, zIndex: itemZ(item), opacity: style.opacity };
 
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className={`btn btn-sm ${variantClass} ${disabled ? 'opacity-50 cursor-not-allowed hover:transform-none' : ''}`}
-    >
-      <ToolIcon name={icon} />
-      {label}
-    </button>
-  );
-}
-
-function ResizeHandles({ item, onResize }: { item: PresentationItem; onResize: (id: string, w: number, h: number) => void }) {
-  const handle = useResize(item.id, onResize);
-  return (
-    <>
-      {HANDLES.map(h => (
-        <div
-          key={h}
-          data-handle={h}
-          data-size={JSON.stringify({ w: item.width, h: item.height })}
-          onPointerDown={handle}
-          className={`absolute w-3 h-3 bg-white border-2 border-indigo-500 rounded-sm
-            ${h === 'nw' ? 'left-0 top-0 -translate-x-1/2 -translate-y-1/2 cursor-nw-resize' : ''}
-            ${h === 'n'  ? 'left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 cursor-n-resize' : ''}
-            ${h === 'ne' ? 'right-0 top-0 translate-x-1/2 -translate-y-1/2 cursor-ne-resize' : ''}
-            ${h === 'e'  ? 'right-0 top-1/2 translate-x-1/2 -translate-y-1/2 cursor-e-resize' : ''}
-            ${h === 'se' ? 'right-0 bottom-0 translate-x-1/2 translate-y-1/2 cursor-se-resize' : ''}
-            ${h === 's'  ? 'left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2 cursor-s-resize' : ''}
-            ${h === 'sw' ? 'left-0 bottom-0 -translate-x-1/2 translate-y-1/2 cursor-sw-resize' : ''}
-            ${h === 'w'  ? 'left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-w-resize' : ''}
-          `}
-        />
-      ))}
-    </>
-  );
-}
-
-function ItemRenderer({
-  item,
-  selected,
-  onSelect,
-  onMove,
-  onResize,
-  onDelete,
-  onTextChange,
-}: {
-  item: PresentationItem;
-  selected: boolean;
-  onSelect: (id: string) => void;
-  onMove: (id: string, x: number, y: number) => void;
-  onResize: (id: string, w: number, h: number) => void;
-  onDelete: (id: string) => void;
-  onTextChange: (id: string, text: string) => void;
-}) {
-  const drag = useDrag(item.id, { x: item.x, y: item.y }, onMove);
-  if (item.type === 'image') {
-    return (
-      <div
-        data-item-id={item.id}
-        onPointerDown={(e) => { e.stopPropagation(); drag(e); onSelect(item.id); }}
-        onClick={(e) => e.stopPropagation()}
-        className={`absolute bg-white shadow-md rounded-lg overflow-hidden cursor-move
-          ${selected ? 'ring-2 ring-indigo-500' : 'ring-1 ring-slate-200'}`}
-        style={{ left: item.x, top: item.y, width: item.width, height: item.height }}
-      >
-        <img src={item.content} alt={item.title ?? ''}
-          className="w-full h-full object-contain select-none pointer-events-none bg-white"
-          draggable={false}
-        />
-        {item.title && (
-          <div className="absolute top-2 left-2 max-w-[calc(100%-16px)] px-2 py-1 bg-white text-slate-950 text-xs font-medium truncate rounded border border-slate-200 shadow-sm">
-            {item.title}
-          </div>
-        )}
-        {selected && <ResizeHandles item={item} onResize={onResize} />}
-        {selected && (
-          <button
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => onDelete(item.id)}
-            className="absolute -top-3 -right-3 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold shadow"
-            title="Delete"
-          >
-            ×
-          </button>
-        )}
-      </div>
-    );
-  }
-
+  if (item.type === 'image') return <div data-item-id={item.id} onPointerDown={selectAndDrag} className={`${wrapper} overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm`} style={commonStyle}>
+    <img src={item.content} alt={item.title ?? ''} draggable={false} className="pointer-events-none h-full w-full select-none object-contain"/>
+    {item.title && <span className="absolute left-2 top-2 max-w-[calc(100%-16px)] truncate rounded border border-slate-200 bg-white px-2 py-1 text-xs font-semibold shadow-sm">{item.title}</span>}{handles}
+  </div>;
+  if (item.type === 'drawing') return <div data-item-id={item.id} onPointerDown={selectAndDrag} className={wrapper} style={commonStyle}>
+    <svg className="pointer-events-none h-full w-full overflow-visible"><polyline points={parsePoints(item).map(point => `${point.x},${point.y}`).join(' ')} fill="none" stroke={style.strokeColor} strokeWidth={style.strokeWidth} strokeLinecap="round" strokeLinejoin="round"/></svg>{handles}
+  </div>;
   if (item.type === 'arrow') {
-    const markerId = `arrowhead-${item.id}`;
-    const stroke = item.content || '#111827';
-    return (
-      <div
-        data-item-id={item.id}
-        onPointerDown={(e) => { e.stopPropagation(); drag(e); onSelect(item.id); }}
-        onClick={(e) => e.stopPropagation()}
-        className={`absolute cursor-move ${selected ? 'ring-2 ring-indigo-500' : ''}`}
-        style={{ left: item.x, top: item.y, width: item.width, height: item.height }}
-      >
-        <svg className="w-full h-full overflow-visible pointer-events-none" viewBox={`0 0 ${item.width} ${item.height}`} preserveAspectRatio="none">
-          <defs>
-            <marker id={markerId} markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-              <path d="M0,0 L0,6 L9,3 z" fill={stroke} />
-            </marker>
-          </defs>
-          <line
-            x1="8"
-            y1={item.height / 2}
-            x2={Math.max(16, item.width - 12)}
-            y2={item.height / 2}
-            stroke={stroke}
-            strokeWidth="4"
-            strokeLinecap="round"
-            markerEnd={`url(#${markerId})`}
-          />
-        </svg>
-        {selected && <ResizeHandles item={item} onResize={onResize} />}
-        {selected && (
-          <button
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => onDelete(item.id)}
-            className="absolute -top-3 -right-3 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold shadow"
-            title="Delete"
-          >
-            ×
-          </button>
-        )}
+    const endId = `end-${item.id}`; const startId = `start-${item.id}`;
+    const geometry = parseConnector(item);
+    return <div data-item-id={item.id} onPointerDown={selectAndDrag} className={wrapper} style={commonStyle}><svg className="pointer-events-none h-full w-full overflow-visible" viewBox={`0 0 ${item.width} ${item.height}`} preserveAspectRatio="none"><defs>
+      <marker id={endId} markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill={style.strokeColor}/></marker>
+      <marker id={startId} markerWidth="10" markerHeight="10" refX="1" refY="3" orient="auto"><path d="M9,0 L9,6 L0,3 z" fill={style.strokeColor}/></marker></defs>
+      <path d={connectorPath(geometry, style.connectorType)} fill="none" stroke={style.strokeColor} strokeWidth={style.strokeWidth} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={dashArray(style.lineStyle, style.strokeWidth)} markerStart={style.arrowStart ? `url(#${startId})` : undefined} markerEnd={style.arrowEnd ? `url(#${endId})` : undefined}/>
+      {selected && <><circle cx={geometry.start.x} cy={geometry.start.y} r="5" fill="white" stroke="#4f46e5" strokeWidth="2"/><circle cx={geometry.end.x} cy={geometry.end.y} r="5" fill="white" stroke="#4f46e5" strokeWidth="2"/></>}
+    </svg>{handles}</div>;
+  }
+  if (item.type === 'frame') return <div data-item-id={item.id} onPointerDown={selectAndDrag} className={`${wrapper} border-2 bg-white/40`} style={{ ...commonStyle, borderColor: style.strokeColor }}><span className="absolute -top-7 left-0 max-w-full truncate text-sm font-semibold text-slate-700">{item.title || 'Frame'}</span>{handles}</div>;
+  if (item.type === 'shape') return <div data-item-id={item.id} onPointerDown={selectAndDrag} className={wrapper} style={commonStyle}>
+    <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${item.width} ${item.height}`} preserveAspectRatio="none"><ShapeSvg item={item}/></svg>
+    <textarea value={item.content} onChange={event => onText(item.id, event.target.value)} onFocus={onStart} onBlur={onEnd} onPointerDown={selectEditable} className="absolute inset-[12%] resize-none border-0 bg-transparent p-1 outline-none" style={{ color: style.textColor, fontSize: style.fontSize, fontWeight: weight, textAlign: style.textAlign }} aria-label="Shape text"/>{handles}
+  </div>;
+  if (item.type === 'text') return <div data-item-id={item.id} onPointerDown={selectAndDrag} className={`${wrapper} flex flex-col`} style={commonStyle}>
+    {selected && !item.locked && <button type="button" onPointerDown={selectAndDrag} className="absolute -top-8 left-0 rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 shadow-sm">Move</button>}
+    <textarea value={item.content} onChange={event => onText(item.id, event.target.value)} onFocus={onStart} onBlur={onEnd} onPointerDown={selectEditable} readOnly={item.locked} className="h-full w-full resize-none border-0 bg-transparent p-1 outline-none" style={{ color: style.textColor, fontSize: style.fontSize, fontWeight: weight, textAlign: style.textAlign }} aria-label="Text content"/>{handles}
+  </div>;
+  return <div data-item-id={item.id} onPointerDown={selectAndDrag} className={`${wrapper} flex flex-col rounded-md border shadow-sm`} style={{ ...commonStyle, backgroundColor: style.fillColor, borderColor: style.strokeColor, borderWidth: style.strokeWidth }}>
+    <textarea value={item.content} onChange={event => onText(item.id, event.target.value)} onFocus={onStart} onBlur={onEnd} onPointerDown={selectEditable} readOnly={item.locked} placeholder="Type a note..." className="h-full w-full resize-none border-0 bg-transparent p-4 outline-none" style={{ color: style.textColor, fontSize: style.fontSize, fontWeight: weight, textAlign: style.textAlign }} aria-label="Note content"/>{handles}
+  </div>;
+}
+
+function Glyph({ name }: { name: string }) {
+  const paths: Record<string, React.ReactNode> = {
+    back: <path d="M15 18l-6-6 6-6"/>, undo: <path d="M9 7l-5 5 5 5M5 12h8a6 6 0 016 6"/>, redo: <path d="M15 7l5 5-5 5M19 12h-8a6 6 0 00-6 6"/>, select: <path d="M5 3l14 9-7 2-3 7z"/>,
+    hand: <path d="M8 11V6a2 2 0 014 0v4-2a2 2 0 014 0v3-1a2 2 0 014 0v5c0 4-3 6-7 6h-1c-3 0-5-2-7-5l-2-3a2 2 0 013-2l2 2V8a2 2 0 014 0v3"/>,
+    diagram: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 14h7"/></>, upload: <><path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 14v6h16v-6"/></>, text: <path d="M5 5h14M12 5v14M8 19h8"/>,
+    note: <><path d="M5 3h11l3 3v15H5z"/><path d="M16 3v4h4"/></>, shape: <rect x="4" y="4" width="16" height="16" rx="2"/>, line: <><path d="M4 17L20 7"/><path d="M14 6h6v6"/></>, pen: <><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M13 8l3 3"/></>,
+    highlight: <><path d="M5 16l9-11 5 4-9 11H5z"/><path d="M4 21h16"/></>, eraser: <><path d="M4 15l8-10 8 7-7 9H8z"/><path d="M10 21h10"/></>, frame: <><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></>,
+    export: <><path d="M12 4v11M8 11l4 4 4-4"/><path d="M4 20h16"/></>, duplicate: <><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></>, lock: <><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></>,
+    trash: <><path d="M4 7h16M9 3h6l1 4M7 7l1 14h8l1-14"/></>, front: <><rect x="8" y="4" width="12" height="12"/><rect x="4" y="8" width="12" height="12"/></>, zoomIn: <><circle cx="10" cy="10" r="6"/><path d="M14 14l6 6M10 7v6M7 10h6"/></>, zoomOut: <><circle cx="10" cy="10" r="6"/><path d="M14 14l6 6M7 10h6"/></>,
+  };
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name] ?? paths.shape}</svg>;
+}
+
+function RailButton({ tool, activeTool, label, icon, onClick }: { tool?: CanvasTool; activeTool: CanvasTool; label: string; icon: string; onClick: () => void }) {
+  return <button type="button" onClick={onClick} title={label} aria-label={label} className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition ${tool === activeTool ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`}><Glyph name={icon}/></button>;
+}
+
+export interface PresentationCanvasProps { board: Board; currentDiagramImage: string | null; onCaptureCurrentDiagram?: () => void; onItemsChange?: (items: PresentationItem[]) => void; onClose: () => void; notify: (kind: 'success' | 'error', message: string) => void }
+
+export function PresentationCanvas({ board, currentDiagramImage, onCaptureCurrentDiagram, onItemsChange, onClose, notify }: PresentationCanvasProps) {
+  const stageRef = useRef<HTMLDivElement>(null); const uploadRef = useRef<HTMLInputElement>(null);
+  const [items, setItems] = useState<PresentationItem[]>(board.presentation?.items ?? []); const itemsRef = useRef(items);
+  const [selectedId, setSelectedId] = useState<string | null>(null); const [tool, setTool] = useState<CanvasTool>('select');
+  const [connectorStart, setConnectorStart] = useState<Point | null>(null); const [connectorPreview, setConnectorPreview] = useState<Point | null>(null);
+  const [shapeKind, setShapeKind] = useState<ShapeKind>('rectangle'); const [shapeMenu, setShapeMenu] = useState(false);
+  const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 }); const undoStack = useRef<PresentationItem[][]>([]); const redoStack = useRef<PresentationItem[][]>([]); const interactionStart = useRef<PresentationItem[] | null>(null);
+  const selectedItem = useMemo(() => items.find(item => item.id === selectedId) ?? null, [items, selectedId]);
+  const activateTool = useCallback((next: CanvasTool) => { if (next !== 'line') { setConnectorStart(null); setConnectorPreview(null); } setTool(next); }, []);
+
+  const applyItems = useCallback((next: PresentationItem[]) => { itemsRef.current = next; setItems(next); }, []);
+  const commit = useCallback((change: (current: PresentationItem[]) => PresentationItem[]) => {
+    const before = cloneItems(itemsRef.current); const next = change(itemsRef.current); if (JSON.stringify(before) === JSON.stringify(next)) return;
+    undoStack.current.push(before); if (undoStack.current.length > 60) undoStack.current.shift(); redoStack.current = []; applyItems(next);
+  }, [applyItems]);
+  const beginInteraction = useCallback(() => { if (!interactionStart.current) interactionStart.current = cloneItems(itemsRef.current); }, []);
+  const endInteraction = useCallback(() => { const before = interactionStart.current; interactionStart.current = null; if (!before || JSON.stringify(before) === JSON.stringify(itemsRef.current)) return; undoStack.current.push(before); if (undoStack.current.length > 60) undoStack.current.shift(); redoStack.current = []; }, []);
+  const undo = useCallback(() => { const previous = undoStack.current.pop(); if (!previous) return; redoStack.current.push(cloneItems(itemsRef.current)); applyItems(previous); setSelectedId(null); }, [applyItems]);
+  const redo = useCallback(() => { const next = redoStack.current.pop(); if (!next) return; undoStack.current.push(cloneItems(itemsRef.current)); applyItems(next); setSelectedId(null); }, [applyItems]);
+
+  useEffect(() => { void boardManager.setPresentation(board.id, items); onItemsChange?.(items); }, [items, board.id, onItemsChange]);
+  const updateLive = useCallback((id: string, patch: Partial<PresentationItem>) => applyItems(itemsRef.current.map(item => item.id === id ? { ...item, ...patch } : item)), [applyItems]);
+  const updateStyle = (id: string, patch: Partial<PresentationItemStyle>) => commit(current => current.map(item => item.id === id ? { ...item, style: { ...item.style, ...patch } } : item));
+  const worldPoint = useCallback((clientX: number, clientY: number): Point => { const rect = stageRef.current?.getBoundingClientRect(); return { x: ((clientX - (rect?.left ?? 0)) / viewport.zoom) - viewport.x, y: ((clientY - (rect?.top ?? 0)) / viewport.zoom) - viewport.y }; }, [viewport]);
+  const nextZ = () => Math.max(10, ...itemsRef.current.map(itemZ)) + 1;
+  const addItem = (item: PresentationItem) => { commit(current => [...current, item]); setSelectedId(item.id); };
+  const addDiagram = () => { if (!currentDiagramImage) { notify('error', 'Open a diagram first so it can be captured.'); return; } addItem({ id: uid(), type: 'image', title: board.title, content: currentDiagramImage, x: 100, y: 90, width: 520, height: 330, zIndex: nextZ() }); onCaptureCurrentDiagram?.(); notify('success', 'Diagram added to the canvas.'); };
+  const addAt = (kind: 'text' | 'note', point: Point) => { addItem(kind === 'text'
+    ? { id: uid(), type: 'text', title: 'Text', content: 'Add text', x: point.x, y: point.y, width: 280, height: 80, zIndex: nextZ(), style: { fontSize: 28, fontWeight: 'bold', textAlign: 'left', textColor: '#0f172a' } }
+    : { id: uid(), type: 'note', title: 'Sticky note', content: '', x: point.x, y: point.y, width: 220, height: 180, zIndex: nextZ(), style: { fillColor: '#fef3c7', strokeColor: '#fcd34d', textColor: '#78350f', fontSize: 16, textAlign: 'left' } }); activateTool('select'); };
+  const eraseAt = useCallback((point: Point) => { const hit = [...itemsRef.current].reverse().find(item => !item.locked && (item.type !== 'drawing' ? point.x >= item.x && point.x <= item.x + item.width && point.y >= item.y && point.y <= item.y + item.height : parsePoints(item).some(local => Math.hypot(item.x + local.x - point.x, item.y + local.y - point.y) < Math.max(10, styleFor(item).strokeWidth)))); if (hit) commit(current => current.filter(item => item.id !== hit.id)); }, [commit]);
+
+  const startBox = (event: React.PointerEvent, point: Point, type: 'shape' | 'frame') => {
+    event.preventDefault(); const id = uid();
+    const initial: PresentationItem = { id, type, title: type === 'frame' ? 'Frame' : SHAPES.find(shape => shape.kind === shapeKind)?.label, content: '', x: point.x, y: point.y, width: 140, height: 100,
+      zIndex: type === 'frame' ? -100 + itemsRef.current.filter(item => item.type === 'frame').length : nextZ(), style: type === 'shape' ? { shape: shapeKind, fillColor: '#ffffff', strokeColor: '#334155', strokeWidth: 2, textColor: '#0f172a', fontSize: 16 } : { fillColor: '#ffffff', strokeColor: '#94a3b8', strokeWidth: 2 } };
+    beginInteraction(); applyItems([...itemsRef.current, initial]); setSelectedId(id);
+    const move = (next: PointerEvent) => { const current = worldPoint(next.clientX, next.clientY); updateLive(id, { x: Math.min(point.x, current.x), y: Math.min(point.y, current.y), width: Math.max(24, Math.abs(current.x - point.x)), height: Math.max(40, Math.abs(current.y - point.y)) }); };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); endInteraction(); activateTool('select'); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  const startDrawing = (point: Point, highlighter: boolean) => { const id = uid(); const points = [point]; beginInteraction(); applyItems([...itemsRef.current, drawingItem(id, points, highlighter)]); const move = (next: PointerEvent) => { points.push(worldPoint(next.clientX, next.clientY)); updateLive(id, drawingItem(id, points, highlighter)); }; const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); endInteraction(); setSelectedId(id); }; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); };
+  const startPan = (event: React.PointerEvent) => { const start = { x: event.clientX, y: event.clientY, vx: viewport.x, vy: viewport.y }; const move = (next: PointerEvent) => setViewport(value => ({ ...value, x: start.vx + (next.clientX - start.x) / value.zoom, y: start.vy + (next.clientY - start.y) / value.zoom })); const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); }; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); };
+  const addConnectorPoint = (point: Point) => {
+    if (!connectorStart) { setConnectorStart(point); setConnectorPreview(point); setSelectedId(null); return; }
+    if (Math.hypot(point.x - connectorStart.x, point.y - connectorStart.y) < 8) return;
+    addItem({ ...connectorItem(connectorStart, point), zIndex: nextZ() }); activateTool('select');
+  };
+  const onStagePointerDown = (event: React.PointerEvent) => { const controls = stageRef.current?.querySelectorAll<HTMLElement>('[data-canvas-ui]') ?? []; const overControls = [...controls].some(control => { const rect = control.getBoundingClientRect(); return event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom; }); if (overControls || event.target !== event.currentTarget) return; const point = worldPoint(event.clientX, event.clientY); if (tool === 'hand' || event.button === 1) startPan(event); else if (tool === 'text' || tool === 'note') addAt(tool, point); else if (tool === 'line') addConnectorPoint(point); else if (tool === 'shape' || tool === 'frame') startBox(event, point, tool); else if (tool === 'pen' || tool === 'highlighter') startDrawing(point, tool === 'highlighter'); else if (tool === 'eraser') eraseAt(point); else setSelectedId(null); };
+
+  const deleteSelected = useCallback(() => { if (!selectedId) return; commit(current => current.filter(item => item.id !== selectedId)); setSelectedId(null); }, [commit, selectedId]);
+  const duplicateSelected = useCallback(() => { if (!selectedItem) return; const copy = { ...selectedItem, id: uid(), x: selectedItem.x + 24, y: selectedItem.y + 24, title: selectedItem.title ? `${selectedItem.title} copy` : undefined, locked: false, zIndex: Math.max(10, ...itemsRef.current.map(itemZ)) + 1, style: selectedItem.style ? { ...selectedItem.style } : undefined }; commit(current => [...current, copy]); setSelectedId(copy.id); }, [commit, selectedItem]);
+  const moveLayer = (direction: 'front' | 'back') => { if (!selectedItem) return; const values = itemsRef.current.map(itemZ); const zIndex = direction === 'front' ? Math.max(...values, 0) + 1 : Math.min(...values, 0) - 1; commit(current => current.map(item => item.id === selectedItem.id ? { ...item, zIndex } : item)); };
+
+  useEffect(() => { const onKey = (event: KeyboardEvent) => { const editing = ['INPUT', 'TEXTAREA', 'SELECT'].includes((event.target as HTMLElement).tagName); if (event.key === 'Escape') { activateTool('select'); setShapeMenu(false); return; } if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); return; } if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); return; } if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd' && !editing) { event.preventDefault(); duplicateSelected(); return; } if (editing) return; if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); deleteSelected(); return; } const keyTools: Record<string, CanvasTool> = { v: 'select', h: 'hand', t: 'text', n: 'note', r: 'shape', l: 'line', p: event.shiftKey ? 'highlighter' : 'pen', e: 'eraser', f: 'frame' }; const next = keyTools[event.key.toLowerCase()]; if (next) { event.preventDefault(); activateTool(next); } if (event.key === '+' || event.key === '=') setViewport(value => ({ ...value, zoom: clamp(value.zoom * 1.15, 0.2, 3) })); if (event.key === '-') setViewport(value => ({ ...value, zoom: clamp(value.zoom / 1.15, 0.2, 3) })); }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey); }, [activateTool, deleteSelected, duplicateSelected, redo, undo]);
+  const uploadImage = (file?: File) => { if (!file || !file.type.startsWith('image/')) return; const reader = new FileReader(); reader.onload = () => addItem({ id: uid(), type: 'image', title: file.name.replace(/\.[^.]+$/, ''), content: String(reader.result), x: 120, y: 100, width: 420, height: 280, zIndex: nextZ() }); reader.onerror = () => notify('error', 'Image upload failed.'); reader.readAsDataURL(file); };
+  const exportPng = async () => { if (!itemsRef.current.length) { notify('error', 'Add something before exporting.'); return; } try { const url = await renderPresentationPng(itemsRef.current); const link = document.createElement('a'); link.download = `${slug(board.title)}-presentation.png`; link.href = url; link.click(); notify('success', 'Presentation exported as PNG.'); } catch (error) { notify('error', error instanceof Error ? error.message : 'PNG export failed.'); } };
+
+  return <div className="flex min-h-0 flex-1 flex-col bg-white text-slate-900">
+    <header className="z-50 flex min-h-14 items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 shadow-sm"><button type="button" onClick={onClose} className="flex h-9 items-center gap-1 rounded-md border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Glyph name="back"/><span className="hidden sm:inline">Back</span></button><div className="min-w-0 border-l border-slate-200 pl-3"><div className="truncate text-sm font-semibold">{board.title}</div><div className="text-[11px] text-slate-500">Presentation canvas · {items.length} object{items.length === 1 ? '' : 's'}</div></div><div className="ml-auto flex items-center gap-1">
+      <button type="button" onClick={undo} className="rounded-md p-2 text-slate-600 hover:bg-slate-100" title="Undo (Ctrl/⌘ Z)"><Glyph name="undo"/></button><button type="button" onClick={redo} className="rounded-md p-2 text-slate-600 hover:bg-slate-100" title="Redo"><Glyph name="redo"/></button><span className="mx-1 h-6 w-px bg-slate-200"/>
+      <button type="button" onClick={addDiagram} disabled={!currentDiagramImage} className="flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40" title="Add current diagram"><Glyph name="diagram"/><span className="hidden lg:inline">Diagram</span></button><button type="button" onClick={() => uploadRef.current?.click()} className="flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Glyph name="upload"/><span className="hidden lg:inline">Image</span></button><input ref={uploadRef} type="file" accept="image/*" className="hidden" onChange={event => { uploadImage(event.target.files?.[0]); event.target.value = ''; }}/><button type="button" onClick={exportPng} className="flex h-9 items-center gap-2 rounded-md bg-indigo-600 px-3 text-sm font-semibold text-white hover:bg-indigo-700"><Glyph name="export"/><span className="hidden sm:inline">Export PNG</span></button>
+    </div></header>
+
+    {selectedItem && <div className="z-40 flex min-h-12 items-center gap-2 overflow-x-auto border-b border-slate-200 bg-slate-50 px-3 py-1.5"><span className="whitespace-nowrap rounded bg-indigo-50 px-2 py-1 text-xs font-bold capitalize text-indigo-700">{selectedItem.type}</span>
+      {selectedItem.type !== 'image' && selectedItem.type !== 'drawing' && selectedItem.type !== 'arrow' && <label className="flex items-center gap-1 text-xs text-slate-500">Fill <input type="color" value={styleFor(selectedItem).fillColor} onChange={event => updateStyle(selectedItem.id, { fillColor: event.target.value })} className="h-8 w-9 rounded border border-slate-200 bg-white p-1"/></label>}
+      {selectedItem.type !== 'image' && selectedItem.type !== 'text' && <label className="flex items-center gap-1 text-xs text-slate-500">Stroke <input type="color" value={styleFor(selectedItem).strokeColor} onChange={event => updateStyle(selectedItem.id, { strokeColor: event.target.value })} className="h-8 w-9 rounded border border-slate-200 bg-white p-1"/></label>}
+      {selectedItem.type !== 'image' && selectedItem.type !== 'text' && selectedItem.type !== 'frame' && <select value={styleFor(selectedItem).strokeWidth} onChange={event => updateStyle(selectedItem.id, { strokeWidth: Number(event.target.value) })} className="h-8 rounded border border-slate-200 bg-white px-2 text-xs" aria-label="Stroke width"><option value="1">1 px</option><option value="2">2 px</option><option value="3">3 px</option><option value="5">5 px</option><option value="8">8 px</option><option value="16">16 px</option></select>}
+      {(selectedItem.type === 'arrow' || selectedItem.type === 'shape') && <select value={styleFor(selectedItem).lineStyle} onChange={event => updateStyle(selectedItem.id, { lineStyle: event.target.value as PresentationItemStyle['lineStyle'] })} className="h-8 rounded border border-slate-200 bg-white px-2 text-xs" aria-label="Line style"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select>}
+      {selectedItem.type === 'arrow' && <><select value={styleFor(selectedItem).connectorType} onChange={event => updateStyle(selectedItem.id, { connectorType: event.target.value as ConnectorType })} className="h-8 rounded border border-slate-200 bg-white px-2 text-xs" aria-label="Connector route"><option value="curved">Curved</option><option value="straight">Straight</option><option value="elbow">Elbow</option></select><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={styleFor(selectedItem).arrowStart} onChange={event => updateStyle(selectedItem.id, { arrowStart: event.target.checked })}/>Start arrow</label><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={styleFor(selectedItem).arrowEnd} onChange={event => updateStyle(selectedItem.id, { arrowEnd: event.target.checked })}/>End arrow</label></>}
+      {(selectedItem.type === 'text' || selectedItem.type === 'note' || selectedItem.type === 'shape') && <><input type="color" value={styleFor(selectedItem).textColor} onChange={event => updateStyle(selectedItem.id, { textColor: event.target.value })} className="h-8 w-9 rounded border border-slate-200 bg-white p-1" title="Text color"/><input type="number" min="8" max="96" value={styleFor(selectedItem).fontSize} onChange={event => updateStyle(selectedItem.id, { fontSize: clamp(Number(event.target.value), 8, 96) })} className="h-8 w-16 rounded border border-slate-200 px-2 text-xs" aria-label="Font size"/><button type="button" onClick={() => updateStyle(selectedItem.id, { fontWeight: styleFor(selectedItem).fontWeight === 'bold' ? 'normal' : 'bold' })} className={`h-8 w-8 rounded border text-sm font-bold ${styleFor(selectedItem).fontWeight === 'bold' ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white'}`}>B</button></>}
+      <label className="flex items-center gap-1 text-xs text-slate-500">Opacity <input type="range" min="10" max="100" value={styleFor(selectedItem).opacity * 100} onChange={event => updateStyle(selectedItem.id, { opacity: Number(event.target.value) / 100 })} className="w-20 accent-indigo-600"/></label><span className="h-6 w-px bg-slate-200"/>
+      <button type="button" onClick={duplicateSelected} className="rounded p-1.5 text-slate-600 hover:bg-white" title="Duplicate"><Glyph name="duplicate"/></button><button type="button" onClick={() => moveLayer('back')} className="rounded p-1.5 text-slate-600 hover:bg-white" title="Send backward"><Glyph name="front"/></button><button type="button" onClick={() => moveLayer('front')} className="rotate-180 rounded p-1.5 text-slate-600 hover:bg-white" title="Bring forward"><Glyph name="front"/></button><button type="button" onClick={() => commit(current => current.map(item => item.id === selectedItem.id ? { ...item, locked: !item.locked } : item))} className={`rounded p-1.5 ${selectedItem.locked ? 'bg-indigo-100 text-indigo-700' : 'text-slate-600 hover:bg-white'}`} title={selectedItem.locked ? 'Unlock' : 'Lock'}><Glyph name="lock"/></button><button type="button" onClick={deleteSelected} className="ml-auto flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"><Glyph name="trash"/>Delete</button>
+    </div>}
+
+    <main ref={stageRef} onPointerDown={onStagePointerDown} onPointerMove={event => { if (tool === 'line' && connectorStart) setConnectorPreview(worldPoint(event.clientX, event.clientY)); }} onWheel={event => { if (event.ctrlKey || event.metaKey) { event.preventDefault(); setViewport(value => ({ ...value, zoom: clamp(value.zoom * (event.deltaY < 0 ? 1.08 : 0.93), 0.2, 3) })); } }} className="relative min-h-0 flex-1 touch-none overflow-hidden bg-white" style={{ cursor: tool === 'hand' ? 'grab' : tool === 'eraser' ? 'cell' : tool === 'pen' || tool === 'highlighter' || tool === 'line' ? 'crosshair' : 'default', backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: `${24 * viewport.zoom}px ${24 * viewport.zoom}px`, backgroundPosition: `${viewport.x * viewport.zoom}px ${viewport.y * viewport.zoom}px` }}>
+      <div className="absolute origin-top-left" style={{ transform: `translate(${viewport.x * viewport.zoom}px, ${viewport.y * viewport.zoom}px) scale(${viewport.zoom})` }}>{sortedItems(items).map(item => <ItemRenderer key={item.id} item={item} selected={selectedId === item.id} connectorMode={tool === 'line'} onSelect={setSelectedId} onConnectorPoint={(clientX, clientY) => addConnectorPoint(worldPoint(clientX, clientY))} onMove={(id, x, y) => updateLive(id, { x, y })} onResize={(id, x, y, width, height) => updateLive(id, { x, y, width, height })} onText={(id, content) => updateLive(id, { content })} onStart={beginInteraction} onEnd={endInteraction}/>)}{connectorStart && connectorPreview && <svg width="1" height="1" className="pointer-events-none absolute left-0 top-0 overflow-visible" aria-hidden="true"><path d={connectorPath({ start: connectorStart, end: connectorPreview }, 'curved')} fill="none" stroke="#4f46e5" strokeWidth="3" strokeDasharray="7 6" strokeLinecap="round"/><circle cx={connectorStart.x} cy={connectorStart.y} r="6" fill="white" stroke="#4f46e5" strokeWidth="3"/><circle cx={connectorPreview.x} cy={connectorPreview.y} r="5" fill="#4f46e5"/></svg>}</div>
+      <div data-canvas-ui="true" onPointerDown={event => event.stopPropagation()} className="absolute bottom-3 left-2 right-2 z-40 flex items-center gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg md:bottom-auto md:left-3 md:right-auto md:top-3 md:flex-col md:overflow-visible" aria-label="Creation tools">
+        <RailButton tool="select" activeTool={tool} label="Select (V)" icon="select" onClick={() => activateTool('select')}/><RailButton tool="hand" activeTool={tool} label="Hand (H)" icon="hand" onClick={() => activateTool('hand')}/><span className="mx-1 h-6 w-px bg-slate-200 md:my-1 md:h-px md:w-6"/><RailButton tool="note" activeTool={tool} label="Sticky note (N)" icon="note" onClick={() => activateTool('note')}/><RailButton tool="text" activeTool={tool} label="Text (T)" icon="text" onClick={() => activateTool('text')}/>
+        <div className="relative"><RailButton tool="shape" activeTool={tool} label="Shapes (R)" icon="shape" onClick={() => setShapeMenu(open => !open)}/>{shapeMenu && <div className="absolute bottom-12 left-1/2 w-48 -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-1 shadow-xl md:bottom-auto md:left-12 md:top-0 md:translate-x-0">{SHAPES.map(shape => <button type="button" key={shape.kind} onClick={() => { setShapeKind(shape.kind); activateTool('shape'); setShapeMenu(false); }} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-slate-100"><span className={`h-5 w-7 border border-slate-500 ${shape.kind === 'circle' ? 'rounded-full' : shape.kind === 'rounded' ? 'rounded-md' : ''}`}/>{shape.label}</button>)}</div>}</div>
+        <RailButton tool="line" activeTool={tool} label="Connector (L)" icon="line" onClick={() => activateTool('line')}/><RailButton tool="pen" activeTool={tool} label="Pen (P)" icon="pen" onClick={() => activateTool('pen')}/><RailButton tool="highlighter" activeTool={tool} label="Highlighter (Shift+P)" icon="highlight" onClick={() => activateTool('highlighter')}/><RailButton tool="eraser" activeTool={tool} label="Eraser (E)" icon="eraser" onClick={() => activateTool('eraser')}/><RailButton tool="frame" activeTool={tool} label="Frame (F)" icon="frame" onClick={() => activateTool('frame')}/>
       </div>
-    );
+      {connectorStart && <div className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 rounded-md border border-indigo-200 bg-white px-3 py-2 text-xs font-semibold text-indigo-700 shadow-md">Choose an end point · Esc to cancel</div>}
+      {!items.length && !connectorStart && <div className="pointer-events-none absolute left-1/2 top-1/2 max-w-sm -translate-x-1/2 -translate-y-1/2 text-center"><div className="text-lg font-semibold text-slate-800">Start creating</div><p className="mt-1 text-sm leading-6 text-slate-500">Add your diagram, choose a tool, or upload an image. Drag to draw shapes and frames, or click start and end points for a connector.</p></div>}
+      <div data-canvas-ui="true" onPointerDown={event => event.stopPropagation()} className="absolute bottom-16 right-3 z-40 flex items-center rounded-lg border border-slate-200 bg-white p-1 shadow-md md:bottom-3"><button type="button" onClick={() => setViewport(value => ({ ...value, zoom: clamp(value.zoom / 1.15, 0.2, 3) }))} className="rounded p-2 text-slate-600 hover:bg-slate-100" title="Zoom out"><Glyph name="zoomOut"/></button><button type="button" onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })} className="min-w-14 rounded px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">{Math.round(viewport.zoom * 100)}%</button><button type="button" onClick={() => setViewport(value => ({ ...value, zoom: clamp(value.zoom * 1.15, 0.2, 3) }))} className="rounded p-2 text-slate-600 hover:bg-slate-100" title="Zoom in"><Glyph name="zoomIn"/></button></div>
+      <div className="absolute right-3 top-3 hidden rounded bg-white/90 px-2 py-1 text-[11px] text-slate-500 shadow-sm lg:block">V select · H hand · T text · N note · R shape · L line · P pen</div>
+    </main>
+  </div>;
+}
+
+function slug(value: string) { return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'presentation'; }
+async function renderPresentationPng(items: PresentationItem[]) {
+  const padding = 60; const minX = Math.min(...items.map(item => item.x)) - padding; const minY = Math.min(...items.map(item => item.y)) - padding;
+  const maxX = Math.max(...items.map(item => item.x + item.width)) + padding; const maxY = Math.max(...items.map(item => item.y + item.height)) + padding; const ratio = 2;
+  const canvas = document.createElement('canvas'); canvas.width = Math.ceil((maxX - minX) * ratio); canvas.height = Math.ceil((maxY - minY) * ratio); const ctx = canvas.getContext('2d'); if (!ctx) throw new Error('Could not create export canvas.');
+  ctx.scale(ratio, ratio); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, maxX - minX, maxY - minY); ctx.translate(-minX, -minY); for (const item of sortedItems(items)) await drawItem(ctx, item); return canvas.toDataURL('image/png');
+}
+async function drawItem(ctx: CanvasRenderingContext2D, item: PresentationItem) {
+  const style = styleFor(item); ctx.save(); ctx.globalAlpha = style.opacity;
+  if (item.type === 'image') { try { const image = await loadImage(item.content); const scale = Math.min(item.width / image.width, item.height / image.height); const width = image.width * scale; const height = image.height * scale; ctx.drawImage(image, item.x + (item.width - width) / 2, item.y + (item.height - height) / 2, width, height); } catch { ctx.fillStyle = '#f1f5f9'; ctx.fillRect(item.x, item.y, item.width, item.height); } }
+  else if (item.type === 'drawing') { const points = parsePoints(item); if (points.length) { ctx.strokeStyle = style.strokeColor; ctx.lineWidth = style.strokeWidth; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(item.x + points[0].x, item.y + points[0].y); points.slice(1).forEach(point => ctx.lineTo(item.x + point.x, item.y + point.y)); ctx.stroke(); } }
+  else if (item.type === 'arrow') {
+    const local = parseConnector(item); const start = { x: item.x + local.start.x, y: item.y + local.start.y }; const end = { x: item.x + local.end.x, y: item.y + local.end.y };
+    let startAngle = Math.atan2(end.y - start.y, end.x - start.x); let endAngle = startAngle;
+    ctx.strokeStyle = style.strokeColor; ctx.fillStyle = style.strokeColor; ctx.lineWidth = style.strokeWidth; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.setLineDash(style.lineStyle === 'dashed' ? [10, 7] : style.lineStyle === 'dotted' ? [2, 6] : []); ctx.beginPath(); ctx.moveTo(start.x, start.y);
+    if (style.connectorType === 'curved') {
+      const dx = end.x - start.x; const dy = end.y - start.y;
+      const c1 = Math.abs(dx) >= Math.abs(dy) ? { x: start.x + dx * 0.48, y: start.y } : { x: start.x, y: start.y + dy * 0.48 };
+      const c2 = Math.abs(dx) >= Math.abs(dy) ? { x: end.x - dx * 0.48, y: end.y } : { x: end.x, y: end.y - dy * 0.48 };
+      ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, end.x, end.y); startAngle = Math.atan2(c1.y - start.y, c1.x - start.x); endAngle = Math.atan2(end.y - c2.y, end.x - c2.x);
+    } else if (style.connectorType === 'elbow') {
+      if (Math.abs(end.x - start.x) >= Math.abs(end.y - start.y)) { const midX = (start.x + end.x) / 2; ctx.lineTo(midX, start.y); ctx.lineTo(midX, end.y); ctx.lineTo(end.x, end.y); startAngle = Math.atan2(0, midX - start.x); endAngle = Math.atan2(0, end.x - midX); }
+      else { const midY = (start.y + end.y) / 2; ctx.lineTo(start.x, midY); ctx.lineTo(end.x, midY); ctx.lineTo(end.x, end.y); startAngle = Math.atan2(midY - start.y, 0); endAngle = Math.atan2(end.y - midY, 0); }
+    } else ctx.lineTo(end.x, end.y);
+    ctx.stroke(); ctx.setLineDash([]); if (style.arrowEnd) drawArrowHead(ctx, end, endAngle, style.strokeWidth); if (style.arrowStart) drawArrowHead(ctx, start, startAngle + Math.PI, style.strokeWidth);
   }
-
-  if (item.type === 'text') {
-    return (
-      <div
-        data-item-id={item.id}
-        onPointerDown={(e) => { e.stopPropagation(); drag(e); onSelect(item.id); }}
-        onClick={(e) => e.stopPropagation()}
-        className={`absolute bg-transparent cursor-move p-1 flex flex-col
-          ${selected ? 'ring-2 ring-indigo-500 rounded-md' : ''}`}
-        style={{ left: item.x, top: item.y, width: item.width, height: item.height }}
-      >
-        {selected && (
-          <div
-            onPointerDown={(e) => { e.stopPropagation(); onSelect(item.id); drag(e); }}
-            className="absolute -top-8 left-0 px-2 py-1 rounded-md bg-white border border-slate-200 shadow-sm text-[11px] font-semibold text-slate-600 cursor-move select-none"
-            title="Drag to move wording"
-          >
-            Move
-          </div>
-        )}
-        <textarea
-          value={item.content}
-          onChange={(e) => onTextChange(item.id, e.target.value)}
-          onPointerDown={(e) => { e.stopPropagation(); onSelect(item.id); }}
-          onFocus={() => onSelect(item.id)}
-          className="flex-1 bg-transparent border-0 outline-none resize-none text-2xl font-semibold leading-tight text-slate-950 placeholder-slate-400 cursor-text"
-          placeholder="Add wording..."
-        />
-        {selected && <ResizeHandles item={item} onResize={onResize} />}
-        {selected && (
-          <button
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => onDelete(item.id)}
-            className="absolute -top-3 -right-3 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold shadow"
-            title="Delete"
-          >
-            ×
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  // Note item — a sticky-note card.
-  return (
-    <div
-      data-item-id={item.id}
-      onPointerDown={(e) => { e.stopPropagation(); drag(e); onSelect(item.id); }}
-      onClick={(e) => e.stopPropagation()}
-      className={`absolute bg-amber-100 border-2 rounded-md shadow-md cursor-move p-3 flex flex-col
-        ${selected ? 'border-indigo-500' : 'border-amber-300'}`}
-      style={{ left: item.x, top: item.y, width: item.width, height: item.height }}
-    >
-      {item.title && (
-        <div className="text-[10px] font-bold uppercase tracking-wide text-amber-700 mb-1">
-          {item.title}
-        </div>
-      )}
-      <textarea
-        value={item.content}
-        onChange={(e) => onTextChange(item.id, e.target.value)}
-        onPointerDown={(e) => { e.stopPropagation(); onSelect(item.id); }}
-        onFocus={() => onSelect(item.id)}
-        className="flex-1 bg-transparent border-0 outline-none resize-none text-sm text-amber-900 placeholder-amber-700/50"
-        placeholder="Speaker note…"
-      />
-      {selected && <ResizeHandles item={item} onResize={onResize} />}
-      {selected && (
-        <button
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={() => onDelete(item.id)}
-          className="absolute -top-3 -right-3 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs font-bold shadow"
-          title="Delete"
-        >
-          ×
-        </button>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
-export interface PresentationCanvasProps {
-  board: Board;
-  /** PNG data URL of the current diagram (captured from the editor). */
-  currentDiagramImage: string | null;
-  /** Optional callback for the user adding the current diagram as a fresh item. */
-  onCaptureCurrentDiagram?: () => void;
-  /** Called after items change so the host can persist. */
-  onItemsChange?: (items: PresentationItem[]) => void;
-  /** Back to dashboard. */
-  onClose: () => void;
-  /** Toast-style notification. */
-  notify: (kind: 'success' | 'error', message: string) => void;
-}
-
-export function PresentationCanvas({
-  board,
-  currentDiagramImage,
-  onCaptureCurrentDiagram,
-  onItemsChange,
-  onClose,
-  notify,
-}: PresentationCanvasProps) {
-  const stageRef = useRef<HTMLDivElement>(null);
-  const [items, setItems] = useState<PresentationItem[]>(board.presentation?.items ?? []);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
-  const [panning, setPanning] = useState<{ x: number; y: number; vx: number; vy: number } | null>(null);
-  const selectedItem = useMemo(
-    () => items.find(item => item.id === selectedId) ?? null,
-    [items, selectedId],
-  );
-
-  // Persist on every change so a reload brings the user back to where they
-  // were. Last-write-wins via boardManager.
-  useEffect(() => {
-    void boardManager.setPresentation(board.id, items);
-    onItemsChange?.(items);
-    // We deliberately exclude onItemsChange to avoid feedback loops when the
-    // host rerenders parent state on every change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, board.id]);
-
-  // Persist a sensible default item when the user first opens an empty
-  // presentation canvas with a freshly-rendered diagram ready to drop.
-  const handleCapture = () => {
-    if (!currentDiagramImage) {
-      notify('error', 'No diagram rendered yet. Open a diagram, then publish.');
-      return;
-    }
-    const item: PresentationItem = {
-      id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      type: 'image',
-      title: board.title,
-      content: currentDiagramImage,
-      x: Math.round((viewport.x + 80 - viewport.x) / viewport.zoom),
-      y: Math.round((80) / viewport.zoom),
-      // Stamp the image at a sensible canvas size by default. 1024-wide
-      // looks good at 1× zoom.
-      width: 480,
-      height: 320,
-    };
-    setItems(prev => [...prev, item]);
-    setSelectedId(item.id);
-    onCaptureCurrentDiagram?.();
-    notify('success', 'Added the current diagram to the deck.');
-  };
-
-  const handleAddNote = () => {
-    const note: PresentationItem = {
-      id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      type: 'note',
-      title: 'Note',
-      content: '',
-      x: 120,
-      y: 120,
-      width: 220,
-      height: 140,
-    };
-    setItems(prev => [...prev, note]);
-    setSelectedId(note.id);
-  };
-
-  const handleAddText = () => {
-    const text: PresentationItem = {
-      id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      type: 'text',
-      title: 'Wording',
-      content: 'Add wording',
-      x: 120,
-      y: 120,
-      width: 280,
-      height: 90,
-    };
-    setItems(prev => [...prev, text]);
-    setSelectedId(text.id);
-  };
-
-  const handleAddArrow = () => {
-    const arrow: PresentationItem = {
-      id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      type: 'arrow',
-      title: 'Arrow',
-      content: '#111827',
-      x: 160,
-      y: 180,
-      width: 220,
-      height: 80,
-    };
-    setItems(prev => [...prev, arrow]);
-    setSelectedId(arrow.id);
-  };
-
-  const handleDelete = (id: string) => {
-    setItems(prev => prev.filter(i => i.id !== id));
-    setSelectedId(prev => prev === id ? null : prev);
-  };
-
-  const handleMove = (id: string, x: number, y: number) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, x, y } : i));
-  };
-
-  const handleResize = (id: string, w: number, h: number) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, width: w, height: h } : i));
-  };
-
-  const handleTitleChange = (id: string, title: string) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, title } : i));
-  };
-
-  const handleTextChange = (id: string, content: string) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, content } : i));
-  };
-
-  // Pan / zoom the workspace.
-  const beginPan = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).dataset.itemId) return;
-    if ((e.target as HTMLElement).dataset.handle) return;
-    setPanning({ x: e.clientX, y: e.clientY, vx: viewport.x, vy: viewport.y });
-  };
-  useEffect(() => {
-    if (!panning) return;
-    const move = (ev: PointerEvent) => {
-      const dx = (ev.clientX - panning.x) / viewport.zoom;
-      const dy = (ev.clientY - panning.y) / viewport.zoom;
-      setViewport(v => ({ ...v, x: panning.vx + dx, y: panning.vy + dy }));
-    };
-    const up = () => setPanning(null);
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-    return () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-  }, [panning, viewport.zoom]);
-
-  const onWheel = (e: React.WheelEvent) => {
-    if (!e.ctrlKey && !e.metaKey) return;
-    e.preventDefault();
-    setViewport(v => ({
-      ...v,
-      zoom: clamp(v.zoom * (e.deltaY < 0 ? 1.08 : 0.93), 0.25, 2.5),
-    }));
-  };
-
-  // Export the composed board as PNG. Render directly to canvas instead of
-  // rasterizing the DOM, which is more reliable for editable text and arrows.
-  const exportPng = async () => {
-    if (items.length === 0) {
-      notify('error', 'Add something to the presentation before exporting.');
-      return;
-    }
-
-    try {
-      const dataUrl = await renderPresentationPng(items);
-      const a = document.createElement('a');
-      a.download = `${slug(board.title)}-deck.png`;
-      a.href = dataUrl;
-      a.click();
-      notify('success', 'Exported the deck as PNG.');
-    } catch (err) {
-      notify('error', err instanceof Error ? err.message : 'PNG export failed.');
-    }
-  };
-
-  const sortedItems = useMemo(() => sortPresentationItems(items), [items]);
-
-  return (
-    <div className="flex-1 flex flex-col bg-white">
-      {/* Toolbar */}
-      <div className="flex items-center gap-4 px-4 py-2 bg-white border-b border-slate-200 shadow-sm">
-        <button
-          onClick={onClose}
-          className="btn btn-secondary btn-sm"
-        >
-          <ToolIcon name="back" />
-          Back
-        </button>
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-slate-900">Presentation · {board.title}</div>
-          <div className="text-[11px] text-slate-500">{items.length} item{items.length === 1 ? '' : 's'} · saved with the board</div>
-        </div>
-
-        <div className="ml-auto flex items-center gap-3">
-          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 shadow-xs">
-            <span className="px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Insert
-            </span>
-            <ToolButton
-              icon="diagram"
-              label="Diagram"
-              variant="primary"
-              onClick={handleCapture}
-              disabled={!currentDiagramImage}
-              title={currentDiagramImage ? 'Add the current diagram as an image' : 'Open a diagram first, then publish'}
-            />
-            <ToolButton icon="text" label="Wording" onClick={handleAddText} />
-            <ToolButton icon="arrow" label="Arrow" onClick={handleAddArrow} />
-            <ToolButton icon="note" label="Note" onClick={handleAddNote} />
-          </div>
-
-          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 shadow-xs">
-            <span className="px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Canvas
-            </span>
-            <ToolButton
-              icon="reset"
-              label="100%"
-              onClick={() => setViewport({ x: 0, y: 0, zoom: 1 })}
-              title="Reset view (100%)"
-            />
-          </div>
-
-          <ToolButton icon="export" label="Export PNG" variant="success" onClick={exportPng} />
-        </div>
-      </div>
-
-      {selectedItem && (
-        <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 border-b border-slate-200 text-sm shadow-xs">
-          <div className="flex items-center gap-2 min-w-40">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Edit
-            </span>
-            <span className="px-2 py-1 rounded-md bg-white border border-slate-200 text-xs font-semibold text-indigo-600 shadow-xs">
-              {selectedItem.type === 'image' ? 'Diagram' : selectedItem.type === 'text' ? 'Wording' : selectedItem.type === 'arrow' ? 'Arrow' : 'Note'}
-            </span>
-          </div>
-          <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Title
-            <input
-              value={selectedItem.title ?? ''}
-              onChange={e => handleTitleChange(selectedItem.id, e.target.value)}
-              className="w-56 px-2 py-1.5 border border-slate-200 rounded-md bg-white text-sm font-medium normal-case tracking-normal text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder={selectedItem.type === 'image' ? 'Diagram title' : `${selectedItem.type} title`}
-            />
-          </label>
-          {selectedItem.type === 'arrow' && (
-            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Color
-              <input
-                type="color"
-                value={selectedItem.content || '#111827'}
-                onChange={e => handleTextChange(selectedItem.id, e.target.value)}
-                className="w-10 h-8 p-1 border border-slate-200 rounded-md bg-white shadow-xs"
-              />
-            </label>
-          )}
-          <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            W
-            <input
-              type="number"
-              min={80}
-              value={Math.round(selectedItem.width)}
-              onChange={e => handleResize(selectedItem.id, Math.max(80, Number(e.target.value) || 80), selectedItem.height)}
-              className="w-20 px-2 py-1.5 border border-slate-200 rounded-md bg-white text-sm font-medium normal-case tracking-normal text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            H
-            <input
-              type="number"
-              min={60}
-              value={Math.round(selectedItem.height)}
-              onChange={e => handleResize(selectedItem.id, selectedItem.width, Math.max(60, Number(e.target.value) || 60))}
-              className="w-20 px-2 py-1.5 border border-slate-200 rounded-md bg-white text-sm font-medium normal-case tracking-normal text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </label>
-          <button
-            onClick={() => handleDelete(selectedItem.id)}
-            className="btn btn-danger btn-sm ml-auto"
-          >
-            Delete
-          </button>
-        </div>
-      )}
-
-      {/* Stage */}
-      <div
-        ref={stageRef}
-        onPointerDown={beginPan}
-        onWheel={onWheel}
-        onClick={() => setSelectedId(null)}
-        className="flex-1 relative overflow-hidden bg-white"
-        style={{
-          cursor: panning ? 'grabbing' : 'grab',
-        }}
-      >
-        <div
-          className="absolute origin-top-left"
-          style={{
-            transform: `translate(${viewport.x * viewport.zoom}px, ${viewport.y * viewport.zoom}px) scale(${viewport.zoom})`,
-          }}
-        >
-          {sortedItems.length === 0 && (
-            <div className="absolute left-12 top-12 max-w-md bg-white/90 backdrop-blur border border-slate-200 rounded-lg p-4 shadow-sm">
-              <div className="text-sm font-semibold text-slate-900 mb-1">Empty deck</div>
-              <div className="text-xs text-slate-600 leading-relaxed">
-                Click <strong>+ Add current diagram</strong> to drop a rendered PNG of the
-                board's diagram onto the canvas, then drag and resize it.
-                <br /><br />
-                Add a few <strong>+ Note</strong> cards for speaker notes, then
-                <strong> Export PNG</strong> to publish the whole composition.
-              </div>
-            </div>
-          )}
-          {sortedItems.map(item => (
-            <ItemRenderer
-              key={item.id}
-              item={item}
-              selected={selectedId === item.id}
-              onSelect={setSelectedId}
-              onMove={handleMove}
-              onResize={handleResize}
-              onDelete={handleDelete}
-              onTextChange={handleTextChange}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function slug(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'deck';
-}
-
-async function renderPresentationPng(items: PresentationItem[]): Promise<string> {
-  const padding = 56;
-  const bounds = getItemsBounds(items, padding);
-  const pixelRatio = 2;
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.ceil(bounds.width * pixelRatio);
-  canvas.height = Math.ceil(bounds.height * pixelRatio);
-
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Could not create PNG canvas.');
-
-  ctx.scale(pixelRatio, pixelRatio);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, bounds.width, bounds.height);
-  ctx.translate(-bounds.x, -bounds.y);
-
-  for (const item of sortPresentationItems(items)) {
-    await drawPresentationItem(ctx, item);
-  }
-
-  return canvas.toDataURL('image/png');
-}
-
-function getItemsBounds(items: PresentationItem[], padding: number) {
-  const minX = Math.min(...items.map(item => item.x));
-  const minY = Math.min(...items.map(item => item.y));
-  const maxX = Math.max(...items.map(item => item.x + item.width));
-  const maxY = Math.max(...items.map(item => item.y + item.height));
-
-  return {
-    x: minX - padding,
-    y: minY - padding,
-    width: Math.max(1, maxX - minX + padding * 2),
-    height: Math.max(1, maxY - minY + padding * 2),
-  };
-}
-
-async function drawPresentationItem(ctx: CanvasRenderingContext2D, item: PresentationItem): Promise<void> {
-  if (item.type === 'image') {
-    await drawImageItem(ctx, item);
-  } else if (item.type === 'arrow') {
-    drawArrowItem(ctx, item);
-  } else if (item.type === 'text') {
-    drawTextItem(ctx, item);
-  } else {
-    drawNoteItem(ctx, item);
-  }
-}
-
-async function drawImageItem(ctx: CanvasRenderingContext2D, item: PresentationItem): Promise<void> {
-  ctx.save();
-  roundRect(ctx, item.x, item.y, item.width, item.height, 8);
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
-  ctx.strokeStyle = '#e2e8f0';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.clip();
-
-  try {
-    const image = await loadImage(item.content);
-    const fit = containRect(image.width, image.height, item.width, item.height);
-    ctx.drawImage(image, item.x + fit.x, item.y + fit.y, fit.width, fit.height);
-  } catch {
-    ctx.fillStyle = '#f8fafc';
-    ctx.fillRect(item.x, item.y, item.width, item.height);
-    ctx.fillStyle = '#64748b';
-    ctx.font = '14px Inter, Arial, sans-serif';
-    ctx.fillText('Image could not be exported', item.x + 16, item.y + 28);
-  }
-
-  if (item.title) {
-    ctx.font = '600 13px Inter, Arial, sans-serif';
-    const text = truncateForWidth(ctx, item.title, item.width - 32);
-    const labelWidth = Math.min(item.width - 16, ctx.measureText(text).width + 18);
-    roundRect(ctx, item.x + 8, item.y + 8, labelWidth, 26, 6);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    ctx.strokeStyle = '#e2e8f0';
-    ctx.stroke();
-    ctx.fillStyle = '#020617';
-    ctx.fillText(text, item.x + 17, item.y + 26);
-  }
-
+  else if (item.type === 'frame') { ctx.strokeStyle = style.strokeColor; ctx.lineWidth = 2; ctx.strokeRect(item.x, item.y, item.width, item.height); ctx.fillStyle = '#334155'; ctx.font = '600 14px Inter, Arial'; ctx.fillText(item.title || 'Frame', item.x, item.y - 9); }
+  else if (item.type === 'shape') { drawShape(ctx, item, style); drawItemText(ctx, item, style, 16); }
+  else if (item.type === 'text') drawItemText(ctx, item, style, 4);
+  else { roundRect(ctx, item.x, item.y, item.width, item.height, 6); ctx.fillStyle = style.fillColor; ctx.fill(); ctx.strokeStyle = style.strokeColor; ctx.lineWidth = style.strokeWidth; ctx.stroke(); drawItemText(ctx, item, style, 16); }
   ctx.restore();
 }
-
-function drawArrowItem(ctx: CanvasRenderingContext2D, item: PresentationItem): void {
-  const stroke = item.content || '#111827';
-  const y = item.y + item.height / 2;
-  const startX = item.x + 8;
-  const endX = item.x + Math.max(18, item.width - 14);
-
-  ctx.save();
-  ctx.strokeStyle = stroke;
-  ctx.fillStyle = stroke;
-  ctx.lineWidth = 4;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(startX, y);
-  ctx.lineTo(endX, y);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(endX, y);
-  ctx.lineTo(endX - 14, y - 8);
-  ctx.lineTo(endX - 14, y + 8);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawTextItem(ctx: CanvasRenderingContext2D, item: PresentationItem): void {
-  ctx.save();
-  ctx.fillStyle = '#020617';
-  ctx.font = '700 26px Inter, Arial, sans-serif';
-  drawWrappedText(ctx, item.content || 'Add wording', item.x + 4, item.y + 30, item.width - 8, 31, item.height - 8);
-  ctx.restore();
-}
-
-function drawNoteItem(ctx: CanvasRenderingContext2D, item: PresentationItem): void {
-  ctx.save();
-  roundRect(ctx, item.x, item.y, item.width, item.height, 6);
-  ctx.fillStyle = '#fef3c7';
-  ctx.fill();
-  ctx.strokeStyle = '#fcd34d';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  let textY = item.y + 18;
-  if (item.title) {
-    ctx.fillStyle = '#92400e';
-    ctx.font = '700 11px Inter, Arial, sans-serif';
-    ctx.fillText(item.title.toUpperCase(), item.x + 12, textY);
-    textY += 18;
-  }
-
-  ctx.fillStyle = '#78350f';
-  ctx.font = '14px Inter, Arial, sans-serif';
-  drawWrappedText(ctx, item.content || '', item.x + 12, textY, item.width - 24, 18, item.height - (textY - item.y) - 8);
-  ctx.restore();
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = reject;
-    image.src = src;
-  });
-}
-
-function containRect(sourceWidth: number, sourceHeight: number, targetWidth: number, targetHeight: number) {
-  const scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight);
-  const width = sourceWidth * scale;
-  const height = sourceHeight * scale;
-  return {
-    x: (targetWidth - width) / 2,
-    y: (targetHeight - height) / 2,
-    width,
-    height,
-  };
-}
-
-function drawWrappedText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  lineHeight: number,
-  maxHeight: number,
-): void {
-  const paragraphs = text.split('\n');
-  let cursorY = y;
-
-  for (const paragraph of paragraphs) {
-    const words = paragraph.split(/\s+/).filter(Boolean);
-    let line = '';
-
-    if (words.length === 0) {
-      cursorY += lineHeight;
-      continue;
-    }
-
-    for (const word of words) {
-      const test = line ? `${line} ${word}` : word;
-      if (ctx.measureText(test).width > maxWidth && line) {
-        if (cursorY - y + lineHeight > maxHeight) return;
-        ctx.fillText(line, x, cursorY);
-        line = word;
-        cursorY += lineHeight;
-      } else {
-        line = test;
-      }
-    }
-
-    if (line) {
-      if (cursorY - y + lineHeight > maxHeight) return;
-      ctx.fillText(line, x, cursorY);
-      cursorY += lineHeight;
-    }
-  }
-}
-
-function truncateForWidth(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
-  if (ctx.measureText(text).width <= maxWidth) return text;
-  let out = text;
-  while (out.length > 1 && ctx.measureText(`${out}...`).width > maxWidth) {
-    out = out.slice(0, -1);
-  }
-  return `${out}...`;
-}
-
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
-  const radius = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + w - radius, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
-  ctx.lineTo(x + w, y + h - radius);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
-  ctx.lineTo(x + radius, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
-}
+function drawShape(ctx: CanvasRenderingContext2D, item: PresentationItem, style: ReturnType<typeof styleFor>) { const x = item.x, y = item.y, w = item.width, h = item.height; ctx.fillStyle = style.fillColor; ctx.strokeStyle = style.strokeColor; ctx.lineWidth = style.strokeWidth; ctx.setLineDash(style.lineStyle === 'dashed' ? [10, 6] : style.lineStyle === 'dotted' ? [2, 5] : []); ctx.beginPath(); if (style.shape === 'circle') ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); else if (style.shape === 'diamond') { ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w, y + h / 2); ctx.lineTo(x + w / 2, y + h); ctx.lineTo(x, y + h / 2); ctx.closePath(); } else if (style.shape === 'triangle') { ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.closePath(); } else roundRect(ctx, x, y, w, h, style.shape === 'rounded' ? 16 : 2); ctx.fill(); ctx.stroke(); ctx.setLineDash([]); }
+function drawItemText(ctx: CanvasRenderingContext2D, item: PresentationItem, style: ReturnType<typeof styleFor>, padding: number) { const weight = style.fontWeight === 'bold' ? 700 : style.fontWeight === 'semibold' ? 600 : 400; ctx.fillStyle = style.textColor; ctx.font = `${weight} ${style.fontSize}px Inter, Arial`; ctx.textAlign = style.textAlign; ctx.textBaseline = 'top'; const x = style.textAlign === 'left' ? item.x + padding : style.textAlign === 'right' ? item.x + item.width - padding : item.x + item.width / 2; drawWrappedText(ctx, item.content, x, item.y + padding, item.width - padding * 2, style.fontSize * 1.25, item.height - padding * 2); }
+function drawWrappedText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number, maxHeight: number) { let cursor = y; for (const paragraph of text.split('\n')) { let line = ''; for (const word of paragraph.split(/\s+/).filter(Boolean)) { const candidate = line ? `${line} ${word}` : word; if (line && ctx.measureText(candidate).width > maxWidth) { if (cursor + lineHeight > y + maxHeight) return; ctx.fillText(line, x, cursor); cursor += lineHeight; line = word; } else line = candidate; } if (line) { if (cursor + lineHeight > y + maxHeight) return; ctx.fillText(line, x, cursor); cursor += lineHeight; } else cursor += lineHeight; } }
+function drawArrowHead(ctx: CanvasRenderingContext2D, point: Point, angle: number, width: number) { const size = 10 + width; ctx.save(); ctx.translate(point.x, point.y); ctx.rotate(angle); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-size, -size * 0.55); ctx.lineTo(-size, size * 0.55); ctx.closePath(); ctx.fill(); ctx.restore(); }
+function loadImage(src: string): Promise<HTMLImageElement> { return new Promise((resolve, reject) => { const image = new Image(); image.onload = () => resolve(image); image.onerror = reject; image.src = src; }); }
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) { const r = Math.min(radius, width / 2, height / 2); ctx.moveTo(x + r, y); ctx.lineTo(x + width - r, y); ctx.quadraticCurveTo(x + width, y, x + width, y + r); ctx.lineTo(x + width, y + height - r); ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height); ctx.lineTo(x + r, y + height); ctx.quadraticCurveTo(x, y + height, x, y + height - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath(); }
