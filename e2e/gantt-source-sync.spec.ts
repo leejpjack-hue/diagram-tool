@@ -75,7 +75,7 @@ async function createGanttBoard(page: Page) {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
   await page.getByRole('button', { name: 'Create new' }).click();
-  await page.getByRole('button', { name: /Blank Gantt/ }).click();
+  await page.getByRole('button', { name: 'Blank Gantt Open a clean DSL canvas.' }).click();
   await setEditorDsl(page, GANTT_DSL);
   await expect(page.getByText('Planning', { exact: true }).first()).toBeVisible();
   await expect(planningBar(page)).toBeVisible();
@@ -134,7 +134,7 @@ test.describe('Gantt bidirectional source sync', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.getByRole('button', { name: 'Create new' }).click();
-    await page.getByRole('button', { name: 'Templates' }).click();
+    await page.getByLabel('Create a board').getByRole('button', { name: 'Templates' }).click();
     await page.getByRole('button', { name: /Product Launch Plan/ }).click();
     await waitForEditor(page);
     await expect(page.getByText('Strategy').first()).toBeVisible();
