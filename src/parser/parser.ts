@@ -37,18 +37,20 @@ export class Parser {
   }
 
   private peek(): Token {
-    return this.tokens[this.pos];
+    return this.tokens[this.pos] ?? this.tokens[this.tokens.length - 1];
   }
 
   private advance(): Token {
-    return this.tokens[this.pos++];
+    return this.tokens[this.pos++] ?? this.tokens[this.tokens.length - 1];
   }
 
   private expect(type: TokenType): Token {
     const token = this.advance();
     if (token.type !== type) {
       throw new Error(
-        `Expected ${type} but got ${token.type} at line ${token.line}, column ${token.column}`
+        token.type === TokenType.EOF
+          ? `Unexpected end of input (expected ${type})`
+          : `Expected ${type} but got ${token.type} at line ${token.line}, column ${token.column}`
       );
     }
     return token;
@@ -61,7 +63,9 @@ export class Parser {
     const token = this.advance();
     if (token.type !== TokenType.IDENTIFIER && token.type !== TokenType.KEYWORD) {
       throw new Error(
-        `Expected name but got ${token.type} at line ${token.line}, column ${token.column}`
+        token.type === TokenType.EOF
+          ? 'Unexpected end of input (expected name)'
+          : `Expected name but got ${token.type} at line ${token.line}, column ${token.column}`
       );
     }
     return token;

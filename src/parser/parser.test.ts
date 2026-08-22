@@ -325,6 +325,15 @@ Client ->
       expect(() => parseDiagram(dsl)).toThrow(/missing a target after ->/i);
     });
 
+    it('throws a parse error for an unclosed service block instead of a TypeError', () => {
+      const dsl = `diagram: architecture
+service FirstService {
+  color: "#6366f1"
+  tech: "edit this in the DSL"
+`;
+      expect(() => parseDiagram(dsl)).toThrow(/Unexpected end of input \(expected RBRACE\)/);
+    });
+
     it('handles multiple labelled edges in one diagram', () => {
       const dsl = `
 service Client {}
