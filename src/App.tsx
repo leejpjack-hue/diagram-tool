@@ -34,8 +34,9 @@ import { useMobile } from './hooks/useMobile';
 import { BrandLogo } from './components/BrandLogo';
 import { Dashboard, type DashboardCreateRequest } from './components/Dashboard/Dashboard';
 import { PresentationCanvas } from './components/Dashboard/PresentationCanvas';
-import { boardManager, toWorkspaceError, type Board, type BoardMode } from './utils/boardManager';
+import { boardManager, toWorkspaceError, type Board, type BoardMode, type PresentationItem } from './utils/boardManager';
 import { OfflineBanner, WorkspaceErrorBanner } from './components/Workspace/WorkspaceStatus';
+import { BoardSizeMeter, BoardSizeWarnBanner, useBoardSizeSnapshot } from './components/Workspace/BoardSizeMeter';
 import './styles/gantt-fixes.css';
 
 const ARCHITECTURE_DSL = `diagram: architecture
@@ -380,6 +381,7 @@ function App() {
     setDslText, 
     diagramMode, 
     setDiagramMode, 
+    parsedDiagram,
     setParsedDiagram,
     selectedNodeId,
     clipboard,
@@ -402,6 +404,7 @@ function App() {
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
   // Board being presented and the freshly-rendered image of its diagram.
   const [presentationFor, setPresentationFor] = useState<Board | null>(null);
+  const [deckItems, setDeckItems] = useState<PresentationItem[]>([]);
   const [currentDiagramImage, setCurrentDiagramImage] = useState<string | null>(null);
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
   const [showTaskPanel, setShowTaskPanel] = useState(true);
@@ -763,8 +766,12 @@ function App() {
         setParsedDiagram(parseDiagram(board.dslText));
       } catch (err) {
         console.error('Board parse error:', err);
+        setParsedDiagram(null);
       }
+    } else {
+      setParsedDiagram(null);
     }
+    setDeckItems(board.presentation?.items ?? []);
     setView('editor');
   };
 
@@ -847,6 +854,7 @@ function App() {
     }
 
     setPresentationFor(target);
+    setDeckItems(target.presentation?.items ?? []);
     setCurrentDiagramImage(captured);
     setView('presentation');
     if (captured) toast.success('Captured the diagram — drag and resize on the deck.');
@@ -972,10 +980,16 @@ function App() {
 
   const { isMobile } = useMobile();
   const [mobileView, setMobileView] = useState<'editor' | 'timeline' | 'tasks'>('timeline');
+  const boardSize = useBoardSizeSnapshot(
+    parsedDiagram?.nodes.length ?? 0,
+    parsedDiagram?.edges.length ?? 0,
+    deckItems,
+  );
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       <OfflineBanner />
+      {(view === 'editor' || view === 'presentation') && <BoardSizeWarnBanner snapshot={boardSize} />}
       {workspaceError && view === 'editor' && (
         <div className="px-4 pt-3">
           <WorkspaceErrorBanner message={workspaceError} onRetry={handleSave} />
@@ -1060,10 +1074,11 @@ function App() {
         </div>
         
         {/* Status */}
-        <div className="flex-shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
           <span className="status-badge badge-primary">
             <span className="capitalize">{diagramMode} Mode</span>
           </span>
+          <BoardSizeMeter snapshot={boardSize} />
         </div>
         
         {/* Actions */}
@@ -1147,9 +1162,8 @@ function App() {
             // already in state; nothing more to do here — keep the trigger
             // hook so the host can react later if needed.
           }}
-          onItemsChange={() => {
-            // Items persist via boardManager.setPresentation inside the
-            // canvas — this callback is reserved for cross-cutting updates.
+          onItemsChange={(items) => {
+            setDeckItems(items);
           }}
           onClose={closePresentation}
           notify={(type, msg) => (type === 'success' ? toast.success(msg) : toast.error(msg))}
