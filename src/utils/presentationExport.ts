@@ -2,6 +2,7 @@ import type { PresentationItem, PresentationItemStyle } from './boardManager';
 import {
   boundsForExport,
   itemsForExport,
+  visibleFrames,
   type PresentationExportScope,
 } from './presentationFrames';
 
@@ -106,7 +107,6 @@ export async function renderPresentationPdf(
 ): Promise<Blob> {
   const { default: jsPDF } = await import('jspdf');
   if (scope === 'frames') {
-    const { visibleFrames } = await import('./presentationFrames');
     const frames = visibleFrames(items);
     if (!frames.length) throw new Error('Nothing to export.');
     const first = await rasterPage(items, 'frame', frames[0].id);

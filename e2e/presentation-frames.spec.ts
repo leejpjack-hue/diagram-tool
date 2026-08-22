@@ -77,7 +77,7 @@ test.describe('Deck frames as first-class containers', () => {
     expect(all.height).toBeLessThan(700);
 
     await page.getByRole('button', { name: 'Exit present' }).click();
-    await page.getByRole('button', { name: 'Back' }).click();
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
     await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Architecture' })).toBeVisible();
   });
