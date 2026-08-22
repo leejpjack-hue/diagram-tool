@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { buildBoardDocument } from '../../utils/boardFormat';
+import { sanitizePublishedSnapshot } from '../../utils/presentationSanitizer';
 import type { Board } from '../../utils/boardManager';
 import {
   clearPublishedShare,
@@ -25,7 +26,7 @@ export function ShareDialog({ board, onClose, notify }: ShareDialogProps) {
   const publish = async () => {
     setBusy(true);
     try {
-      const published = await publishShare(buildBoardDocument(board));
+      const published = await publishShare(sanitizePublishedSnapshot(buildBoardDocument(board)));
       const next = { boardId: board.id, ...published };
       writePublishedShare(next);
       setShare(next);

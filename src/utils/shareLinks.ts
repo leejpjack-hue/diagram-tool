@@ -1,4 +1,5 @@
 import type { BoardDocument } from './boardFormat';
+import { sanitizePublishedSnapshot } from './presentationSanitizer';
 
 const STORAGE_KEY = 'diagram-tool.share-links';
 
@@ -60,7 +61,7 @@ export async function fetchShareSnapshot(token: string): Promise<BoardDocument> 
   if (document.version !== '3.0' || document.kind !== 'board') {
     throw new Error('This snapshot is not a format 3.0 board.');
   }
-  return document;
+  return sanitizePublishedSnapshot(document);
 }
 
 export async function revokeShare(token: string, manageToken: string): Promise<void> {

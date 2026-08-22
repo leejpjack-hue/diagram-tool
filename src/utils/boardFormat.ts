@@ -9,25 +9,20 @@ import type {
   BoardVersion,
   PersonalTemplate,
   Presentation,
-  PresentationItem,
   Space,
 } from './boardManager';
+
+import {
+  KNOWN_PRESENTATION_TYPES,
+  isAllowedPresentationContent,
+  sanitizePresentation,
+} from './presentationSanitizer';
 
 export const BOARD_FORMAT_VERSION = '3.0';
 export const EXPORT_WATERMARK = null;
 export const EXPORT_REQUIRES_ACCOUNT = false;
 export const KNOWN_BOARD_MODES: readonly BoardMode[] = ['architecture', 'flow', 'sequence', 'gantt'];
-export const KNOWN_PRESENTATION_TYPES = ['image', 'note', 'text', 'arrow', 'shape', 'drawing', 'frame'] as const;
-
-const SAFE_IMAGE_DATA_URL = /^data:image\/(?:png|jpeg|webp|gif)(?:;[\w.-]+=[\w.-]+)*;base64,[A-Za-z0-9+/]+={0,2}$/i;
-
-export function isAllowedPresentationContent(type: string, content: string): boolean {
-  if (typeof content !== 'string') return false;
-  const value = content.trim();
-  if (/^https?:\/\//i.test(value) || /^data:image\/svg\+xml/i.test(value)) return false;
-  if (type === 'image') return SAFE_IMAGE_DATA_URL.test(value);
-  return true;
-}
+export { KNOWN_PRESENTATION_TYPES, isAllowedPresentationContent };
 
 export interface PortableSource {
   kind: 'dsl' | 'mermaid';
@@ -125,7 +120,6 @@ export interface LayoutPoint {
   y: number;
 }
 
-const PRESENTATION_TYPE_SET = new Set<string>(KNOWN_PRESENTATION_TYPES);
 const BOARD_MODE_SET = new Set<string>(KNOWN_BOARD_MODES);
 
 export function sourceKindFor(mode: BoardMode, text: string): PortableSource['kind'] {
@@ -388,7 +382,7 @@ export function parsePortableImport(data: unknown): PortableImportPlan {
     if (Array.isArray(record.frames) && record.frames.length > 0) {
       skipped.push({ kind: 'frames', id: asString(record.id), reason: 'Board-level frames are reserved and are not imported.' });
     }
-    const presentation = sanitizePresentation(record.presentation, asString(record.id), skipped);
+    const presentation = asPresentation(sanitizePresentation(record.presentation, asString(record.id), skipped));
     const graph = projectBoardGraph(mode as BoardMode, dslText);
     boards.push({
       id: asString(record.id),
@@ -454,41 +448,8 @@ export function parsePortableImport(data: unknown): PortableImportPlan {
   return { boards, spaces, templates, versions, skipped };
 }
 
-function sanitizePresentation(value: unknown, boardId: string | undefined, skipped: ImportSkip[]): Presentation | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  const record = value as { items?: unknown; updatedAt?: string };
-  if (!Array.isArray(record.items)) return undefined;
-  const items: PresentationItem[] = [];
-  for (const item of record.items) {
-    if (!item || typeof item !== 'object') {
-      skipped.push({ kind: 'presentation', id: boardId, reason: 'Skipped an unreadable deck object.' });
-      continue;
-    }
-    const candidate = item as PresentationItem;
-    if (!PRESENTATION_TYPE_SET.has(candidate.type)) {
-      skipped.push({ kind: candidate.type || 'presentation', id: candidate.id, reason: 'Unknown deck object type.' });
-      continue;
-    }
-    if ([candidate.x, candidate.y, candidate.width, candidate.height].some(n => typeof n !== 'number')) {
-      skipped.push({ kind: candidate.type, id: candidate.id, reason: 'Deck object was missing geometry.' });
-      continue;
-    }
-    if (typeof candidate.content !== 'string' || !isAllowedPresentationContent(candidate.type, candidate.content)) {
-      skipped.push({ kind: candidate.type, id: candidate.id, reason: 'Presentation content must be local text or a png/jpeg/webp/gif data URL.' });
-      continue;
-    }
-    items.push({
-      ...candidate,
-      content: candidate.content,
-      hidden: candidate.hidden === true ? true : undefined,
-      lockChildren: candidate.lockChildren === true ? true : undefined,
-      startId: typeof candidate.startId === 'string' ? candidate.startId : undefined,
-      endId: typeof candidate.endId === 'string' ? candidate.endId : undefined,
-      startSide: candidate.startSide === 'left' || candidate.startSide === 'right' || candidate.startSide === 'top' || candidate.startSide === 'bottom' ? candidate.startSide : undefined,
-      endSide: candidate.endSide === 'left' || candidate.endSide === 'right' || candidate.endSide === 'top' || candidate.endSide === 'bottom' ? candidate.endSide : undefined,
-    });
-  }
-  return { items, updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : new Date().toISOString() };
+function asPresentation(value: ReturnType<typeof sanitizePresentation>): Presentation | undefined {
+  return value as Presentation | undefined;
 }
 
 function asString(value: unknown): string | undefined {

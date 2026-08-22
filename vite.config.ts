@@ -5,6 +5,11 @@ import { shareHostPlugin } from './server/sharePlugin'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), shareHostPlugin()],
+  server: {
+    fs: {
+      deny: ['.share-store', '.share-store-e2e', '.share-store-e2e-preview'],
+    },
+  },
   preview: {
     // Allow the production hostname (requests arrive via nginx reverse proxy
     // with Host: diagram.teqcon.uk). Without this, Vite preview replies 403.

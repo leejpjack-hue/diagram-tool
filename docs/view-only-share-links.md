@@ -14,18 +14,25 @@ Anyone with that URL can view the snapshot with no sign-in. The owner’s Indexe
 
 ## Where snapshots live
 
-Live `diagram-tool.teqcon.uk` is **nginx → Vite preview** on the teqcon.uk VPS (`rsync dist/` + systemd). There is no Cloudflare Worker, KV, or R2 binding today.
+Live `diagram-tool.teqcon.uk` is **nginx → Vite preview** on the teqcon.uk VPS (`rsync dist/` + systemd). The repo has no wrangler/KV/R2 binding. Cloudflare Workers Builds is a dashboard Git integration (PR previews already fail on earlier branches such as #5; `main` still builds). This feature does not add a user table or a Worker rewrite.
 
-The smallest store that fits that host is a **file-backed token store** attached to the same Vite dev/preview process (`server/sharePlugin.ts`):
+The smallest store that fits the Vite preview host is a **file-backed token store** (`server/sharePlugin.ts`):
 
 | Item | Location |
 | --- | --- |
-| Snapshot + tokens | `.share-store/<token>.json` next to the Vite process (`SHARE_STORE_DIR` overrides) |
-| Record | `{ token, manageToken, createdAt, document }` where `document` is format 3.0 board JSON |
-| Public GET | `/api/shares/<token>` returns the board document only (never `manageToken`) |
+| Snapshot + tokens | `.share-store/<token>.json` next to the Vite process (`SHARE_STORE_DIR` overrides). That directory is not a static web root (`server.fs.deny`). |
+| Record | `{ token, manageToken, createdAt, document }` where `document` is format 3.0 board JSON after the presentation sanitizer |
+| Public GET | `/api/shares/<token>` returns the sanitized board document only (never `manageToken`) |
+| Collection GET | `GET /api/shares` is **404**. There is no list/index of tokens. |
 | Viewer page | `/view/<token>` serves the SPA when the token exists; **404** when it does not |
 
 No user table. The manage token is a capability stored only on the owner’s device (`localStorage` key `diagram-tool.share-links`). Losing that browser means the owner cannot revoke from the UI (v1).
+
+## Token and snapshot rules
+
+- View and manage tokens are 18 CSPRNG bytes, base64url (144 bits). They are not sequential counters.
+- Publish (and serve) run the existing presentation sanitizer (`isAllowedPresentationContent` / `sanitizePresentation`). Remote `http(s)` images and `data:image/svg+xml` are dropped. Comments and board-level frames stay empty.
+- Revoke/rotate compare the manage token with a constant-time equality check. A viewer never receives it.
 
 ## How tokens are revoked and rotated
 

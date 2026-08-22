@@ -1,4 +1,6 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { sanitizePublishedSnapshot } from '../src/utils/presentationSanitizer';
 import {
   createShareToken,
   isShareBoardDocument,
@@ -47,6 +49,10 @@ export async function routeShareRequest(input: ShareRouteInput, store: ShareStor
     return { kind: 'viewer' };
   }
 
+  if (SHARE_PATH.test(path) && method !== 'POST') {
+    return json(404, { error: 'not_found' });
+  }
+
   if (method === 'POST' && SHARE_PATH.test(path)) {
     if (!isShareBoardDocument(input.body)) {
       return json(400, { error: 'invalid_snapshot', message: 'Publish a format 3.0 board snapshot.' });
@@ -58,7 +64,7 @@ export async function routeShareRequest(input: ShareRouteInput, store: ShareStor
       token,
       manageToken,
       createdAt,
-      document: input.body,
+      document: sanitizePublishedSnapshot(input.body),
     });
     return json(201, {
       token,
@@ -72,7 +78,7 @@ export async function routeShareRequest(input: ShareRouteInput, store: ShareStor
   if (method === 'GET' && getMatch) {
     const record = isShareToken(getMatch[1]) ? await store.get(getMatch[1]) : undefined;
     if (!record) return json(404, { error: 'not_found' });
-    return json(200, publicShareDocument(record.document));
+    return json(200, publicShareDocument(sanitizePublishedSnapshot(record.document)));
   }
 
   const revokeMatch = path.match(SHARE_REVOKE_PATH);
@@ -93,7 +99,7 @@ export async function routeShareRequest(input: ShareRouteInput, store: ShareStor
       token,
       manageToken: auth.record.manageToken,
       createdAt,
-      document: auth.record.document,
+      document: sanitizePublishedSnapshot(auth.record.document),
     });
     await store.delete(auth.record.token);
     return json(201, {
@@ -168,10 +174,17 @@ async function authorizeShare(
   if (!isShareToken(token)) return { ok: false, result: json(404, { error: 'not_found' }) };
   const record = await store.get(token);
   if (!record) return { ok: false, result: json(404, { error: 'not_found' }) };
-  if (!manageToken || manageToken !== record.manageToken) {
+  if (!manageToken || !secretEqual(manageToken, record.manageToken)) {
     return { ok: false, result: json(403, { error: 'forbidden' }) };
   }
   return { ok: true, record };
+}
+
+function secretEqual(left: string, right: string): boolean {
+  const a = Buffer.from(left);
+  const b = Buffer.from(right);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 function json(status: number, body: unknown): ShareResponse {
