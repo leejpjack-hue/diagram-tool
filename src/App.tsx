@@ -16,6 +16,7 @@ import { ImportPanel } from './components/Panel/ImportPanel';
 import { FileMenu } from './components/Panel/FileMenu';
 import { TemplatePicker } from './components/TemplatePicker/TemplatePicker';
 import type { DiagramTemplate } from './components/TemplatePicker/templates';
+import { isWorkshopTemplateId } from './components/TemplatePicker/workshopTemplates';
 import { parseDiagram } from './parser/parser';
 import { ToastContainer } from './components/Toast/ToastContainer';
 import { useDiagramStore } from './store/diagramStore';
@@ -772,6 +773,11 @@ function App() {
       setParsedDiagram(null);
     }
     setDeckItems(board.presentation?.items ?? []);
+    if (board.presentation?.items.length && isWorkshopTemplateId(board.templateSourceId)) {
+      setPresentationFor(board);
+      setView('presentation');
+      return;
+    }
     setView('editor');
   };
 
@@ -779,11 +785,12 @@ function App() {
     try {
       const dslText = request.dslText ?? blankBoardDsl(request.mode);
       const board = await boardManager.create({
-        title: extractBoardTitle(dslText, request.mode) || request.title?.trim() || `Untitled ${request.mode}`,
+        title: request.title?.trim() || extractBoardTitle(dslText, request.mode) || `Untitled ${request.mode}`,
         mode: request.mode,
         dslText,
         templateSourceId: request.templateSourceId,
         spaceId: request.spaceId,
+        presentation: request.presentation,
       });
       setWorkspaceError('');
       openBoard(board);
@@ -928,6 +935,12 @@ function App() {
         setParsedDiagram(parseDiagram(tpl.dsl));
       } catch (err) {
         console.error('Template parse error:', err);
+      }
+    }
+    if (tpl.presentation?.length) {
+      setDeckItems(tpl.presentation);
+      if (currentBoardId) {
+        void boardManager.setPresentation(currentBoardId, tpl.presentation);
       }
     }
     toast.success(`Loaded template: ${tpl.name}`);

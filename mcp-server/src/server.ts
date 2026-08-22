@@ -57,7 +57,7 @@ server.registerTool(
   {
     description: 'List available diagram templates. Templates are starting points — load one and edit it.',
     inputSchema: {
-      category: z.enum(['Architecture', 'Flow', 'Sequence', 'Gantt']).optional()
+      category: z.enum(['Architecture', 'Flow', 'Sequence', 'Gantt', 'Workshop']).optional()
         .describe('Optional category filter.'),
     },
   },

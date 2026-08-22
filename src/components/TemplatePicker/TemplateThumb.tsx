@@ -13,11 +13,13 @@ type ThumbKind =
   | 'bpmn'
   | 'gantt'
   | 'cards'
-  | 'sequence';
+  | 'sequence'
+  | 'workshop';
 
 function thumbKindFor(t: DiagramTemplate): ThumbKind {
   if (t.mode === 'gantt') return 'gantt';
   if (t.mode === 'sequence') return 'sequence';
+  if (t.category === 'Workshop' || t.tags.includes('workshop')) return 'workshop';
   const has = (tag: string) => t.tags.includes(tag);
   if (has('presentation') || has('cards')) return 'cards';
   if (has('uml') || has('er') || has('class')) return 'class';
@@ -167,6 +169,22 @@ function Cards() {
   );
 }
 
+function Workshop() {
+  return (
+    <>
+      <rect x="16" y="14" width="80" height="84" rx="6" fill="#fffbeb" stroke="#f59e0b" />
+      <rect x="105" y="14" width="80" height="84" rx="6" fill="#eff6ff" stroke="#3b82f6" />
+      <rect x="194" y="14" width="80" height="84" rx="6" fill="#ecfdf5" stroke="#10b981" />
+      <rect x="26" y="36" width="28" height="22" rx="3" fill="#fde68a" stroke="#f59e0b" />
+      <rect x="58" y="52" width="28" height="22" rx="3" fill="#fde68a" stroke="#f59e0b" />
+      <rect x="115" y="36" width="28" height="22" rx="3" fill="#bfdbfe" stroke="#3b82f6" />
+      <rect x="147" y="58" width="28" height="22" rx="3" fill="#bfdbfe" stroke="#3b82f6" />
+      <rect x="204" y="40" width="28" height="22" rx="3" fill="#bbf7d0" stroke="#10b981" />
+      <rect x="236" y="62" width="28" height="22" rx="3" fill="#bbf7d0" stroke="#10b981" />
+    </>
+  );
+}
+
 function Sequence() {
   const xs = [56, 145, 234];
   const colors = ['#6366f1', '#0ea5e9', '#10b981'];
@@ -200,6 +218,7 @@ const THUMBS: Record<ThumbKind, () => ReactElement> = {
   gantt: Gantt,
   cards: Cards,
   sequence: Sequence,
+  workshop: Workshop,
 };
 
 export function TemplateThumb({ template }: { template: DiagramTemplate }) {

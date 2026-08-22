@@ -107,6 +107,23 @@ describe('board repository workflows', () => {
     expect((await manager.list({ deleted: true })).every(board => !board.spaceId)).toBe(true);
   });
 
+  it('can seed presentation items when creating a board from a starter', async () => {
+    const board = await manager.create({
+      title: 'Retro',
+      mode: 'architecture',
+      dslText: 'diagram: architecture\ntitle: Retro',
+      presentation: [
+        { id: 'frame', type: 'frame', title: 'Went well', content: '', x: 0, y: 0, width: 200, height: 160 },
+        { id: 'note', type: 'note', content: 'Shipped', x: 20, y: 20, width: 80, height: 60 },
+        { id: 'note-2', type: 'note', content: 'Pair', x: 20, y: 90, width: 80, height: 60 },
+        { id: 'arrow', type: 'arrow', content: '', x: 0, y: 0, width: 40, height: 40 },
+      ],
+    });
+    expect(board.title).toBe('Retro');
+    expect(board.presentation?.items).toHaveLength(4);
+    expect((await manager.get(board.id))?.presentation?.items).toHaveLength(4);
+  });
+
   it('persists presentation items but does not copy them during duplication', async () => {
     const board = await create();
     await manager.setPresentation(board.id, [{ id: 'note', type: 'note', content: 'hello', x: 0, y: 0, width: 100, height: 100 }]);
