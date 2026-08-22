@@ -23,6 +23,7 @@ async function waitForEditor(page: Page) {
 
 async function setEditorDsl(page: Page, dsl: string) {
   await waitForEditor(page);
+  // DEV-only seam (import.meta.env.DEV). Production builds do not install it.
   await page.waitForFunction(() => typeof (window as unknown as { __setDiagramDsl?: unknown }).__setDiagramDsl === 'function');
   await page.evaluate(value => {
     (window as unknown as { __setDiagramDsl: (text: string) => void }).__setDiagramDsl(value);

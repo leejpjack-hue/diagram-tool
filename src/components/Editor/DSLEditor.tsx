@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { useDiagramStore } from '../../store/diagramStore';
 import { parseDiagram } from '../../parser/parser';
+import { installDiagramDslTestHook } from '../../utils/devTestHook';
 
 const isGanttDSL = (text: string) => /^\s*diagram:\s*gantt\b/im.test(text);
 
@@ -47,9 +48,7 @@ export function DSLEditor() {
   }, []); // Only run once on mount
 
   useEffect(() => {
-    const host = window as Window & { __setDiagramDsl?: (text: string) => void };
-    host.__setDiagramDsl = (text: string) => handleEditorChange(text);
-    return () => { delete host.__setDiagramDsl; };
+    return installDiagramDslTestHook(text => handleEditorChange(text));
   }, [handleEditorChange]);
 
   return (
