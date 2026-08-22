@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { TEMPLATES, type DiagramTemplate, type TemplateCategory } from './templates';
+import { TEMPLATES, templateMatchesQuery, type DiagramTemplate, type TemplateCategory } from './templates';
 import { TemplateThumb } from './TemplateThumb';
 
 interface TemplatePickerProps {
@@ -8,13 +8,14 @@ interface TemplatePickerProps {
   onPick: (tpl: DiagramTemplate) => void;
 }
 
-const CATEGORIES: (TemplateCategory | 'All')[] = ['All', 'Architecture', 'Flow', 'Sequence', 'Gantt'];
+const CATEGORIES: (TemplateCategory | 'All')[] = ['All', 'Workshop', 'Architecture', 'Flow', 'Sequence', 'Gantt'];
 
 const CATEGORY_BADGE: Record<TemplateCategory, string> = {
   Architecture: 'bg-purple-100 text-purple-700',
   Flow: 'bg-blue-100 text-blue-700',
   Sequence: 'bg-sky-100 text-sky-700',
   Gantt: 'bg-emerald-100 text-emerald-700',
+  Workshop: 'bg-amber-100 text-amber-800',
 };
 
 export function TemplatePicker({ open, onClose, onPick }: TemplatePickerProps) {
@@ -24,13 +25,7 @@ export function TemplatePicker({ open, onClose, onPick }: TemplatePickerProps) {
   const filtered = useMemo(() => {
     return TEMPLATES.filter(t => {
       if (category !== 'All' && t.category !== category) return false;
-      if (!query.trim()) return true;
-      const q = query.toLowerCase();
-      return (
-        t.name.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q) ||
-        t.tags.some(tag => tag.includes(q))
-      );
+      return templateMatchesQuery(t, query);
     });
   }, [category, query]);
 

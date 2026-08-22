@@ -499,7 +499,7 @@ export class BoardManager {
   }
 
   async create(
-    input: { title: string; description?: string; mode: BoardMode; dslText: string; thumbnail?: string; spaceId?: string; tags?: string[]; templateSourceId?: string },
+    input: { title: string; description?: string; mode: BoardMode; dslText: string; thumbnail?: string; spaceId?: string; tags?: string[]; templateSourceId?: string; presentation?: PresentationItem[] },
     recordActivity = true,
   ): Promise<Board> {
     if (recordActivity) await this.initialize();
@@ -518,6 +518,9 @@ export class BoardManager {
       tags: input.tags ?? [],
       starred: false,
       templateSourceId: input.templateSourceId,
+      presentation: input.presentation?.length
+        ? { items: input.presentation, updatedAt: now }
+        : undefined,
       schemaVersion: 2,
     };
     return this.enqueueBoardWrite(board.id, async () => {

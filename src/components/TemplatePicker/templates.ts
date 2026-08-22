@@ -1,4 +1,7 @@
-export type TemplateCategory = 'Architecture' | 'Flow' | 'Sequence' | 'Gantt';
+import type { PresentationItem } from '../../utils/boardManager';
+import { WORKSHOP_TEMPLATES } from './workshopTemplates';
+
+export type TemplateCategory = 'Architecture' | 'Flow' | 'Sequence' | 'Gantt' | 'Workshop';
 
 export interface DiagramTemplate {
   id: string;
@@ -8,9 +11,21 @@ export interface DiagramTemplate {
   mode: 'architecture' | 'flow' | 'sequence' | 'gantt';
   tags: string[];
   dsl: string;
+  /** Deck frames, stickies, and connectors. Workshop starters seed these. */
+  presentation?: PresentationItem[];
 }
 
-export const TEMPLATES: DiagramTemplate[] = [
+export function templateMatchesQuery(template: Pick<DiagramTemplate, 'name' | 'description' | 'tags'>, query: string): boolean {
+  if (!query.trim()) return true;
+  const q = query.toLowerCase();
+  return (
+    template.name.toLowerCase().includes(q) ||
+    template.description.toLowerCase().includes(q) ||
+    template.tags.some(tag => tag.toLowerCase().includes(q))
+  );
+}
+
+const CATALOG_TEMPLATES: DiagramTemplate[] = [
   {
     id: 'aws-three-tier',
     name: 'AWS 3-Tier Web Application',
@@ -1241,3 +1256,5 @@ Note over M,G: Settlement runs nightly
 M-->>C: Order confirmed`,
   },
 ];
+
+export const TEMPLATES: DiagramTemplate[] = [...CATALOG_TEMPLATES, ...WORKSHOP_TEMPLATES];
