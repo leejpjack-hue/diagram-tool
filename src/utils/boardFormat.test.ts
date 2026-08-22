@@ -159,6 +159,37 @@ describe('public portable board format', () => {
     expect(plan.skipped.map(item => item.kind)).toEqual(expect.arrayContaining(['comments', 'frames', 'sticky']));
   });
 
+  it('round-trips presentation frames with title, color, lockChildren, and hidden', () => {
+    const plan = parsePortableImport({
+      version: '3.0',
+      board: {
+        title: 'Deck frames',
+        mode: 'architecture',
+        source: { kind: 'dsl', text: ARCH_DSL },
+        frames: [],
+        comments: [],
+        presentation: {
+          items: [
+            {
+              id: 'intro', type: 'frame', title: 'Intro', content: '', x: 10, y: 20, width: 200, height: 140,
+              lockChildren: true, hidden: false, style: { strokeColor: '#7c3aed' },
+            },
+            {
+              id: 'secret', type: 'frame', title: 'Secret', content: '', x: 400, y: 20, width: 200, height: 140,
+              hidden: true, style: { strokeColor: '#e11d48' },
+            },
+            { id: 'note', type: 'note', content: 'inside intro', x: 30, y: 40, width: 80, height: 40 },
+          ],
+        },
+      },
+    });
+    expect(plan.boards[0].frames).toEqual([]);
+    const items = plan.boards[0].presentation?.items ?? [];
+    expect(items).toHaveLength(3);
+    expect(items[0]).toMatchObject({ type: 'frame', title: 'Intro', lockChildren: true, style: { strokeColor: '#7c3aed' } });
+    expect(items[1]).toMatchObject({ type: 'frame', title: 'Secret', hidden: true });
+  });
+
   it('rejects remote and SVG presentation content and accepts raster data URLs', () => {
     const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJ0hREFU';
     const jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';

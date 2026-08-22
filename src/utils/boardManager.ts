@@ -21,6 +21,10 @@ export interface PresentationItem {
   width: number;
   height: number;
   locked?: boolean;
+  /** Frame-only: hide from Present and from PNG/PDF export. */
+  hidden?: boolean;
+  /** Frame-only: children inside the frame cannot be moved independently. */
+  lockChildren?: boolean;
   zIndex?: number;
   style?: PresentationItemStyle;
 }

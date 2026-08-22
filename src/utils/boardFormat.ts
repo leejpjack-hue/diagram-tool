@@ -477,7 +477,12 @@ function sanitizePresentation(value: unknown, boardId: string | undefined, skipp
       skipped.push({ kind: candidate.type, id: candidate.id, reason: 'Presentation content must be local text or a png/jpeg/webp/gif data URL.' });
       continue;
     }
-    items.push({ ...candidate, content: candidate.content });
+    items.push({
+      ...candidate,
+      content: candidate.content,
+      hidden: candidate.hidden === true ? true : undefined,
+      lockChildren: candidate.lockChildren === true ? true : undefined,
+    });
   }
   return { items, updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : new Date().toISOString() };
 }

@@ -69,7 +69,7 @@ Unknown object types (future nodes, unknown deck types, leftover comments/frames
 
 ## Presentation / deck objects
 
-`board.presentation.items[]` is the existing presentation canvas. Supported `type` values: `image`, `note`, `text`, `arrow`, `shape`, `drawing`, `frame`. Geometry (`x`, `y`, `width`, `height`) is required so a deck re-imports in place.
+`board.presentation.items[]` is the existing presentation canvas. Supported `type` values: `image`, `note`, `text`, `arrow`, `shape`, `drawing`, `frame`. Geometry (`x`, `y`, `width`, `height`) is required so a deck re-imports in place. Deck frames (`type: "frame"`) use `title`, `style.strokeColor` for color, `lockChildren`, and `hidden` (hidden frames are skipped by Present and excluded from PNG/PDF export). Do not put frames in `board.frames`.
 
 ## Privacy
 
