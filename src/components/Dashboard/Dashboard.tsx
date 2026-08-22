@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   boardManager,
   filterAndSortBoards,
+  toWorkspaceError,
   type ActivityEntry,
   type Board,
   type BoardMode,
@@ -14,6 +15,7 @@ import {
 import { TEMPLATES, type DiagramTemplate, type TemplateCategory } from '../TemplatePicker/templates';
 import { TemplateThumb } from '../TemplatePicker/TemplateThumb';
 import { BrandLogo } from '../BrandLogo';
+import { WorkspaceErrorBanner } from '../Workspace/WorkspaceStatus';
 
 export interface DashboardCreateRequest {
   mode: BoardMode;
@@ -161,7 +163,7 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify }: DashboardProp
       ]);
       setBoards(nextBoards); setTrashBoards(nextTrash); setSpaces(nextSpaces); setTemplates(nextTemplates); setActivity(nextActivity); setPreferences(nextPreferences); setStorage(nextStorage); setLoadError('');
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'Local workspace storage could not be opened.');
+      setLoadError(toWorkspaceError(error).message);
     } finally { setLoading(false); }
   }, []);
 
@@ -282,10 +284,17 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify }: DashboardProp
 
         <main className="min-h-0 flex-1 overflow-y-auto bg-white">
           <div className="mx-auto w-full max-w-[1500px] px-4 py-6 md:px-8 md:py-8">
-            {loadError && <div className="mb-6 flex items-start gap-3 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800"><Icon name="storage" className="mt-0.5 h-5 w-5"/><div><div className="font-semibold">Local workspace unavailable</div><div>{loadError}</div><button onClick={() => void refresh()} className="mt-2 font-semibold underline">Try again</button></div></div>}
+            {loadError && <div className="mb-6"><WorkspaceErrorBanner message={loadError} onRetry={() => void refresh()} /></div>}
             <div className="mb-6 flex flex-wrap items-end gap-4"><div><h1 className="text-2xl font-bold tracking-tight text-slate-950">{viewTitle}</h1><p className="mt-1 text-sm text-slate-500">{viewSubtitle}</p></div>{currentSpace && <button className="ml-auto text-xs font-semibold text-slate-500 hover:text-indigo-600" onClick={() => setSpaceOpen(true)}>Manage Space</button>}</div>
 
-            {loading ? <DashboardSkeleton /> : view === 'templates' ? (
+            {loading ? <DashboardSkeleton /> : loadError ? (
+              <EmptyState
+                icon="storage"
+                title="Your boards could not be loaded"
+                description="This is a storage problem, not an empty workspace. Try again, export a backup if you still have one, or free browser storage and reload."
+                action={<button className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => void refresh()}>Try again</button>}
+              />
+            ) : view === 'templates' ? (
               <TemplatesView templates={templates} onUseBuiltIn={template => void createFrom({ mode: template.mode, title: template.name, dslText: template.dsl, templateSourceId: template.id })} onUsePersonal={async template => { const used = await boardManager.useTemplate(template.id); if (used) await createFrom({ mode: used.mode, title: used.name, dslText: used.dslText, templateSourceId: used.id }); }} onDeletePersonal={template => void boardManager.removeTemplate(template.id)} />
             ) : view === 'activity' ? <ActivityView activity={activity} onOpen={async entry => { if (!entry.boardId) return; const board = await boardManager.get(entry.boardId); if (board && !board.deletedAt) await openBoard(board); }} /> : (
               <>

@@ -34,7 +34,8 @@ import { useMobile } from './hooks/useMobile';
 import { BrandLogo } from './components/BrandLogo';
 import { Dashboard, type DashboardCreateRequest } from './components/Dashboard/Dashboard';
 import { PresentationCanvas } from './components/Dashboard/PresentationCanvas';
-import { boardManager, type Board, type BoardMode } from './utils/boardManager';
+import { boardManager, toWorkspaceError, type Board, type BoardMode } from './utils/boardManager';
+import { OfflineBanner, WorkspaceErrorBanner } from './components/Workspace/WorkspaceStatus';
 import './styles/gantt-fixes.css';
 
 const ARCHITECTURE_DSL = `diagram: architecture
@@ -410,6 +411,7 @@ function App() {
   const [editorWidth, setEditorWidth] = useState(250);
   const [isResizing, setIsResizing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const [workspaceError, setWorkspaceError] = useState('');
   const [lastSaved, setLastSaved] = useState<Date | null>(() => {
     const saved = saveManager.getCurrentDiagram();
     return saved ? new Date(saved.updatedAt) : null;
@@ -648,11 +650,14 @@ function App() {
           await boardManager.update(currentBoardId, { dslText, mode: activeTab });
           void captureAndStoreBoardThumbnail(currentBoardId, activeTab);
         }
+        setWorkspaceError('');
         setSaveStatus('saved');
         setLastSaved(new Date());
         toast.success(`Saved: ${title}`);
-      } catch {
-        toast.error('Failed to save diagram');
+      } catch (error) {
+        const message = toWorkspaceError(error).message;
+        setWorkspaceError(message);
+        toast.error(message);
         setSaveStatus('unsaved');
       }
     }, 300);
@@ -763,15 +768,22 @@ function App() {
   };
 
   const createBoard = async (request: DashboardCreateRequest) => {
-    const board = await boardManager.create({
-      title: request.title || `Untitled ${request.mode}`,
-      mode: request.mode,
-      dslText: request.dslText ?? blankBoardDsl(request.mode),
-      templateSourceId: request.templateSourceId,
-      spaceId: request.spaceId,
-    });
-    openBoard(board);
-    toast.success('Board created');
+    try {
+      const board = await boardManager.create({
+        title: request.title || `Untitled ${request.mode}`,
+        mode: request.mode,
+        dslText: request.dslText ?? blankBoardDsl(request.mode),
+        templateSourceId: request.templateSourceId,
+        spaceId: request.spaceId,
+      });
+      setWorkspaceError('');
+      openBoard(board);
+      toast.success('Board created');
+    } catch (error) {
+      const message = toWorkspaceError(error).message;
+      setWorkspaceError(message);
+      toast.error(message);
+    }
   };
 
   const backToDashboard = async () => {
@@ -850,9 +862,10 @@ function App() {
   useEffect(() => {
     if (view !== 'editor' || !currentBoardId) return;
     const t = setTimeout(() => {
-      void boardManager.update(currentBoardId, { dslText, mode: activeTab }).then(() =>
-        boardManager.createVersion(currentBoardId, 'Automatic save', true),
-      );
+      void boardManager.update(currentBoardId, { dslText, mode: activeTab })
+        .then(() => boardManager.createVersion(currentBoardId, 'Automatic save', true))
+        .then(() => setWorkspaceError(''))
+        .catch(error => setWorkspaceError(toWorkspaceError(error).message));
       if (thumbnailCaptureTimerRef.current) {
         clearTimeout(thumbnailCaptureTimerRef.current);
       }
@@ -960,6 +973,12 @@ function App() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
+      <OfflineBanner />
+      {workspaceError && view === 'editor' && (
+        <div className="px-4 pt-3">
+          <WorkspaceErrorBanner message={workspaceError} onRetry={handleSave} />
+        </div>
+      )}
       {/* Header */}
       {view === 'editor' && <header className="professional-header">
         {/* Logo & Title */}

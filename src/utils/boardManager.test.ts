@@ -1,5 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createMemoryBoardManager, filterAndSortBoards, normalizeBoard, type Board, type BoardManager } from './boardManager';
+import {
+  createMemoryBoardManager,
+  createMemoryWorkspace,
+  filterAndSortBoards,
+  MAX_AUTO_VERSIONS,
+  normalizeBoard,
+  toWorkspaceError,
+  WORKSPACE_DB_NAME,
+  WORKSPACE_STORES,
+  type Board,
+  type BoardManager,
+} from './boardManager';
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -112,6 +123,49 @@ describe('board repository workflows', () => {
     expect(await manager.listTemplates()).toHaveLength(0);
   });
 
+  it('does not drop newer fields when two local writes race', async () => {
+    const board = await create();
+    await Promise.all([
+      manager.update(board.id, { dslText: 'diagram: architecture\n# newer dsl' }),
+      manager.update(board.id, { description: 'kept description' }),
+    ]);
+    const saved = await manager.get(board.id);
+    expect(saved?.dslText).toContain('# newer dsl');
+    expect(saved?.description).toBe('kept description');
+  });
+
+  it('serializes createVersion, presentation, trash, and restore with board updates', async () => {
+    const board = await create();
+    await Promise.all([
+      manager.update(board.id, { dslText: 'diagram: architecture\n# locked write' }),
+      manager.createVersion(board.id, 'After update'),
+      manager.setPresentation(board.id, [{ id: 'note', type: 'note', content: 'stay', x: 0, y: 0, width: 80, height: 80 }]),
+    ]);
+    const saved = await manager.get(board.id);
+    expect(saved?.dslText).toContain('# locked write');
+    expect(saved?.presentation?.items).toHaveLength(1);
+    const versions = await manager.listVersions(board.id);
+    expect(versions.some(version => version.name === 'After update')).toBe(true);
+
+    await Promise.all([
+      manager.update(board.id, { description: 'still here' }),
+      manager.trash(board.id),
+    ]);
+    expect((await manager.list({ deleted: true }))[0]?.description).toBe('still here');
+    await manager.restore(board.id);
+    expect((await manager.list())[0]?.description).toBe('still here');
+  });
+
+  it('never silently overwrites a newer object when an older updatedAt arrives', async () => {
+    const board = await create();
+    const newer = new Date(Date.parse(board.updatedAt) + 60_000).toISOString();
+    const older = new Date(Date.parse(board.updatedAt) - 60_000).toISOString();
+    await manager.update(board.id, { dslText: 'diagram: architecture\n# current', updatedAt: newer });
+    const kept = await manager.update(board.id, { dslText: 'diagram: architecture\n# stale remote', updatedAt: older });
+    expect(kept?.dslText).toContain('# current');
+    expect(kept?.updatedAt).toBe(newer);
+  });
+
   it('keeps named versions and only the latest 20 automatic versions', async () => {
     const board = await create();
     await manager.createVersion(board.id, 'Before redesign');
@@ -158,5 +212,49 @@ describe('migration and import compatibility', () => {
 
   it('rejects invalid files', async () => {
     await expect(manager.importFromFile(asFile({ nope: true }, 'bad.json'))).rejects.toThrow('valid board file');
+  });
+});
+
+describe('durable workspace reload and quota recovery', () => {
+  it('recovers the last 3 opened boards after a workspace restart', async () => {
+    const workspace = createMemoryWorkspace();
+    const first = workspace.open();
+    const architecture = await first.create({ title: 'Train Arch', mode: 'architecture', dslText: 'diagram: architecture\nservice API' });
+    const flow = await first.create({ title: 'Train Flow', mode: 'flow', dslText: 'diagram: flow\nstart A' });
+    const sequence = await first.create({ title: 'Train Seq', mode: 'sequence', dslText: 'sequenceDiagram\nAlice->>Bob: hi' });
+    await first.markOpened(architecture.id);
+    await first.markOpened(flow.id);
+    await first.markOpened(sequence.id);
+
+    const restarted = workspace.open();
+    const recent = (await restarted.list({ sort: 'lastOpened' })).slice(0, 3);
+    expect(recent.map(board => board.title)).toEqual(['Train Seq', 'Train Flow', 'Train Arch']);
+    expect((await restarted.get(architecture.id))?.dslText).toContain('service API');
+    expect((await restarted.get(flow.id))?.mode).toBe('flow');
+    expect((await restarted.get(sequence.id))?.mode).toBe('sequence');
+  });
+
+  it('keeps named checkpoints and the latest 20 autosaves after a workspace restart', async () => {
+    const workspace = createMemoryWorkspace();
+    const first = workspace.open();
+    const board = await first.create({ title: 'Checkpointed', mode: 'gantt', dslText: 'diagram: gantt\ntitle: Plan' });
+    await first.createVersion(board.id, 'Before redesign');
+    for (let index = 0; index < 24; index += 1) {
+      await first.update(board.id, { dslText: `diagram: gantt\n# change ${index}` });
+      await first.createVersion(board.id, 'Automatic save', true);
+    }
+
+    const restarted = workspace.open();
+    const versions = await restarted.listVersions(board.id);
+    expect(versions.filter(version => version.automatic)).toHaveLength(MAX_AUTO_VERSIONS);
+    expect(versions.some(version => version.name === 'Before redesign' && !version.automatic)).toBe(true);
+    expect((await restarted.get(board.id))?.dslText).toContain('# change 23');
+  });
+
+  it('maps quota failures to a recovery message', () => {
+    expect(toWorkspaceError(new DOMException('The quota has been exceeded.', 'QuotaExceededError')).message).toMatch(/out of storage/);
+    expect(toWorkspaceError(new Error('IndexedDB quota exceeded'))).toMatchObject({ message: expect.stringMatching(/out of storage/) });
+    expect(WORKSPACE_DB_NAME).toBe('diagram-tool-workspace');
+    expect(WORKSPACE_STORES).toEqual(['boards', 'spaces', 'templates', 'versions', 'activity', 'preferences']);
   });
 });
