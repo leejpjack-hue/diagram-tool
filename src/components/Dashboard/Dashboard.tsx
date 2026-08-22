@@ -14,6 +14,7 @@ import {
   type Space,
 } from '../../utils/boardManager';
 import { TEMPLATES, templateMatchesQuery, type DiagramTemplate, type TemplateCategory } from '../TemplatePicker/templates';
+import { WORKSHOP_TEMPLATES } from '../TemplatePicker/workshopTemplates';
 import { TemplateThumb } from '../TemplatePicker/TemplateThumb';
 import { BrandLogo } from '../BrandLogo';
 import { WorkspaceErrorBanner } from '../Workspace/WorkspaceStatus';
@@ -359,7 +360,72 @@ function NavButton({ item, active, collapsed, onClick, color }: { item: { label:
 }
 
 function HomeStart({ templates, recent, onQuickCreate, onUseTemplate, onOpen, onBrowseTemplates }: { templates: DiagramTemplate[]; recent: Board[]; onQuickCreate: (mode: BoardMode) => void; onUseTemplate: (template: DiagramTemplate) => void; onOpen: (board: Board) => void; onBrowseTemplates: () => void }) {
-  return <><section><div className="mb-3 flex items-center"><h2 className="text-base font-bold">Start creating</h2><button onClick={onBrowseTemplates} className="ml-auto text-xs font-semibold text-indigo-600 hover:text-indigo-800">Browse all templates</button></div><div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">{(Object.keys(MODE_META) as BoardMode[]).map(mode => <button key={mode} className="group flex min-h-28 flex-col justify-between rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-indigo-300 hover:shadow-sm" onClick={() => onQuickCreate(mode)}><div className={`flex h-9 w-9 items-center justify-center rounded-md text-white ${MODE_META[mode].dot}`}><Icon name="plus" /></div><div><div className="text-sm font-semibold group-hover:text-indigo-700">Blank {MODE_META[mode].label}</div><div className="mt-0.5 text-[11px] text-slate-400">Start clean</div></div></button>)}{templates.map(template => <button key={template.id} className="hidden min-h-28 overflow-hidden rounded-lg border border-slate-200 bg-white text-left hover:border-indigo-300 hover:shadow-sm xl:block" onClick={() => onUseTemplate(template)}><div className="h-16 overflow-hidden"><TemplateThumb template={template} /></div><div className="truncate px-2.5 py-2 text-xs font-semibold">{template.name}</div></button>)}</div></section>{recent.length > 0 && <section className="mt-9"><div className="mb-3 flex items-center"><h2 className="text-base font-bold">Pick up where you left off</h2><span className="ml-2 text-xs text-slate-400">Recently opened</span></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{recent.map(board => <button key={board.id} onClick={() => onOpen(board)} className="group overflow-hidden rounded-lg border border-slate-200 bg-white text-left hover:border-indigo-300 hover:shadow-sm"><div className="aspect-[16/10] overflow-hidden bg-slate-100"><BoardThumbnail board={board}/></div><div className="p-2.5"><div className="truncate text-xs font-semibold group-hover:text-indigo-700">{board.title}</div><div className="mt-1 text-[10px] text-slate-400">Opened {timeAgo(board.lastOpenedAt)}</div></div></button>)}</div></section>}</>;
+  return (
+    <>
+      <section>
+        <div className="mb-3 flex items-center">
+          <h2 className="text-base font-bold">Start creating</h2>
+          <button onClick={onBrowseTemplates} className="ml-auto text-xs font-semibold text-indigo-600 hover:text-indigo-800">Browse all templates</button>
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+          {(Object.keys(MODE_META) as BoardMode[]).map(mode => (
+            <button key={mode} className="group flex min-h-28 flex-col justify-between rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-indigo-300 hover:shadow-sm" onClick={() => onQuickCreate(mode)}>
+              <div className={`flex h-9 w-9 items-center justify-center rounded-md text-white ${MODE_META[mode].dot}`}><Icon name="plus" /></div>
+              <div>
+                <div className="text-sm font-semibold group-hover:text-indigo-700">Blank {MODE_META[mode].label}</div>
+                <div className="mt-0.5 text-[11px] text-slate-400">Start clean</div>
+              </div>
+            </button>
+          ))}
+          {templates.map(template => (
+            <button key={template.id} className="hidden min-h-28 overflow-hidden rounded-lg border border-slate-200 bg-white text-left hover:border-indigo-300 hover:shadow-sm xl:block" onClick={() => onUseTemplate(template)}>
+              <div className="h-16 overflow-hidden"><TemplateThumb template={template} /></div>
+              <div className="truncate px-2.5 py-2 text-xs font-semibold">{template.name}</div>
+            </button>
+          ))}
+        </div>
+      </section>
+      <section className="mt-9">
+        <div className="mb-3 flex items-center">
+          <h2 className="text-base font-bold">Workshop</h2>
+          <span className="ml-2 text-xs text-slate-400">Five named starters</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {WORKSHOP_TEMPLATES.map(template => (
+            <button
+              key={template.id}
+              data-testid={`template-card-${template.id}`}
+              className="rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-indigo-300 hover:shadow-sm"
+              onClick={() => onUseTemplate(template)}
+            >
+              <div className="h-16 overflow-hidden"><TemplateThumb template={template} /></div>
+              <div className="mt-2 text-sm font-semibold">{template.name}</div>
+              <div className="mt-1 text-xs leading-5 text-slate-500">{template.description}</div>
+            </button>
+          ))}
+        </div>
+      </section>
+      {recent.length > 0 && (
+        <section className="mt-9">
+          <div className="mb-3 flex items-center">
+            <h2 className="text-base font-bold">Pick up where you left off</h2>
+            <span className="ml-2 text-xs text-slate-400">Recently opened</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            {recent.map(board => (
+              <button key={board.id} onClick={() => onOpen(board)} className="group overflow-hidden rounded-lg border border-slate-200 bg-white text-left hover:border-indigo-300 hover:shadow-sm">
+                <div className="aspect-[16/10] overflow-hidden bg-slate-100"><BoardThumbnail board={board}/></div>
+                <div className="p-2.5">
+                  <div className="truncate text-xs font-semibold group-hover:text-indigo-700">{board.title}</div>
+                  <div className="mt-1 text-[10px] text-slate-400">Opened {timeAgo(board.lastOpenedAt)}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+    </>
+  );
 }
 
 function BoardCard(props: { board: Board; space?: Space; layout: 'grid' | 'list'; selected: boolean; menuOpen: boolean; trashView: boolean; onOpen: () => void; onSelect: () => void; onToggleStar: () => void; onMenu: (event: React.MouseEvent) => void; onEdit: () => void; onPresent: () => void; onDuplicate: () => void; onTemplate: () => void; onVersions: () => void; onExport: () => void; onTrash: () => void; onRestore: () => void; onDelete: () => void }) {
@@ -378,7 +444,7 @@ function FilterChip({ label, onClear }: { label: string; onClear: () => void }) 
 function CreateDialog({ tab, onTab, spaces, boards, templates, onClose, onCreate, onImport }: { tab: CreateTab; onTab: (tab: CreateTab) => void; spaces: Space[]; boards: Board[]; templates: PersonalTemplate[]; onClose: () => void; onCreate: (request: DashboardCreateRequest) => void; onImport: () => void }) {
   const [spaceId, setSpaceId] = useState('');
   const tabs: Array<{ id: CreateTab; label: string }> = [{ id: 'blank', label: 'Blank' }, { id: 'templates', label: 'Templates' }, { id: 'import', label: 'Import' }, { id: 'existing', label: 'From a board' }];
-  return <Modal title="Create a board" subtitle="Start clean, use a pattern, import work, or branch from an existing board." onClose={onClose} width="max-w-5xl"><div className="flex border-b border-slate-200 px-5">{tabs.map(item => <button key={item.id} onClick={() => onTab(item.id)} className={`border-b-2 px-4 py-3 text-sm font-semibold ${tab === item.id ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`}>{item.label}</button>)}</div><div className="p-5"><div className="mb-5 flex items-center gap-3"><label className="text-xs font-semibold text-slate-600">Create in</label><select value={spaceId} onChange={event => setSpaceId(event.target.value)} className="rounded-md border border-slate-200 px-2.5 py-2 text-sm"><option value="">No Space</option>{spaces.map(space => <option key={space.id} value={space.id}>{space.name}</option>)}</select></div>{tab === 'blank' && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{(Object.keys(MODE_META) as BoardMode[]).map(mode => <button key={mode} onClick={() => onCreate({ mode, spaceId: spaceId || undefined })} className="rounded-lg border border-slate-200 p-4 text-left hover:border-indigo-400 hover:bg-indigo-50"><div className={`mb-8 flex h-10 w-10 items-center justify-center rounded-md text-white ${MODE_META[mode].dot}`}><Icon name="plus"/></div><div className="font-semibold">Blank {MODE_META[mode].label}</div><div className="mt-1 text-xs text-slate-500">Open a clean DSL canvas.</div></button>)}</div>}{tab === 'templates' && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{[...TEMPLATES, ...templates.map(template => ({ id: template.id, name: template.name, description: template.description, category: MODE_META[template.mode].category, mode: template.mode, tags: ['personal'], dsl: template.dslText } satisfies DiagramTemplate))].map(template => <button key={template.id} onClick={() => onCreate({ ...requestFromBuiltIn(template), spaceId: spaceId || undefined })} className="rounded-lg border border-slate-200 p-3 text-left hover:border-indigo-400"><TemplateThumb template={template}/><div className="mt-3 text-sm font-semibold">{template.name}</div><div className="mt-1 line-clamp-2 text-xs text-slate-500">{template.description}</div></button>)}</div>}{tab === 'import' && <button onClick={onImport} className="flex min-h-60 w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 text-slate-500 hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700"><Icon name="upload" className="mb-3 h-8 w-8"/><span className="font-semibold">Import a local diagram file</span><span className="mt-1 text-xs">DiagramTool JSON, Mermaid, or draw.io as a flow board — no Miro, FigJam, or architecture guess</span></button>}{tab === 'existing' && <div className="grid gap-2 sm:grid-cols-2">{boards.map(board => <button key={board.id} onClick={() => onCreate({ mode: board.mode, title: `${board.title} (copy)`, dslText: board.dslText, spaceId: spaceId || board.spaceId })} className="flex items-center gap-3 rounded-lg border border-slate-200 p-2 text-left hover:border-indigo-400"><div className="h-14 w-24 shrink-0 overflow-hidden rounded bg-slate-100"><BoardThumbnail board={board}/></div><div className="min-w-0"><div className="truncate text-sm font-semibold">{board.title}</div><div className="text-xs text-slate-500">{MODE_META[board.mode].label}</div></div></button>)}</div>}</div></Modal>;
+  return <Modal title="Create a board" subtitle="Start clean, use a pattern, import work, or branch from an existing board." onClose={onClose} width="max-w-5xl"><div className="flex border-b border-slate-200 px-5">{tabs.map(item => <button key={item.id} onClick={() => onTab(item.id)} className={`border-b-2 px-4 py-3 text-sm font-semibold ${tab === item.id ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`}>{item.label}</button>)}</div><div className="p-5"><div className="mb-5 flex items-center gap-3"><label className="text-xs font-semibold text-slate-600">Create in</label><select value={spaceId} onChange={event => setSpaceId(event.target.value)} className="rounded-md border border-slate-200 px-2.5 py-2 text-sm"><option value="">No Space</option>{spaces.map(space => <option key={space.id} value={space.id}>{space.name}</option>)}</select></div>{tab === 'blank' && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{(Object.keys(MODE_META) as BoardMode[]).map(mode => <button key={mode} onClick={() => onCreate({ mode, spaceId: spaceId || undefined })} className="rounded-lg border border-slate-200 p-4 text-left hover:border-indigo-400 hover:bg-indigo-50"><div className={`mb-8 flex h-10 w-10 items-center justify-center rounded-md text-white ${MODE_META[mode].dot}`}><Icon name="plus"/></div><div className="font-semibold">Blank {MODE_META[mode].label}</div><div className="mt-1 text-xs text-slate-500">Open a clean DSL canvas.</div></button>)}</div>}{tab === 'templates' && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{[...WORKSHOP_TEMPLATES, ...TEMPLATES.filter(template => template.category !== 'Workshop'), ...templates.map(template => ({ id: template.id, name: template.name, description: template.description, category: MODE_META[template.mode].category, mode: template.mode, tags: ['personal'], dsl: template.dslText, presentation: undefined } satisfies DiagramTemplate))].map(template => <button key={template.id} data-testid={`template-card-${template.id}`} onClick={() => onCreate({ ...requestFromBuiltIn(template), spaceId: spaceId || undefined })} className="rounded-lg border border-slate-200 p-3 text-left hover:border-indigo-400"><TemplateThumb template={template}/><div className="mt-3 text-sm font-semibold">{template.name}</div><div className="mt-1 line-clamp-2 text-xs text-slate-500">{template.description}</div></button>)}</div>}{tab === 'import' && <button onClick={onImport} className="flex min-h-60 w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 text-slate-500 hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700"><Icon name="upload" className="mb-3 h-8 w-8"/><span className="font-semibold">Import a local diagram file</span><span className="mt-1 text-xs">DiagramTool JSON, Mermaid, or draw.io as a flow board — no Miro, FigJam, or architecture guess</span></button>}{tab === 'existing' && <div className="grid gap-2 sm:grid-cols-2">{boards.map(board => <button key={board.id} onClick={() => onCreate({ mode: board.mode, title: `${board.title} (copy)`, dslText: board.dslText, spaceId: spaceId || board.spaceId })} className="flex items-center gap-3 rounded-lg border border-slate-200 p-2 text-left hover:border-indigo-400"><div className="h-14 w-24 shrink-0 overflow-hidden rounded bg-slate-100"><BoardThumbnail board={board}/></div><div className="min-w-0"><div className="truncate text-sm font-semibold">{board.title}</div><div className="text-xs text-slate-500">{MODE_META[board.mode].label}</div></div></button>)}</div>}</div></Modal>;
 }
 
 function OrganizeDialog({ board, spaces, onClose, onSave }: { board: Board; spaces: Space[]; onClose: () => void; onSave: (patch: Partial<Board>) => void }) {

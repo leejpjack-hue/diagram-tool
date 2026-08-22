@@ -785,7 +785,7 @@ function App() {
     try {
       const dslText = request.dslText ?? blankBoardDsl(request.mode);
       const board = await boardManager.create({
-        title: extractBoardTitle(dslText, request.mode) || request.title?.trim() || `Untitled ${request.mode}`,
+        title: request.title?.trim() || extractBoardTitle(dslText, request.mode) || `Untitled ${request.mode}`,
         mode: request.mode,
         dslText,
         templateSourceId: request.templateSourceId,
