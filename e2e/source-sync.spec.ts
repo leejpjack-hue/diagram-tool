@@ -65,8 +65,6 @@ async function setEditorDsl(page: Page, dsl: string) {
 
 async function getEditorDsl(page: Page) {
   return page.evaluate(() => {
-    const hooked = (window as unknown as { __getDiagramDsl?: () => string }).__getDiagramDsl;
-    if (typeof hooked === 'function') return hooked();
     const monaco = (window as unknown as { monaco?: { editor?: { getEditors?: () => { getValue: () => string }[] } } }).monaco;
     return monaco?.editor?.getEditors?.()?.[0]?.getValue() ?? '';
   });

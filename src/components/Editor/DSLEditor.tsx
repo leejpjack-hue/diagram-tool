@@ -42,11 +42,7 @@ export function DSLEditor() {
   }, []);
 
   useEffect(() => {
-    return installDiagramDslTestHook(
-      text => handleEditorChange(text),
-      undefined,
-      () => useDiagramStore.getState().dslText,
-    );
+    return installDiagramDslTestHook(text => handleEditorChange(text));
   }, [handleEditorChange]);
 
   const showCopy = diagramMode === 'flow' || diagramMode === 'sequence';
