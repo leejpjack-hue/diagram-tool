@@ -1,5 +1,10 @@
 import type { BoardMode } from './boardManager';
 import type { ImportSkip } from './boardFormat';
+import {
+  assertDrawioXmlSafe,
+  hasEmbeddedBlockedImage,
+  sanitizeImportPlainText,
+} from './importSanitizer';
 
 /**
  * Best-effort draw.io / diagrams.net → DiagramTool board.
@@ -11,6 +16,10 @@ import type { ImportSkip } from './boardFormat';
  * Dropped (skipped, never silent): swimlanes, groups, containers, tables,
  * images, text-only overlays, extra pages, edges with a missing endpoint,
  * and stencil shapes we cannot classify as a node.
+ *
+ * Sanitizer: labels become plain text (no script/HTML). Remote http(s)
+ * images and svg-xml data URLs are skipped. DTD/ENTITY and oversized
+ * files fail closed.
  */
 
 export interface DrawioImport {
@@ -52,6 +61,7 @@ interface ParsedCell {
   target?: string;
   x?: number;
   y?: number;
+  unsafeImage: boolean;
 }
 
 interface MappedNode {
@@ -75,6 +85,7 @@ export function looksLikeDrawio(filename: string, text: string): boolean {
 export async function importDrawio(filename: string, text: string): Promise<DrawioImport> {
   const xml = text.trim();
   if (!xml) throw new Error("That draw.io file is empty.");
+  assertDrawioXmlSafe(xml);
 
   const doc = parseXml(xml);
   if (!doc) throw new Error("That file isn't a valid draw.io diagram.");
@@ -93,6 +104,7 @@ export async function importDrawio(filename: string, text: string): Promise<Draw
   }
 
   const modelXml = await decodeDiagramBody(page.body);
+  if (modelXml) assertDrawioXmlSafe(modelXml);
   const modelDoc = modelXml.startsWith('<') ? parseXml(modelXml) : null;
   const root = modelDoc ?? (page.body.startsWith('<') ? parseXml(page.body) : doc);
   if (!root) throw new Error("That file isn't a valid draw.io diagram.");
@@ -110,7 +122,10 @@ export async function importDrawio(filename: string, text: string): Promise<Draw
 
   const infraCount = nodes.filter(node => node.infra).length;
   const mode: BoardMode = infraCount > 0 && infraCount >= nodes.length / 2 ? 'architecture' : 'flow';
-  const title = page.name.trim() || filename.replace(/\.(drawio|xml)$/i, '').trim() || 'Imported diagram';
+  const title = sanitizeImportPlainText(
+    page.name,
+    sanitizeImportPlainText(filename.replace(/\.(drawio|xml)$/i, ''), 'Imported diagram'),
+  );
   const dslText = mode === 'architecture' ? emitArchitecture(title, nodes, edges) : emitFlow(title, nodes, edges);
 
   return {
@@ -211,11 +226,12 @@ function collectCells(doc: Document): ParsedCell[] {
 
 function readCell(el: Element, id: string | null, value: string | null): ParsedCell {
   const styleRaw = el.getAttribute('style') ?? '';
+  const rawValue = value ?? '';
   const geom = el.getElementsByTagName('mxGeometry')[0];
   return {
     id: id ?? '',
     parent: el.getAttribute('parent') ?? undefined,
-    value: stripHtml(value ?? ''),
+    value: sanitizeImportPlainText(rawValue),
     style: parseStyle(styleRaw),
     styleRaw,
     vertex: el.getAttribute('vertex') === '1',
@@ -224,6 +240,7 @@ function readCell(el: Element, id: string | null, value: string | null): ParsedC
     target: el.getAttribute('target') ?? undefined,
     x: geom ? num(geom.getAttribute('x')) : undefined,
     y: geom ? num(geom.getAttribute('y')) : undefined,
+    unsafeImage: hasEmbeddedBlockedImage(styleRaw) || hasEmbeddedBlockedImage(rawValue),
   };
 }
 
@@ -239,20 +256,6 @@ function parseStyle(style: string): Record<string, string> {
     out[part.slice(0, eq).trim().toLowerCase()] = part.slice(eq + 1).trim();
   }
   return out;
-}
-
-function stripHtml(value: string): string {
-  return value
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 function num(value: string | null): number | undefined {
@@ -331,6 +334,9 @@ function skipReason(cell: ParsedCell): { kind: string; reason: string } | null {
   }
   if (shape.includes('table') || raw.includes('shape=table')) {
     return { kind: 'table', reason: 'Tables are not imported.' };
+  }
+  if (cell.unsafeImage) {
+    return { kind: 'image', reason: 'Remote or scripted images are not imported.' };
   }
   if (shape === 'image' || raw.includes('image=') || raw.startsWith('image;')) {
     return { kind: 'image', reason: 'Images are not imported.' };

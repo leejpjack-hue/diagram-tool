@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parseDiagram } from '../parser/parser';
 import { importDrawio, looksLikeDrawio } from './drawioImport';
+
+const here = dirname(fileURLToPath(import.meta.url));
 
 const TWO_BOXES = `<mxfile host="app.diagrams.net">
   <diagram id="two-boxes" name="Two Boxes">
@@ -79,6 +84,15 @@ const CONTAINERS_ONLY = `<mxfile host="app.diagrams.net">
   </diagram>
 </mxfile>`;
 
+describe('draw.io import stays local-first', () => {
+  it('does not add window.__ hooks', () => {
+    const source = readFileSync(join(here, 'drawioImport.ts'), 'utf8');
+    const manager = readFileSync(join(here, 'boardManager.ts'), 'utf8');
+    const sanitizer = readFileSync(join(here, 'importSanitizer.ts'), 'utf8');
+    expect(source + manager + sanitizer).not.toMatch(/window\.__|__setDiagramDsl|__getDiagramDsl/);
+  });
+});
+
 describe('looksLikeDrawio', () => {
   it('accepts mxfile and mxGraphModel XML', () => {
     expect(looksLikeDrawio('flow.drawio', TWO_BOXES)).toBe(true);
@@ -127,6 +141,66 @@ describe('importDrawio', () => {
 
   it('refuses a non-empty file that maps to nothing', async () => {
     await expect(importDrawio('empty.drawio', CONTAINERS_ONLY)).rejects.toThrow(/no mappable nodes/i);
+  });
+
+  it('strips HTML/script from labels and never emits markup in DSL', async () => {
+    const xml = `<mxfile host="app.diagrams.net">
+      <diagram name="&lt;script&gt;alert(1)&lt;/script&gt;Safe">
+        <mxGraphModel>
+          <root>
+            <mxCell id="0"/>
+            <mxCell id="1" parent="0"/>
+            <mxCell id="2" value="&lt;div onclick=&quot;alert(1)&quot;&gt;Intake&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+              <mxGeometry x="80" y="80" width="120" height="60" as="geometry"/>
+            </mxCell>
+            <mxCell id="3" value="Review" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+              <mxGeometry x="320" y="80" width="120" height="60" as="geometry"/>
+            </mxCell>
+            <mxCell id="4" edge="1" parent="1" source="2" target="3"/>
+          </root>
+        </mxGraphModel>
+      </diagram>
+    </mxfile>`;
+    const imported = await importDrawio('safe.drawio', xml);
+    expect(imported.title).toBe('Safe');
+    expect(imported.dslText).toContain('Intake');
+    expect(imported.dslText).not.toMatch(/<script|<div|onclick|javascript:/i);
+  });
+
+  it('skips remote http(s) images and svg-xml data URLs', async () => {
+    const xml = `<mxfile host="app.diagrams.net">
+      <diagram name="Mixed">
+        <mxGraphModel>
+          <root>
+            <mxCell id="0"/>
+            <mxCell id="1" parent="0"/>
+            <mxCell id="2" value="Intake" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+              <mxGeometry x="80" y="80" width="120" height="60" as="geometry"/>
+            </mxCell>
+            <mxCell id="3" value="Review" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+              <mxGeometry x="320" y="80" width="120" height="60" as="geometry"/>
+            </mxCell>
+            <mxCell id="evil" value="Logo" style="shape=image;image=https://evil.example/x.png;" vertex="1" parent="1">
+              <mxGeometry x="80" y="200" width="80" height="80" as="geometry"/>
+            </mxCell>
+            <mxCell id="svg" value="Mark" style="shape=image;image=data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+PC9zdmc+;" vertex="1" parent="1">
+              <mxGeometry x="200" y="200" width="80" height="80" as="geometry"/>
+            </mxCell>
+            <mxCell id="4" edge="1" parent="1" source="2" target="3"/>
+          </root>
+        </mxGraphModel>
+      </diagram>
+    </mxfile>`;
+    const imported = await importDrawio('mixed.drawio', xml);
+    expect(imported.mapped).toBe(3);
+    expect(imported.skipped.filter(item => item.kind === 'image')).toHaveLength(2);
+    expect(imported.dslText).not.toMatch(/https?:\/\/|data:image\/svg\+xml/i);
+    expect(parseDiagram(imported.dslText).nodes).toHaveLength(2);
+  });
+
+  it('rejects DTD/ENTITY files instead of mapping them', async () => {
+    await expect(importDrawio('xxe.drawio', '<!DOCTYPE foo [<!ENTITY x SYSTEM "http://evil">]><mxfile><diagram/></mxfile>'))
+      .rejects.toThrow(/valid draw\.io/i);
   });
 
   it('imports a bare mxGraphModel .xml file', async () => {

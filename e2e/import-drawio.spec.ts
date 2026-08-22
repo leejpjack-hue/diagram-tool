@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,5 +38,23 @@ test.describe('draw.io dashboard import', () => {
     await expect(page.getByTestId('rf__node-intake')).toBeVisible();
     await expect(page.getByTestId('rf__node-review')).toBeVisible();
     await expect(page.getByText(/diagram:\s*flow/).first()).toBeVisible();
+  });
+
+  test('invalid draw.io XML shows an error and does not wipe Home', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    const path = join(tmpdir(), `diagram-tool-bad-${Date.now()}.xml`);
+    writeFileSync(path, 'not a draw.io diagram');
+
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.getByTestId('dashboard-import').click(),
+    ]);
+    await fileChooser.setFiles(path);
+
+    await expect(page.getByText(/isn't a valid board file|could not be imported/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.getByTestId('import-report')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Two Boxes' })).toHaveCount(0);
   });
 });

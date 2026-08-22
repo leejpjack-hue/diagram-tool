@@ -11,6 +11,8 @@ import {
   type Board,
   type BoardManager,
 } from './boardManager';
+import { buildBoardDocument } from './boardFormat';
+import { MAX_IMPORT_BYTES } from './importSanitizer';
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -276,6 +278,21 @@ U->>A: GET /orders
     expect(report.boards[0].dslText).toContain('Intake -> Review');
     expect(report.mapped).toBe(3);
     expect(report.skipped).toEqual([]);
+    const exported = buildBoardDocument(report.boards[0]);
+    expect(exported.version).toBe('3.0');
+    expect(exported.board.frames).toEqual([]);
+  });
+
+  it('rejects huge or invalid files without wiping existing boards', async () => {
+    const existing = await manager.create({ title: 'Keep Me', mode: 'flow', dslText: 'diagram: flow\nstart A' });
+    const huge = new File(['tiny'], 'huge.drawio', { type: 'application/xml' });
+    Object.defineProperty(huge, 'size', { value: MAX_IMPORT_BYTES + 1 });
+    await expect(manager.importFromFile(huge)).rejects.toThrow(/too large/i);
+    await expect(manager.importFromFile(new File(['not-a-diagram'], 'bad.xml', { type: 'text/xml' })))
+      .rejects.toThrow(/valid board file/i);
+    const boards = await manager.list();
+    expect(boards).toHaveLength(1);
+    expect(boards[0]).toMatchObject({ id: existing.id, title: 'Keep Me', dslText: 'diagram: flow\nstart A' });
   });
 });
 
