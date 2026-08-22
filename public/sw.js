@@ -27,13 +27,13 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(cache => cache.put('/', copy));
           return response;
         })
-        .catch(() => caches.match('/')),
+        .catch(() => caches.match('/', { ignoreSearch: true, ignoreVary: true })),
     );
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
+    caches.match(event.request, { ignoreSearch: true, ignoreVary: true }).then(cached => cached || fetch(event.request).then(response => {
       if (response.ok) {
         const copy = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));

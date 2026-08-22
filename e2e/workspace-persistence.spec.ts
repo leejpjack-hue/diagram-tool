@@ -36,6 +36,26 @@ async function createEditedBoard(page: Page, starter: RegExp, dsl: string) {
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
 }
 
+async function warmOfflineShell(page: Page) {
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+    const urls = new Set<string>([`${location.origin}/`, `${location.origin}/manifest.webmanifest`, `${location.origin}/favicon.svg`]);
+    for (const entry of performance.getEntriesByType('resource')) {
+      if (entry.name.startsWith(location.origin)) urls.add(entry.name);
+    }
+    document.querySelectorAll('script[src], link[href]').forEach(element => {
+      const url = (element as HTMLScriptElement).src || (element as HTMLLinkElement).href;
+      if (url.startsWith(location.origin)) urls.add(url);
+    });
+    const cache = await caches.open('diagram-tool-shell-v2');
+    for (const url of urls) {
+      const response = await fetch(url);
+      if (response.ok) await cache.put(url, response.clone());
+    }
+  });
+}
+
 test.use({ baseURL: 'http://127.0.0.1:4173' });
 
 test.describe('Durable local-first workspace', () => {
@@ -59,6 +79,7 @@ test.describe('Durable local-first workspace', () => {
     await expect(page.getByText('Before train ride')).toBeVisible();
     await page.getByRole('button', { name: 'Close' }).click();
 
+    await warmOfflineShell(page);
     await context.setOffline(true);
     await page.getByRole('heading', { name: 'Untitled architecture' }).click();
     await setEditorDsl(page, ARCH_OFFLINE_DSL);
@@ -68,6 +89,7 @@ test.describe('Durable local-first workspace', () => {
 
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('offline-banner')).toHaveText('offline — changes on this device.');
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Untitled architecture' })).toBeVisible();
 
     await page.getByRole('heading', { name: 'Untitled architecture' }).click();
