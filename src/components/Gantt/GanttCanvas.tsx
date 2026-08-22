@@ -587,6 +587,10 @@ export function GanttCanvas({ readOnly = false }: { readOnly?: boolean }) {
                 {!task.isGroup && !isMilestone && (
                   <g
                     className="cursor-pointer"
+                    data-testid={`gantt-bar-${task.id}`}
+                    data-start={task.startDate instanceof Date ? task.startDate.toISOString() : String(task.startDate)}
+                    data-end={task.endDate instanceof Date ? task.endDate.toISOString() : String(task.endDate)}
+                    data-progress={String(task.progress)}
                     onClick={(e) => {
                       if (readOnly) return;
                       const isMultiSelect = e.ctrlKey || e.metaKey;
