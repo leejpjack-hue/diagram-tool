@@ -22,19 +22,13 @@ async function openDeck(page: Page) {
 
 async function drawShape(page: Page, x1: number, y1: number, x2: number, y2: number) {
   await page.getByRole('button', { name: 'Shapes (R)' }).click();
-  await page.getByRole('button', { name: 'Rectangle' }).click();
+  await page.getByRole('button', { name: 'Rectangle', exact: true }).click();
   const box = await page.getByRole('main').boundingBox();
   expect(box).toBeTruthy();
   await page.mouse.move(box!.x + x1, box!.y + y1);
   await page.mouse.down();
   await page.mouse.move(box!.x + x2, box!.y + y2, { steps: 8 });
   await page.mouse.up();
-}
-
-async function clickOnMain(page: Page, x: number, y: number) {
-  const box = await page.getByRole('main').boundingBox();
-  expect(box).toBeTruthy();
-  await page.mouse.click(box!.x + x, box!.y + y);
 }
 
 test.describe('Deck connector attachments', () => {
@@ -45,9 +39,13 @@ test.describe('Deck connector attachments', () => {
     await drawShape(page, 180, 140, 320, 240);
     await drawShape(page, 520, 140, 660, 240);
 
+    const shapes = page.locator('[data-item-id]').filter({ has: page.getByLabel('Shape text') });
+    await expect(shapes).toHaveCount(2);
+
     await page.getByRole('button', { name: 'Connector (L)' }).click();
-    await clickOnMain(page, 250, 190);
-    await clickOnMain(page, 590, 190);
+    await shapes.nth(0).click({ position: { x: 50, y: 40 } });
+    await expect(page.getByText('Choose an end point · Esc to cancel')).toBeVisible();
+    await shapes.nth(1).click({ position: { x: 50, y: 40 } });
 
     const connector = page.getByTestId('deck-connector');
     await expect(connector).toBeVisible();
@@ -67,9 +65,11 @@ test.describe('Deck connector attachments', () => {
     await expect(startShape).toBeVisible();
     const startBox = await startShape.boundingBox();
     expect(startBox).toBeTruthy();
-    await page.mouse.move(startBox!.x + startBox!.width / 2, startBox!.y + startBox!.height / 2);
+    const grabX = startBox!.x + 8;
+    const grabY = startBox!.y + 8;
+    await page.mouse.move(grabX, grabY);
     await page.mouse.down();
-    await page.mouse.move(startBox!.x + startBox!.width / 2 + 140, startBox!.y + startBox!.height / 2 + 80, { steps: 10 });
+    await page.mouse.move(grabX + 140, grabY + 90, { steps: 12 });
     await page.mouse.up();
 
     await expect(connector).toHaveAttribute('data-start-id', startId!);
@@ -115,6 +115,6 @@ test.describe('Deck connector attachments', () => {
     }, ARCH_DSL);
     await expect(page.getByTestId('rf__node-gateway')).toBeVisible();
     await expect(page.getByTestId('rf__node-api')).toBeVisible();
-    await expect(page.locator('.react-flow__edge').first()).toBeVisible();
+    await expect(page.getByTestId('rf__edge-gateway_to_api')).toHaveCount(1);
   });
 });
