@@ -81,6 +81,47 @@ describe('applyBoardSource last-good contract', () => {
     const result = applyBoardSource('sequenceDiagram\nA -> B\n', 'sequence');
     expect(result.ok).toBe(false);
   });
+
+  it('parses native Gantt DSL', () => {
+    const result = applyBoardSource(`diagram: gantt
+title: Plan
+task Design {
+  start: 2026-08-01
+  end: 2026-08-05
+}
+task Build {
+  start: 2026-08-06
+  end: 2026-08-12
+  depends: Design
+  progress: 25
+}`, 'gantt');
+    expect(result.ok).toBe(true);
+    if (result.ok && result.kind === 'gantt') {
+      expect(result.project.tasks.map(task => task.name)).toEqual(['Design', 'Build']);
+      expect(result.project.dependencies).toHaveLength(1);
+    }
+  });
+
+  it('returns an error for an unclosed Gantt task and does not invent a plan', () => {
+    const result = applyBoardSource(`diagram: gantt
+title: Plan
+task Design {
+  start: 2026-08-01
+`, 'gantt');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/Expected \}/i);
+  });
+
+  it('rejects Mermaid gantt so the native DSL stays the only format', () => {
+    const result = applyBoardSource(`gantt
+    title Mermaid Plan
+    dateFormat YYYY-MM-DD
+    section Build
+    Design :a1, 2026-08-01, 4d
+`, 'gantt');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/diagram:\s*gantt/i);
+  });
 });
 
 describe('copy-as-Mermaid / copy-as-DSL', () => {

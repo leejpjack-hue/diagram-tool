@@ -16,7 +16,6 @@ export function DSLEditor() {
   const applySource = useCallback((value: string) => {
     setDslText(value);
     const mode = asBoardMode(diagramMode);
-    if (mode === 'gantt') return;
 
     setLoading(true);
     const result = applyBoardSource(value, mode);

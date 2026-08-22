@@ -267,6 +267,18 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
           <h3 className="gantt-editor-title">
             {selectedTask.isGroup ? '📁 ' : ''}Edit: {selectedTask.name}
           </h3>
+
+          <div className="gantt-form-group">
+            <label className="gantt-label" htmlFor="gantt-task-name">Task Name</label>
+            <input
+              id="gantt-task-name"
+              data-testid="gantt-task-name"
+              type="text"
+              value={selectedTask.name}
+              onInput={(e) => updateTask(selectedTask.id, { name: e.currentTarget.value })}
+              className="input input-sm"
+            />
+          </div>
           
           {/* Progress Slider */}
           <div className="gantt-progress-section">
@@ -275,6 +287,7 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
             </label>
             <input
               type="range"
+              data-testid="gantt-task-progress"
               min="0"
               max="100"
               value={selectedTask.progress}
@@ -290,6 +303,7 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
                 <label className="gantt-label">Start</label>
                 <input
                   type="date"
+                  data-testid="gantt-task-start"
                   value={formatForInput(selectedTask.startDate)}
                   onInput={(e) => updateTask(selectedTask.id, { startDate: new Date(e.currentTarget.value) })}
                   className="input input-sm"
@@ -299,6 +313,7 @@ export function GanttPanel({ onAddTask }: GanttPanelProps) {
                 <label className="gantt-label">End</label>
                 <input
                   type="date"
+                  data-testid="gantt-task-end"
                   value={formatForInput(selectedTask.endDate)}
                   onInput={(e) => updateTask(selectedTask.id, { endDate: new Date(e.currentTarget.value) })}
                   className="input input-sm"
