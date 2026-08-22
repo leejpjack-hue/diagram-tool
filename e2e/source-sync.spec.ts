@@ -78,7 +78,7 @@ async function createArchitectureBoard(page: Page) {
   await setEditorDsl(page, ARCH_DSL);
   await expect(page.getByTestId('rf__node-gateway')).toBeVisible();
   await expect(page.getByTestId('rf__node-api')).toBeVisible();
-  await page.getByTitle('Fit to Screen').click();
+  await page.getByTestId('fit-to-screen').click();
   await expect(page.getByTestId('rf__node-gateway').getByText('Gateway', { exact: true })).toBeVisible();
   // ZoomControls.fitView animates for 300ms — dragging mid-tween hits the pane.
   await page.waitForTimeout(450);

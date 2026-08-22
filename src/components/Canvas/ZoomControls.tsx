@@ -59,8 +59,8 @@ export function ZoomControls({ className = '' }: ZoomControlsProps) {
         onClick={fitCurrentGraph}
         data-testid="zoom-reset"
         className="px-2 py-1 min-w-[50px] text-center text-sm font-semibold text-gray-900 hover:bg-gray-200 rounded transition-colors cursor-pointer"
-        title="Fit to Screen"
-        aria-label="Fit to Screen"
+        title="Reset zoom to fit"
+        aria-label="Reset zoom to fit"
       >
         {zoom}%
       </button>

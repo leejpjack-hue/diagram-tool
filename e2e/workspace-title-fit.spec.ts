@@ -101,6 +101,37 @@ test.describe('Workspace title, fit, and File menu', () => {
     expect(isInside(farAfter!, canvasAfter!)).toBe(true);
   });
 
+  test('flow decision labels stay horizontal', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await page.getByRole('button', { name: 'Create new' }).click();
+    await page.getByRole('button', { name: 'Blank Workflow Open a clean DSL canvas.' }).click();
+    await setEditorDsl(page, `diagram: flow
+title: User Signup
+direction: LR
+start Begin
+Begin -> ValidateEmail
+ValidateEmail ->|Valid| CreateAccount
+ValidateEmail ->|Invalid| ShowError
+node ValidateEmail {
+  type: decision
+  label: Email Valid?
+}`);
+    await page.getByTestId('fit-to-screen').click();
+    await page.waitForTimeout(400);
+    await expect(page.getByText('Email Valid?')).toBeVisible();
+    await expect(page.getByText('Valid', { exact: true })).toBeVisible();
+
+    const decisionLabel = page.getByText('Email Valid?');
+    const transform = await decisionLabel.evaluate(el => getComputedStyle(el).transform);
+    expect(transform === 'none' || transform === 'matrix(1, 0, 0, 1, 0, 0)').toBeTruthy();
+
+    const edgeLabel = page.locator('.flow-edge-label, .react-flow__edge-label, .react-flow__edge-text').filter({ hasText: 'Valid' }).first();
+    await expect(edgeLabel).toBeVisible();
+    const edgeTransform = await edgeLabel.evaluate(el => getComputedStyle(el).transform);
+    expect(edgeTransform.includes('matrix(0.') || /rotate\(/.test(edgeTransform)).toBeFalsy();
+  });
+
   test('Escape dismisses the File menu', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
