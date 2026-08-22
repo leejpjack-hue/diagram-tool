@@ -153,28 +153,26 @@ test.describe('Bidirectional source sync', () => {
     await expect(page.getByTestId('copy-as-dsl')).toBeVisible();
 
     await page.evaluate(() => {
-      const written: string[] = [];
+      let last = '';
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
         value: {
-          writeText: async (text: string) => {
-            written.push(text);
-            (window as unknown as { __copiedText?: string }).__copiedText = text;
-          },
+          writeText: async (text: string) => { last = text; },
+          readText: async () => last,
         },
       });
     });
 
     await page.getByTestId('copy-as-mermaid').click();
     await expect(page.getByText('Copied Mermaid')).toBeVisible();
-    const mermaid = await page.evaluate(() => (window as unknown as { __copiedText?: string }).__copiedText ?? '');
+    const mermaid = await page.evaluate(() => navigator.clipboard.readText());
     expect(mermaid).toMatch(/^flowchart LR/m);
     expect(mermaid).toContain('Intake');
     expect(mermaid).toContain('Review');
 
     await page.getByTestId('copy-as-dsl').click();
     await expect(page.getByText('Copied DSL')).toBeVisible();
-    const dsl = await page.evaluate(() => (window as unknown as { __copiedText?: string }).__copiedText ?? '');
+    const dsl = await page.evaluate(() => navigator.clipboard.readText());
     expect(dsl).toMatch(/diagram:\s*flow/);
     expect(dsl).toContain('Intake -> Review');
   });

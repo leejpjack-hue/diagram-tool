@@ -56,6 +56,7 @@ describe('diagram DSL test hook', () => {
     expect(editor).not.toMatch(/host\.__setDiagramDsl\s*=/);
     expect(editor).not.toMatch(/__getDiagramDsl/);
     expect(spec).not.toMatch(/__getDiagramDsl/);
+    expect(spec).not.toMatch(/__copiedText|__get[A-Z]/);
     expect(spec).toMatch(/getEditors\?\.\(\)\?\.\[0\]\?\.getValue\(\)/);
   });
 });
