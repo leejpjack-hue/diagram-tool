@@ -12,7 +12,7 @@ async function openTemplates(page: import('@playwright/test').Page) {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
   await page.getByRole('button', { name: 'Templates', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Templates' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Templates', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Workshop' })).toBeVisible();
 }
 
