@@ -19,6 +19,16 @@ export const EXPORT_REQUIRES_ACCOUNT = false;
 export const KNOWN_BOARD_MODES: readonly BoardMode[] = ['architecture', 'flow', 'sequence', 'gantt'];
 export const KNOWN_PRESENTATION_TYPES = ['image', 'note', 'text', 'arrow', 'shape', 'drawing', 'frame'] as const;
 
+const SAFE_IMAGE_DATA_URL = /^data:image\/(?:png|jpeg|webp|gif)(?:;[\w.-]+=[\w.-]+)*;base64,[A-Za-z0-9+/]+={0,2}$/i;
+
+export function isAllowedPresentationContent(type: string, content: string): boolean {
+  if (typeof content !== 'string') return false;
+  const value = content.trim();
+  if (/^https?:\/\//i.test(value) || /^data:image\/svg\+xml/i.test(value)) return false;
+  if (type === 'image') return SAFE_IMAGE_DATA_URL.test(value);
+  return true;
+}
+
 export interface PortableSource {
   kind: 'dsl' | 'mermaid';
   text: string;
@@ -463,7 +473,11 @@ function sanitizePresentation(value: unknown, boardId: string | undefined, skipp
       skipped.push({ kind: candidate.type, id: candidate.id, reason: 'Deck object was missing geometry.' });
       continue;
     }
-    items.push(candidate);
+    if (typeof candidate.content !== 'string' || !isAllowedPresentationContent(candidate.type, candidate.content)) {
+      skipped.push({ kind: candidate.type, id: candidate.id, reason: 'Presentation content must be local text or a png/jpeg/webp/gif data URL.' });
+      continue;
+    }
+    items.push({ ...candidate, content: candidate.content });
   }
   return { items, updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : new Date().toISOString() };
 }

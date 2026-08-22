@@ -11,6 +11,7 @@ import {
   computeTypedLayout,
   containsWatermark,
   layoutDelta,
+  isAllowedPresentationContent,
   parsePortableImport,
   projectBoardGraph,
   validatePortableDocument,
@@ -156,6 +157,41 @@ describe('public portable board format', () => {
     });
     expect(plan.boards[0].presentation?.items).toHaveLength(1);
     expect(plan.skipped.map(item => item.kind)).toEqual(expect.arrayContaining(['comments', 'frames', 'sticky']));
+  });
+
+  it('rejects remote and SVG presentation content and accepts raster data URLs', () => {
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJ0hREFU';
+    const jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+    const webp = 'data:image/webp;base64,UklGRg==';
+    const gif = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    expect(isAllowedPresentationContent('image', png)).toBe(true);
+    expect(isAllowedPresentationContent('image', jpeg)).toBe(true);
+    expect(isAllowedPresentationContent('image', webp)).toBe(true);
+    expect(isAllowedPresentationContent('image', gif)).toBe(true);
+    expect(isAllowedPresentationContent('image', 'https://evil.example/x.png')).toBe(false);
+    expect(isAllowedPresentationContent('image', 'http://evil.example/x.png')).toBe(false);
+    expect(isAllowedPresentationContent('image', 'data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+PC9zdmc+')).toBe(false);
+    expect(isAllowedPresentationContent('image', 'data:image/svg+xml,<svg onload="alert(1)"></svg>')).toBe(false);
+    expect(isAllowedPresentationContent('note', 'https://evil.example')).toBe(false);
+
+    const plan = parsePortableImport({
+      version: '3.0',
+      board: {
+        title: 'Deck',
+        mode: 'architecture',
+        source: { kind: 'dsl', text: ARCH_DSL },
+        presentation: {
+          items: [
+            { id: 'ok', type: 'image', content: png, x: 0, y: 0, width: 10, height: 10 },
+            { id: 'remote', type: 'image', content: 'https://evil.example/x.png', x: 0, y: 0, width: 10, height: 10 },
+            { id: 'svg', type: 'image', content: 'data:image/svg+xml;base64,PHN2Zc+', x: 0, y: 0, width: 10, height: 10 },
+            { id: 'note', type: 'note', content: 'keep', x: 10, y: 20, width: 80, height: 40 },
+          ],
+        },
+      },
+    });
+    expect(plan.boards[0].presentation?.items.map(item => item.id)).toEqual(['ok', 'note']);
+    expect(plan.skipped.map(item => item.id)).toEqual(expect.arrayContaining(['remote', 'svg']));
   });
 
   it('PNG/SVG/PDF export stays free and unwatermarked', () => {
