@@ -65,9 +65,11 @@ export const DecisionNode = memo(({ data, selected }: NodeProps) => {
         }}
       />
 
-      {/* Text container (rotated back) */}
+      {/* Label sits on the unrotated node box so decision text stays horizontal.
+          The diamond itself is a sibling (`rotate-45`); counter-rotating this
+          text used to tilt Yes/No and node labels 45°. */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="transform -rotate-45 text-center px-2">
+        <div className="text-center px-2">
           <div className="font-semibold text-[11.5px] leading-tight" style={{ color: C.text, fontFamily: TITLE_FONT }}>
             {nodeData.label}
           </div>

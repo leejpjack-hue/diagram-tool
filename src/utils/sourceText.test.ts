@@ -3,6 +3,7 @@ import { parseDiagram } from '../parser/parser';
 import {
   applyBoardSource,
   detectRawDiagramImport,
+  extractBoardTitle,
   renameNodeInSource,
   toDslSource,
   toMermaidSource,
@@ -24,6 +25,25 @@ title Checkout
 participant U as User
 participant A as API
 U->>A: GET /orders`;
+
+describe('extractBoardTitle', () => {
+  it('reads architecture and flow title: lines', () => {
+    expect(extractBoardTitle('diagram: architecture\ntitle: AWS 3-Tier Web App\nservice API {}', 'architecture'))
+      .toBe('AWS 3-Tier Web App');
+    expect(extractBoardTitle('diagram: flow\ntitle: User Signup\nstart A', 'flow')).toBe('User Signup');
+  });
+
+  it('reads sequence title, title:, and the first heading', () => {
+    expect(extractBoardTitle('sequenceDiagram\ntitle Checkout\nA->>B: hi', 'sequence')).toBe('Checkout');
+    expect(extractBoardTitle('sequenceDiagram\ntitle: Auth Flow\nA->>B: hi', 'sequence')).toBe('Auth Flow');
+    expect(extractBoardTitle('sequenceDiagram\n# Password reset\nA->>B: hi', 'sequence')).toBe('Password reset');
+  });
+
+  it('returns null when the source has no title', () => {
+    expect(extractBoardTitle('sequenceDiagram\nAlice->>Bob: hi', 'sequence')).toBeNull();
+    expect(extractBoardTitle('diagram: architecture\nservice API {}', 'architecture')).toBeNull();
+  });
+});
 
 describe('detectRawDiagramImport', () => {
   it('imports a sequenceDiagram .mmd file', () => {

@@ -13,3 +13,11 @@ body {
   background: var(--bg-secondary);
   color: var(--text-primary);
 }
+
+/* Decision / branch labels stay upright even when the path is diagonal. */
+.react-flow__edge-text,
+.react-flow__edge-label,
+.flow-edge-label {
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+}

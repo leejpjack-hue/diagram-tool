@@ -96,25 +96,25 @@ test.describe('Durable local-first workspace', () => {
     await createEditedBoard(page, /Blank Workflow/, FLOW_DSL);
     await createEditedBoard(page, /Blank Sequence/, SEQUENCE_DSL);
 
-    await expect(page.getByRole('heading', { name: 'Untitled architecture' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Untitled flow' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Untitled sequence' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Train Arch Offline' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Train Flow Offline' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Untitled Sequence' })).toBeVisible();
 
     page.once('dialog', dialog => dialog.accept('Before train ride'));
-    await page.getByRole('button', { name: 'Actions for Untitled architecture' }).click();
+    await page.getByRole('button', { name: 'Actions for Train Arch Offline' }).click();
     await page.getByRole('button', { name: 'Version history' }).click();
     await page.getByRole('button', { name: 'Create checkpoint' }).click();
     await expect(page.getByText('Before train ride')).toBeVisible();
     await page.getByRole('button', { name: 'Close' }).click();
 
-    await page.getByRole('heading', { name: 'Untitled architecture' }).click();
+    await page.getByRole('heading', { name: 'Train Arch Offline' }).click();
     await generateProductAutosaves(page, 20);
     await page.getByRole('button', { name: '⌂ Boards' }).click();
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
 
     await warmOfflineShell(page);
     await context.setOffline(true);
-    await page.getByRole('heading', { name: 'Untitled architecture' }).click();
+    await page.getByRole('heading', { name: 'Train Arch Offline' }).click();
     await setEditorDsl(page, ARCH_OFFLINE_DSL);
     await expect(page.getByTestId('offline-banner')).toHaveText('offline — changes on this device.');
     await page.getByRole('button', { name: '⌂ Boards' }).click();
@@ -123,21 +123,21 @@ test.describe('Durable local-first workspace', () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('offline-banner')).toHaveText('offline — changes on this device.');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Untitled architecture' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Train Arch Offline Edited' })).toBeVisible();
 
-    await page.getByRole('heading', { name: 'Untitled architecture' }).click();
+    await page.getByRole('heading', { name: 'Train Arch Offline Edited' }).click();
     await expect(page.getByText('Train Arch Offline Edited')).toBeVisible();
     await page.getByRole('button', { name: '⌂ Boards' }).click();
 
-    await page.getByRole('heading', { name: 'Untitled flow' }).click();
+    await page.getByRole('heading', { name: 'Train Flow Offline' }).click();
     await expect(page.getByText('Train Flow Offline')).toBeVisible();
     await page.getByRole('button', { name: '⌂ Boards' }).click();
 
-    await page.getByRole('heading', { name: 'Untitled sequence' }).click();
+    await page.getByRole('heading', { name: 'Untitled Sequence' }).click();
     await expect(page.getByText('train-offline')).toBeVisible();
     await page.getByRole('button', { name: '⌂ Boards' }).click();
 
-    await page.getByRole('button', { name: 'Actions for Untitled architecture' }).click();
+    await page.getByRole('button', { name: 'Actions for Train Arch Offline Edited' }).click();
     await page.getByRole('button', { name: 'Version history' }).click();
     await expect(page.getByText('Before train ride')).toBeVisible();
     await expect(page.getByText(/· Named checkpoint/)).toBeVisible();

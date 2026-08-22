@@ -96,7 +96,7 @@ test.describe('Deck connector attachments', () => {
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
-    await page.getByRole('heading', { name: 'Untitled architecture' }).click();
+    await page.getByRole('heading', { name: 'Untitled Architecture' }).click();
     await expect(page.getByRole('button', { name: 'View deck' })).toBeVisible();
     await page.getByRole('button', { name: 'View deck' }).click();
     await expect(page.getByTestId('deck-connector')).toHaveAttribute('data-start-id', startId!);
