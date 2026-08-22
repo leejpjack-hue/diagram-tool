@@ -26,7 +26,7 @@ async function setEditorDsl(page: Page, dsl: string) {
     const editor = (window as unknown as { monaco: { editor: { getEditors: () => { setValue: (next: string) => void }[] } } }).monaco.editor.getEditors()[0];
     editor.setValue(value);
   }, dsl);
-  await expect(page.getByText(dsl.split('\n')[1])).toBeVisible();
+  await expect(page.getByText(dsl.split('\n').find(line => line.trim() && !line.startsWith('diagram:')) ?? dsl)).toBeVisible();
 }
 
 async function createEditedBoard(page: Page, starter: RegExp, dsl: string) {
@@ -34,6 +34,33 @@ async function createEditedBoard(page: Page, starter: RegExp, dsl: string) {
   await setEditorDsl(page, dsl);
   await page.getByRole('button', { name: '⌂ Boards' }).click();
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+}
+
+async function countAutomaticVersions(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('diagram-tool-workspace', 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const versions = await new Promise<Array<{ automatic?: boolean }>>((resolve, reject) => {
+      const request = db.transaction('versions', 'readonly').objectStore('versions').getAll();
+      request.onsuccess = () => resolve(request.result as Array<{ automatic?: boolean }>);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    return versions.filter(version => version.automatic).length;
+  });
+}
+
+async function generateProductAutosaves(page: Page, count: number) {
+  await waitForEditor(page);
+  const starting = await countAutomaticVersions(page);
+  for (let index = 1; index <= count; index += 1) {
+    await setEditorDsl(page, `${ARCH_DSL}\n# autosave ${index}`);
+    await expect.poll(async () => countAutomaticVersions(page), { timeout: 5000 }).toBeGreaterThanOrEqual(Math.min(starting + index, 20));
+  }
+  await expect.poll(async () => countAutomaticVersions(page), { timeout: 5000 }).toBe(20);
 }
 
 async function warmOfflineShell(page: Page) {
@@ -59,7 +86,8 @@ async function warmOfflineShell(page: Page) {
 test.use({ baseURL: 'http://127.0.0.1:4173' });
 
 test.describe('Durable local-first workspace', () => {
-  test('keeps last 3 edited boards and a named checkpoint offline after reload', async ({ page, context }) => {
+  test('keeps last 3 boards, a named checkpoint, and 20 autosaves offline after reload', async ({ page, context }) => {
+    test.setTimeout(120_000);
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.evaluate(() => navigator.serviceWorker.ready);
@@ -78,6 +106,11 @@ test.describe('Durable local-first workspace', () => {
     await page.getByRole('button', { name: 'Create checkpoint' }).click();
     await expect(page.getByText('Before train ride')).toBeVisible();
     await page.getByRole('button', { name: 'Close' }).click();
+
+    await page.getByRole('heading', { name: 'Untitled architecture' }).click();
+    await generateProductAutosaves(page, 20);
+    await page.getByRole('button', { name: '⌂ Boards' }).click();
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
 
     await warmOfflineShell(page);
     await context.setOffline(true);
@@ -108,5 +141,6 @@ test.describe('Durable local-first workspace', () => {
     await page.getByRole('button', { name: 'Version history' }).click();
     await expect(page.getByText('Before train ride')).toBeVisible();
     await expect(page.getByText(/· Named checkpoint/)).toBeVisible();
+    await expect(page.getByText(/· Automatic/)).toHaveCount(20);
   });
 });
