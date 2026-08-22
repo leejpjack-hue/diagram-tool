@@ -6,6 +6,7 @@ import {
   type ImportReport,
 } from './boardFormat';
 import { detectRawDiagramImport } from './sourceText';
+import { importDrawio, looksLikeDrawio } from './drawioImport';
 
 export type BoardMode = 'architecture' | 'flow' | 'sequence' | 'gantt';
 export type BoardSort = 'lastOpened' | 'updated' | 'created' | 'name';
@@ -840,6 +841,23 @@ export class BoardManager {
         dslText: mermaid.dslText,
       });
       return { boards: [board], spaces: 0, templates: 0, versions: 0, skipped: [] };
+    }
+
+    if (looksLikeDrawio(file.name, text)) {
+      const drawio = await importDrawio(file.name, text);
+      const board = await this.create({
+        title: drawio.title,
+        mode: drawio.mode,
+        dslText: drawio.dslText,
+      });
+      return {
+        boards: [board],
+        spaces: 0,
+        templates: 0,
+        versions: 0,
+        skipped: drawio.skipped,
+        mapped: drawio.mapped,
+      };
     }
 
     let data: unknown;

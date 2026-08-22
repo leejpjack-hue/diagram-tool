@@ -118,6 +118,8 @@ export interface ImportReport {
   templates: number;
   versions: number;
   skipped: ImportSkip[];
+  /** Objects mapped on a best-effort file import (draw.io nodes + edges). */
+  mapped?: number;
 }
 
 export interface LayoutPoint {
