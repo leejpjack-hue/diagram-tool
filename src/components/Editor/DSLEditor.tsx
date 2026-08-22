@@ -46,6 +46,12 @@ export function DSLEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
+  useEffect(() => {
+    const host = window as Window & { __setDiagramDsl?: (text: string) => void };
+    host.__setDiagramDsl = (text: string) => handleEditorChange(text);
+    return () => { delete host.__setDiagramDsl; };
+  }, [handleEditorChange]);
+
   return (
     <div className="editor-panel" style={{ height: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="editor-header">

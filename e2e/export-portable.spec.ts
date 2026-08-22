@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { copyFileSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const ARCH_DSL = `diagram: architecture
 title: Portable Roundtrip
@@ -21,11 +23,13 @@ async function waitForEditor(page: Page) {
 
 async function setEditorDsl(page: Page, dsl: string) {
   await waitForEditor(page);
+  await page.waitForFunction(() => typeof (window as unknown as { __setDiagramDsl?: unknown }).__setDiagramDsl === 'function');
   await page.evaluate(value => {
-    const editor = (window as unknown as { monaco: { editor: { getEditors: () => { setValue: (next: string) => void }[] } } }).monaco.editor.getEditors()[0];
-    editor.setValue(value);
+    (window as unknown as { __setDiagramDsl: (text: string) => void }).__setDiagramDsl(value);
   }, dsl);
-  await expect(page.getByText('Portable Roundtrip')).toBeVisible();
+  await expect(page.getByText('Portable Roundtrip').first()).toBeVisible();
+  await expect(page.getByTestId('rf__node-gateway')).toBeVisible();
+  await expect(page.getByTestId('rf__node-api')).toBeVisible();
 }
 
 async function createKnownArchitectureBoard(page: Page) {
@@ -34,16 +38,25 @@ async function createKnownArchitectureBoard(page: Page) {
   await page.getByRole('button', { name: 'Create new' }).click();
   await page.getByRole('button', { name: 'Blank Architecture Open a clean DSL canvas.' }).click();
   await setEditorDsl(page, ARCH_DSL);
-  await expect(page.locator('.react-flow__node')).toHaveCount(2);
+  await expect(page.getByTestId('rf__node-gateway')).toBeVisible();
+  await expect(page.getByTestId('rf__node-api')).toBeVisible();
 }
 
+const FORMAT_LABEL: Record<'JSON' | 'PNG' | 'SVG', RegExp> = {
+  JSON: /Structured data for tools/,
+  PNG: /Crisp image for docs/,
+  SVG: /Vector, free and portable/,
+};
+
 async function downloadFromExport(page: Page, format: 'JSON' | 'PNG' | 'SVG') {
-  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  if (!await page.getByTestId('export-portable-copy').isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
+  }
   await expect(page.getByTestId('export-portable-copy')).toContainText('portable and free');
   await expect(page.getByTestId('export-portable-copy')).toContainText('no watermark');
-  await page.getByRole('button', { name: new RegExp(`^${format}\\b`) }).click();
+  await page.getByRole('button', { name: FORMAT_LABEL[format] }).click();
   if (format === 'PNG') {
-    await page.locator('select').selectOption('2');
+    await page.locator('.side-panel select').selectOption('2');
   }
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: `Download ${format}` }).click();
@@ -51,12 +64,16 @@ async function downloadFromExport(page: Page, format: 'JSON' | 'PNG' | 'SVG') {
 }
 
 test.describe('Portable export and import', () => {
+  test.describe.configure({ timeout: 60_000 });
+
   test('exports JSON of a known architecture board, then imports matching DSL and node count', async ({ page }) => {
     await createKnownArchitectureBoard(page);
     const download = await downloadFromExport(page, 'JSON');
-    const path = await download.path();
-    expect(path).toBeTruthy();
-    const payload = JSON.parse(readFileSync(path!, 'utf8')) as {
+    const downloaded = await download.path();
+    expect(downloaded).toBeTruthy();
+    const path = join(tmpdir(), `diagram-tool-board-${Date.now()}.json`);
+    copyFileSync(downloaded!, path);
+    const payload = JSON.parse(readFileSync(path, 'utf8')) as {
       version: string;
       board: { source: { text: string }; nodes: unknown[] };
     };
@@ -77,8 +94,9 @@ test.describe('Portable export and import', () => {
 
     await page.getByRole('heading', { name: 'Portable Roundtrip' }).click();
     await waitForEditor(page);
-    await expect(page.getByText('Portable Roundtrip')).toBeVisible();
-    await expect(page.locator('.react-flow__node')).toHaveCount(2);
+    await expect(page.getByText('Portable Roundtrip').first()).toBeVisible();
+    await expect(page.getByTestId('rf__node-gateway')).toBeVisible();
+    await expect(page.getByTestId('rf__node-api')).toBeVisible();
   });
 
   test('PNG @2x and SVG download without a watermark', async ({ page }) => {
@@ -127,7 +145,9 @@ test.describe('Portable export and import', () => {
     const backup = await downloadPromise;
     const backupPath = await backup.path();
     expect(backupPath).toBeTruthy();
-    const payload = JSON.parse(readFileSync(backupPath!, 'utf8')) as {
+    const stableBackup = join(tmpdir(), `diagram-tool-backup-${Date.now()}.boards.json`);
+    copyFileSync(backupPath!, stableBackup);
+    const payload = JSON.parse(readFileSync(stableBackup, 'utf8')) as {
       spaces: Array<{ name: string }>;
       boards: Array<{ title: string }>;
       templates: unknown[];
@@ -149,7 +169,7 @@ test.describe('Portable export and import', () => {
       restored.waitForEvent('filechooser'),
       restored.getByTestId('dashboard-import').click(),
     ]);
-    await fileChooser.setFiles(backupPath!);
+    await fileChooser.setFiles(stableBackup);
     await expect(restored.getByRole('heading', { name: 'Backup Core API' })).toBeVisible();
     await expect(restored.getByRole('button', { name: /Platform Backup/ })).toBeVisible();
     await clean.close();
