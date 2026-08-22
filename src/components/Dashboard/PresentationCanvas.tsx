@@ -22,11 +22,23 @@ import {
   visibleFrames,
   type PresentationExportScope,
 } from '../../utils/presentationFrames';
+import {
+  attachToItem,
+  createConnectorItem,
+  isAttachable,
+  parseConnectorLabel,
+  pointOnItem,
+  reflowConnectors,
+  setConnectorLabel,
+  snapAttachment,
+  updateConnectorEnd,
+  type ConnectorDraft,
+  type Point,
+} from '../../utils/presentationConnectors';
 
 type CanvasTool = 'select' | 'hand' | 'text' | 'note' | 'shape' | 'line' | 'pen' | 'highlighter' | 'eraser' | 'frame';
 type ShapeKind = NonNullable<PresentationItemStyle['shape']>;
 type ConnectorType = NonNullable<PresentationItemStyle['connectorType']>;
-interface Point { x: number; y: number }
 
 const SHAPES: Array<{ kind: ShapeKind; label: string }> = [
   { kind: 'rectangle', label: 'Rectangle' }, { kind: 'rounded', label: 'Rounded rectangle' },
@@ -35,16 +47,6 @@ const SHAPES: Array<{ kind: ShapeKind; label: string }> = [
 const uid = () => `item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const cloneItems = (items: PresentationItem[]) => items.map(item => ({ ...item, style: item.style ? { ...item.style } : undefined }));
-
-function connectorItem(start: Point, end: Point): PresentationItem {
-  const padding = 20; const x = Math.min(start.x, end.x) - padding; const y = Math.min(start.y, end.y) - padding;
-  return {
-    id: uid(), type: 'arrow', title: 'Connector',
-    content: JSON.stringify({ start: { x: start.x - x, y: start.y - y }, end: { x: end.x - x, y: end.y - y } }),
-    x, y, width: Math.max(40, Math.abs(end.x - start.x) + padding * 2), height: Math.max(40, Math.abs(end.y - start.y) + padding * 2),
-    style: { strokeColor: '#334155', strokeWidth: 3, arrowEnd: true, lineStyle: 'solid', connectorType: 'curved' },
-  };
-}
 
 function drawingItem(id: string, points: Point[], highlighter: boolean): PresentationItem {
   const minX = Math.min(...points.map(point => point.x)); const minY = Math.min(...points.map(point => point.y));
@@ -106,17 +108,18 @@ function ShapeSvg({ item }: { item: PresentationItem }) {
   return <rect x="3" y="3" width={Math.max(1, w - 6)} height={Math.max(1, h - 6)} rx={style.shape === 'rounded' ? 16 : 2} {...common}/>;
 }
 
-function ItemRenderer({ item, selected, connectorMode, childLocked, onSelect, onConnectorPoint, onMove, onResize, onText, onStart, onEnd }: {
+function ItemRenderer({ item, selected, connectorMode, childLocked, onSelect, onConnectorPoint, onMove, onResize, onText, onStart, onEnd, onEndpointDrag }: {
   item: PresentationItem; selected: boolean; childLocked: boolean; onSelect: (id: string, additive?: boolean) => void; onMove: (id: string, x: number, y: number) => void;
-  connectorMode: boolean; onConnectorPoint: (clientX: number, clientY: number) => void;
+  connectorMode: boolean; onConnectorPoint: (item: PresentationItem, event: React.PointerEvent) => void;
   onResize: (id: string, x: number, y: number, width: number, height: number) => void; onText: (id: string, content: string) => void; onStart: () => void; onEnd: () => void;
+  onEndpointDrag: (id: string, which: 'start' | 'end', event: React.PointerEvent) => void;
 }) {
   const frozen = { ...item, locked: item.locked || childLocked };
   const drag = useDrag(frozen, onStart, onMove, onEnd); const style = styleFor(item);
   const weight = style.fontWeight === 'bold' ? 700 : style.fontWeight === 'semibold' ? 600 : 400;
   const wrapper = `absolute ${frozen.locked ? 'cursor-default' : 'cursor-move'} ${selected ? 'ring-2 ring-indigo-500 ring-offset-2' : ''}`;
-  const selectAndDrag = (event: React.PointerEvent) => { if (connectorMode) { event.stopPropagation(); event.preventDefault(); onConnectorPoint(event.clientX, event.clientY); return; } onSelect(item.id, event.shiftKey); if (!childLocked) drag(event); };
-  const selectEditable = (event: React.PointerEvent) => { event.stopPropagation(); if (connectorMode) { event.preventDefault(); onConnectorPoint(event.clientX, event.clientY); } else onSelect(item.id, event.shiftKey); };
+  const selectAndDrag = (event: React.PointerEvent) => { if (connectorMode) { event.stopPropagation(); event.preventDefault(); onConnectorPoint(item, event); return; } onSelect(item.id, event.shiftKey); if (!childLocked) drag(event); };
+  const selectEditable = (event: React.PointerEvent) => { event.stopPropagation(); if (connectorMode) { event.preventDefault(); onConnectorPoint(item, event); } else onSelect(item.id, event.shiftKey); };
   const handles = selected && !frozen.locked ? <ResizeHandles item={item} onStart={onStart} onResize={onResize} onEnd={onEnd}/> : null;
   const commonStyle = { left: item.x, top: item.y, width: item.width, height: item.height, zIndex: itemZ(item), opacity: item.hidden ? 0.35 : style.opacity };
 
@@ -130,11 +133,19 @@ function ItemRenderer({ item, selected, connectorMode, childLocked, onSelect, on
   if (item.type === 'arrow') {
     const endId = `end-${item.id}`; const startId = `start-${item.id}`;
     const geometry = parseConnector(item);
-    return <div data-item-id={item.id} onPointerDown={selectAndDrag} className={wrapper} style={commonStyle}><svg className="pointer-events-none h-full w-full overflow-visible" viewBox={`0 0 ${item.width} ${item.height}`} preserveAspectRatio="none"><defs>
+    const label = parseConnectorLabel(item);
+    const mid = { x: (geometry.start.x + geometry.end.x) / 2, y: (geometry.start.y + geometry.end.y) / 2 };
+    const grabEnd = (which: 'start' | 'end') => (event: React.PointerEvent) => {
+      event.stopPropagation(); event.preventDefault();
+      onEndpointDrag(item.id, which, event);
+    };
+    return <div data-item-id={item.id} data-testid="deck-connector" data-start-id={item.startId ?? ''} data-end-id={item.endId ?? ''} data-start-side={item.startSide ?? ''} data-end-side={item.endSide ?? ''} onPointerDown={selectAndDrag} className={wrapper} style={commonStyle}><svg className="pointer-events-none h-full w-full overflow-visible" viewBox={`0 0 ${item.width} ${item.height}`} preserveAspectRatio="none"><defs>
       <marker id={endId} markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill={style.strokeColor}/></marker>
       <marker id={startId} markerWidth="10" markerHeight="10" refX="1" refY="3" orient="auto"><path d="M9,0 L9,6 L0,3 z" fill={style.strokeColor}/></marker></defs>
       <path d={connectorPath(geometry, style.connectorType)} fill="none" stroke={style.strokeColor} strokeWidth={style.strokeWidth} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={dashArray(style.lineStyle, style.strokeWidth)} markerStart={style.arrowStart ? `url(#${startId})` : undefined} markerEnd={style.arrowEnd ? `url(#${endId})` : undefined}/>
-      {selected && <><circle cx={geometry.start.x} cy={geometry.start.y} r="5" fill="white" stroke="#4f46e5" strokeWidth="2"/><circle cx={geometry.end.x} cy={geometry.end.y} r="5" fill="white" stroke="#4f46e5" strokeWidth="2"/></>}
+      {label && <text x={mid.x} y={mid.y - 8} textAnchor="middle" fill={style.strokeColor} fontSize="12" fontWeight="600">{label}</text>}
+      <circle data-endpoint="start" cx={geometry.start.x} cy={geometry.start.y} r={selected ? 6 : 4} fill={selected ? 'white' : 'transparent'} stroke={selected ? '#4f46e5' : 'transparent'} strokeWidth="2" className="pointer-events-auto cursor-grab" onPointerDown={grabEnd('start')}/>
+      <circle data-endpoint="end" cx={geometry.end.x} cy={geometry.end.y} r={selected ? 6 : 4} fill={selected ? 'white' : 'transparent'} stroke={selected ? '#4f46e5' : 'transparent'} strokeWidth="2" className="pointer-events-auto cursor-grab" onPointerDown={grabEnd('end')}/>
     </svg>{handles}</div>;
   }
   if (item.type === 'frame') return <div data-item-id={item.id} data-frame-title={item.title || 'Frame'} onPointerDown={selectAndDrag} className={`${wrapper} border-2 bg-white/40`} style={{ ...commonStyle, borderColor: style.strokeColor }}><span className="absolute -top-7 left-0 max-w-full truncate text-sm font-semibold text-slate-700">{item.title || 'Frame'}{item.hidden ? ' · hidden' : ''}{item.lockChildren ? ' · locked children' : ''}</span>{handles}</div>;
@@ -173,10 +184,10 @@ export interface PresentationCanvasProps { board: Board; currentDiagramImage: st
 
 export function PresentationCanvas({ board, currentDiagramImage, onCaptureCurrentDiagram, onItemsChange, onClose, notify }: PresentationCanvasProps) {
   const stageRef = useRef<HTMLDivElement>(null); const uploadRef = useRef<HTMLInputElement>(null);
-  const [items, setItems] = useState<PresentationItem[]>(board.presentation?.items ?? []); const itemsRef = useRef(items);
+  const [items, setItems] = useState<PresentationItem[]>(() => reflowConnectors(board.presentation?.items ?? [])); const itemsRef = useRef(items);
   const [selectedId, setSelectedId] = useState<string | null>(null); const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [tool, setTool] = useState<CanvasTool>('select');
-  const [connectorStart, setConnectorStart] = useState<Point | null>(null); const [connectorPreview, setConnectorPreview] = useState<Point | null>(null);
+  const [connectorStart, setConnectorStart] = useState<ConnectorDraft | null>(null); const [connectorPreview, setConnectorPreview] = useState<Point | null>(null);
   const [shapeKind, setShapeKind] = useState<ShapeKind>('rectangle'); const [shapeMenu, setShapeMenu] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [presenting, setPresenting] = useState(false); const [presentIndex, setPresentIndex] = useState(0);
@@ -192,7 +203,7 @@ export function PresentationCanvas({ board, currentDiagramImage, onCaptureCurren
     setSelectedIds(current => additive ? (current.includes(id) ? current : [...current, id]) : [id]);
   }, []);
 
-  const applyItems = useCallback((next: PresentationItem[]) => { itemsRef.current = next; setItems(next); }, []);
+  const applyItems = useCallback((next: PresentationItem[]) => { const reflowed = reflowConnectors(next); itemsRef.current = reflowed; setItems(reflowed); }, []);
   const commit = useCallback((change: (current: PresentationItem[]) => PresentationItem[]) => {
     const before = cloneItems(itemsRef.current); const next = change(itemsRef.current); if (JSON.stringify(before) === JSON.stringify(next)) return;
     undoStack.current.push(before); if (undoStack.current.length > 60) undoStack.current.shift(); redoStack.current = []; applyItems(next);
@@ -275,10 +286,29 @@ export function PresentationCanvas({ board, currentDiagramImage, onCaptureCurren
   };
   const startDrawing = (point: Point, highlighter: boolean) => { const id = uid(); const points = [point]; beginInteraction(); applyItems([...itemsRef.current, drawingItem(id, points, highlighter)]); const move = (next: PointerEvent) => { points.push(worldPoint(next.clientX, next.clientY)); updateLive(id, drawingItem(id, points, highlighter)); }; const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); endInteraction(); selectItem(id); }; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); };
   const startPan = (event: React.PointerEvent) => { const start = { x: event.clientX, y: event.clientY, vx: viewport.x, vy: viewport.y }; const move = (next: PointerEvent) => setViewport(value => ({ ...value, x: start.vx + (next.clientX - start.x) / value.zoom, y: start.vy + (next.clientY - start.y) / value.zoom })); const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); }; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); };
-  const addConnectorPoint = (point: Point) => {
-    if (!connectorStart) { setConnectorStart(point); setConnectorPreview(point); selectItem(null); return; }
-    if (Math.hypot(point.x - connectorStart.x, point.y - connectorStart.y) < 8) return;
-    addItem({ ...connectorItem(connectorStart, point), zIndex: nextZ() }); activateTool('select');
+  const draftFromPoint = (point: Point, prefer?: PresentationItem): ConnectorDraft => {
+    if (prefer && isAttachable(prefer)) {
+      const snap = attachToItem(prefer, point);
+      return { point: snap.point, snap };
+    }
+    const snap = snapAttachment(point, itemsRef.current);
+    return { point: snap?.point ?? point, snap };
+  };
+  const addConnectorPoint = (point: Point, prefer?: PresentationItem) => {
+    const draft = draftFromPoint(point, prefer);
+    if (!connectorStart) { setConnectorStart(draft); setConnectorPreview(draft.point); selectItem(null); return; }
+    if (Math.hypot(draft.point.x - connectorStart.point.x, draft.point.y - connectorStart.point.y) < 8) return;
+    addItem(createConnectorItem(connectorStart, draft, uid(), nextZ())); activateTool('select');
+  };
+  const onItemConnectorPoint = (item: PresentationItem, event: React.PointerEvent) => {
+    addConnectorPoint(pointOnItem(item, event.clientX, event.clientY, event.currentTarget), item);
+  };
+  const onEndpointDrag = (id: string, which: 'start' | 'end', event: React.PointerEvent) => {
+    beginInteraction();
+    const move = (next: PointerEvent) => applyItems(updateConnectorEnd(itemsRef.current, id, which, worldPoint(next.clientX, next.clientY)));
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); endInteraction(); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+    move(event.nativeEvent);
   };
   const onStagePointerDown = (event: React.PointerEvent) => { if (presenting) return; const controls = stageRef.current?.querySelectorAll<HTMLElement>('[data-canvas-ui]') ?? []; const overControls = [...controls].some(control => { const rect = control.getBoundingClientRect(); return event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom; }); if (overControls || event.target !== event.currentTarget) return; const point = worldPoint(event.clientX, event.clientY); if (tool === 'hand' || event.button === 1) startPan(event); else if (tool === 'text' || tool === 'note') addAt(tool, point); else if (tool === 'line') addConnectorPoint(point); else if (tool === 'shape' || tool === 'frame') startBox(event, point, tool); else if (tool === 'pen' || tool === 'highlighter') startDrawing(point, tool === 'highlighter'); else if (tool === 'eraser') eraseAt(point); else selectItem(null); };
 
@@ -316,7 +346,7 @@ export function PresentationCanvas({ board, currentDiagramImage, onCaptureCurren
       {selectedItem.type === 'frame' && <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={selectedItem.hidden === true} onChange={event => commit(current => current.map(item => item.id === selectedItem.id ? { ...item, hidden: event.target.checked } : item))}/>Hidden</label>}
       {selectedItem.type !== 'image' && selectedItem.type !== 'text' && selectedItem.type !== 'frame' && <select value={styleFor(selectedItem).strokeWidth} onChange={event => updateStyle(selectedItem.id, { strokeWidth: Number(event.target.value) })} className="h-8 rounded border border-slate-200 bg-white px-2 text-xs" aria-label="Stroke width"><option value="1">1 px</option><option value="2">2 px</option><option value="3">3 px</option><option value="5">5 px</option><option value="8">8 px</option><option value="16">16 px</option></select>}
       {(selectedItem.type === 'arrow' || selectedItem.type === 'shape') && <select value={styleFor(selectedItem).lineStyle} onChange={event => updateStyle(selectedItem.id, { lineStyle: event.target.value as PresentationItemStyle['lineStyle'] })} className="h-8 rounded border border-slate-200 bg-white px-2 text-xs" aria-label="Line style"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select>}
-      {selectedItem.type === 'arrow' && <><select value={styleFor(selectedItem).connectorType} onChange={event => updateStyle(selectedItem.id, { connectorType: event.target.value as ConnectorType })} className="h-8 rounded border border-slate-200 bg-white px-2 text-xs" aria-label="Connector route"><option value="curved">Curved</option><option value="straight">Straight</option><option value="elbow">Elbow</option></select><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={styleFor(selectedItem).arrowStart} onChange={event => updateStyle(selectedItem.id, { arrowStart: event.target.checked })}/>Start arrow</label><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={styleFor(selectedItem).arrowEnd} onChange={event => updateStyle(selectedItem.id, { arrowEnd: event.target.checked })}/>End arrow</label></>}
+      {selectedItem.type === 'arrow' && <><select value={styleFor(selectedItem).connectorType} onChange={event => updateStyle(selectedItem.id, { connectorType: event.target.value as ConnectorType })} className="h-8 rounded border border-slate-200 bg-white px-2 text-xs" aria-label="Connector route"><option value="curved">Curved</option><option value="straight">Straight</option><option value="elbow">Elbow</option></select><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={styleFor(selectedItem).arrowStart} onChange={event => updateStyle(selectedItem.id, { arrowStart: event.target.checked })}/>Start arrow</label><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={styleFor(selectedItem).arrowEnd} onChange={event => updateStyle(selectedItem.id, { arrowEnd: event.target.checked })}/>End arrow</label><label className="flex items-center gap-1 text-xs text-slate-500">Label <input aria-label="Connector label" value={parseConnectorLabel(selectedItem)} onChange={event => commit(current => current.map(item => item.id === selectedItem.id ? setConnectorLabel(item, event.target.value) : item))} className="h-8 w-36 rounded border border-slate-200 px-2 text-xs text-slate-800" placeholder="Edge label"/></label></>}
       {(selectedItem.type === 'text' || selectedItem.type === 'note' || selectedItem.type === 'shape') && <><input type="color" value={styleFor(selectedItem).textColor} onChange={event => updateStyle(selectedItem.id, { textColor: event.target.value })} className="h-8 w-9 rounded border border-slate-200 bg-white p-1" title="Text color"/><input type="number" min="8" max="96" value={styleFor(selectedItem).fontSize} onChange={event => updateStyle(selectedItem.id, { fontSize: clamp(Number(event.target.value), 8, 96) })} className="h-8 w-16 rounded border border-slate-200 px-2 text-xs" aria-label="Font size"/><button type="button" onClick={() => updateStyle(selectedItem.id, { fontWeight: styleFor(selectedItem).fontWeight === 'bold' ? 'normal' : 'bold' })} className={`h-8 w-8 rounded border text-sm font-bold ${styleFor(selectedItem).fontWeight === 'bold' ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white'}`}>B</button></>}
       <label className="flex items-center gap-1 text-xs text-slate-500">Opacity <input type="range" min="10" max="100" value={styleFor(selectedItem).opacity * 100} onChange={event => updateStyle(selectedItem.id, { opacity: Number(event.target.value) / 100 })} className="w-20 accent-indigo-600"/></label><span className="h-6 w-px bg-slate-200"/>
       <button type="button" onClick={duplicateSelected} className="rounded p-1.5 text-slate-600 hover:bg-white" title="Duplicate"><Glyph name="duplicate"/></button><button type="button" onClick={() => moveLayer('back')} className="rounded p-1.5 text-slate-600 hover:bg-white" title="Send backward"><Glyph name="front"/></button><button type="button" onClick={() => moveLayer('front')} className="rotate-180 rounded p-1.5 text-slate-600 hover:bg-white" title="Bring forward"><Glyph name="front"/></button><button type="button" onClick={() => commit(current => current.map(item => item.id === selectedItem.id ? { ...item, locked: !item.locked } : item))} className={`rounded p-1.5 ${selectedItem.locked ? 'bg-indigo-100 text-indigo-700' : 'text-slate-600 hover:bg-white'}`} title={selectedItem.locked ? 'Unlock' : 'Lock'}><Glyph name="lock"/></button><button type="button" onClick={deleteSelected} className="ml-auto flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"><Glyph name="trash"/>Delete</button>
@@ -324,7 +354,7 @@ export function PresentationCanvas({ board, currentDiagramImage, onCaptureCurren
 
     <div className="flex min-h-0 flex-1">
     <main ref={stageRef} onPointerDown={onStagePointerDown} onPointerMove={event => { if (tool === 'line' && connectorStart) setConnectorPreview(worldPoint(event.clientX, event.clientY)); }} onWheel={event => { if (event.ctrlKey || event.metaKey) { event.preventDefault(); setViewport(value => ({ ...value, zoom: clamp(value.zoom * (event.deltaY < 0 ? 1.08 : 0.93), 0.2, 3) })); } }} className="relative min-h-0 flex-1 touch-none overflow-hidden bg-white" style={{ cursor: tool === 'hand' ? 'grab' : tool === 'eraser' ? 'cell' : tool === 'pen' || tool === 'highlighter' || tool === 'line' ? 'crosshair' : 'default', backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: `${24 * viewport.zoom}px ${24 * viewport.zoom}px`, backgroundPosition: `${viewport.x * viewport.zoom}px ${viewport.y * viewport.zoom}px` }}>
-      <div className="absolute origin-top-left" style={{ transform: `translate(${viewport.x * viewport.zoom}px, ${viewport.y * viewport.zoom}px) scale(${viewport.zoom})` }}>{sortedItems(items).map(item => <ItemRenderer key={item.id} item={item} selected={selectedIds.includes(item.id) || selectedId === item.id} childLocked={childLockedByFrame(item, items)} connectorMode={tool === 'line'} onSelect={selectItem} onConnectorPoint={(clientX, clientY) => addConnectorPoint(worldPoint(clientX, clientY))} onMove={(id, x, y) => applyItems(moveFrameAndChildren(itemsRef.current, id, x, y))} onResize={(id, x, y, width, height) => updateLive(id, { x, y, width, height })} onText={(id, content) => updateLive(id, { content })} onStart={beginInteraction} onEnd={endInteraction}/>)}{connectorStart && connectorPreview && <svg width="1" height="1" className="pointer-events-none absolute left-0 top-0 overflow-visible" aria-hidden="true"><path d={connectorPath({ start: connectorStart, end: connectorPreview }, 'curved')} fill="none" stroke="#4f46e5" strokeWidth="3" strokeDasharray="7 6" strokeLinecap="round"/><circle cx={connectorStart.x} cy={connectorStart.y} r="6" fill="white" stroke="#4f46e5" strokeWidth="3"/><circle cx={connectorPreview.x} cy={connectorPreview.y} r="5" fill="#4f46e5"/></svg>}</div>
+      <div className="absolute origin-top-left" style={{ transform: `translate(${viewport.x * viewport.zoom}px, ${viewport.y * viewport.zoom}px) scale(${viewport.zoom})` }}>{sortedItems(items).map(item => <ItemRenderer key={item.id} item={item} selected={selectedIds.includes(item.id) || selectedId === item.id} childLocked={childLockedByFrame(item, items)} connectorMode={tool === 'line'} onSelect={selectItem} onConnectorPoint={onItemConnectorPoint} onMove={(id, x, y) => applyItems(moveFrameAndChildren(itemsRef.current, id, x, y))} onResize={(id, x, y, width, height) => updateLive(id, { x, y, width, height })} onText={(id, content) => updateLive(id, { content })} onStart={beginInteraction} onEnd={endInteraction} onEndpointDrag={onEndpointDrag}/>)}{connectorStart && connectorPreview && <svg width="1" height="1" className="pointer-events-none absolute left-0 top-0 overflow-visible" aria-hidden="true"><path d={connectorPath({ start: connectorStart.point, end: connectorPreview }, 'curved')} fill="none" stroke="#4f46e5" strokeWidth="3" strokeDasharray="7 6" strokeLinecap="round"/><circle cx={connectorStart.point.x} cy={connectorStart.point.y} r="6" fill="white" stroke="#4f46e5" strokeWidth="3"/><circle cx={connectorPreview.x} cy={connectorPreview.y} r="5" fill="#4f46e5"/></svg>}</div>
       <div data-canvas-ui="true" onPointerDown={event => event.stopPropagation()} className="absolute bottom-3 left-2 right-2 z-40 flex items-center gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg md:bottom-auto md:left-3 md:right-auto md:top-3 md:flex-col md:overflow-visible" aria-label="Creation tools">
         <RailButton tool="select" activeTool={tool} label="Select (V)" icon="select" onClick={() => activateTool('select')}/><RailButton tool="hand" activeTool={tool} label="Hand (H)" icon="hand" onClick={() => activateTool('hand')}/><span className="mx-1 h-6 w-px bg-slate-200 md:my-1 md:h-px md:w-6"/><RailButton tool="note" activeTool={tool} label="Sticky note (N)" icon="note" onClick={() => activateTool('note')}/><RailButton tool="text" activeTool={tool} label="Text (T)" icon="text" onClick={() => activateTool('text')}/>
         <div className="relative"><RailButton tool="shape" activeTool={tool} label="Shapes (R)" icon="shape" onClick={() => setShapeMenu(open => !open)}/>{shapeMenu && <div className="absolute bottom-12 left-1/2 w-48 -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-1 shadow-xl md:bottom-auto md:left-12 md:top-0 md:translate-x-0">{SHAPES.map(shape => <button type="button" key={shape.kind} onClick={() => { setShapeKind(shape.kind); activateTool('shape'); setShapeMenu(false); }} className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-slate-100"><span className={`h-5 w-7 border border-slate-500 ${shape.kind === 'circle' ? 'rounded-full' : shape.kind === 'rounded' ? 'rounded-md' : ''}`}/>{shape.label}</button>)}</div>}</div>

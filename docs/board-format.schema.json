@@ -97,6 +97,10 @@
         "hidden": { "type": "boolean", "description": "Frame-only. Hidden frames are skipped by Present and excluded from PNG/PDF export." },
         "lockChildren": { "type": "boolean", "description": "Frame-only. Children stay as separate deck objects; they cannot be moved independently." },
         "zIndex": { "type": "number" },
+        "startId": { "type": "string", "description": "Deck arrow only. Id of the object the start magnet attaches to." },
+        "endId": { "type": "string", "description": "Deck arrow only. Id of the object the end magnet attaches to." },
+        "startSide": { "type": "string", "enum": ["left", "right", "top", "bottom"] },
+        "endSide": { "type": "string", "enum": ["left", "right", "top", "bottom"] },
         "style": { "type": "object" }
       }
     },

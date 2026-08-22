@@ -27,6 +27,14 @@ export interface PresentationItem {
   lockChildren?: boolean;
   zIndex?: number;
   style?: PresentationItemStyle;
+  /** Deck arrow only: attach start to this shape/note/text/frame. */
+  startId?: string;
+  /** Deck arrow only: attach end to this shape/note/text/frame. */
+  endId?: string;
+  /** Deck arrow only: magnet on the start object. */
+  startSide?: 'left' | 'right' | 'top' | 'bottom';
+  /** Deck arrow only: magnet on the end object. */
+  endSide?: 'left' | 'right' | 'top' | 'bottom';
 }
 
 export interface PresentationItemStyle {

@@ -71,6 +71,14 @@ Unknown object types (future nodes, unknown deck types, leftover comments/frames
 
 `board.presentation.items[]` is the existing presentation canvas. Supported `type` values: `image`, `note`, `text`, `arrow`, `shape`, `drawing`, `frame`. Geometry (`x`, `y`, `width`, `height`) is required so a deck re-imports in place. Deck frames (`type: "frame"`) use `title`, `style.strokeColor` for color, `lockChildren`, and `hidden` (hidden frames are skipped by Present and excluded from PNG/PDF export). Do not put frames in `board.frames`.
 
+Deck arrows (`type: "arrow"`) may optionally bind to another deck object so they reflow when that object moves or resizes:
+
+| Field | Meaning |
+| --- | --- |
+| `startId` / `endId` | Id of the attached shape, sticky (`note`), text, or frame. Omit for a free-floating end. |
+| `startSide` / `endSide` | Magnet on that object: `left`, `right`, `top`, or `bottom`. |
+| `content` | JSON `{ start, end, label? }` in the arrow's local box. `label` is an optional edge caption that stays on the connector. Older arrows with no bindings (or a color string as `content`) still import. |
+
 ## Privacy
 
 Export and import of local boards stay on-device. No account is required.
