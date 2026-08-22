@@ -148,11 +148,14 @@ interface StoredTemplate extends Omit<PersonalTemplate, 'thumbnail'> {
   thumbnail?: string | Blob;
 }
 
-const DB_NAME = 'diagram-tool-workspace';
-const DB_VERSION = 1;
+export const WORKSPACE_DB_NAME = 'diagram-tool-workspace';
+export const WORKSPACE_DB_VERSION = 1;
+export const WORKSPACE_STORES = ['boards', 'spaces', 'templates', 'versions', 'activity', 'preferences'] as const;
+export const MAX_AUTO_VERSIONS = 20;
+const DB_NAME = WORKSPACE_DB_NAME;
+const DB_VERSION = WORKSPACE_DB_VERSION;
 const LEGACY_STORAGE_KEY = 'diagram-tool-boards';
 const MIGRATION_KEY = 'diagram-tool-indexeddb-migrated-v2';
-const MAX_AUTO_VERSIONS = 20;
 const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const DEFAULT_PREFERENCES: DashboardPreferences = {
   id: 'dashboard',
@@ -162,7 +165,17 @@ const DEFAULT_PREFERENCES: DashboardPreferences = {
   sidebarCollapsed: false,
 };
 
-type StoreName = 'boards' | 'spaces' | 'templates' | 'versions' | 'activity' | 'preferences';
+type StoreName = typeof WORKSPACE_STORES[number];
+
+export function toWorkspaceError(error: unknown): Error {
+  const name = error instanceof DOMException ? error.name : '';
+  const message = error instanceof Error ? error.message : '';
+  if (name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED' || /quota/i.test(message)) {
+    return new Error('This browser is out of storage for local boards. Export a backup or clear old automatic saves, then try again.');
+  }
+  if (error instanceof Error && error.message) return error;
+  return new Error('Local workspace storage could not be opened.');
+}
 
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -171,15 +184,15 @@ function generateId(prefix: string): string {
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('IndexedDB request failed.'));
+    request.onerror = () => reject(toWorkspaceError(request.error ?? new Error('IndexedDB request failed.')));
   });
 }
 
 function transactionDone(transaction: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error('IndexedDB transaction failed.'));
-    transaction.onabort = () => reject(transaction.error ?? new Error('IndexedDB transaction aborted.'));
+    transaction.onerror = () => reject(toWorkspaceError(transaction.error ?? new Error('IndexedDB transaction failed.')));
+    transaction.onabort = () => reject(toWorkspaceError(transaction.error ?? new Error('IndexedDB transaction aborted.')));
   });
 }
 
@@ -202,7 +215,7 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('preferences')) db.createObjectStore('preferences', { keyPath: 'id' });
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Unable to open local workspace storage.'));
+    request.onerror = () => reject(toWorkspaceError(request.error ?? new Error('Unable to open local workspace storage.')));
   });
 }
 
@@ -356,9 +369,17 @@ export class BoardManager {
   private initialized: Promise<void> | null = null;
   private listeners = new Set<() => void>();
   private repository: WorkspaceRepository;
+  private boardWrites = new Map<string, Promise<unknown>>();
 
   constructor(repository: WorkspaceRepository = new IndexedDbBoardRepository()) {
     this.repository = repository;
+  }
+
+  private enqueueBoardWrite<T>(boardId: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.boardWrites.get(boardId) ?? Promise.resolve();
+    const next = previous.then(task, task);
+    this.boardWrites.set(boardId, next.then(() => undefined, () => undefined));
+    return next;
   }
 
   subscribe(listener: () => void): () => void {
@@ -371,7 +392,12 @@ export class BoardManager {
   }
 
   async initialize(): Promise<void> {
-    if (!this.initialized) this.initialized = this.runInitialization();
+    if (!this.initialized) {
+      this.initialized = this.runInitialization().catch(error => {
+        this.initialized = null;
+        throw toWorkspaceError(error);
+      });
+    }
     return this.initialized;
   }
 
@@ -450,24 +476,37 @@ export class BoardManager {
 
   async update(id: string, patch: Partial<Omit<Board, 'id' | 'createdAt' | 'schemaVersion'>>, activity?: ActivityType): Promise<Board | undefined> {
     await this.initialize();
-    const board = await this.get(id);
-    if (!board) return undefined;
-    const updated = normalizeBoard({ ...board, ...patch, updatedAt: new Date().toISOString() });
-    await this.repository.put('boards', await storeBoard(updated));
-    if (activity) await this.addActivity(updated, activity);
-    this.emit();
-    return updated;
+    return this.enqueueBoardWrite(id, async () => {
+      const board = await this.get(id);
+      if (!board) return undefined;
+      // Local writes omit updatedAt and always advance the clock. A future
+      // sync layer can pass updatedAt to apply last-write-wins per object
+      // without silently overwriting a newer local or remote revision.
+      if (patch.updatedAt && patch.updatedAt < board.updatedAt) return board;
+      const { updatedAt: incomingClock, ...fields } = patch;
+      const updated = normalizeBoard({
+        ...board,
+        ...fields,
+        updatedAt: incomingClock && incomingClock > board.updatedAt ? incomingClock : new Date().toISOString(),
+      });
+      await this.repository.put('boards', await storeBoard(updated));
+      if (activity) await this.addActivity(updated, activity);
+      this.emit();
+      return updated;
+    });
   }
 
   async markOpened(id: string): Promise<Board | undefined> {
     await this.initialize();
-    const board = await this.get(id);
-    if (!board) return undefined;
-    const opened = normalizeBoard({ ...board, lastOpenedAt: new Date().toISOString() });
-    await this.repository.put('boards', await storeBoard(opened));
-    await this.addActivity(opened, 'opened');
-    this.emit();
-    return opened;
+    return this.enqueueBoardWrite(id, async () => {
+      const board = await this.get(id);
+      if (!board) return undefined;
+      const opened = normalizeBoard({ ...board, lastOpenedAt: new Date().toISOString() });
+      await this.repository.put('boards', await storeBoard(opened));
+      await this.addActivity(opened, 'opened');
+      this.emit();
+      return opened;
+    });
   }
 
   async trash(id: string): Promise<void> {
@@ -804,14 +843,14 @@ function downloadJson(data: unknown, filename: string): void {
 
 export const boardManager = new BoardManager();
 
-export function createMemoryBoardManager(): BoardManager {
+function createMemoryRepository(): WorkspaceRepository {
   const stores = new Map<StoreName, Map<string, unknown>>();
   const store = (name: StoreName) => {
     let values = stores.get(name);
     if (!values) { values = new Map(); stores.set(name, values); }
     return values;
   };
-  const repository: WorkspaceRepository = {
+  return {
     async getAll<T>(name: StoreName): Promise<T[]> { return [...store(name).values()] as T[]; },
     async get<T>(name: StoreName, id: string): Promise<T | undefined> { return store(name).get(id) as T | undefined; },
     async put<T>(name: StoreName, value: T): Promise<void> {
@@ -822,5 +861,13 @@ export function createMemoryBoardManager(): BoardManager {
     async delete(name: StoreName, id: string): Promise<void> { store(name).delete(id); },
     async clear(name: StoreName): Promise<void> { store(name).clear(); },
   };
-  return new BoardManager(repository);
+}
+
+export function createMemoryWorkspace(): { open: () => BoardManager } {
+  const repository = createMemoryRepository();
+  return { open: () => new BoardManager(repository) };
+}
+
+export function createMemoryBoardManager(): BoardManager {
+  return createMemoryWorkspace().open();
 }
