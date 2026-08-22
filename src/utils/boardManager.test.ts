@@ -134,6 +134,28 @@ describe('board repository workflows', () => {
     expect(saved?.description).toBe('kept description');
   });
 
+  it('serializes createVersion, presentation, trash, and restore with board updates', async () => {
+    const board = await create();
+    await Promise.all([
+      manager.update(board.id, { dslText: 'diagram: architecture\n# locked write' }),
+      manager.createVersion(board.id, 'After update'),
+      manager.setPresentation(board.id, [{ id: 'note', type: 'note', content: 'stay', x: 0, y: 0, width: 80, height: 80 }]),
+    ]);
+    const saved = await manager.get(board.id);
+    expect(saved?.dslText).toContain('# locked write');
+    expect(saved?.presentation?.items).toHaveLength(1);
+    const versions = await manager.listVersions(board.id);
+    expect(versions.some(version => version.name === 'After update')).toBe(true);
+
+    await Promise.all([
+      manager.update(board.id, { description: 'still here' }),
+      manager.trash(board.id),
+    ]);
+    expect((await manager.list({ deleted: true }))[0]?.description).toBe('still here');
+    await manager.restore(board.id);
+    expect((await manager.list())[0]?.description).toBe('still here');
+  });
+
   it('never silently overwrites a newer object when an older updatedAt arrives', async () => {
     const board = await create();
     const newer = new Date(Date.parse(board.updatedAt) + 60_000).toISOString();
@@ -206,7 +228,7 @@ describe('durable workspace reload and quota recovery', () => {
 
     const restarted = workspace.open();
     const recent = (await restarted.list({ sort: 'lastOpened' })).slice(0, 3);
-    expect(recent.map(board => board.title).sort()).toEqual(['Train Arch', 'Train Flow', 'Train Seq']);
+    expect(recent.map(board => board.title)).toEqual(['Train Seq', 'Train Flow', 'Train Arch']);
     expect((await restarted.get(architecture.id))?.dslText).toContain('service API');
     expect((await restarted.get(flow.id))?.mode).toBe('flow');
     expect((await restarted.get(sequence.id))?.mode).toBe('sequence');

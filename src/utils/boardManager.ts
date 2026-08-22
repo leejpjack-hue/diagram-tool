@@ -370,6 +370,7 @@ export class BoardManager {
   private listeners = new Set<() => void>();
   private repository: WorkspaceRepository;
   private boardWrites = new Map<string, Promise<unknown>>();
+  private lastOpenedMs = 0;
 
   constructor(repository: WorkspaceRepository = new IndexedDbBoardRepository()) {
     this.repository = repository;
@@ -380,6 +381,35 @@ export class BoardManager {
     const next = previous.then(task, task);
     this.boardWrites.set(boardId, next.then(() => undefined, () => undefined));
     return next;
+  }
+
+  private nextOpenedClock(): string {
+    const now = Date.now();
+    this.lastOpenedMs = Math.max(now, this.lastOpenedMs + 1);
+    return new Date(this.lastOpenedMs).toISOString();
+  }
+
+  private async applyBoardPatch(
+    id: string,
+    patch: Partial<Omit<Board, 'id' | 'createdAt' | 'schemaVersion'>>,
+    activity?: ActivityType,
+  ): Promise<Board | undefined> {
+    const board = await this.get(id);
+    if (!board) return undefined;
+    // Local writes omit updatedAt and always advance the clock. A future
+    // sync layer can pass updatedAt to apply last-write-wins per object
+    // without silently overwriting a newer local or remote revision.
+    if (patch.updatedAt && patch.updatedAt < board.updatedAt) return board;
+    const { updatedAt: incomingClock, ...fields } = patch;
+    const updated = normalizeBoard({
+      ...board,
+      ...fields,
+      updatedAt: incomingClock && incomingClock > board.updatedAt ? incomingClock : new Date().toISOString(),
+    });
+    await this.repository.put('boards', await storeBoard(updated));
+    if (activity) await this.addActivity(updated, activity);
+    this.emit();
+    return updated;
   }
 
   subscribe(listener: () => void): () => void {
@@ -461,39 +491,24 @@ export class BoardManager {
       thumbnail: input.thumbnail,
       createdAt: now,
       updatedAt: now,
-      lastOpenedAt: now,
+      lastOpenedAt: this.nextOpenedClock(),
       spaceId: input.spaceId,
       tags: input.tags ?? [],
       starred: false,
       templateSourceId: input.templateSourceId,
       schemaVersion: 2,
     };
-    await this.repository.put('boards', await storeBoard(board));
-    if (recordActivity) await this.addActivity(board, 'created');
-    this.emit();
-    return board;
+    return this.enqueueBoardWrite(board.id, async () => {
+      await this.repository.put('boards', await storeBoard(board));
+      if (recordActivity) await this.addActivity(board, 'created');
+      this.emit();
+      return board;
+    });
   }
 
   async update(id: string, patch: Partial<Omit<Board, 'id' | 'createdAt' | 'schemaVersion'>>, activity?: ActivityType): Promise<Board | undefined> {
     await this.initialize();
-    return this.enqueueBoardWrite(id, async () => {
-      const board = await this.get(id);
-      if (!board) return undefined;
-      // Local writes omit updatedAt and always advance the clock. A future
-      // sync layer can pass updatedAt to apply last-write-wins per object
-      // without silently overwriting a newer local or remote revision.
-      if (patch.updatedAt && patch.updatedAt < board.updatedAt) return board;
-      const { updatedAt: incomingClock, ...fields } = patch;
-      const updated = normalizeBoard({
-        ...board,
-        ...fields,
-        updatedAt: incomingClock && incomingClock > board.updatedAt ? incomingClock : new Date().toISOString(),
-      });
-      await this.repository.put('boards', await storeBoard(updated));
-      if (activity) await this.addActivity(updated, activity);
-      this.emit();
-      return updated;
-    });
+    return this.enqueueBoardWrite(id, () => this.applyBoardPatch(id, patch, activity));
   }
 
   async markOpened(id: string): Promise<Board | undefined> {
@@ -501,7 +516,7 @@ export class BoardManager {
     return this.enqueueBoardWrite(id, async () => {
       const board = await this.get(id);
       if (!board) return undefined;
-      const opened = normalizeBoard({ ...board, lastOpenedAt: new Date().toISOString() });
+      const opened = normalizeBoard({ ...board, lastOpenedAt: this.nextOpenedClock() });
       await this.repository.put('boards', await storeBoard(opened));
       await this.addActivity(opened, 'opened');
       this.emit();
@@ -510,29 +525,40 @@ export class BoardManager {
   }
 
   async trash(id: string): Promise<void> {
-    const board = await this.update(id, { deletedAt: new Date().toISOString() });
-    if (board) await this.addActivity(board, 'trashed');
-    if (board) this.emit();
+    await this.initialize();
+    await this.enqueueBoardWrite(id, async () => {
+      const board = await this.applyBoardPatch(id, { deletedAt: new Date().toISOString() });
+      if (board) await this.addActivity(board, 'trashed');
+      if (board) this.emit();
+    });
   }
 
   async restore(id: string): Promise<void> {
-    const board = await this.update(id, { deletedAt: undefined });
-    if (board) await this.addActivity(board, 'restored');
-    if (board) this.emit();
+    await this.initialize();
+    await this.enqueueBoardWrite(id, async () => {
+      const board = await this.applyBoardPatch(id, { deletedAt: undefined });
+      if (board) await this.addActivity(board, 'restored');
+      if (board) this.emit();
+    });
   }
 
   async remove(id: string): Promise<void> {
     await this.initialize();
-    const board = await this.get(id);
-    await this.repository.delete('boards', id);
-    const versions = await this.listVersions(id);
-    await Promise.all(versions.map(version => this.repository.delete('versions', version.id)));
-    if (board) await this.addActivity(board, 'deleted');
-    this.emit();
+    await this.enqueueBoardWrite(id, async () => {
+      const board = await this.get(id);
+      await this.repository.delete('boards', id);
+      const versions = await this.listVersions(id);
+      await Promise.all(versions.map(version => this.repository.delete('versions', version.id)));
+      if (board) await this.addActivity(board, 'deleted');
+      this.emit();
+    });
   }
 
   async bulkUpdate(ids: string[], patch: Partial<Pick<Board, 'spaceId' | 'tags' | 'starred' | 'deletedAt'>>): Promise<void> {
-    await Promise.all(ids.map(id => this.update(id, patch)));
+    await this.initialize();
+    for (const id of ids) {
+      await this.enqueueBoardWrite(id, () => this.applyBoardPatch(id, patch));
+    }
     this.emit();
   }
 
@@ -553,21 +579,27 @@ export class BoardManager {
   }
 
   async setPresentation(boardId: string, items: PresentationItem[]): Promise<void> {
-    const board = await this.get(boardId);
-    if (!board) return;
-    await this.update(boardId, { presentation: { items, updatedAt: new Date().toISOString() } });
+    await this.initialize();
+    await this.enqueueBoardWrite(boardId, async () => {
+      const board = await this.get(boardId);
+      if (!board) return;
+      await this.applyBoardPatch(boardId, { presentation: { items, updatedAt: new Date().toISOString() } });
+    });
   }
 
   async upsertPresentationItem(boardId: string, item: PresentationItem): Promise<PresentationItem[] | null> {
-    const board = await this.get(boardId);
-    if (!board) return null;
-    const existing = board.presentation?.items ?? [];
-    const index = existing.findIndex(candidate => candidate.id === item.id);
-    const items = index >= 0
-      ? existing.map((candidate, candidateIndex) => candidateIndex === index ? item : candidate)
-      : [...existing, item];
-    await this.setPresentation(boardId, items);
-    return items;
+    await this.initialize();
+    return this.enqueueBoardWrite(boardId, async () => {
+      const board = await this.get(boardId);
+      if (!board) return null;
+      const existing = board.presentation?.items ?? [];
+      const index = existing.findIndex(candidate => candidate.id === item.id);
+      const items = index >= 0
+        ? existing.map((candidate, candidateIndex) => candidateIndex === index ? item : candidate)
+        : [...existing, item];
+      await this.applyBoardPatch(boardId, { presentation: { items, updatedAt: new Date().toISOString() } });
+      return items;
+    });
   }
 
   async listSpaces(): Promise<Space[]> {
@@ -647,25 +679,28 @@ export class BoardManager {
   }
 
   async createVersion(boardId: string, name: string, automatic = false): Promise<BoardVersion | undefined> {
-    const board = await this.get(boardId);
-    if (!board) return undefined;
-    if (automatic) {
-      const latestAutomatic = (await this.listVersions(boardId)).find(version => version.automatic);
-      if (latestAutomatic?.dslText === board.dslText && latestAutomatic.mode === board.mode) return latestAutomatic;
-    }
-    const version: BoardVersion = {
-      id: generateId('version'),
-      boardId,
-      name: name.trim() || (automatic ? 'Automatic save' : 'Checkpoint'),
-      dslText: board.dslText,
-      mode: board.mode,
-      createdAt: new Date().toISOString(),
-      automatic,
-    };
-    await this.repository.put('versions', version);
-    if (automatic) await this.trimAutomaticVersions(boardId);
-    this.emit();
-    return version;
+    await this.initialize();
+    return this.enqueueBoardWrite(boardId, async () => {
+      const board = await this.get(boardId);
+      if (!board) return undefined;
+      if (automatic) {
+        const latestAutomatic = (await this.listVersions(boardId)).find(version => version.automatic);
+        if (latestAutomatic?.dslText === board.dslText && latestAutomatic.mode === board.mode) return latestAutomatic;
+      }
+      const version: BoardVersion = {
+        id: generateId('version'),
+        boardId,
+        name: name.trim() || (automatic ? 'Automatic save' : 'Checkpoint'),
+        dslText: board.dslText,
+        mode: board.mode,
+        createdAt: new Date().toISOString(),
+        automatic,
+      };
+      await this.repository.put('versions', version);
+      if (automatic) await this.trimAutomaticVersions(boardId);
+      this.emit();
+      return version;
+    });
   }
 
   async listVersions(boardId: string): Promise<BoardVersion[]> {
