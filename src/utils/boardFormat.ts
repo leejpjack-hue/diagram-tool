@@ -482,6 +482,10 @@ function sanitizePresentation(value: unknown, boardId: string | undefined, skipp
       content: candidate.content,
       hidden: candidate.hidden === true ? true : undefined,
       lockChildren: candidate.lockChildren === true ? true : undefined,
+      startId: typeof candidate.startId === 'string' ? candidate.startId : undefined,
+      endId: typeof candidate.endId === 'string' ? candidate.endId : undefined,
+      startSide: candidate.startSide === 'left' || candidate.startSide === 'right' || candidate.startSide === 'top' || candidate.startSide === 'bottom' ? candidate.startSide : undefined,
+      endSide: candidate.endSide === 'left' || candidate.endSide === 'right' || candidate.endSide === 'top' || candidate.endSide === 'bottom' ? candidate.endSide : undefined,
     });
   }
   return { items, updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : new Date().toISOString() };

@@ -124,6 +124,55 @@ describe('PresentationCanvas creation tools', () => {
 
     expect(screen.getByText('Presentation canvas · 2 objects')).toBeInTheDocument();
     expect(screen.getByLabelText('Connector route')).toHaveValue('curved');
+    expect(screen.getByTestId('deck-connector')).toHaveAttribute('data-start-id');
+    expect(screen.getByTestId('deck-connector').getAttribute('data-start-id')).not.toBe('');
+    expect(screen.getByTestId('deck-connector')).toHaveAttribute('data-end-id', '');
+  });
+
+  it('attaches a connector to two shapes and reflows it when one is dragged', () => {
+    render(
+      <PresentationCanvas
+        board={{
+          ...board,
+          presentation: {
+            updatedAt: '2026-08-22T00:00:00.000Z',
+            items: [
+              { id: 'a', type: 'shape', content: 'A', x: 40, y: 40, width: 120, height: 80, style: { shape: 'rectangle' } },
+              { id: 'b', type: 'shape', content: 'B', x: 320, y: 40, width: 120, height: 80, style: { shape: 'rectangle' } },
+            ],
+          },
+        }}
+        currentDiagramImage={null}
+        onClose={vi.fn()}
+        notify={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connector (L)' }));
+    const [shapeA, shapeB] = screen.getAllByLabelText('Shape text');
+    fireEvent.pointerDown(shapeA, { clientX: 100, clientY: 80 });
+    fireEvent.pointerDown(shapeB, { clientX: 380, clientY: 80 });
+
+    const connector = screen.getByTestId('deck-connector');
+    expect(connector).toHaveAttribute('data-start-id', 'a');
+    expect(connector).toHaveAttribute('data-end-id', 'b');
+    fireEvent.change(screen.getByLabelText('Connector label'), { target: { value: 'owns' } });
+    fireEvent.change(screen.getByLabelText('Line style'), { target: { value: 'dashed' } });
+    fireEvent.change(screen.getByLabelText('Connector route'), { target: { value: 'straight' } });
+    expect(screen.getByLabelText('Connector route')).toHaveValue('straight');
+    const before = connector.getAttribute('style');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select (V)' }));
+    fireEvent.pointerDown(shapeA.closest('[data-item-id="a"]')!, { clientX: 80, clientY: 70 });
+    fireEvent.pointerMove(window, { clientX: 180, clientY: 70 });
+    fireEvent.pointerUp(window);
+
+    const after = screen.getByTestId('deck-connector');
+    expect(after).toHaveAttribute('data-start-id', 'a');
+    expect(after).toHaveAttribute('data-end-id', 'b');
+    expect(after.getAttribute('style')).not.toBe(before);
+    fireEvent.pointerDown(after);
+    expect(screen.getByLabelText('Connector label')).toHaveValue('owns');
   });
 
   it('creates a frame from selection without flattening children', async () => {

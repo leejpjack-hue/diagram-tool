@@ -190,6 +190,32 @@ describe('public portable board format', () => {
     expect(items[1]).toMatchObject({ type: 'frame', title: 'Secret', hidden: true });
   });
 
+  it('round-trips deck arrow bindings and still imports unattached legacy arrows', () => {
+    const plan = parsePortableImport({
+      version: '3.0',
+      board: {
+        title: 'Deck arrows',
+        mode: 'architecture',
+        source: { kind: 'dsl', text: ARCH_DSL },
+        presentation: {
+          items: [
+            { id: 'box', type: 'shape', content: 'A', x: 10, y: 20, width: 80, height: 40 },
+            {
+              id: 'bound', type: 'arrow', content: '{"start":{"x":20,"y":20},"end":{"x":80,"y":20},"label":"owns"}',
+              x: 0, y: 0, width: 100, height: 40, startId: 'box', endId: 'missing', startSide: 'right', endSide: 'left',
+            },
+            { id: 'legacy', type: 'arrow', content: '#334155', x: 40, y: 80, width: 80, height: 20 },
+          ],
+        },
+      },
+    });
+    const items = plan.boards[0].presentation?.items ?? [];
+    expect(items).toHaveLength(3);
+    expect(items[1]).toMatchObject({ id: 'bound', startId: 'box', startSide: 'right', endId: 'missing', endSide: 'left' });
+    expect(items[2]).toMatchObject({ id: 'legacy' });
+    expect(items[2].startId).toBeUndefined();
+  });
+
   it('rejects remote and SVG presentation content and accepts raster data URLs', () => {
     const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJ0hREFU';
     const jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';

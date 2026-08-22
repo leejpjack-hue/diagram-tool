@@ -176,6 +176,13 @@ async function drawItem(ctx: CanvasRenderingContext2D, item: PresentationItem) {
       else { const midY = (start.y + end.y) / 2; ctx.lineTo(start.x, midY); ctx.lineTo(end.x, midY); ctx.lineTo(end.x, end.y); startAngle = Math.atan2(midY - start.y, 0); endAngle = Math.atan2(end.y - midY, 0); }
     } else ctx.lineTo(end.x, end.y);
     ctx.stroke(); ctx.setLineDash([]); if (style.arrowEnd) drawArrowHead(ctx, end, endAngle, style.strokeWidth); if (style.arrowStart) drawArrowHead(ctx, start, startAngle + Math.PI, style.strokeWidth);
+    try {
+      const payload = JSON.parse(item.content) as { label?: unknown };
+      if (typeof payload.label === 'string' && payload.label.trim()) {
+        ctx.fillStyle = style.strokeColor; ctx.font = '600 12px Inter, Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        ctx.fillText(payload.label, (start.x + end.x) / 2, (start.y + end.y) / 2 - 6);
+      }
+    } catch { /* Unlabelled or legacy arrows. */ }
   }
   else if (item.type === 'frame') { ctx.strokeStyle = style.strokeColor; ctx.lineWidth = 2; ctx.strokeRect(item.x, item.y, item.width, item.height); ctx.fillStyle = '#334155'; ctx.font = '600 14px Inter, Arial'; ctx.fillText(item.title || 'Frame', item.x, item.y - 9); }
   else if (item.type === 'shape') { drawShape(ctx, item, style); drawItemText(ctx, item, style, 16); }
