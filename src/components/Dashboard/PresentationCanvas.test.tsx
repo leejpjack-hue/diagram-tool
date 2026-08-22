@@ -125,4 +125,50 @@ describe('PresentationCanvas creation tools', () => {
     expect(screen.getByText('Presentation canvas · 2 objects')).toBeInTheDocument();
     expect(screen.getByLabelText('Connector route')).toHaveValue('curved');
   });
+
+  it('creates a frame from selection without flattening children', async () => {
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Shapes (R)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rectangle' }));
+    const stage = screen.getByRole('main');
+    fireEvent.pointerDown(stage, { clientX: 120, clientY: 120 });
+    fireEvent.pointerMove(window, { clientX: 260, clientY: 220 });
+    fireEvent.pointerUp(window);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create frame from selection' }));
+    expect(screen.getByText('Presentation canvas · 2 objects')).toBeInTheDocument();
+    expect(screen.getByLabelText('Shape text')).toBeInTheDocument();
+    expect(screen.getByLabelText('Frame title')).toHaveValue('Frame');
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('presents titled frames in outline order and skips a hidden frame', () => {
+    render(
+      <PresentationCanvas
+        board={{
+          ...board,
+          presentation: {
+            updatedAt: '2026-08-22T00:00:00.000Z',
+            items: [
+              { id: 'intro', type: 'frame', title: 'Intro', content: '', x: 0, y: 0, width: 220, height: 140 },
+              { id: 'review', type: 'frame', title: 'Review', content: '', x: 280, y: 0, width: 220, height: 140 },
+              { id: 'secret', type: 'frame', title: 'Secret', content: '', x: 0, y: 400, width: 400, height: 240, hidden: true },
+            ],
+          },
+        }}
+        currentDiagramImage={null}
+        onClose={vi.fn()}
+        notify={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Present deck' }));
+    expect(screen.getByTestId('present-frame-title')).toHaveTextContent('Intro');
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(screen.getByTestId('present-frame-title')).toHaveTextContent('Review');
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(screen.getByTestId('present-frame-title')).toHaveTextContent('Review');
+    fireEvent.click(screen.getByRole('button', { name: 'Present Review' }));
+    expect(screen.getByTestId('present-frame-title')).toHaveTextContent('Review');
+  });
 });

@@ -94,6 +94,8 @@
         "width": { "type": "number" },
         "height": { "type": "number" },
         "locked": { "type": "boolean" },
+        "hidden": { "type": "boolean", "description": "Frame-only. Hidden frames are skipped by Present and excluded from PNG/PDF export." },
+        "lockChildren": { "type": "boolean", "description": "Frame-only. Children stay as separate deck objects; they cannot be moved independently." },
         "zIndex": { "type": "number" },
         "style": { "type": "object" }
       }
