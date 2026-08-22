@@ -16,6 +16,10 @@ coverage/
 test-results/
 playwright-report/
 
+# View-only share snapshots (local / preview host)
+.share-store/
+.share-store-e2e/
+
 # Screenshots
 e2e/**/*-snapshots/
 screenshots-gallery.html

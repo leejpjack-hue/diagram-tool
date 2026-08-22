@@ -23,7 +23,16 @@ export default defineConfig({
       test: {
         name: 'unit',
         environment: 'jsdom',
-        include: ['src/**/*.test.{ts,tsx}']
+        include: ['src/**/*.test.{ts,tsx}'],
+        exclude: ['server/**']
+      }
+    }, {
+      extends: true,
+      test: {
+        name: 'server',
+        environment: 'node',
+        include: ['server/**/*.test.ts'],
+        setupFiles: []
       }
     }, {
       extends: true,

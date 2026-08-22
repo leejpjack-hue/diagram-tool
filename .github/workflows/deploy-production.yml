@@ -51,6 +51,8 @@ jobs:
         run: |
           sshpass -e ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && rm -rf .deploy-dist-new && mkdir .deploy-dist-new"
           sshpass -e rsync -az --delete dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/.deploy-dist-new/"
+          sshpass -e rsync -az --delete server/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/server/"
+          sshpass -e rsync -az vite.config.ts "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/vite.config.ts"
 
       - name: Activate build and restart service
         env:

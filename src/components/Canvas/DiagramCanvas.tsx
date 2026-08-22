@@ -184,7 +184,7 @@ function computeArchitectureRouting(diagramMode: string, diagramEdges: DiagramEd
   return { edgeRoutes, nodeSlots };
 }
 
-function DiagramCanvasInternal() {
+function DiagramCanvasInternal({ readOnly }: { readOnly: boolean }) {
   const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode, dslText, setDslText, setParsedDiagram } = useDiagramStore();
   const { getZoom } = useReactFlow();
   const [c4Level, setC4Level] = useState<C4Level | 'all'>('all');
@@ -980,14 +980,17 @@ function DiagramCanvasInternal() {
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={handleNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
+        onNodesChange={readOnly ? undefined : handleNodesChange}
+        onEdgesChange={readOnly ? undefined : onEdgesChange}
+        onConnect={readOnly ? undefined : onConnect}
         onMoveEnd={handleMoveEnd}
-        onSelectionChange={onSelectionChange}
-        onNodeClick={onNodeClick}
-        onNodeDoubleClick={onNodeDoubleClick}
-        onNodeDragStop={onNodeDragStop}
+        onSelectionChange={readOnly ? undefined : onSelectionChange}
+        onNodeClick={readOnly ? undefined : onNodeClick}
+        onNodeDoubleClick={readOnly ? undefined : onNodeDoubleClick}
+        onNodeDragStop={readOnly ? undefined : onNodeDragStop}
+        nodesDraggable={!readOnly}
+        nodesConnectable={!readOnly}
+        elementsSelectable={!readOnly}
         nodeTypes={nodeTypes}
         snapToGrid
         snapGrid={[10, 10]}
@@ -1079,8 +1082,7 @@ function DiagramCanvasInternal() {
         />
       </ReactFlow>
 
-      {/* Shape library palette */}
-      <ShapeLibrary />
+      {!readOnly && <ShapeLibrary />}
 
       {/* Floating Zoom Controls */}
       <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-md rounded-lg shadow-md border border-slate-200 p-2 z-10">
@@ -1120,10 +1122,10 @@ function DiagramCanvasInternal() {
   );
 }
 
-export function DiagramCanvas() {
+export function DiagramCanvas({ readOnly = false }: { readOnly?: boolean }) {
   return (
     <ReactFlowProvider>
-      <DiagramCanvasInternal />
+      <DiagramCanvasInternal readOnly={readOnly} />
     </ReactFlowProvider>
   );
 }

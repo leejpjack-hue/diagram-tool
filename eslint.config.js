@@ -20,4 +20,9 @@ export default defineConfig([globalIgnores(['dist']), {
     ecmaVersion: 2020,
     globals: globals.browser,
   },
+}, {
+  files: ['server/**/*.ts', 'vite.config.ts'],
+  languageOptions: {
+    globals: globals.node,
+  },
 }, ...storybook.configs["flat/recommended"]])

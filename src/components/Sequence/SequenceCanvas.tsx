@@ -40,7 +40,7 @@ type Editing =
   | { kind: 'message'; index: number; x: number; y: number }
   | null;
 
-export function SequenceCanvas() {
+export function SequenceCanvas({ readOnly = false }: { readOnly?: boolean }) {
   const { dslText, setDslText } = useDiagramStore();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -140,16 +140,19 @@ export function SequenceCanvas() {
   const cancelEdit = () => setEditing(null);
 
   const startParticipantEdit = (id: string, current: string) => {
+    if (readOnly) return;
     setDraft(current);
     setEditing({ kind: 'participant', id });
   };
 
   const startMessageEdit = (index: number, current: string, x: number, y: number) => {
+    if (readOnly) return;
     setDraft(current);
     setEditing({ kind: 'message', index, x, y });
   };
 
   const toggleDashed = (index: number) => {
+    if (readOnly) return;
     const next = toggleMessageDashed(dslText, index);
     if (next !== dslText) setDslText(next);
   };
@@ -385,7 +388,7 @@ A-->>U: 200 OK`}
         })}
 
         {/* Participant cards, top and bottom */}
-        {renderHeaderRow(HEADER_H - 24, true)}
+        {renderHeaderRow(HEADER_H - 24, !readOnly)}
         {renderHeaderRow(layout.bodyEnd + HEADER_GAP, false)}
         </svg>
       </div>

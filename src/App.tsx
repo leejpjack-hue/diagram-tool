@@ -36,6 +36,8 @@ import { Dashboard, type DashboardCreateRequest } from './components/Dashboard/D
 import { PresentationCanvas } from './components/Dashboard/PresentationCanvas';
 import { boardManager, toWorkspaceError, type Board, type BoardMode } from './utils/boardManager';
 import { OfflineBanner, WorkspaceErrorBanner } from './components/Workspace/WorkspaceStatus';
+import { ShareViewer } from './components/Share/ShareViewer';
+import { viewTokenFromPath } from './utils/shareLinks';
 import './styles/gantt-fixes.css';
 
 const ARCHITECTURE_DSL = `diagram: architecture
@@ -397,7 +399,8 @@ function App() {
   // Miro-style home: the board dashboard is the landing view; opening or
   // creating a board switches to the editor. A third view, `presentation`,
   // shows the per-board compose canvas for publication.
-  const [view, setView] = useState<'dashboard' | 'editor' | 'presentation'>('dashboard');
+  const viewToken = viewTokenFromPath();
+  const [view, setView] = useState<'dashboard' | 'editor' | 'presentation' | 'viewer'>(viewToken ? 'viewer' : 'dashboard');
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
   // Board being presented and the freshly-rendered image of its diagram.
   const [presentationFor, setPresentationFor] = useState<Board | null>(null);
@@ -664,6 +667,7 @@ function App() {
   }, [dslText, diagramMode, currentBoardId, activeTab, captureAndStoreBoardThumbnail, toast]);
 
   useEffect(() => {
+    if (view === 'viewer') return;
     const handleKeyPress = (e: KeyboardEvent) => {
       // Ctrl+S or Cmd+S for save
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -722,10 +726,11 @@ function App() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [dslText, diagramMode, selectedNodeId, clipboard, setClipboard, setDslText, handleSave, toast]);
+  }, [dslText, diagramMode, selectedNodeId, clipboard, setClipboard, setDslText, handleSave, toast, view]);
 
   // Auto-save setup
   useEffect(() => {
+    if (view === 'viewer') return;
     saveManager.startAutosave(() => {
       if (!dslText || dslText.trim().length === 0) return null;
       
@@ -737,16 +742,17 @@ function App() {
     });
 
     return () => saveManager.stopAutosave();
-  }, [dslText, diagramMode]);
+  }, [dslText, diagramMode, view]);
 
   // Load saved diagram on mount
   useEffect(() => {
+    if (view === 'viewer') return;
     const saved = saveManager.getCurrentDiagram();
     if (saved) {
       setDslText(saved.dslText);
       setDiagramMode(saved.mode);
     }
-  }, [setDslText, setDiagramMode]);
+  }, [setDslText, setDiagramMode, view]);
 
   // ---- Board dashboard (Miro-style home) ----
 
@@ -1126,6 +1132,8 @@ function App() {
         </>
         )}
       </header>}
+
+      {view === 'viewer' && viewToken && <ShareViewer token={viewToken} />}
 
       {/* Board dashboard (home) */}
       {view === 'dashboard' && (

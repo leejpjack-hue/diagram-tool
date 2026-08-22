@@ -21,13 +21,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'npm run dev -- --port 5173',
+      command: 'SHARE_STORE_DIR=.share-store-e2e npm run dev -- --port 5173',
       url: 'http://localhost:5173',
       reuseExistingServer: true,
       timeout: 30000,
     },
     {
-      command: 'npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
+      command: 'SHARE_STORE_DIR=.share-store-e2e-preview npm run build && SHARE_STORE_DIR=.share-store-e2e-preview npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
       url: 'http://localhost:4173',
       reuseExistingServer: true,
       timeout: 180000,
