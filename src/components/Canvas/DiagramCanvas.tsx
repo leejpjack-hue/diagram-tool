@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useCallback, useState, useRef } from 'react';
 import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider, useReactFlow, BackgroundVariant, ViewportPortal } from '@xyflow/react';
-import type { Node, Edge as ReactFlowEdge, Viewport, Connection } from '@xyflow/react';
+import type { Node, NodeChange, Edge as ReactFlowEdge, Viewport, Connection } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { ServiceNode } from './ServiceNode';
@@ -86,6 +86,15 @@ const nextC4Level = (lvl: C4Level): C4Level | null => {
   const i = C4_ORDER.indexOf(lvl);
   return i >= 0 && i < C4_ORDER.length - 1 ? C4_ORDER[i + 1] : null;
 };
+
+function isEndedDragChange(change: NodeChange<Node>): change is NodeChange<Node> & {
+  type: 'position';
+  id: string;
+  dragging: false;
+  position: { x: number; y: number };
+} {
+  return change.type === 'position' && change.dragging === false && !!change.position;
+}
 
 interface ArchitectureEdgeRoute {
   sourceHandle: string;
@@ -796,7 +805,7 @@ function DiagramCanvasInternal() {
 
       onNodesChange(applied);
 
-      const ended = applied.filter(c => c.type === 'position' && c.dragging === false && c.position);
+      const ended = applied.filter(isEndedDragChange);
       if (ended.length === 0 || !parsedDiagram) return;
 
       const positions = new Map<string, { x: number; y: number }>();
