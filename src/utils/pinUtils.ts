@@ -49,6 +49,47 @@ export function setMermaidNodePin(dsl: string, id: string, x: number, y: number)
   return re.test(dsl) ? dsl.replace(re, line) : `${dsl.replace(/\s+$/, '')}\n${line}\n`;
 }
 
+/**
+ * Write canvas positions back into DSL. Architecture pins every graph node so
+ * a drag cannot leave unpinned siblings to be auto-laid out on the next parse.
+ * Flow only writes the supplied ids (native `at:` or Mermaid `%% at`).
+ */
+export function applyCanvasPins(
+  dsl: string,
+  nodes: ReadonlyArray<{ id: string; name: string; type: string }>,
+  positions: Map<string, { x: number; y: number }>,
+  options?: {
+    mode?: 'architecture' | 'flow';
+    mermaidFlow?: boolean;
+    group?: { name: string; x: number; y: number; w: number; h: number };
+  },
+): string {
+  let next = dsl;
+  if (options?.group) {
+    const group = options.group;
+    next = setGroupPin(next, group.name, group.x, group.y, group.w, group.h);
+  }
+
+  if (options?.mode !== 'flow') {
+    for (const meta of nodes) {
+      if (meta.type === 'annotation') continue;
+      const position = positions.get(meta.id);
+      if (!position) continue;
+      next = setNodePin(next, meta.name, position.x, position.y);
+    }
+    return next;
+  }
+
+  for (const [id, position] of positions) {
+    const meta = nodes.find(node => node.id === id);
+    if (!meta || meta.type === 'annotation') continue;
+    next = options?.mermaidFlow
+      ? setMermaidNodePin(next, meta.name, position.x, position.y)
+      : setNodePin(next, meta.name, position.x, position.y);
+  }
+  return next;
+}
+
 /** Write `at:` and `size:` into a `group` block. */
 export function setGroupPin(
   dsl: string,

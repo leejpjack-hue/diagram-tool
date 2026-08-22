@@ -76,11 +76,13 @@ test.describe('Portable export and import', () => {
     copyFileSync(downloaded!, path);
     const payload = JSON.parse(readFileSync(path, 'utf8')) as {
       version: string;
-      board: { source: { text: string }; nodes: unknown[] };
+      board: { source: { text: string }; nodes: unknown[]; frames: unknown[]; comments: unknown[] };
     };
     expect(payload.version).toBe('3.0');
     expect(payload.board.source.text).toBe(ARCH_DSL);
     expect(payload.board.nodes).toHaveLength(2);
+    expect(payload.board.frames).toEqual([]);
+    expect(payload.board.comments).toEqual([]);
 
     await page.getByRole('button', { name: '⌂ Boards' }).click();
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();

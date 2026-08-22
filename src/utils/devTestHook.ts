@@ -10,7 +10,11 @@ export function installDiagramDslTestHook(
   enabled = canInstallDiagramDslTestHook(),
 ): (() => void) | undefined {
   if (!enabled) return undefined;
-  const host = window as Window & { [DIAGRAM_DSL_TEST_HOOK]?: (text: string) => void };
+  const host = window as Window & {
+    [DIAGRAM_DSL_TEST_HOOK]?: (text: string) => void;
+  };
   host[DIAGRAM_DSL_TEST_HOOK] = setter;
-  return () => { delete host[DIAGRAM_DSL_TEST_HOOK]; };
+  return () => {
+    delete host[DIAGRAM_DSL_TEST_HOOK];
+  };
 }

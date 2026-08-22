@@ -1,9 +1,31 @@
+import { useState } from 'react';
 import { useDiagramStore } from '../../store/diagramStore';
+import { applyBoardSource, renameNodeInSource } from '../../utils/sourceText';
+import type { BoardMode } from '../../utils/boardManager';
 
 export function PropertiesPanel() {
-  const { parsedDiagram, selectedNodeId } = useDiagramStore();
-
+  const { parsedDiagram, selectedNodeId, dslText, setDslText, setParsedDiagram, setError, diagramMode } = useDiagramStore();
   const selectedNode = parsedDiagram?.nodes.find(n => n.id === selectedNodeId);
+  const [nameDraft, setNameDraft] = useState(selectedNode?.name ?? '');
+  const [draftForId, setDraftForId] = useState(selectedNode?.id ?? '');
+  if ((selectedNode?.id ?? '') !== draftForId) {
+    setDraftForId(selectedNode?.id ?? '');
+    setNameDraft(selectedNode?.name ?? '');
+  }
+
+  const commitRename = () => {
+    if (!selectedNode) return;
+    const next = renameNodeInSource(dslText, selectedNode, nameDraft);
+    if (next === dslText) return;
+    setDslText(next);
+    const result = applyBoardSource(next, (diagramMode === 'flow' || diagramMode === 'sequence' || diagramMode === 'gantt' ? diagramMode : 'architecture') as BoardMode);
+    if (result.ok) {
+      setError(null);
+      if (result.kind === 'diagram') setParsedDiagram(result.parsed);
+    } else {
+      setError(result.error);
+    }
+  };
 
   return (
     <div className="side-panel">
@@ -20,7 +42,18 @@ export function PropertiesPanel() {
             <div className="property-group">
               <div className="property-label">Selected Node</div>
               <div className="card">
-                <div className="card-title">{selectedNode.name}</div>
+                <input
+                  aria-label="Rename node"
+                  data-testid="rename-node-input"
+                  value={nameDraft}
+                  onChange={e => setNameDraft(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                    if (e.key === 'Escape') setNameDraft(selectedNode.name);
+                  }}
+                  className="card-title w-full bg-transparent outline-none"
+                />
               </div>
             </div>
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { setNodePin, setGroupPin } from './pinUtils';
+import { applyCanvasPins, setNodePin, setGroupPin } from './pinUtils';
 import { parseDiagram } from '../parser/parser';
 
 describe('setNodePin', () => {
@@ -38,6 +38,45 @@ database Db {
     const out = setNodePin(flow, 'Step', 200, 80);
     expect(out).toMatch(/node Step \{\n {2}at: 200, 80\n\}/);
     expect(parseDiagram(out).pins?.step).toEqual({ x: 200, y: 80 });
+  });
+});
+
+describe('applyCanvasPins', () => {
+  const DSL = `diagram: architecture
+service Gateway {
+  at: 40, 100
+  connects: API
+}
+service API {
+  at: 320, 100
+}`;
+
+  it('updates architecture pins for every supplied node', () => {
+    const parsed = parseDiagram(DSL);
+    const out = applyCanvasPins(
+      DSL,
+      parsed.nodes,
+      new Map([
+        ['gateway', { x: 180, y: 240 }],
+        ['api', { x: 320, y: 100 }],
+      ]),
+    );
+    expect(out).toMatch(/service Gateway \{[^}]*at: 180, 240/);
+    expect(out).toMatch(/service API \{[^}]*at: 320, 100/);
+    expect(out).not.toBe(DSL);
+  });
+
+  it('is a no-op when rounded coordinates already match', () => {
+    const parsed = parseDiagram(DSL);
+    const out = applyCanvasPins(
+      DSL,
+      parsed.nodes,
+      new Map([
+        ['gateway', { x: 40.2, y: 100.4 }],
+        ['api', { x: 320, y: 100 }],
+      ]),
+    );
+    expect(out).toBe(DSL);
   });
 });
 

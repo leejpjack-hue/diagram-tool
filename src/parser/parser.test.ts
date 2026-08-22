@@ -303,6 +303,37 @@ edge API -> SQLStore {
       expect(result.edges[0].color).toBe('#22c55e');
     });
 
+    it('parses a bare architecture A -> B instead of dropping the edge', () => {
+      const dsl = `
+diagram: architecture
+service Client {}
+service CDN {}
+Client -> CDN
+`;
+      const result = parseDiagram(dsl);
+      expect(result.edges).toHaveLength(1);
+      expect(result.edges[0].from).toBe('client');
+      expect(result.edges[0].to).toBe('cdn');
+    });
+
+    it('throws when an architecture arrow is missing its target', () => {
+      const dsl = `
+diagram: architecture
+service Client {}
+Client ->
+`;
+      expect(() => parseDiagram(dsl)).toThrow(/missing a target after ->/i);
+    });
+
+    it('throws a parse error for an unclosed service block instead of a TypeError', () => {
+      const dsl = `diagram: architecture
+service FirstService {
+  color: "#6366f1"
+  tech: "edit this in the DSL"
+`;
+      expect(() => parseDiagram(dsl)).toThrow(/Unexpected end of input \(expected RBRACE\)/);
+    });
+
     it('handles multiple labelled edges in one diagram', () => {
       const dsl = `
 service Client {}

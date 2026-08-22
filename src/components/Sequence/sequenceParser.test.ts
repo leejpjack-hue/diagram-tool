@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSequenceDiagram } from './sequenceParser';
+import { parseSequenceDiagram, parseSequenceSource } from './sequenceParser';
 
 const SAMPLE = `sequenceDiagram
 title Checkout
@@ -56,6 +56,14 @@ describe('parseSequenceDiagram', () => {
     expect(starts.map(f => (f as { frameType: string }).frameType)).toEqual(['loop', 'alt']);
     expect(model.items.filter(i => i.kind === 'frameElse')).toHaveLength(1);
     expect(model.items.filter(i => i.kind === 'frameEnd')).toHaveLength(2);
+  });
+
+  it('reports leftover arrow lines instead of dropping them silently', () => {
+    const result = parseSequenceSource(`sequenceDiagram
+participant A as Alice
+A -> B
+`);
+    expect(result.error).toMatch(/Unrecognized sequence message/i);
   });
 
   it('implicitly declares participants seen in messages', () => {

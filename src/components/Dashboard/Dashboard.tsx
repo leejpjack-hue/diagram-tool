@@ -338,7 +338,7 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify }: DashboardProp
       {storageOpen && <StorageDialog storage={storage} boards={boards} versionsCount={activity.length} onClose={() => setStorageOpen(false)} onExport={() => void boardManager.exportAll()} onClear={async () => { const count = await boardManager.clearOldVersions(); notify('success', count ? `Removed ${count} old automatic versions` : 'No old versions to remove'); }} />}
       {commandOpen && <CommandPalette boards={boards} onClose={() => setCommandOpen(false)} onOpen={board => void openBoard(board)} onCreate={mode => void createFrom({ mode })} />}
       {importReport && <ImportReportDialog report={importReport} onClose={() => setImportReport(null)} />}
-      <input ref={fileInputRef} type="file" accept=".board,.boards,.board.json,.boards.json,.diagram,.json" onChange={handleImport} className="hidden" />
+      <input ref={fileInputRef} type="file" accept=".board,.boards,.board.json,.boards.json,.diagram,.json,.mmd,.mermaid,.txt" onChange={handleImport} className="hidden" />
     </div>
   );
 }

@@ -1,63 +1,103 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { useDiagramStore } from '../../store/diagramStore';
-import { parseDiagram } from '../../parser/parser';
 import { installDiagramDslTestHook } from '../../utils/devTestHook';
+import { applyBoardSource, toDslSource, toMermaidSource } from '../../utils/sourceText';
+import type { BoardMode } from '../../utils/boardManager';
 
-const isGanttDSL = (text: string) => /^\s*diagram:\s*gantt\b/im.test(text);
+function asBoardMode(mode: string): BoardMode {
+  return mode === 'flow' || mode === 'sequence' || mode === 'gantt' ? mode : 'architecture';
+}
 
 export function DSLEditor() {
-  const { dslText, setDslText, setParsedDiagram, setError, setLoading, diagramMode } = useDiagramStore();
+  const { dslText, setDslText, setParsedDiagram, setError, setLoading, diagramMode, error } = useDiagramStore();
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
-  // Sequence and Gantt each have their own parsers/canvases. Running the
-  // generic architecture/flow parser on those DSLs can clear the current mode
-  // during normal typing, so let their owning canvases/effects handle them.
-  const skipGenericParse = diagramMode === 'sequence' || diagramMode === 'gantt';
+  const applySource = useCallback((value: string) => {
+    setDslText(value);
+    const mode = asBoardMode(diagramMode);
+    if (mode === 'gantt') return;
+
+    setLoading(true);
+    const result = applyBoardSource(value, mode);
+    if (result.ok) {
+      setError(null);
+      if (result.kind === 'diagram') setParsedDiagram(result.parsed);
+    } else {
+      setError(result.error);
+    }
+    setLoading(false);
+  }, [diagramMode, setDslText, setParsedDiagram, setError, setLoading]);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
-    if (value !== undefined) {
-      setDslText(value);
-      if (skipGenericParse || isGanttDSL(value)) return;
+    if (value === undefined) return;
+    // Ignore Monaco echoes after a canvas writeback updates `dslText`.
+    if (value === useDiagramStore.getState().dslText) return;
+    applySource(value);
+  }, [applySource]);
 
-      // Parse the diagram
-      setLoading(true);
-      setError(null);
-
-      try {
-        const parsed = parseDiagram(value);
-        setParsedDiagram(parsed);
-      } catch (error) {
-        setError(error instanceof Error ? error.message : 'Parse error');
-        setParsedDiagram(null);
-      } finally {
-        setLoading(false);
-      }
-    }
-  }, [setDslText, setParsedDiagram, setError, setLoading, skipGenericParse]);
-
-  // Parse initial text
   useEffect(() => {
-    if (skipGenericParse) return;
-    try {
-      const parsed = parseDiagram(dslText);
-      setParsedDiagram(parsed);
-    } catch (error) {
-      console.error('Initial parse error:', error);
-    }
+    applySource(dslText);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  }, []);
 
   useEffect(() => {
     return installDiagramDslTestHook(text => handleEditorChange(text));
   }, [handleEditorChange]);
+
+  const showCopy = diagramMode === 'flow' || diagramMode === 'sequence';
+
+  const copy = async (kind: 'mermaid' | 'dsl') => {
+    const payload = kind === 'mermaid'
+      ? toMermaidSource(dslText, asBoardMode(diagramMode))
+      : toDslSource(dslText, asBoardMode(diagramMode));
+    try {
+      await navigator.clipboard.writeText(payload);
+      setCopyStatus(kind === 'mermaid' ? 'Copied Mermaid' : 'Copied DSL');
+    } catch {
+      setCopyStatus('Copy failed');
+    }
+    window.setTimeout(() => setCopyStatus(null), 1600);
+  };
 
   return (
     <div className="editor-panel" style={{ height: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="editor-header">
         <div className="editor-title">Editor</div>
         <div className="editor-subtitle">Describe your diagram in plain text</div>
+        {showCopy && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              data-testid="copy-as-mermaid"
+              onClick={() => void copy('mermaid')}
+              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:border-indigo-300 hover:text-indigo-700"
+            >
+              Copy as Mermaid
+            </button>
+            <button
+              type="button"
+              data-testid="copy-as-dsl"
+              onClick={() => void copy('dsl')}
+              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:border-indigo-300 hover:text-indigo-700"
+            >
+              Copy as DSL
+            </button>
+            {copyStatus && <span className="text-[11px] font-medium text-slate-500">{copyStatus}</span>}
+          </div>
+        )}
       </div>
-      
+
+      {error && (
+        <div
+          data-testid="dsl-parse-error"
+          role="alert"
+          className="mx-3 mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700"
+        >
+          {error}
+        </div>
+      )}
+
       <div className="editor-content" style={{ flex: '1 1 auto', minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, width: '100%', minHeight: '400px' }}>
           <Editor
