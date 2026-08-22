@@ -93,7 +93,7 @@ export function ShareViewer({ token }: ShareViewerProps) {
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1 bg-white">
           {mode === 'gantt' ? (
-            <GanttCanvas />
+            <GanttCanvas readOnly />
           ) : mode === 'sequence' ? (
             <SequenceCanvas readOnly />
           ) : (

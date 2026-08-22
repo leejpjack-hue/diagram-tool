@@ -42,7 +42,7 @@ const diffDays = (a: Date, b: Date): number => {
   return Math.floor(ms / (1000 * 60 * 60 * 24));
 };
 
-export function GanttCanvas() {
+export function GanttCanvas({ readOnly = false }: { readOnly?: boolean }) {
   const { 
     tasks, 
     dependencies,
@@ -257,7 +257,7 @@ export function GanttCanvas() {
   // Handle task bar interactions
   const handleMouseDown = useCallback((e: React.MouseEvent, task: GanttTask, type: 'move' | 'resize-start' | 'resize-end') => {
     e.preventDefault();
-    if (task.isGroup) return;
+    if (readOnly || task.isGroup) return;
     
     setSelectedTask(task.id);
     setDragging({
@@ -266,7 +266,7 @@ export function GanttCanvas() {
       startX: e.clientX,
       originalTask: { ...task },
     });
-  }, [setSelectedTask]);
+  }, [readOnly, setSelectedTask]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!dragging) return;
@@ -412,6 +412,8 @@ export function GanttCanvas() {
       ref={containerRef}
       className="w-full h-full overflow-auto bg-white relative"
       data-canvas-target="primary"
+      data-testid="gantt-canvas"
+      data-readonly={readOnly ? 'true' : 'false'}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
@@ -586,6 +588,7 @@ export function GanttCanvas() {
                   <g
                     className="cursor-pointer"
                     onClick={(e) => {
+                      if (readOnly) return;
                       const isMultiSelect = e.ctrlKey || e.metaKey;
                       toggleTaskSelection(task.id, isMultiSelect);
                     }}
@@ -744,7 +747,7 @@ export function GanttCanvas() {
                     })()}
                     
                     {/* Resize handles (only when selected) */}
-                    {isSelected && (
+                    {isSelected && !readOnly && (
                       <>
                         {/* Left resize handle */}
                         <rect
@@ -1005,7 +1008,7 @@ export function GanttCanvas() {
       )}
       
       {/* Sprint 10: Bulk Operations Panel */}
-      {selectedTaskIds.size > 1 && (
+      {selectedTaskIds.size > 1 && !readOnly && (
         <div className="fixed top-20 right-4 z-20">
           <BulkOperationsPanel onClose={() => clearSelection()} />
         </div>

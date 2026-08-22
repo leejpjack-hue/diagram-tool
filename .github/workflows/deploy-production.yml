@@ -60,6 +60,7 @@ jobs:
         run: |
           sshpass -e ssh "$DEPLOY_USER@$DEPLOY_HOST" "
             set -e
+            mkdir -p \"\$HOME/.local/share/diagram-tool/shares\"
             cd '$DEPLOY_PATH'
             test -f .deploy-dist-new/index.html
             stamp=\$(date +%Y%m%d%H%M%S)
