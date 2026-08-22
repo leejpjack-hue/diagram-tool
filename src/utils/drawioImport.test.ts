@@ -90,6 +90,7 @@ describe('draw.io import stays local-first', () => {
     const manager = readFileSync(join(here, 'boardManager.ts'), 'utf8');
     const sanitizer = readFileSync(join(here, 'importSanitizer.ts'), 'utf8');
     expect(source + manager + sanitizer).not.toMatch(/window\.__|__setDiagramDsl|__getDiagramDsl/);
+    expect(source).not.toMatch(/diagram:\s*architecture|emitArchitecture|INFRA_STYLE/);
   });
 });
 
@@ -128,13 +129,14 @@ describe('importDrawio', () => {
     expect(parsed.nodes).toHaveLength(2);
   });
 
-  it('uses architecture when infra stencils dominate', async () => {
+  it('keeps AWS/infra stencils as a flow board, not architecture', async () => {
     const imported = await importDrawio('payments.drawio', INFRA);
-    expect(imported.mode).toBe('architecture');
-    expect(imported.dslText).toMatch(/diagram:\s*architecture/);
-    expect(imported.dslText).toMatch(/service API/);
-    expect(imported.dslText).toMatch(/database OrdersDB/);
+    expect(imported.mode).toBe('flow');
+    expect(imported.dslText).toMatch(/diagram:\s*flow/);
+    expect(imported.dslText).not.toMatch(/diagram:\s*architecture/);
+    expect(imported.dslText).toContain('API -> OrdersDB');
     const parsed = parseDiagram(imported.dslText);
+    expect(parsed.mode).toBe('flow');
     expect(parsed.nodes).toHaveLength(2);
     expect(parsed.edges).toHaveLength(1);
   });

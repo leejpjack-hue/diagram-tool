@@ -1,4 +1,3 @@
-import type { BoardMode } from './boardManager';
 import type { ImportSkip } from './boardFormat';
 import {
   assertDrawioXmlSafe,
@@ -7,11 +6,13 @@ import {
 } from './importSanitizer';
 
 /**
- * Best-effort draw.io / diagrams.net → DiagramTool board.
+ * Best-effort draw.io / diagrams.net → DiagramTool **flow** board.
+ *
+ * Always flow. Never architecture, deck, Miro, or FigJam. Infra stencils
+ * are ordinary flow nodes — we do not guess architecture.
  *
  * Mapped: rectangle / rounded / ellipse / rhombus / flowchart basics, plus
- * edges with both ends. Infra stencils (AWS/Azure/GCP/…) become architecture
- * nodes when they dominate; otherwise the board is flow.
+ * edges with both ends.
  *
  * Dropped (skipped, never silent): swimlanes, groups, containers, tables,
  * images, text-only overlays, extra pages, edges with a missing endpoint,
@@ -23,7 +24,7 @@ import {
  */
 
 export interface DrawioImport {
-  mode: BoardMode;
+  mode: 'flow';
   title: string;
   dslText: string;
   mapped: number;
@@ -35,8 +36,6 @@ const RESERVED = new Set([
   'cloud', 'class', 'note', 'edge', 'group', 'lane', 'start', 'end', 'node',
 ]);
 
-const INFRA_STYLE = /mxgraph\.(aws|aws3|aws4|azure|gcp|googlecloud|kubernetes|k8s|openstack|ibm|cisco|alibaba|oracle)/i;
-
 type FlowKind =
   | 'process'
   | 'decision'
@@ -46,8 +45,6 @@ type FlowKind =
   | 'manualinput'
   | 'subprocesscollapsed'
   | 'gatewayexclusive';
-
-type ArchKind = 'service' | 'database' | 'queue' | 'cloud';
 
 interface ParsedCell {
   id: string;
@@ -71,8 +68,6 @@ interface MappedNode {
   x?: number;
   y?: number;
   flowKind: FlowKind;
-  archKind: ArchKind;
-  infra: boolean;
 }
 
 export function looksLikeDrawio(filename: string, text: string): boolean {
@@ -120,16 +115,14 @@ export async function importDrawio(filename: string, text: string): Promise<Draw
     throw new Error(`That draw.io file has no mappable nodes or edges.${detail}`);
   }
 
-  const infraCount = nodes.filter(node => node.infra).length;
-  const mode: BoardMode = infraCount > 0 && infraCount >= nodes.length / 2 ? 'architecture' : 'flow';
   const title = sanitizeImportPlainText(
     page.name,
     sanitizeImportPlainText(filename.replace(/\.(drawio|xml)$/i, ''), 'Imported diagram'),
   );
-  const dslText = mode === 'architecture' ? emitArchitecture(title, nodes, edges) : emitFlow(title, nodes, edges);
+  const dslText = emitFlow(title, nodes, edges);
 
   return {
-    mode,
+    mode: 'flow',
     title,
     dslText,
     mapped: nodes.length + edges.length,
@@ -293,8 +286,6 @@ function mapCells(cells: ParsedCell[]): {
       x: cell.x != null ? Math.round(cell.x) : undefined,
       y: cell.y != null ? Math.round(cell.y) : undefined,
       flowKind: flowKind(cell),
-      archKind: archKind(cell),
-      infra: isInfra(cell),
     };
     nodes.push(node);
     idToIdent.set(cell.id, ident);
@@ -347,10 +338,6 @@ function skipReason(cell: ParsedCell): { kind: string; reason: string } | null {
   return null;
 }
 
-function isInfra(cell: ParsedCell): boolean {
-  return INFRA_STYLE.test(cell.styleRaw) || INFRA_STYLE.test(cell.style.shape ?? '');
-}
-
 function flowKind(cell: ParsedCell): FlowKind {
   const shape = (cell.style.shape ?? Object.keys(cell.style)[0] ?? '').toLowerCase();
   const raw = cell.styleRaw.toLowerCase();
@@ -365,14 +352,6 @@ function flowKind(cell: ParsedCell): FlowKind {
   if (/manual.?input/.test(shape) || /manual.?input/.test(raw)) return 'manualinput';
   if (/subprocess|subroutine/.test(shape) || /subprocess|subroutine/.test(raw)) return 'subprocesscollapsed';
   return 'process';
-}
-
-function archKind(cell: ParsedCell): ArchKind {
-  const raw = `${cell.styleRaw} ${cell.style.shape ?? ''} ${cell.value}`.toLowerCase();
-  if (/database|dbinstance|dynamodb|rds|sql|postgres|mongo|cylinder/.test(raw)) return 'database';
-  if (/queue|sqs|sns|kafka|mq\b|pubsub/.test(raw)) return 'queue';
-  if (/cloud|vpc|region|account/.test(raw)) return 'cloud';
-  return 'service';
 }
 
 function uniqueIdent(label: string, used: Set<string>): string {
@@ -412,28 +391,6 @@ function emitFlow(
     if (node.x != null && node.y != null) body.push(`  at: ${node.x}, ${node.y}`);
     if (body.length === 0) continue;
     lines.push(`node ${node.ident} {`, ...body, '}', '');
-  }
-  return lines.join('\n').trim() + '\n';
-}
-
-function emitArchitecture(
-  title: string,
-  nodes: MappedNode[],
-  edges: Array<{ from: string; to: string; label?: string }>,
-): string {
-  const outgoing = new Map<string, string[]>();
-  for (const edge of edges) {
-    const list = outgoing.get(edge.from) ?? [];
-    list.push(edge.to);
-    outgoing.set(edge.from, list);
-  }
-  const lines = [`diagram: architecture`, `title: ${title}`, ''];
-  for (const node of nodes) {
-    lines.push(`${node.archKind} ${node.ident} {`);
-    if (node.x != null && node.y != null) lines.push(`  at: ${node.x}, ${node.y}`);
-    const connects = outgoing.get(node.ident);
-    if (connects?.length) lines.push(`  connects: ${connects.join(', ')}`);
-    lines.push('}', '');
   }
   return lines.join('\n').trim() + '\n';
 }

@@ -33,6 +33,7 @@ test.describe('draw.io dashboard import', () => {
     await page.getByRole('button', { name: 'Done' }).click();
 
     await expect(page.getByRole('heading', { name: 'Two Boxes' })).toBeVisible();
+    await expect(page.getByTestId('board-mode-tag')).toHaveText(/Workflow/i);
     await page.getByRole('heading', { name: 'Two Boxes' }).click();
     await waitForEditor(page);
     await expect(page.getByTestId('rf__node-intake')).toBeVisible();
