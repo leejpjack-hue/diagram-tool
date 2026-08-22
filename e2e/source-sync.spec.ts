@@ -41,6 +41,12 @@ U->>A: GET /orders
 A-->>U: 200 OK
 `;
 
+const FLOW_DSL = `diagram: flow
+title: Copy Flow
+direction: LR
+Intake -> Review
+Review -> Done`;
+
 async function waitForEditor(page: Page) {
   await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible();
   await page.waitForFunction(() => {
@@ -137,5 +143,41 @@ test.describe('Bidirectional source sync', () => {
     await expect(page.getByText('Imported Sequence').first()).toBeVisible();
     await expect(page.getByText('User').first()).toBeVisible();
     await expect(page.getByText('GET /orders').first()).toBeVisible();
+  });
+
+  test('copy as Mermaid and copy as DSL from a flow board', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await page.getByRole('button', { name: 'Create new' }).click();
+    await page.getByRole('button', { name: 'Blank Workflow Open a clean DSL canvas.' }).click();
+    await setEditorDsl(page, FLOW_DSL);
+    await expect(page.getByTestId('copy-as-mermaid')).toBeVisible();
+    await expect(page.getByTestId('copy-as-dsl')).toBeVisible();
+
+    await page.evaluate(() => {
+      const written: string[] = [];
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: async (text: string) => {
+            written.push(text);
+            (window as unknown as { __copiedText?: string }).__copiedText = text;
+          },
+        },
+      });
+    });
+
+    await page.getByTestId('copy-as-mermaid').click();
+    await expect(page.getByText('Copied Mermaid')).toBeVisible();
+    const mermaid = await page.evaluate(() => (window as unknown as { __copiedText?: string }).__copiedText ?? '');
+    expect(mermaid).toMatch(/^flowchart LR/m);
+    expect(mermaid).toContain('Intake');
+    expect(mermaid).toContain('Review');
+
+    await page.getByTestId('copy-as-dsl').click();
+    await expect(page.getByText('Copied DSL')).toBeVisible();
+    const dsl = await page.evaluate(() => (window as unknown as { __copiedText?: string }).__copiedText ?? '');
+    expect(dsl).toMatch(/diagram:\s*flow/);
+    expect(dsl).toContain('Intake -> Review');
   });
 });
