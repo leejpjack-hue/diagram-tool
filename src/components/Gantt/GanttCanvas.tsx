@@ -269,7 +269,7 @@ export function GanttCanvas({ readOnly = false }: { readOnly?: boolean }) {
   }, [readOnly, setSelectedTask]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragging) return;
+    if (readOnly || !dragging) return;
     
     const deltaX = e.clientX - dragging.startX;
     const deltaDays = Math.round(deltaX / dayWidth);
@@ -295,7 +295,7 @@ export function GanttCanvas({ readOnly = false }: { readOnly?: boolean }) {
         updateTask(dragging.taskId, { endDate: newEnd });
       }
     }
-  }, [dragging, dayWidth, visibleTasks, updateTask]);
+  }, [readOnly, dragging, dayWidth, visibleTasks, updateTask]);
 
   const handleMouseUp = useCallback(() => {
     setDragging(null);
@@ -786,6 +786,7 @@ export function GanttCanvas({ readOnly = false }: { readOnly?: boolean }) {
                   <g
                     className="cursor-pointer"
                     onClick={(e) => {
+                      if (readOnly) return;
                       const isMultiSelect = e.ctrlKey || e.metaKey;
                       toggleTaskSelection(task.id, isMultiSelect);
                     }}
@@ -817,6 +818,7 @@ export function GanttCanvas({ readOnly = false }: { readOnly?: boolean }) {
                   <g
                     className="cursor-pointer"
                     onClick={(e) => {
+                      if (readOnly) return;
                       const isMultiSelect = e.ctrlKey || e.metaKey;
                       toggleTaskSelection(task.id, isMultiSelect);
                     }}
@@ -1019,7 +1021,7 @@ export function GanttCanvas({ readOnly = false }: { readOnly?: boolean }) {
       )}
       
       {/* Selection count indicator */}
-      {selectedTaskIds.size > 0 && (
+      {selectedTaskIds.size > 0 && !readOnly && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-4 py-2 rounded-full shadow-lg z-20 flex items-center gap-2">
           <span className="font-semibold">{selectedTaskIds.size}</span>
           <span>selected</span>

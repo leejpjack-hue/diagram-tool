@@ -60,7 +60,21 @@ jobs:
         run: |
           sshpass -e ssh "$DEPLOY_USER@$DEPLOY_HOST" "
             set -e
-            mkdir -p \"\$HOME/.local/share/diagram-tool/shares\"
+            # Pin SHARE_STORE_DIR outside dist/. rsync --delete server/ and the
+            # atomic dist swap must not wipe published view-link tokens.
+            SHARE_STORE_DIR=/var/lib/diagram-tool/share-store
+            if ! mkdir -p \"\$SHARE_STORE_DIR\" 2>/dev/null || [ ! -w \"\$SHARE_STORE_DIR\" ]; then
+              SHARE_STORE_DIR='$DEPLOY_PATH/share-store'
+              mkdir -p \"\$SHARE_STORE_DIR\"
+            fi
+            unit='$DEPLOY_SERVICE'
+            case \"\$unit\" in
+              *.service) drop=\"\$unit.d\" ;;
+              *) drop=\"\$unit.service.d\" ;;
+            esac
+            mkdir -p \"\$HOME/.config/systemd/user/\$drop\"
+            printf '[Service]\\nEnvironment=SHARE_STORE_DIR=%s\\n' \"\$SHARE_STORE_DIR\" > \"\$HOME/.config/systemd/user/\$drop/share-store.conf\"
+            systemctl --user daemon-reload
             cd '$DEPLOY_PATH'
             test -f .deploy-dist-new/index.html
             stamp=\$(date +%Y%m%d%H%M%S)

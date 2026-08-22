@@ -1,26 +1,22 @@
-import { homedir } from 'node:os';
-import { isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 
-export const PRODUCTION_SHARE_STORE_DIR = join(homedir(), '.local/share/diagram-tool/shares');
+/** Stable VPS data dir. Never derived from process.cwd() — a store under dist/ dies on every release. */
+export const PRODUCTION_SHARE_STORE_DIR = '/var/lib/diagram-tool/share-store';
 
 export function resolveShareStoreDirectory(
   env: NodeJS.ProcessEnv = process.env,
   options: { production?: boolean; cwd?: string } = {},
 ): string {
-  const cwd = options.cwd ?? process.cwd();
+  const production = options.production ?? env.NODE_ENV === 'production';
   const override = env.SHARE_STORE_DIR?.trim();
   if (override) {
-    return isAbsolute(override) ? override : resolve(cwd, override);
+    if (isAbsolute(override)) return override;
+    // Relative overrides are local/e2e only. Production must not resolve against cwd
+    // (vite preview often runs with cwd = …/dist).
+    if (production) return PRODUCTION_SHARE_STORE_DIR;
+    return resolve(options.cwd ?? process.cwd(), override);
   }
 
-  const production = options.production ?? env.NODE_ENV === 'production';
-  if (production || cwdLooksLikeDeployArtifact(cwd)) {
-    return PRODUCTION_SHARE_STORE_DIR;
-  }
-  return resolve(cwd, '.share-store');
-}
-
-function cwdLooksLikeDeployArtifact(cwd: string): boolean {
-  const normalized = cwd.replace(/\\/g, '/').replace(/\/+$/, '');
-  return normalized.endsWith('/dist') || /\/dist\//.test(normalized);
+  if (production) return PRODUCTION_SHARE_STORE_DIR;
+  return resolve(options.cwd ?? process.cwd(), '.share-store');
 }

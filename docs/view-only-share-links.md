@@ -14,21 +14,24 @@ Anyone with that URL can view the snapshot with no sign-in. The owner’s Indexe
 
 ## Where snapshots live
 
-Live `diagram-tool.teqcon.uk` is **nginx → Vite preview** on the teqcon.uk VPS (`rsync dist/` + systemd). The repo has no wrangler/KV/R2 binding. Cloudflare Workers Builds is a dashboard Git integration (PR previews already fail on earlier branches such as #5; `main` still builds). This feature does not add a user table or a Worker rewrite.
+Live `diagram-tool.teqcon.uk` is **nginx → Vite preview** on the teqcon.uk VPS (`rsync dist/` + `rsync server/` + systemd). The repo has no wrangler/KV/R2 binding. Cloudflare Workers Builds is a dashboard Git integration (PR previews already fail on earlier branches such as #5; `main` still builds). This feature does **not** rewrite to KV. Ignore Cloudflare Workers Builds.
 
-The smallest store that fits the Vite preview host is a **file-backed token store** (`server/sharePlugin.ts`). Production deploy (`deploy-production.yml`) only swaps `dist/` (and rsyncs `server/` + `vite.config.ts`). It never deletes the share data directory.
+The store is a **file-backed token store** (`server/sharePlugin.ts`). Production deploy (`deploy-production.yml`) rsyncs `server/` with `--delete` and atomically swaps `dist/`. A store under `dist/` or `server/` dies on every release.
+
+`SHARE_STORE_DIR` is therefore **pinned to a stable absolute path outside `dist/`**. The Node process does **not** guess from `process.cwd()` in production (Vite preview often runs with cwd = `…/dist`).
 
 | Item | Location |
 | --- | --- |
-| Snapshot + tokens (production) | **`$HOME/.local/share/diagram-tool/shares/<token>.json`** on the VPS deploy user. Absolute path, outside `dist/` and outside the rsync artifact. A ship/restart does **not** wipe tokens. |
-| Override | `SHARE_STORE_DIR` (absolute path preferred). Use this for a mounted data volume. |
+| Snapshot + tokens (production default) | **`/var/lib/diagram-tool/share-store/<token>.json`**. Literal absolute path. Not `process.cwd()`, not `$HOME` inference, not inside `dist/`. |
+| Live pin | Deploy writes a systemd user drop-in `Environment=SHARE_STORE_DIR=…` and `mkdir`s the directory **before** the `dist` swap. If `/var/lib/diagram-tool/share-store` is not writable by the deploy user, it pins **`$DEPLOY_PATH/share-store`** (sibling of `dist/` and `server/`). Either path survives rsync and the dist swap. |
+| Override | `SHARE_STORE_DIR` must be an **absolute** path in production. A relative value is ignored when `NODE_ENV=production` so cwd cannot place files in `dist/`. |
 | Local / e2e | `.share-store/` in the checkout, or `SHARE_STORE_DIR=.share-store-e2e`. Not used on teqcon.uk. |
 | Record | `{ token, manageToken, createdAt, document }` where `document` is format 3.0 board JSON after the presentation sanitizer |
 | Public GET | `/api/shares/<token>` returns the sanitized board document only (never `manageToken`) |
 | Collection GET | `GET /api/shares` is **404**. There is no list/index of tokens. |
 | Viewer page | `/view/<token>` serves the SPA when the token exists; **404** when it does not |
 
-`deploy-production.yml` runs `mkdir -p "$HOME/.local/share/diagram-tool/shares"` before the `dist` swap. Vite preview in production (`NODE_ENV=production`, or a cwd of `…/dist`) resolves to that home data dir via `resolveShareStoreDirectory()`. The store is not a static web root.
+`resolveShareStoreDirectory()` in `server/shareStorePath.ts` implements this. The store is not a static web root (`server.fs.deny` for `.share-store*`).
 
 No user table. The manage token is a capability stored only on the owner’s device (`localStorage` key `diagram-tool.share-links`). Losing that browser means the owner cannot revoke from the UI (v1).
 
@@ -42,11 +45,13 @@ No user table. The manage token is a capability stored only on the owner’s dev
 
 | Action | Owner UI | Host |
 | --- | --- | --- |
-| **Revoke** | Share dialog → **Revoke link** | Deletes `<store>/<token>.json` (production: `$HOME/.local/share/diagram-tool/shares`). `GET /view/<token>` and `GET /api/shares/<token>` return **404**. |
+| **Revoke** | Share dialog → **Revoke link** | Deletes `<store>/<token>.json` (production: `/var/lib/diagram-tool/share-store`, or the pinned `SHARE_STORE_DIR`). `GET /view/<token>` and `GET /api/shares/<token>` return **404**. |
 | **Rotate** | Share dialog → **Replace link** | Writes a new token file in the same durable store, deletes the old one. Old URL 404s; new URL serves the same snapshot. |
 
 Revoke/rotate require the manage token (`X-Share-Manage-Token` or JSON body). A viewer never receives it.
 
 ## Viewer rules
 
-The viewer is read-only: no DSL editor, no deck editor, no import, no export-to-overwrite. Download export is allowed. The UI never mentions seats, members, or billing. There is no path that turns a viewer into an identity.
+The viewer is read-only: no DSL editor, no deck editor, no import, no export-to-overwrite. Download export is allowed. Architecture, sequence, and **Gantt** canvases take `readOnly`. On a published Gantt link there is no task edit, no % complete control, and no schedule drag.
+
+The UI never mentions seats, members, or billing. There is no path that turns a viewer into an identity.

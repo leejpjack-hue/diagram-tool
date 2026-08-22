@@ -144,7 +144,9 @@ test.describe('View-only share links', () => {
     await expect(viewerPage.getByRole('button', { name: /add task/i })).toHaveCount(0);
     await expect(viewerPage.locator('input[type="range"]')).toHaveCount(0);
     await expect(viewerPage.getByLabel(/progress/i)).toHaveCount(0);
+    await expect(viewerPage.getByText(/progress:/i)).toHaveCount(0);
     await expect(viewerPage.locator('.cursor-ew-resize')).toHaveCount(0);
+    await expect(viewerPage.getByText('selected')).toHaveCount(0);
 
     const bar = viewerPage.getByTestId('gantt-bar-task-1');
     await expect(bar).toBeVisible();
