@@ -51,8 +51,8 @@ test.describe('View-only share links', () => {
     await expect(page.getByRole('dialog', { name: 'Share Board A' })).toBeVisible();
     await expect(page.getByRole('dialog')).not.toContainText(/seats|members|billing/i);
     await page.getByTestId('share-publish').click();
+    await expect(page.getByTestId('share-view-url')).toHaveValue(/\/view\/[A-Za-z0-9_-]{16,64}$/);
     const shareUrl = await page.getByTestId('share-view-url').inputValue();
-    expect(shareUrl).toMatch(/\/view\/[A-Za-z0-9_-]{16,64}$/);
 
     await expect(page.getByRole('heading', { name: 'Board A' })).toBeVisible();
     await page.getByRole('button', { name: 'Close' }).click();
@@ -73,8 +73,9 @@ test.describe('View-only share links', () => {
     await page.getByRole('button', { name: 'Actions for Board A' }).click();
     await page.getByRole('button', { name: 'Share' }).click();
     await page.getByTestId('share-rotate').click();
+    await expect(page.getByTestId('share-view-url')).not.toHaveValue(shareUrl);
     const rotatedUrl = await page.getByTestId('share-view-url').inputValue();
-    expect(rotatedUrl).not.toBe(shareUrl);
+    expect(rotatedUrl).toMatch(/\/view\/[A-Za-z0-9_-]{16,64}$/);
 
     const oldAfterRotate = await viewerPage.goto(shareUrl);
     expect(oldAfterRotate?.status()).toBe(404);
@@ -86,6 +87,7 @@ test.describe('View-only share links', () => {
     await expect(viewerPage.getByTestId('share-viewer-node-count')).toHaveText('2');
 
     await page.getByTestId('share-revoke').click();
+    await expect(page.getByTestId('share-publish')).toBeVisible();
     const afterRevoke = await viewerPage.goto(rotatedUrl);
     expect(afterRevoke?.status()).toBe(404);
     await expect(viewerPage.getByText('This view link is gone')).toBeVisible();
