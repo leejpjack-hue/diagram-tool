@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://diagram-tool.teqcon.uk/schema/board-format-3.0.json",
+  "title": "DiagramTool portable board format",
+  "description": "Public, versioned JSON for a local-first DiagramTool board or a complete workspace backup. Free to export and re-open. No account required.",
+  "oneOf": [
+    { "$ref": "#/$defs/boardDocument" },
+    { "$ref": "#/$defs/workspaceDocument" }
+  ],
+  "$defs": {
+    "version": {
+      "type": "string",
+      "description": "Format version. Current public version is 3.0. Importers must still accept 1.0 and 2.0 files.",
+      "enum": ["1.0", "2.0", "3.0"]
+    },
+    "boardMode": {
+      "type": "string",
+      "enum": ["architecture", "flow", "sequence", "gantt"]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "text"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["dsl", "mermaid"] },
+        "text": { "type": "string", "description": "Authoring source: native DSL or Mermaid (sequence / flowchart)." }
+      }
+    },
+    "point": {
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "properties": { "type": "object" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["id", "from", "to"],
+      "properties": {
+        "id": { "type": "string" },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "label": { "type": "string" }
+      }
+    },
+    "comment": {
+      "type": "object",
+      "description": "Reserved. Comments are not a product feature yet; exporters write [] so the format can grow.",
+      "properties": {
+        "id": { "type": "string" },
+        "body": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "description": "Reserved board-level frames. Presentation/deck frames live under presentation.items with type=frame.",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" }
+      }
+    },
+    "presentationItem": {
+      "type": "object",
+      "required": ["id", "type", "content", "x", "y", "width", "height"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["image", "note", "text", "arrow", "shape", "drawing", "frame"]
+        },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "locked": { "type": "boolean" },
+        "zIndex": { "type": "number" },
+        "style": { "type": "object" }
+      }
+    },
+    "portableBoard": {
+      "type": "object",
+      "required": ["title", "mode", "source", "nodes", "edges", "frames", "comments"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "mode": { "$ref": "#/$defs/boardMode" },
+        "dslText": { "type": "string", "description": "Alias of source.text for 2.0 compatibility." },
+        "source": { "$ref": "#/$defs/source" },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+        "frames": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/frame" },
+          "description": "Always present. Empty until board-level frames exist."
+        },
+        "comments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/comment" },
+          "description": "Always present. Empty until comments exist."
+        },
+        "layout": {
+          "type": "object",
+          "properties": {
+            "pins": {
+              "type": "object",
+              "additionalProperties": { "$ref": "#/$defs/point" }
+            }
+          }
+        },
+        "presentation": {
+          "type": "object",
+          "properties": {
+            "items": { "type": "array", "items": { "$ref": "#/$defs/presentationItem" } },
+            "updatedAt": { "type": "string" }
+          }
+        },
+        "thumbnail": { "type": "string" },
+        "spaceId": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "starred": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "lastOpenedAt": { "type": "string" },
+        "deletedAt": { "type": "string" },
+        "templateSourceId": { "type": "string" },
+        "schemaVersion": { "type": "integer" }
+      }
+    },
+    "space": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "order": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "template": {
+      "type": "object",
+      "required": ["name", "mode", "dslText"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "mode": { "$ref": "#/$defs/boardMode" },
+        "dslText": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "useCount": { "type": "number" },
+        "lastUsedAt": { "type": "string" }
+      }
+    },
+    "versionCheckpoint": {
+      "type": "object",
+      "description": "Version checkpoint metadata (named and automatic). Included in a complete backup.",
+      "required": ["boardId", "name", "dslText", "mode", "createdAt"],
+      "properties": {
+        "id": { "type": "string" },
+        "boardId": { "type": "string" },
+        "name": { "type": "string" },
+        "dslText": { "type": "string" },
+        "mode": { "$ref": "#/$defs/boardMode" },
+        "createdAt": { "type": "string" },
+        "automatic": { "type": "boolean" }
+      }
+    },
+    "boardDocument": {
+      "type": "object",
+      "required": ["version", "board"],
+      "properties": {
+        "version": { "$ref": "#/$defs/version" },
+        "kind": { "const": "board" },
+        "exportedAt": { "type": "string" },
+        "board": { "$ref": "#/$defs/portableBoard" }
+      }
+    },
+    "workspaceDocument": {
+      "type": "object",
+      "required": ["version", "boards"],
+      "properties": {
+        "version": { "$ref": "#/$defs/version" },
+        "kind": { "const": "workspace" },
+        "exportedAt": { "type": "string" },
+        "boards": { "type": "array", "items": { "$ref": "#/$defs/portableBoard" } },
+        "spaces": { "type": "array", "items": { "$ref": "#/$defs/space" } },
+        "templates": { "type": "array", "items": { "$ref": "#/$defs/template" } },
+        "versions": { "type": "array", "items": { "$ref": "#/$defs/versionCheckpoint" } }
+      }
+    }
+  }
+}
