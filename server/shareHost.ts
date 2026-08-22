@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { sanitizePublishedSnapshot } from '../src/utils/presentationSanitizer';
+import { sanitizePublishedSnapshot } from './presentationSanitizer';
 import {
   createShareToken,
   isShareBoardDocument,

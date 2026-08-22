@@ -22,5 +22,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts", "server/**/*.ts", "src/utils/presentationSanitizer.ts"]
+  "include": ["vite.config.ts", "server/**/*.ts"]
 }

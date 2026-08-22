@@ -16,7 +16,7 @@ Anyone with that URL can view the snapshot with no sign-in. The owner’s Indexe
 
 Live `diagram-tool.teqcon.uk` is **nginx → Vite preview** on the teqcon.uk VPS (`rsync dist/` + `rsync server/` + systemd). The repo has no wrangler/KV/R2 binding. Cloudflare Workers Builds is a dashboard Git integration (PR previews already fail on earlier branches such as #5; `main` still builds). This feature does **not** rewrite to KV. Ignore Cloudflare Workers Builds.
 
-The store is a **file-backed token store** (`server/sharePlugin.ts`). Production deploy (`deploy-production.yml`) rsyncs `server/` with `--delete` and atomically swaps `dist/`. A store under `dist/` or `server/` dies on every release.
+The store is a **file-backed token store** (`server/sharePlugin.ts`). Production deploy (`deploy-production.yml`) rsyncs `server/` with `--delete` and atomically swaps `dist/` + `vite.config.ts`. It does **not** rsync `src/`. The share plugin therefore must not import from `src/` — the presentation sanitizer lives in `server/presentationSanitizer.ts`. A store under `dist/` or `server/` dies on every release.
 
 **`SHARE_STORE_DIR` is pinned outside `dist/`.** The resolver never defaults to `resolve(process.cwd(), '.share-store')`. systemd / `vite preview` often start with cwd = `…/dist`; a cwd-relative store would be wiped on every ship.
 
