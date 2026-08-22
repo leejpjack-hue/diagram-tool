@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isMermaidFlow } from './mermaidFlow';
+import { isMermaidFlow, isMermaidSequence } from './mermaidFlow';
 import { parseDiagram } from './parser';
 
 describe('isMermaidFlow', () => {
@@ -11,6 +11,17 @@ describe('isMermaidFlow', () => {
   it('ignores native DSL and sequence', () => {
     expect(isMermaidFlow('diagram: flow\nA -> B')).toBe(false);
     expect(isMermaidFlow('sequenceDiagram\nA->>B: hi')).toBe(false);
+  });
+});
+
+describe('isMermaidSequence', () => {
+  it('detects a sequenceDiagram header', () => {
+    expect(isMermaidSequence('sequenceDiagram\nA->>B: hi')).toBe(true);
+    expect(isMermaidSequence('%% note\n\nsequenceDiagram\nA->>B: hi')).toBe(true);
+  });
+  it('ignores flowcharts and native DSL', () => {
+    expect(isMermaidSequence('flowchart TD\nA-->B')).toBe(false);
+    expect(isMermaidSequence('diagram: architecture\nservice A {}')).toBe(false);
   });
 });
 

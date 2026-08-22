@@ -30,6 +30,7 @@ import { calculateAutoLayout, resolveGroupOverlaps } from '../../utils/autoLayou
 import { addConnectionDSL } from '../../utils/connectDSL';
 import { setReverseDSL, setReverseMermaidDSL } from '../../utils/flowDSL';
 import { setNodePin, setGroupPin, setMermaidNodePin } from '../../utils/pinUtils';
+import { applyBoardSource, renameNodeInSource } from '../../utils/sourceText';
 import { isMermaidFlow } from '../../parser/mermaidFlow';
 import { parseDiagram } from '../../parser/parser';
 import { getHelperLines, type HelperLineResult } from './helperLines';
@@ -185,7 +186,8 @@ function computeArchitectureRouting(diagramMode: string, diagramEdges: DiagramEd
 }
 
 function DiagramCanvasInternal() {
-  const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode, dslText, setDslText, setParsedDiagram } = useDiagramStore();
+  const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode, dslText, setDslText, setParsedDiagram, setError, selectedNodeId } = useDiagramStore();
+  const [renameDraft, setRenameDraft] = useState<string | null>(null);
   const { getZoom } = useReactFlow();
   const [c4Level, setC4Level] = useState<C4Level | 'all'>('all');
   // When the user clicks a parent node, we filter to its direct children.
@@ -792,7 +794,32 @@ function DiagramCanvasInternal() {
   // The toggle is written back to the DSL (source of truth) and re-parsed.
   // For Mermaid-format flowcharts the toggle rides along as a `%% reverse <id>`
   // comment so it survives the Mermaid→native transpilation round-trip.
+  const commitRename = useCallback((nodeId: string, nextName: string) => {
+    if (!parsedDiagram) return;
+    const meta = parsedDiagram.nodes.find(n => n.id === nodeId);
+    if (!meta) return;
+    const next = renameNodeInSource(dslText, meta, nextName);
+    setRenameDraft(null);
+    if (next === dslText) return;
+    setDslText(next);
+    const result = applyBoardSource(next, diagramMode === 'flow' ? 'flow' : 'architecture');
+    if (result.ok) {
+      setError(null);
+      if (result.kind === 'diagram') setParsedDiagram(result.parsed);
+    } else {
+      setError(result.error);
+    }
+  }, [parsedDiagram, dslText, diagramMode, setDslText, setParsedDiagram, setError, setSelectedNode]);
+
   const onNodeDoubleClick = useCallback((_e: unknown, node: Node) => {
+    if (diagramMode !== 'flow' && parsedDiagram) {
+      const meta = parsedDiagram.nodes.find(n => n.id === node.id);
+      if (meta && meta.type !== 'annotation') {
+        setRenameDraft(meta.name);
+        setSelectedNode(node.id);
+        return;
+      }
+    }
     if (diagramMode !== 'flow' || !parsedDiagram) return;
     const clicked = parsedDiagram.nodes.find(n => n.id === node.id);
     if (!clicked || clicked.type !== 'flow') return;
@@ -810,7 +837,7 @@ function DiagramCanvasInternal() {
     } catch (err) {
       console.error('Reverse toggle parse error:', err);
     }
-  }, [diagramMode, parsedDiagram, dslText, setDslText, setParsedDiagram]);
+  }, [diagramMode, parsedDiagram, dslText, setDslText, setParsedDiagram, setSelectedNode]);
 
   // Click a parent node to drill into its children at the next C4 level.
   // No-op when there are no children with parent = clicked node id.
@@ -865,6 +892,20 @@ function DiagramCanvasInternal() {
     }, 100);
     return () => clearTimeout(timer);
   }, [getZoom, setZoomLevel]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'F2' || !selectedNodeId || !parsedDiagram) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      const meta = parsedDiagram.nodes.find(n => n.id === selectedNodeId);
+      if (!meta || meta.type === 'annotation') return;
+      event.preventDefault();
+      setRenameDraft(meta.name);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedNodeId, parsedDiagram]);
 
   // Handle node selection for copy/paste
   const onSelectionChange = useCallback(({ nodes: selectedNodes }: { nodes: Node[] }) => {
@@ -977,6 +1018,23 @@ function DiagramCanvasInternal() {
   return (
     <LayoutDirectionContext.Provider value={layoutDirection}>
     <div className="w-full h-full overflow-hidden bg-white relative" data-canvas-target="primary">
+      {renameDraft !== null && selectedNodeId && (
+        <div className="absolute top-4 left-1/2 z-20 -translate-x-1/2 rounded-lg border border-indigo-200 bg-white px-3 py-2 shadow-md">
+          <input
+            autoFocus
+            aria-label="Rename node"
+            data-testid="canvas-rename-input"
+            value={renameDraft}
+            onChange={e => setRenameDraft(e.target.value)}
+            onBlur={() => commitRename(selectedNodeId, renameDraft)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') commitRename(selectedNodeId, renameDraft);
+              if (e.key === 'Escape') setRenameDraft(null);
+            }}
+            className="w-56 rounded-md border border-slate-200 px-2 py-1 text-sm outline-none focus:border-indigo-400"
+          />
+        </div>
+      )}
       <ReactFlow
         nodes={nodes}
         edges={edges}

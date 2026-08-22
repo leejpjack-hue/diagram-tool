@@ -24,6 +24,15 @@ export function isMermaidFlow(text: string): boolean {
   return false;
 }
 
+export function isMermaidSequence(text: string): boolean {
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line || line.startsWith('%%') || line.startsWith('#')) continue;
+    return /^sequenceDiagram\b/i.test(line);
+  }
+  return false;
+}
+
 type Shape =
   | 'process' | 'decision' | 'terminator' | 'data'
   | 'manualinput' | 'document' | 'subprocesscollapsed' | 'gatewayexclusive';

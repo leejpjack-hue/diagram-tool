@@ -79,6 +79,111 @@ export class Parser {
     return undefined;
   }
 
+  private peekAt(offset: number): Token {
+    return this.tokens[this.pos + offset] ?? this.tokens[this.tokens.length - 1];
+  }
+
+  private isNameToken(token: Token): boolean {
+    return token.type === TokenType.IDENTIFIER || token.type === TokenType.KEYWORD;
+  }
+
+  private looksLikeArchitectureArrow(): boolean {
+    let offset = 1;
+    while (this.peekAt(offset).type === TokenType.NEWLINE) offset += 1;
+    return this.peekAt(offset).type === TokenType.ARROW;
+  }
+
+  // `Client -> CDN` or `Client -> CDN { label: "REST" }` — same edge as `edge`.
+  private parseArchitectureArrowLine(): void {
+    const fromName = String(this.expectName().value);
+    this.skipNewlines();
+    if (this.peek().type !== TokenType.ARROW) {
+      throw new Error(
+        `Expected -> after ${fromName} at line ${this.peek().line}, column ${this.peek().column}`,
+      );
+    }
+    this.advance();
+    this.skipNewlines();
+    if (!this.isNameToken(this.peek())) {
+      throw new Error(
+        `Architecture edge is missing a target after -> at line ${this.peek().line}, column ${this.peek().column}. Use connects: or A -> B.`,
+      );
+    }
+    const toName = String(this.expectName().value);
+    this.upsertArchitectureEdge(fromName, toName, this.readOptionalArchitectureEdgeSettings());
+  }
+
+  private readOptionalArchitectureEdgeSettings(): {
+    label?: string;
+    color?: string;
+    sourceSide?: ConnectionSide;
+    targetSide?: ConnectionSide;
+  } {
+    const settings: {
+      label?: string;
+      color?: string;
+      sourceSide?: ConnectionSide;
+      targetSide?: ConnectionSide;
+    } = {};
+    if (this.peek().type !== TokenType.LBRACE) return settings;
+
+    this.advance();
+    this.skipNewlines();
+    while (this.peek().type !== TokenType.RBRACE && this.peek().type !== TokenType.EOF) {
+      this.skipNewlines();
+      if (this.peek().type === TokenType.RBRACE) break;
+      const keyTok = this.peek();
+      if (keyTok.type === TokenType.KEYWORD || keyTok.type === TokenType.IDENTIFIER) {
+        this.advance();
+        this.expect(TokenType.COLON);
+        const v = this.advance();
+        const key = String(keyTok.value).toLowerCase();
+        if (key === 'label') settings.label = String(v.value);
+        else if (key === 'color' || key === 'colour') settings.color = String(v.value);
+        else if (key === 'from' || key === 'source' || key === 'sourceside' || key === 'sourceport') {
+          settings.sourceSide = this.parseConnectionSide(v.value);
+        } else if (key === 'to' || key === 'target' || key === 'targetside' || key === 'targetport') {
+          settings.targetSide = this.parseConnectionSide(v.value);
+        }
+      } else {
+        this.advance();
+      }
+    }
+    if (this.peek().type === TokenType.RBRACE) this.advance();
+    return settings;
+  }
+
+  private upsertArchitectureEdge(
+    fromName: string,
+    toName: string,
+    settings: {
+      label?: string;
+      color?: string;
+      sourceSide?: ConnectionSide;
+      targetSide?: ConnectionSide;
+    } = {},
+  ): void {
+    const fromId = fromName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const toId = toName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const existing = this.edges.find(e => e.from === fromId && e.to === toId);
+    if (existing) {
+      if (settings.label !== undefined) existing.label = settings.label;
+      if (settings.color !== undefined) existing.color = settings.color;
+      if (settings.sourceSide !== undefined) existing.sourceSide = settings.sourceSide;
+      if (settings.targetSide !== undefined) existing.targetSide = settings.targetSide;
+      return;
+    }
+    this.edges.push({
+      id: `${fromId}_to_${toId}_${this.edges.length}`,
+      from: fromId,
+      to: toId,
+      label: settings.label,
+      color: settings.color,
+      sourceSide: settings.sourceSide,
+      targetSide: settings.targetSide,
+    });
+  }
+
   parse(): ParsedDiagram {
     this.skipNewlines();
 
@@ -86,6 +191,11 @@ export class Parser {
       const token = this.peek();
 
       if (token.type === TokenType.KEYWORD) {
+        if (this.mode === 'architecture' && this.looksLikeArchitectureArrow()) {
+          this.parseArchitectureArrowLine();
+          this.skipNewlines();
+          continue;
+        }
         switch ((token.value as string).toLowerCase()) {
           case 'diagram':
             this.parseDiagramDeclaration();
@@ -136,16 +246,26 @@ export class Parser {
             this.parseFlowNodeMetadata();
             break;
           default:
-            // Try to parse as flow connection if identifier follows
-            if (this.mode === 'flow') {
+            // A reserved word used as a node name (`Cloud -> Gateway`) is an
+            // architecture arrow, not a new `cloud` declaration.
+            if (this.mode === 'architecture' && this.looksLikeArchitectureArrow()) {
+              this.parseArchitectureArrowLine();
+            } else if (this.mode === 'flow') {
               this.parseFlowConnection();
             } else {
               this.advance();
             }
         }
+      } else if (this.mode === 'architecture' && this.isNameToken(token) && this.looksLikeArchitectureArrow()) {
+        // Bare `Client -> CDN` — do not silently drop architecture edges.
+        this.parseArchitectureArrowLine();
       } else if (this.mode === 'flow' && token.type === TokenType.IDENTIFIER) {
         // Flow mode: parse connections like "A -> B -> C"
         this.parseFlowConnection();
+      } else if (this.mode === 'architecture' && token.type === TokenType.ARROW) {
+        throw new Error(
+          `Unexpected -> at line ${token.line}, column ${token.column}. Architecture edges use connects: or A -> B.`,
+        );
       } else {
         this.advance();
       }
@@ -812,77 +932,21 @@ export class Parser {
     this.advance(); // consume 'edge'
 
     const fromName = String(this.expectName().value);
-    const fromId = fromName.toLowerCase().replace(/[^a-z0-9]/g, '_');
-
-    // Expect an arrow
+    this.skipNewlines();
     if (this.peek().type !== TokenType.ARROW) {
-      this.advance(); // unknown token — bail out gracefully
-      return;
+      throw new Error(
+        `Expected -> after edge ${fromName} at line ${this.peek().line}, column ${this.peek().column}`,
+      );
     }
-    this.advance(); // consume '->'
-
+    this.advance();
+    this.skipNewlines();
+    if (!this.isNameToken(this.peek())) {
+      throw new Error(
+        `Architecture edge is missing a target after -> at line ${this.peek().line}, column ${this.peek().column}`,
+      );
+    }
     const toName = String(this.expectName().value);
-    const toId = toName.toLowerCase().replace(/[^a-z0-9]/g, '_');
-
-    let label: string | undefined;
-    let color: string | undefined;
-    let sourceSide: ConnectionSide | undefined;
-    let targetSide: ConnectionSide | undefined;
-
-    // Optional settings block — supports quoted strings and bare identifiers so
-    // users can write either `label: "REST"` or `label: REST`.
-    if (this.peek().type === TokenType.LBRACE) {
-      this.advance(); // consume '{'
-      this.skipNewlines();
-      while (this.peek().type !== TokenType.RBRACE && this.peek().type !== TokenType.EOF) {
-        this.skipNewlines();
-        if (this.peek().type === TokenType.RBRACE) break;
-        const keyTok = this.peek();
-        if (keyTok.type === TokenType.KEYWORD || keyTok.type === TokenType.IDENTIFIER) {
-          this.advance(); // consume key
-          this.expect(TokenType.COLON);
-          const v = this.advance();
-          const key = String(keyTok.value).toLowerCase();
-          if (key === 'label') {
-            label = String(v.value);
-          } else if (key === 'color' || key === 'colour') {
-            color = String(v.value);
-          } else if (key === 'from' || key === 'source' || key === 'sourceside' || key === 'sourceport') {
-            sourceSide = this.parseConnectionSide(v.value);
-          } else if (key === 'to' || key === 'target' || key === 'targetside' || key === 'targetport') {
-            targetSide = this.parseConnectionSide(v.value);
-          }
-        } else {
-          this.advance();
-        }
-      }
-      if (this.peek().type === TokenType.RBRACE) {
-        this.advance();
-      }
-    }
-
-    // Find an existing edge between these two nodes (created by an earlier
-    // `connects:` declaration) and either add a label or replace an empty one.
-    // If no edge exists yet, create one.
-    const existing = this.edges.find(
-      e => e.from === fromId && e.to === toId
-    );
-    if (existing) {
-      if (label !== undefined) existing.label = label;
-      if (color !== undefined) existing.color = color;
-      if (sourceSide !== undefined) existing.sourceSide = sourceSide;
-      if (targetSide !== undefined) existing.targetSide = targetSide;
-    } else {
-      this.edges.push({
-        id: `${fromId}_to_${toId}_${this.edges.length}`,
-        from: fromId,
-        to: toId,
-        label,
-        color,
-        sourceSide,
-        targetSide,
-      });
-    }
+    this.upsertArchitectureEdge(fromName, toName, this.readOptionalArchitectureEdgeSettings());
   }
 
   // Read tokens until the next newline/rbrace/eof and split on commas. Each item

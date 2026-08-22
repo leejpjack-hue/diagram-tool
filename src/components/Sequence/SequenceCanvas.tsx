@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDiagramStore } from '../../store/diagramStore';
-import { parseSequenceDiagram } from './sequenceParser';
+import { parseSequenceSource } from './sequenceParser';
 import type { SequenceItem } from './sequenceParser';
 import { renameParticipant, editMessageText, toggleMessageDashed } from './sequenceEdit';
 
@@ -41,15 +41,24 @@ type Editing =
   | null;
 
 export function SequenceCanvas() {
-  const { dslText, setDslText } = useDiagramStore();
+  const { dslText, setDslText, setError } = useDiagramStore();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const [zoom, setZoom] = useState(1);
   const [editing, setEditing] = useState<Editing>(null);
   const [draft, setDraft] = useState('');
 
-  const model = useMemo(() => parseSequenceDiagram(dslText), [dslText]);
+  const parsed = useMemo(() => parseSequenceSource(dslText), [dslText]);
+  const [lastGood, setLastGood] = useState(parsed.model);
+  if (!parsed.error && lastGood !== parsed.model) {
+    setLastGood(parsed.model);
+  }
+  const model = parsed.error ? lastGood : parsed.model;
   const { participants, items, title } = model;
+
+  useEffect(() => {
+    setError(parsed.error);
+  }, [parsed.error, setError]);
 
   // Ctrl/Cmd + wheel zooms, matching the React Flow canvases.
   useEffect(() => {

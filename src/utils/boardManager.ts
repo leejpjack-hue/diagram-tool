@@ -5,6 +5,7 @@ import {
   parsePortableImport,
   type ImportReport,
 } from './boardFormat';
+import { detectRawDiagramImport } from './sourceText';
 
 export type BoardMode = 'architecture' | 'flow' | 'sequence' | 'gantt';
 export type BoardSort = 'lastOpened' | 'updated' | 'created' | 'name';
@@ -830,9 +831,20 @@ export class BoardManager {
 
   async importFromFile(file: File): Promise<ImportReport> {
     await this.initialize();
+    const text = await file.text();
+    const mermaid = detectRawDiagramImport(file.name, text);
+    if (mermaid) {
+      const board = await this.create({
+        title: mermaid.title,
+        mode: mermaid.mode,
+        dslText: mermaid.dslText,
+      });
+      return { boards: [board], spaces: 0, templates: 0, versions: 0, skipped: [] };
+    }
+
     let data: unknown;
     try {
-      data = JSON.parse(await file.text());
+      data = JSON.parse(text);
     } catch {
       throw new Error("That file isn't a valid board file.");
     }

@@ -65,6 +65,38 @@ function cleanId(raw: string): string {
   return raw.trim().replace(/^"|"$/g, '');
 }
 
+export function findUnrecognizedSequenceLines(text: string): { line: number; text: string }[] {
+  const leftover: { line: number; text: string }[] = [];
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line || line.startsWith('%%') || line.startsWith('#')) continue;
+    if (NON_MESSAGE_PREFIX.test(line)) continue;
+    if (MESSAGE_RE.test(line)) continue;
+    if (/->/.test(line) || /->>/.test(line) || /-->/.test(line)) {
+      leftover.push({ line: i + 1, text: line });
+    }
+  }
+  return leftover;
+}
+
+export function parseSequenceSource(text: string): { model: SequenceDiagramModel; error: string | null } {
+  if (/^\s*diagram:\s*(architecture|flow|gantt)\b/im.test(text)) {
+    return {
+      model: parseSequenceDiagram(text),
+      error: 'This source is not a sequenceDiagram. Sequence boards use Mermaid (participant / A->>B: text).',
+    };
+  }
+  const leftover = findUnrecognizedSequenceLines(text);
+  if (leftover.length > 0) {
+    return {
+      model: parseSequenceDiagram(text),
+      error: `Unrecognized sequence message at line ${leftover[0].line}. Use A->>B: text (edge was not applied).`,
+    };
+  }
+  return { model: parseSequenceDiagram(text), error: null };
+}
+
 export function parseSequenceDiagram(text: string): SequenceDiagramModel {
   const participants: SequenceParticipant[] = [];
   const items: SequenceItem[] = [];

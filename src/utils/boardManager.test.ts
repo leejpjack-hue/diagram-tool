@@ -231,6 +231,26 @@ describe('migration and import compatibility', () => {
   it('rejects invalid files', async () => {
     await expect(manager.importFromFile(asFile({ nope: true }, 'bad.json'))).rejects.toThrow('valid board file');
   });
+
+  it('imports a raw sequenceDiagram mermaid file', async () => {
+    const file = new File([`sequenceDiagram
+title Imported Checkout
+participant U as User
+participant A as API
+U->>A: GET /orders
+`], 'checkout.mmd', { type: 'text/plain' });
+    const report = await manager.importFromFile(file);
+    expect(report.boards[0].mode).toBe('sequence');
+    expect(report.boards[0].title).toBe('Imported Checkout');
+    expect(report.boards[0].dslText).toContain('U->>A: GET /orders');
+  });
+
+  it('imports a raw flowchart mermaid file', async () => {
+    const file = new File(['flowchart TD\nA[Start] --> B[Done]\n'], 'flow.mmd', { type: 'text/plain' });
+    const report = await manager.importFromFile(file);
+    expect(report.boards[0].mode).toBe('flow');
+    expect(report.boards[0].dslText).toContain('flowchart TD');
+  });
 });
 
 describe('durable workspace reload and quota recovery', () => {
