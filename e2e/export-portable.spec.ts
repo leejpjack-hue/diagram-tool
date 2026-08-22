@@ -136,7 +136,7 @@ test.describe('Portable export and import', () => {
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await page.getByRole('button', { name: 'Close' }).click();
 
-    await page.getByRole('button', { name: 'Actions for Untitled architecture' }).click();
+    await page.getByRole('button', { name: 'Actions for Portable Roundtrip' }).click();
     await page.getByRole('button', { name: 'Edit details' }).click();
     await page.getByLabel('Title', { exact: true }).fill('Backup Core API');
     await page.locator('[role="dialog"] select').selectOption({ label: 'Platform Backup' });

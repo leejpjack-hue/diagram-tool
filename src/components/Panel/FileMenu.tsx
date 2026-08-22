@@ -1,5 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { saveManager, type SavedDiagram, type SavedDiagramMode } from '../../utils/saveManager';
+import { extractBoardTitle } from '../../utils/sourceText';
 
 interface FileMenuProps {
   currentDsl: string;
@@ -24,6 +25,17 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
     setIsOpen(false);
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.stopPropagation();
+      handleClose();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [isOpen]);
+
   const handleNew = () => {
     if (saveManager.hasUnsavedChanges(currentDsl)) {
       if (!confirm('You have unsaved changes. Start a new diagram anyway?')) {
@@ -36,7 +48,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
 
   const handleSave = () => {
     const saved = saveManager.saveDiagram({
-      title: extractTitle(currentDsl) || 'Untitled Diagram',
+      title: extractBoardTitle(currentDsl, mode) || 'Untitled Diagram',
       dslText: currentDsl,
       mode,
     });
@@ -46,7 +58,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
 
   const handleExport = () => {
     const saved = saveManager.saveDiagram({
-      title: extractTitle(currentDsl) || 'Untitled Diagram',
+      title: extractBoardTitle(currentDsl, mode) || 'Untitled Diagram',
       dslText: currentDsl,
       mode,
     });
@@ -103,15 +115,23 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
     <div className="relative" ref={menuRef} onBlur={handleBlur}>
       {/* Menu Button */}
       <button
+        type="button"
         onClick={handleOpen}
         className="btn btn-secondary"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-label="File"
       >
         📄 File
       </button>
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
+        <div
+          data-testid="file-menu"
+          role="menu"
+          className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden"
+        >
           {/* Menu Items */}
           <div className="py-1">
             <button
@@ -199,12 +219,6 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
       />
     </div>
   );
-}
-
-// Helper functions
-function extractTitle(dsl: string): string | null {
-  const match = dsl.match(/title:\s*(.+)/);
-  return match ? match[1].trim() : null;
 }
 
 function formatDate(iso: string): string {

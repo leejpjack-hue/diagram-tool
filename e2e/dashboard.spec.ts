@@ -10,14 +10,14 @@ test.describe('Miro-style personal dashboard', () => {
     await expect(page.getByText('title: Untitled Workflow')).toBeVisible();
 
     await page.getByRole('button', { name: '⌂ Boards' }).click();
-    await expect(page.getByRole('heading', { name: 'Untitled flow' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Untitled Workflow' })).toBeVisible();
 
     await page.getByRole('button', { name: 'New Space' }).click();
     await page.getByPlaceholder('New Space name').fill('Platform');
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await page.getByRole('button', { name: 'Close' }).click();
 
-    await page.getByRole('button', { name: 'Actions for Untitled flow' }).click();
+    await page.getByRole('button', { name: 'Actions for Untitled Workflow' }).click();
     await page.getByRole('button', { name: 'Edit details' }).click();
     await page.getByLabel('Title', { exact: true }).fill('Platform workflow');
     await page.getByPlaceholder('architecture, payments, v2').fill('platform, demo');
@@ -26,7 +26,7 @@ test.describe('Miro-style personal dashboard', () => {
 
     await page.getByPlaceholder('Search titles, descriptions, tags, and DSL').fill('demo');
     await expect(page.getByRole('heading', { name: 'Platform workflow' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Untitled flow' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Untitled Workflow' })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Actions for Platform workflow' }).click();
     await page.getByRole('button', { name: 'Move to Trash' }).click();

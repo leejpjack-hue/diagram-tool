@@ -35,6 +35,7 @@ import { BrandLogo } from './components/BrandLogo';
 import { Dashboard, type DashboardCreateRequest } from './components/Dashboard/Dashboard';
 import { PresentationCanvas } from './components/Dashboard/PresentationCanvas';
 import { boardManager, toWorkspaceError, type Board, type BoardMode } from './utils/boardManager';
+import { extractBoardTitle } from './utils/sourceText';
 import { OfflineBanner, WorkspaceErrorBanner } from './components/Workspace/WorkspaceStatus';
 import './styles/gantt-fixes.css';
 
@@ -467,7 +468,7 @@ function App() {
     }
     
     // Generate DSL from current tasks and dependencies
-    const title = extractTitle(dslText) || 'Gantt Chart';
+    const title = extractBoardTitle(dslText, 'gantt') || 'Gantt Chart';
     const updatedDSL = generateGanttDSL(tasks, dependencies, title);
     
     // Update DSL text and mark as unsaved
@@ -477,7 +478,7 @@ function App() {
     return () => window.clearTimeout(timer);
     
     // Note: dslText is intentionally excluded to prevent infinite loops
-    // extractTitle is stable and setDslText/setSaveStatus are stable setters
+    // extractBoardTitle is stable and setDslText/setSaveStatus are stable setters
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, dependencies, activeTab]);
 
@@ -641,13 +642,13 @@ function App() {
     
     setTimeout(async () => {
       try {
-        const title = extractTitle(dslText) || 'Untitled Diagram';
+        const title = extractBoardTitle(dslText, activeTab) || 'Untitled Diagram';
         const mode: SavedDiagramMode = (diagramMode === 'architecture' || diagramMode === 'flow') 
           ? diagramMode 
           : 'architecture';
         saveManager.saveDiagram({ title, dslText, mode });
         if (currentBoardId) {
-          await boardManager.update(currentBoardId, { dslText, mode: activeTab });
+          await boardManager.update(currentBoardId, boardPatchFromSource(dslText, activeTab));
           void captureAndStoreBoardThumbnail(currentBoardId, activeTab);
         }
         setWorkspaceError('');
@@ -729,7 +730,7 @@ function App() {
     saveManager.startAutosave(() => {
       if (!dslText || dslText.trim().length === 0) return null;
       
-      const title = extractTitle(dslText) || 'Untitled Diagram';
+      const title = extractBoardTitle(dslText, activeTab) || 'Untitled Diagram';
       const mode: SavedDiagramMode = (diagramMode === 'architecture' || diagramMode === 'flow') 
         ? diagramMode 
         : 'architecture';
@@ -769,10 +770,11 @@ function App() {
 
   const createBoard = async (request: DashboardCreateRequest) => {
     try {
+      const dslText = request.dslText ?? blankBoardDsl(request.mode);
       const board = await boardManager.create({
-        title: request.title || `Untitled ${request.mode}`,
+        title: extractBoardTitle(dslText, request.mode) || request.title?.trim() || `Untitled ${request.mode}`,
         mode: request.mode,
-        dslText: request.dslText ?? blankBoardDsl(request.mode),
+        dslText,
         templateSourceId: request.templateSourceId,
         spaceId: request.spaceId,
       });
@@ -795,8 +797,7 @@ function App() {
       }
       const thumbnail = await captureDiagramThumbnail(activeTab);
       await boardManager.update(currentBoardId, {
-        dslText,
-        mode: activeTab,
+        ...boardPatchFromSource(dslText, activeTab),
         ...(thumbnail ? { thumbnail } : {}),
       });
     }
@@ -810,7 +811,7 @@ function App() {
   const openPresentation = async (board?: Board) => {
     let target: Board | undefined = board;
     if (!target && currentBoardId) {
-      await boardManager.update(currentBoardId, { dslText, mode: activeTab });
+      await boardManager.update(currentBoardId, boardPatchFromSource(dslText, activeTab));
       target = await boardManager.get(currentBoardId);
     }
     if (!target) {
@@ -862,7 +863,7 @@ function App() {
   useEffect(() => {
     if (view !== 'editor' || !currentBoardId) return;
     const t = setTimeout(() => {
-      void boardManager.update(currentBoardId, { dslText, mode: activeTab })
+      void boardManager.update(currentBoardId, boardPatchFromSource(dslText, activeTab))
         .then(() => boardManager.createVersion(currentBoardId, 'Automatic save', true))
         .then(() => setWorkspaceError(''))
         .catch(error => setWorkspaceError(toWorkspaceError(error).message));
@@ -933,7 +934,7 @@ function App() {
         toast.error('Could not find chart to export');
         return;
       }
-      const title = extractTitle(dslText) || 'Gantt Chart';
+      const title = extractBoardTitle(dslText, 'gantt') || 'Gantt Chart';
       exportGanttChart(
         ganttCanvasRef.current,
         { format, includeTaskList: true, dateRange: 'current' },
@@ -1410,10 +1411,13 @@ function App() {
   );
 }
 
-// Helper functions
-function extractTitle(dsl: string): string | null {
-  const match = dsl.match(/title:\s*(.+)/);
-  return match ? match[1].trim() : null;
+function boardPatchFromSource(dslText: string, mode: BoardMode) {
+  const title = extractBoardTitle(dslText, mode);
+  return {
+    dslText,
+    mode,
+    ...(title ? { title } : {}),
+  };
 }
 
 function formatTimeAgo(date: Date): string {

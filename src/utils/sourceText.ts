@@ -15,10 +15,28 @@ const isGanttSource = (text: string) => /^\s*diagram:\s*gantt\b/im.test(text);
 
 export { isMermaidFlow, isMermaidSequence };
 
+/** First `title:` / `title` line, or the first markdown heading on sequence sources. */
+export function extractBoardTitle(text: string, mode?: BoardMode): string | null {
+  const titleLine = text.match(/^\s*title\s*:?\s+(.+)$/im);
+  if (titleLine?.[1]) {
+    const value = titleLine[1].trim().replace(/^["']|["']$/g, '');
+    if (value) return value;
+  }
+
+  const isSequence = mode === 'sequence' || /^\s*sequenceDiagram\b/im.test(text);
+  if (isSequence) {
+    const heading = text.match(/^\s{0,3}#{1,3}\s+(.+)$/m);
+    if (heading?.[1]) {
+      const value = heading[1].trim();
+      if (value) return value;
+    }
+  }
+
+  return null;
+}
+
 export function extractSourceTitle(text: string, fallback = 'Imported diagram'): string {
-  const mermaid = text.match(/^\s*title\s*:?\s+(.+)$/im);
-  if (mermaid?.[1]) return mermaid[1].trim().replace(/^["']|["']$/g, '');
-  return fallback;
+  return extractBoardTitle(text) ?? fallback;
 }
 
 export function detectRawDiagramImport(filename: string, text: string): { mode: BoardMode; title: string; dslText: string } | null {

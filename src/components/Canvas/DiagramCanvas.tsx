@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useCallback, useState, useRef } from 'react';
-import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider, useReactFlow, BackgroundVariant, ViewportPortal } from '@xyflow/react';
+import { ReactFlow, Background, Controls, MiniMap, Panel, useNodesState, useEdgesState, MarkerType, ReactFlowProvider, useReactFlow, BackgroundVariant, ViewportPortal } from '@xyflow/react';
 import type { Node, NodeChange, Edge as ReactFlowEdge, Viewport, Connection } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -693,6 +693,7 @@ function DiagramCanvasInternal() {
           stroke,
           strokeWidth: diagramMode === 'flow' ? 1.8 : 2,
         },
+        labelClassName: 'flow-edge-label',
         labelStyle: {
           fill: branch ?? '#1E293B',
           fontWeight: 700,
@@ -1145,6 +1146,11 @@ function DiagramCanvasInternal() {
           </ViewportPortal>
         )}
         <Controls className="bg-white border border-slate-200 rounded shadow-md" />
+        <Panel position="bottom-left" className="!m-4 !ml-16">
+          <div className="bg-white/95 backdrop-blur-md rounded-lg shadow-md border border-slate-200 p-2">
+            <ZoomControls />
+          </div>
+        </Panel>
         <MiniMap
           className="bg-white border border-slate-200 rounded shadow-md"
           nodeColor={(node) => {
@@ -1191,11 +1197,6 @@ function DiagramCanvasInternal() {
 
       {/* Shape library palette */}
       <ShapeLibrary />
-
-      {/* Floating Zoom Controls */}
-      <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-md rounded-lg shadow-md border border-slate-200 p-2 z-10">
-        <ZoomControls />
-      </div>
 
       {/* C4 Level Switcher (architecture mode, only when levels are present) */}
       {diagramMode !== 'flow' && (
