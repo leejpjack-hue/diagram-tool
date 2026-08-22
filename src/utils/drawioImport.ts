@@ -175,8 +175,13 @@ async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
   if (typeof DecompressionStream !== 'function') {
     throw new Error('deflate-raw is not available');
   }
-  const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  const copy = new Uint8Array(data.byteLength);
+  copy.set(data);
+  const ds = new DecompressionStream('deflate-raw');
+  const writer = ds.writable.getWriter();
+  await writer.write(copy);
+  await writer.close();
+  return new Uint8Array(await new Response(ds.readable).arrayBuffer());
 }
 
 function collectCells(doc: Document): ParsedCell[] {
