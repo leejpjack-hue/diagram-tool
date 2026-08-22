@@ -25,15 +25,10 @@ test.describe('draw.io dashboard import', () => {
     ]);
     await fileChooser.setFiles(FIXTURE);
 
-    await expect(page.getByText(/Imported “Two Boxes”/)).toBeVisible();
-    const report = page.getByTestId('import-report');
-    if (await report.isVisible()) {
-      await expect(page.getByTestId('import-mapped')).toContainText(/mapped/);
-      if (await page.getByTestId('import-skipped').count()) {
-        await expect(page.getByTestId('import-skipped').first()).toBeVisible();
-      }
-      await page.getByRole('button', { name: 'Done' }).click();
-    }
+    await expect(page.getByTestId('import-report')).toBeVisible();
+    await expect(page.getByTestId('import-mapped')).toHaveText('3 objects mapped, 0 skipped');
+    await expect(page.getByTestId('import-skipped')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Done' }).click();
 
     await expect(page.getByRole('heading', { name: 'Two Boxes' })).toBeVisible();
     await page.getByRole('heading', { name: 'Two Boxes' }).click();
