@@ -1,14 +1,16 @@
 import { isMermaidFlow, isMermaidSequence, mermaidFlowToDSL } from '../parser/mermaidFlow';
 import { parseDiagram } from '../parser/parser';
+import { parseGanttSource } from '../components/Gantt/ganttParser';
 import { parseSequenceSource } from '../components/Sequence/sequenceParser';
 import { renameParticipant } from '../components/Sequence/sequenceEdit';
+import type { GanttProject } from '../components/Gantt/types';
 import type { BoardMode } from './boardManager';
 import type { ParsedDiagram } from '../store/types';
 
 export type ApplySourceResult =
   | { ok: true; kind: 'diagram'; parsed: ParsedDiagram }
   | { ok: true; kind: 'sequence' }
-  | { ok: true; kind: 'gantt' }
+  | { ok: true; kind: 'gantt'; project: GanttProject }
   | { ok: false; error: string };
 
 const isGanttSource = (text: string) => /^\s*diagram:\s*gantt\b/im.test(text);
@@ -63,7 +65,16 @@ export function detectRawDiagramImport(filename: string, text: string): { mode: 
 }
 
 export function applyBoardSource(text: string, mode: BoardMode | 'c4'): ApplySourceResult {
-  if (mode === 'gantt' || isGanttSource(text)) return { ok: true, kind: 'gantt' };
+  if (mode === 'gantt' || isGanttSource(text)) {
+    if (mode !== 'gantt' && isGanttSource(text)) {
+      return { ok: false, error: 'This is a Gantt plan. Open it on the Gantt tab or import it as a Gantt board.' };
+    }
+    const result = parseGanttSource(text);
+    if (result.error || !result.project) {
+      return { ok: false, error: result.error ?? 'Parse error' };
+    }
+    return { ok: true, kind: 'gantt', project: result.project };
+  }
 
   if (mode === 'sequence' || isMermaidSequence(text)) {
     if (mode !== 'sequence' && isMermaidSequence(text)) {

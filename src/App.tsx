@@ -20,8 +20,8 @@ import { parseDiagram } from './parser/parser';
 import { ToastContainer } from './components/Toast/ToastContainer';
 import { useDiagramStore } from './store/diagramStore';
 import { useGanttStore } from './components/Gantt/ganttStore';
-import { parseGanttDSL } from './components/Gantt/ganttParser';
 import { generateGanttDSL } from './components/Gantt/ganttGenerator';
+import { applyBoardSource, extractBoardTitle } from './utils/sourceText';
 import { exportGanttChart } from './components/Gantt/exportUtils';
 import type { DelayImpactResult } from './components/Gantt/delayImpactUtils';
 import { useExport } from './utils/useExport';
@@ -35,7 +35,6 @@ import { BrandLogo } from './components/BrandLogo';
 import { Dashboard, type DashboardCreateRequest } from './components/Dashboard/Dashboard';
 import { PresentationCanvas } from './components/Dashboard/PresentationCanvas';
 import { boardManager, toWorkspaceError, type Board, type BoardMode } from './utils/boardManager';
-import { extractBoardTitle } from './utils/sourceText';
 import { OfflineBanner, WorkspaceErrorBanner } from './components/Workspace/WorkspaceStatus';
 import './styles/gantt-fixes.css';
 
@@ -384,7 +383,8 @@ function App() {
     setParsedDiagram,
     selectedNodeId,
     clipboard,
-    setClipboard 
+    setClipboard,
+    setError,
   } = useDiagramStore();
   
   const { addTask, updateTask, setProject, tasks, dependencies } = useGanttStore();
@@ -436,18 +436,18 @@ function App() {
     };
   }, []);
   
-  // Parse Gantt DSL when it changes
+  // Parse Gantt DSL when it changes. Invalid source keeps the last good plan.
   useEffect(() => {
-    if (activeTab === 'gantt' && /^\s*diagram:\s*gantt\b/im.test(dslText)) {
-      isUpdatingFromDSL.current = true;
-      const project = parseGanttDSL(dslText);
-      if (project) {
-        setProject(project.tasks, project.dependencies ?? []);
-      } else {
-        isUpdatingFromDSL.current = false;
-      }
+    if (activeTab !== 'gantt') return;
+    const result = applyBoardSource(dslText, 'gantt');
+    if (!result.ok || result.kind !== 'gantt') {
+      setError(result.ok ? null : result.error);
+      return;
     }
-  }, [dslText, activeTab, setProject]);
+    setError(null);
+    isUpdatingFromDSL.current = true;
+    setProject(result.project.tasks, result.project.dependencies ?? []);
+  }, [dslText, activeTab, setProject, setError]);
   
   // Sync DSL when tasks or dependencies change from UI
   // This ensures DSL is always the single source of truth

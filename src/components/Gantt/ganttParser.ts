@@ -287,6 +287,78 @@ function finalizeTask(partial: Partial<GanttTask>, idNum: number, projectStart: 
   };
 }
 
+const GANTT_HEADER = /^\s*diagram:\s*gantt\b/im;
+const OTHER_DIAGRAM_HEADER = /^\s*diagram:\s*(architecture|flow)\b/im;
+const MERMAID_SEQUENCE = /^\s*sequenceDiagram\b/im;
+const MERMAID_FLOW = /^\s*(?:flowchart|graph)\b/im;
+const MERMAID_GANTT = /^\s*gantt\b/im;
+
+/**
+ * Validate native Gantt DSL (`diagram: gantt`). Invalid source must not replace
+ * the last good plan — callers keep the previous project when `error` is set.
+ */
+export function findGanttSourceError(text: string): string | null {
+  if (MERMAID_SEQUENCE.test(text)) {
+    return 'This source is a sequenceDiagram. Open it on the Sequence tab.';
+  }
+  if (OTHER_DIAGRAM_HEADER.test(text)) {
+    return 'This source is not a Gantt plan. Gantt boards use `diagram: gantt` with task / group blocks.';
+  }
+  if (MERMAID_FLOW.test(text)) {
+    return 'This source is a flowchart. Open it on the Flow tab.';
+  }
+  if (MERMAID_GANTT.test(text) && !GANTT_HEADER.test(text)) {
+    return 'Gantt source must start with `diagram: gantt` (native DSL, not Mermaid gantt).';
+  }
+  if (!GANTT_HEADER.test(text)) {
+    return 'Gantt source must start with `diagram: gantt`.';
+  }
+
+  const braceError = findGanttBraceError(text);
+  if (braceError) return braceError;
+
+  const dateError = findGanttDateError(text);
+  if (dateError) return dateError;
+
+  return null;
+}
+
+export function parseGanttSource(text: string): { project: GanttProject | null; error: string | null } {
+  const error = findGanttSourceError(text);
+  if (error) return { project: null, error };
+  return { project: parseGanttDSL(text), error: null };
+}
+
+function findGanttBraceError(text: string): string | null {
+  let depth = 0;
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    for (const ch of lines[i]) {
+      if (ch === '{') depth += 1;
+      if (ch === '}') {
+        depth -= 1;
+        if (depth < 0) return `Unexpected } at line ${i + 1}.`;
+      }
+    }
+  }
+  if (depth > 0) return 'Expected } to close a task or group block.';
+  return null;
+}
+
+function findGanttDateError(text: string): string | null {
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].trim().match(/^(start|end):\s*(.+)$/i);
+    if (!match) continue;
+    const value = match[2].trim();
+    if (!value) continue;
+    if (!parseDate(value)) {
+      return `Invalid ${match[1].toLowerCase()} date at line ${i + 1}. Use YYYY-MM-DD or +Nd.`;
+    }
+  }
+  return null;
+}
+
 function parseDate(str: string): Date | undefined {
   // Try ISO format: 2026-02-23
   const iso = Date.parse(str);

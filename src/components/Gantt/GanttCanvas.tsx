@@ -257,6 +257,7 @@ export function GanttCanvas() {
   // Handle task bar interactions
   const handleMouseDown = useCallback((e: React.MouseEvent, task: GanttTask, type: 'move' | 'resize-start' | 'resize-end') => {
     e.preventDefault();
+    e.stopPropagation();
     if (task.isGroup) return;
     
     setSelectedTask(task.id);
@@ -502,7 +503,7 @@ export function GanttCanvas() {
                 : task.color || COLORS[index % COLORS.length];
             
             return (
-              <g key={task.id}>
+              <g key={task.id} data-testid={`gantt-task-row-${task.id}`} data-task-name={task.name}>
                 {/* Task name cell */}
                 <rect
                   x={0}
@@ -585,10 +586,13 @@ export function GanttCanvas() {
                 {!task.isGroup && !isMilestone && (
                   <g
                     className="cursor-pointer"
+                    data-testid={`gantt-task-bar-${task.id}`}
+                    data-task-name={task.name}
                     onClick={(e) => {
                       const isMultiSelect = e.ctrlKey || e.metaKey;
                       toggleTaskSelection(task.id, isMultiSelect);
                     }}
+                    onMouseDown={(e) => handleMouseDown(e, task, 'move')}
                   >
                     {/* Slack indicator (if showing critical path) */}
                     {showCriticalPath && slack > 0 && (
