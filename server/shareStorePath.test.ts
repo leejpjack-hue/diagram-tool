@@ -15,27 +15,20 @@ describe('resolveShareStoreDirectory', () => {
     )).toBe('/srv/diagram-tool/share-store');
   });
 
-  it('ignores a relative SHARE_STORE_DIR in production so cwd cannot place the store in dist/', () => {
+  it('resolves an explicit relative SHARE_STORE_DIR for local and e2e even when NODE_ENV is production', () => {
     expect(resolveShareStoreDirectory(
-      { SHARE_STORE_DIR: '.share-store', NODE_ENV: 'production' },
-      { cwd: '/srv/diagram-tool/dist' },
-    )).toBe(PRODUCTION_SHARE_STORE_DIR);
+      { SHARE_STORE_DIR: '.share-store-e2e-preview', NODE_ENV: 'production' },
+      { cwd: '/tmp/work' },
+    )).toBe('/tmp/work/.share-store-e2e-preview');
   });
 
-  it('does not consult cwd when NODE_ENV is production', () => {
+  it('does not consult cwd for the production default', () => {
     expect(resolveShareStoreDirectory({ NODE_ENV: 'production' }, { cwd: '/srv/diagram-tool/dist' }))
       .toBe(PRODUCTION_SHARE_STORE_DIR);
     expect(resolveShareStoreDirectory({ NODE_ENV: 'production' }, { cwd: '/tmp/not-the-app' }))
       .toBe(PRODUCTION_SHARE_STORE_DIR);
     expect(resolveShareStoreDirectory({}, { production: true, cwd: '/workspace' }))
       .toBe(PRODUCTION_SHARE_STORE_DIR);
-  });
-
-  it('resolves a relative SHARE_STORE_DIR only for local/e2e', () => {
-    expect(resolveShareStoreDirectory(
-      { SHARE_STORE_DIR: '.share-store-e2e', NODE_ENV: 'development' },
-      { production: false, cwd: '/tmp/work' },
-    )).toBe('/tmp/work/.share-store-e2e');
   });
 
   it('uses a local project folder only for non-production checkouts', () => {

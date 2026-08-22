@@ -7,16 +7,13 @@ export function resolveShareStoreDirectory(
   env: NodeJS.ProcessEnv = process.env,
   options: { production?: boolean; cwd?: string } = {},
 ): string {
-  const production = options.production ?? env.NODE_ENV === 'production';
+  const cwd = options.cwd ?? process.cwd();
   const override = env.SHARE_STORE_DIR?.trim();
   if (override) {
-    if (isAbsolute(override)) return override;
-    // Relative overrides are local/e2e only. Production must not resolve against cwd
-    // (vite preview often runs with cwd = …/dist).
-    if (production) return PRODUCTION_SHARE_STORE_DIR;
-    return resolve(options.cwd ?? process.cwd(), override);
+    return isAbsolute(override) ? override : resolve(cwd, override);
   }
 
+  const production = options.production ?? env.NODE_ENV === 'production';
   if (production) return PRODUCTION_SHARE_STORE_DIR;
-  return resolve(options.cwd ?? process.cwd(), '.share-store');
+  return resolve(cwd, '.share-store');
 }

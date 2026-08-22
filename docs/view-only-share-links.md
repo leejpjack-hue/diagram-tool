@@ -24,7 +24,7 @@ The store is a **file-backed token store** (`server/sharePlugin.ts`). Production
 | --- | --- |
 | Snapshot + tokens (production default) | **`/var/lib/diagram-tool/share-store/<token>.json`**. Literal absolute path. Not `process.cwd()`, not `$HOME` inference, not inside `dist/`. |
 | Live pin | Deploy writes a systemd user drop-in `Environment=SHARE_STORE_DIR=…` and `mkdir`s the directory **before** the `dist` swap. If `/var/lib/diagram-tool/share-store` is not writable by the deploy user, it pins **`$DEPLOY_PATH/share-store`** (sibling of `dist/` and `server/`). Either path survives rsync and the dist swap. |
-| Override | `SHARE_STORE_DIR` must be an **absolute** path in production. A relative value is ignored when `NODE_ENV=production` so cwd cannot place files in `dist/`. |
+| Override | `SHARE_STORE_DIR`. Absolute path required on the VPS (deploy sets it). Relative values are local/e2e only. |
 | Local / e2e | `.share-store/` in the checkout, or `SHARE_STORE_DIR=.share-store-e2e`. Not used on teqcon.uk. |
 | Record | `{ token, manageToken, createdAt, document }` where `document` is format 3.0 board JSON after the presentation sanitizer |
 | Public GET | `/api/shares/<token>` returns the sanitized board document only (never `manageToken`) |
