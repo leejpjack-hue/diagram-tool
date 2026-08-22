@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
+    "preview": "SHARE_STORE_DIR=\"${SHARE_STORE_DIR:-/var/lib/diagram-tool/share-store}\" vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

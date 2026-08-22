@@ -1,4 +1,8 @@
+import { resolve } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
+
+const e2eStore = resolve(process.cwd(), '.share-store-e2e');
+const e2ePreviewStore = resolve(process.cwd(), '.share-store-e2e-preview');
 
 export default defineConfig({
   testDir: './e2e',
@@ -21,13 +25,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'SHARE_STORE_DIR=.share-store-e2e npm run dev -- --port 5173',
+      command: `SHARE_STORE_DIR=${e2eStore} npm run dev -- --port 5173`,
       url: 'http://localhost:5173',
       reuseExistingServer: true,
       timeout: 30000,
     },
     {
-      command: 'SHARE_STORE_DIR=.share-store-e2e-preview npm run build && SHARE_STORE_DIR=.share-store-e2e-preview npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
+      command: `SHARE_STORE_DIR=${e2ePreviewStore} npm run build && SHARE_STORE_DIR=${e2ePreviewStore} npm run preview -- --host 127.0.0.1 --port 4173 --strictPort`,
       url: 'http://localhost:4173',
       reuseExistingServer: true,
       timeout: 180000,

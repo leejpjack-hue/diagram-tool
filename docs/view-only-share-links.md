@@ -18,14 +18,16 @@ Live `diagram-tool.teqcon.uk` is **nginx → Vite preview** on the teqcon.uk VPS
 
 The store is a **file-backed token store** (`server/sharePlugin.ts`). Production deploy (`deploy-production.yml`) rsyncs `server/` with `--delete` and atomically swaps `dist/`. A store under `dist/` or `server/` dies on every release.
 
-`SHARE_STORE_DIR` is therefore **pinned to a stable absolute path outside `dist/`**. The Node process does **not** guess from `process.cwd()` in production (Vite preview often runs with cwd = `…/dist`).
+**`SHARE_STORE_DIR` is pinned outside `dist/`.** The resolver never defaults to `resolve(process.cwd(), '.share-store')`. systemd / `vite preview` often start with cwd = `…/dist`; a cwd-relative store would be wiped on every ship.
 
 | Item | Location |
 | --- | --- |
-| Snapshot + tokens (production default) | **`/var/lib/diagram-tool/share-store/<token>.json`**. Literal absolute path. Not `process.cwd()`, not `$HOME` inference, not inside `dist/`. |
-| Live pin | Deploy writes a systemd user drop-in `Environment=SHARE_STORE_DIR=…` and `mkdir`s the directory **before** the `dist` swap. If `/var/lib/diagram-tool/share-store` is not writable by the deploy user, it pins **`$DEPLOY_PATH/share-store`** (sibling of `dist/` and `server/`). Either path survives rsync and the dist swap. |
-| Override | `SHARE_STORE_DIR`. Absolute path required on the VPS (deploy sets it). Relative values are local/e2e only. |
-| Local / e2e | `.share-store/` in the checkout, or `SHARE_STORE_DIR=.share-store-e2e`. Not used on teqcon.uk. |
+| `SHARE_STORE_DIR` (required pin) | **`/var/lib/diagram-tool/share-store`** (preferred) or a **sibling of `dist/`** such as `$DEPLOY_PATH/share-store`. Absolute. Not inside `dist/`. |
+| Code default when unset | `/var/lib/diagram-tool/share-store` (`PRODUCTION_SHARE_STORE_DIR`). Same path in every cwd. |
+| `npm run preview` | `package.json` sets `SHARE_STORE_DIR="${SHARE_STORE_DIR:-/var/lib/diagram-tool/share-store}"` so a bare `vite preview` does not inherit a cwd store. |
+| `vite.config.ts` | If the env is still empty when preview/dev loads, assigns `SHARE_STORE_DIR=/var/lib/diagram-tool/share-store` before `shareHostPlugin()` runs. |
+| systemd (live) | Deploy writes `~/.config/systemd/user/<service>.d/share-store.conf` with `Environment=SHARE_STORE_DIR=…` and `mkdir`s that directory **before** the `dist` swap. If `/var/lib/diagram-tool/share-store` is not writable, it pins `$DEPLOY_PATH/share-store` (sibling of `dist/` and `server/`). |
+| Local / e2e | Set `SHARE_STORE_DIR` to a checkout path outside `dist/` (Playwright uses `.share-store-e2e` / `.share-store-e2e-preview`). Not used on teqcon.uk. |
 | Record | `{ token, manageToken, createdAt, document }` where `document` is format 3.0 board JSON after the presentation sanitizer |
 | Public GET | `/api/shares/<token>` returns the sanitized board document only (never `manageToken`) |
 | Collection GET | `GET /api/shares` is **404**. There is no list/index of tokens. |
@@ -45,13 +47,13 @@ No user table. The manage token is a capability stored only on the owner’s dev
 
 | Action | Owner UI | Host |
 | --- | --- | --- |
-| **Revoke** | Share dialog → **Revoke link** | Deletes `<store>/<token>.json` (production: `/var/lib/diagram-tool/share-store`, or the pinned `SHARE_STORE_DIR`). `GET /view/<token>` and `GET /api/shares/<token>` return **404**. |
+| **Revoke** | Share dialog → **Revoke link** | Deletes `<store>/<token>.json` (pinned `SHARE_STORE_DIR`). `GET /view/<token>` and `GET /api/shares/<token>` return **404**. |
 | **Rotate** | Share dialog → **Replace link** | Writes a new token file in the same durable store, deletes the old one. Old URL 404s; new URL serves the same snapshot. |
 
 Revoke/rotate require the manage token (`X-Share-Manage-Token` or JSON body). A viewer never receives it.
 
 ## Viewer rules
 
-The viewer is read-only: no DSL editor, no deck editor, no import, no export-to-overwrite. Download export is allowed. Architecture, sequence, and **Gantt** canvases take `readOnly`. On a published Gantt link there is no task edit, no % complete control, and no schedule drag.
+The viewer is read-only: no DSL editor, no deck editor, no import, no export-to-overwrite. Download export is allowed. Architecture, sequence, and **Gantt** canvases take `readOnly` (`ShareViewer` mounts `<GanttCanvas readOnly />`). On a published Gantt link there is no task edit, no % complete control, and no schedule drag.
 
 The UI never mentions seats, members, or billing. There is no path that turns a viewer into an identity.
