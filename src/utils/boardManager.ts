@@ -1,4 +1,10 @@
 import { saveManager } from './saveManager';
+import {
+  buildBoardDocument,
+  buildWorkspaceDocument,
+  parsePortableImport,
+  type ImportReport,
+} from './boardFormat';
 
 export type BoardMode = 'architecture' | 'flow' | 'sequence' | 'gantt';
 export type BoardSort = 'lastOpened' | 'updated' | 'created' | 'name';
@@ -122,17 +128,18 @@ export interface BoardQuery {
 }
 
 export interface BoardFile {
-  version: '2.0';
+  version: string;
   exportedAt: string;
   board: Board;
 }
 
 export interface BoardsFile {
-  version: '2.0';
+  version: string;
   exportedAt: string;
   boards: Board[];
   spaces: Space[];
   templates: PersonalTemplate[];
+  versions?: BoardVersion[];
 }
 
 interface StoredPresentationItem extends Omit<PresentationItem, 'content'> {
@@ -774,23 +781,42 @@ export class BoardManager {
     return { usage: 0, quota: 0 };
   }
 
+  async listAllVersions(): Promise<BoardVersion[]> {
+    await this.initialize();
+    return this.repository.getAll<BoardVersion>('versions');
+  }
+
+  async buildCompleteBackup() {
+    const boards = [...(await this.list()), ...(await this.list({ deleted: true }))];
+    return buildWorkspaceDocument({
+      boards,
+      spaces: await this.listSpaces(),
+      templates: await this.listTemplates(),
+      versions: await this.listAllVersions(),
+    });
+  }
+
   async exportBoard(board: Board): Promise<void> {
-    downloadJson({ version: '2.0', exportedAt: new Date().toISOString(), board } satisfies BoardFile, `${slug(board.title)}.board`);
+    downloadJson(buildBoardDocument(board), `${slug(board.title)}.board.json`);
     await this.addActivity(board, 'exported');
     this.emit();
   }
 
-  async exportBoards(boards: Board[], filename = `boards-selection-${new Date().toISOString().split('T')[0]}.boards`): Promise<void> {
-    const spaces = await this.listSpaces();
-    const templates = await this.listTemplates();
-    downloadJson({ version: '2.0', exportedAt: new Date().toISOString(), boards, spaces, templates } satisfies BoardsFile, filename);
+  async exportBoards(boards: Board[], filename = `boards-selection-${new Date().toISOString().split('T')[0]}.boards.json`): Promise<void> {
+    const boardIds = new Set(boards.map(board => board.id));
+    downloadJson(buildWorkspaceDocument({
+      boards,
+      spaces: await this.listSpaces(),
+      templates: await this.listTemplates(),
+      versions: (await this.listAllVersions()).filter(version => boardIds.has(version.boardId)),
+    }), filename);
   }
 
   async exportAll(): Promise<void> {
-    await this.exportBoards([...(await this.list()), ...(await this.list({ deleted: true }))], `boards-backup-${new Date().toISOString().split('T')[0]}.boards`);
+    downloadJson(await this.buildCompleteBackup(), `boards-backup-${new Date().toISOString().split('T')[0]}.boards.json`);
   }
 
-  async importFromFile(file: File): Promise<Board[]> {
+  async importFromFile(file: File): Promise<ImportReport> {
     await this.initialize();
     let data: unknown;
     try {
@@ -799,27 +825,16 @@ export class BoardManager {
       throw new Error("That file isn't a valid board file.");
     }
 
-    const object = data as Record<string, unknown>;
-    const candidates: Array<Partial<Board>> = [];
-    if (Array.isArray(object.boards)) candidates.push(...object.boards as Partial<Board>[]);
-    else if (object.board && typeof object.board === 'object') candidates.push(object.board as Partial<Board>);
-    else if (object.diagram && typeof object.diagram === 'object') {
-      const diagram = object.diagram as { title?: string; dslText?: string; mode?: BoardMode };
-      candidates.push({ title: diagram.title, dslText: diagram.dslText, mode: diagram.mode });
-    } else throw new Error("That file isn't a valid board file.");
-
+    const plan = parsePortableImport(data);
     const spaceMap = new Map<string, string>();
-    if (Array.isArray(object.spaces)) {
-      for (const candidate of object.spaces as Partial<Space>[]) {
-        if (!candidate.name) continue;
-        const space = await this.createSpace(candidate.name, candidate.color);
-        if (candidate.id) spaceMap.set(candidate.id, space.id);
-      }
+    for (const candidate of plan.spaces) {
+      const space = await this.createSpace(candidate.name, candidate.color);
+      if (candidate.id) spaceMap.set(candidate.id, space.id);
     }
 
+    const boardIdMap = new Map<string, string>();
     const imported: Board[] = [];
-    for (const candidate of candidates) {
-      if (!candidate.dslText || !candidate.mode) continue;
+    for (const candidate of plan.boards) {
       const board = await this.create({
         title: candidate.title || 'Imported board',
         description: candidate.description ?? '',
@@ -829,7 +844,8 @@ export class BoardManager {
         tags: candidate.tags,
         spaceId: candidate.spaceId ? spaceMap.get(candidate.spaceId) : undefined,
       });
-      if (candidate.presentation?.items) await this.setPresentation(board.id, candidate.presentation.items);
+      if (candidate.id) boardIdMap.set(candidate.id, board.id);
+      if (candidate.presentation?.items.length) await this.setPresentation(board.id, candidate.presentation.items);
       const restored = await this.update(board.id, {
         starred: candidate.starred ?? false,
         lastOpenedAt: candidate.lastOpenedAt ?? board.lastOpenedAt,
@@ -838,20 +854,47 @@ export class BoardManager {
       });
       imported.push(restored ?? board);
     }
-    if (Array.isArray(object.templates)) {
-      for (const candidate of object.templates as Partial<PersonalTemplate>[]) {
-        if (!candidate.name || !candidate.mode || !candidate.dslText) continue;
-        const now = new Date().toISOString();
-        await this.repository.put('templates', await storeTemplate({
-          id: generateId('template'), name: candidate.name, description: candidate.description ?? '', mode: candidate.mode,
-          dslText: candidate.dslText, thumbnail: typeof candidate.thumbnail === 'string' ? candidate.thumbnail : undefined,
-          createdAt: now, updatedAt: now, useCount: 0,
-        }));
-      }
+
+    let templates = 0;
+    for (const candidate of plan.templates) {
+      const now = new Date().toISOString();
+      await this.repository.put('templates', await storeTemplate({
+        id: generateId('template'),
+        name: candidate.name,
+        description: candidate.description ?? '',
+        mode: candidate.mode,
+        dslText: candidate.dslText,
+        thumbnail: typeof candidate.thumbnail === 'string' ? candidate.thumbnail : undefined,
+        createdAt: now,
+        updatedAt: now,
+        useCount: 0,
+      }));
+      templates += 1;
     }
+
+    let versions = 0;
+    const skipped = [...plan.skipped];
+    for (const candidate of plan.versions) {
+      const boardId = boardIdMap.get(candidate.boardId);
+      if (!boardId) {
+        skipped.push({ kind: 'version', id: candidate.id, reason: 'Checkpoint board was not imported.' });
+        continue;
+      }
+      await this.repository.put('versions', {
+        id: generateId('version'),
+        boardId,
+        name: candidate.name,
+        dslText: candidate.dslText,
+        mode: candidate.mode,
+        createdAt: candidate.createdAt,
+        automatic: Boolean(candidate.automatic),
+      });
+      versions += 1;
+    }
+
     if (imported.length === 0) throw new Error('No boards found in that file.');
     this.emit();
-    return imported;
+    return { boards: imported, spaces: plan.spaces.length, templates, versions, skipped };
   }
 
   private async purgeExpiredTrash(): Promise<void> {

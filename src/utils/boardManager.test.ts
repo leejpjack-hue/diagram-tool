@@ -204,10 +204,28 @@ describe('migration and import compatibility', () => {
     const single = await manager.importFromFile(asFile({ version: '1.0', board: { id: 'old', title: 'Solo', mode: 'sequence', dslText: 'sequenceDiagram' } }, 'solo.board'));
     const backup = await manager.importFromFile(asFile({ version: '2.0', boards: [{ id: 'old-2', title: 'Backup', mode: 'gantt', dslText: 'diagram: gantt', starred: true, deletedAt: '2026-02-01T00:00:00.000Z' }] }, 'backup.boards'));
     const legacy = await manager.importFromFile(asFile({ diagram: { title: 'Diagram', mode: 'flow', dslText: 'start A' } }, 'legacy.diagram'));
-    expect(single[0].id).not.toBe('old');
-    expect(backup[0].title).toBe('Backup');
-    expect(backup[0]).toMatchObject({ starred: true, deletedAt: '2026-02-01T00:00:00.000Z' });
-    expect(legacy[0].mode).toBe('flow');
+    expect(single.boards[0].id).not.toBe('old');
+    expect(backup.boards[0].title).toBe('Backup');
+    expect(backup.boards[0]).toMatchObject({ starred: true, deletedAt: '2026-02-01T00:00:00.000Z' });
+    expect(legacy.boards[0].mode).toBe('flow');
+  });
+
+  it('complete backup restores spaces, personal templates, and version checkpoints', async () => {
+    const space = await manager.createSpace('Platform');
+    const board = await manager.create({ title: 'Core API', mode: 'architecture', dslText: 'diagram: architecture\nservice API', spaceId: space.id });
+    await manager.saveAsTemplate(board.id, 'API starter');
+    await manager.createVersion(board.id, 'Before redesign');
+    const backup = await manager.buildCompleteBackup();
+    expect(backup.spaces.some(item => item.name === 'Platform')).toBe(true);
+    expect(backup.templates.some(item => item.name === 'API starter')).toBe(true);
+    expect(backup.versions.some(item => item.name === 'Before redesign')).toBe(true);
+
+    const other = createMemoryBoardManager();
+    const report = await other.importFromFile(asFile(backup, 'complete.boards.json'));
+    expect(report.boards[0].title).toBe('Core API');
+    expect((await other.listSpaces())[0].name).toBe('Platform');
+    expect((await other.listTemplates())[0].name).toBe('API starter');
+    expect((await other.listAllVersions()).some(version => version.name === 'Before redesign')).toBe(true);
   });
 
   it('rejects invalid files', async () => {

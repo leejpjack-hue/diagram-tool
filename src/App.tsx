@@ -424,7 +424,7 @@ function App() {
   // back over fresh editor text while a DSL parse is updating the Gantt store.
   const isUpdatingFromDSL = useRef(false);
   
-  const { exportPNG, exportJPG, exportPDF, exportJSON, exportCSV } = useExport();
+  const { exportPNG, exportJPG, exportSVG, exportPDF, exportJSON, exportCSV } = useExport();
   const toast = useToast();
 
   useEffect(() => {
@@ -924,11 +924,11 @@ function App() {
     toast.success(`Loaded template: ${tpl.name}`);
   };
 
-  const handleExport = (format: 'png' | 'jpg' | 'pdf' | 'json' | 'csv', quality = 3) => {
+  const handleExport = (format: 'png' | 'svg' | 'jpg' | 'pdf' | 'json' | 'csv', quality = 3) => {
     // On the Gantt tab the Flow canvas (.react-flow) doesn't exist, so the
     // image formats need to be generated from the Gantt SVG chart directly.
     // JSON/CSV work the same on every tab.
-    if (activeTab === 'gantt' && (format === 'png' || format === 'jpg' || format === 'pdf')) {
+    if (activeTab === 'gantt' && (format === 'png' || format === 'svg' || format === 'jpg' || format === 'pdf')) {
       if (!ganttCanvasRef.current) {
         toast.error('Could not find chart to export');
         return;
@@ -948,6 +948,7 @@ function App() {
     }
 
     if (format === 'png') exportPNG(quality);
+    else if (format === 'svg') exportSVG();
     else if (format === 'jpg') exportJPG(quality);
     else if (format === 'pdf') exportPDF(quality);
     else if (format === 'json') exportJSON();

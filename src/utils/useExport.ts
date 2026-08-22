@@ -1,7 +1,9 @@
-import { toPng, toJpeg } from 'html-to-image';
+import { toPng, toJpeg, toSvg } from 'html-to-image';
 import { useDiagramStore } from '../store/diagramStore';
 import { useGanttStore } from '../components/Gantt/ganttStore';
 import type { DiagramNode } from '../store/types';
+import { buildBoardDocument, EXPORT_WATERMARK } from './boardFormat';
+import type { BoardMode } from './boardManager';
 
 export const useExport = () => {
   const { parsedDiagram, diagramMode } = useDiagramStore();
@@ -77,7 +79,16 @@ export const useExport = () => {
   const exportPNG = async (quality = 3) => {
     try {
       const dataUrl = await captureCanvas(toPng, quality, '#FDFDFD');
-      if (dataUrl) triggerDownload(dataUrl, getFileName('png'));
+      if (dataUrl) triggerDownload(assertUnwatermarked(dataUrl), getFileName('png'));
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
+  const exportSVG = async () => {
+    try {
+      const dataUrl = await captureCanvas(toSvg, 1, '#FDFDFD');
+      if (dataUrl) triggerDownload(assertUnwatermarked(dataUrl), getFileName('svg'));
     } catch (error) {
       console.error('Export failed:', error);
     }
@@ -115,7 +126,7 @@ export const useExport = () => {
         unit: 'pt',
         format: [pageWidth, pageHeight],
       });
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pageWidth, pageHeight);
+      pdf.addImage(assertUnwatermarked(dataUrl), 'PNG', 0, 0, pageWidth, pageHeight);
       pdf.save(getFileName('pdf'));
     } catch (error) {
       console.error('Export failed:', error);
@@ -123,28 +134,15 @@ export const useExport = () => {
   };
 
   const exportJSON = () => {
-    // Gantt has its own store — exporting parsedDiagram here would silently
-    // download whatever architecture/flow diagram was open before.
-    let exportData: Record<string, unknown>;
-    if (diagramMode === 'gantt') {
-      const { tasks, dependencies } = useGanttStore.getState();
-      exportData = {
-        version: '1.0',
-        exportedAt: new Date().toISOString(),
-        mode: 'gantt',
-        tasks,
-        dependencies,
-      };
-    } else {
-      if (!parsedDiagram) return;
-      exportData = {
-        version: '1.0',
-        exportedAt: new Date().toISOString(),
-        diagram: parsedDiagram,
-      };
-    }
-
-    const json = JSON.stringify(exportData, null, 2);
+    const { dslText } = useDiagramStore.getState();
+    const mode = (diagramMode === 'c4' ? 'architecture' : diagramMode) as BoardMode;
+    if (!dslText.trim() && diagramMode !== 'gantt') return;
+    const title = parsedDiagram?.title || 'diagram';
+    const json = JSON.stringify(buildBoardDocument({
+      title,
+      mode,
+      dslText,
+    }), null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
 
@@ -274,8 +272,14 @@ export const useExport = () => {
   return {
     exportPNG,
     exportJPG,
+    exportSVG,
     exportPDF,
     exportJSON,
     exportCSV,
   };
 };
+
+function assertUnwatermarked(payload: string): string {
+  if (EXPORT_WATERMARK) throw new Error('Export watermark is not allowed on the free path.');
+  return payload;
+}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-type ExportFormat = 'png' | 'jpg' | 'pdf' | 'json' | 'csv';
+type ExportFormat = 'png' | 'svg' | 'jpg' | 'pdf' | 'json' | 'csv';
 
 interface ExportPanelProps {
   onExport: (format: ExportFormat, quality?: number) => void;
@@ -46,6 +46,24 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
               </div>
               {selectedFormat === 'png' && (
                 <span className="ml-auto text-primary-600">✓</span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setSelectedFormat('svg')}
+              className={`w-full p-3 rounded-lg border-2 text-left transition flex items-center gap-3 ${
+                selectedFormat === 'svg'
+                  ? 'border-indigo-500 bg-indigo-50'
+                  : 'border-gray-300 hover:border-indigo-300'
+              }`}
+            >
+              <span className="text-2xl">📐</span>
+              <div>
+                <div className="font-bold text-gray-900">SVG</div>
+                <div className="text-xs text-gray-600">Vector, free and portable</div>
+              </div>
+              {selectedFormat === 'svg' && (
+                <span className="ml-auto text-indigo-600">✓</span>
               )}
             </button>
 
@@ -149,6 +167,11 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
         >
           Download {selectedFormat.toUpperCase()}
         </button>
+
+        <p data-testid="export-portable-copy" className="mt-4 text-xs leading-5 text-gray-600">
+          This format is portable and free. SVG, PNG at 1×–4× (including 2×), PDF, and JSON backup
+          download on this device with no account and no watermark.
+        </p>
       </div>
     </div>
   );
