@@ -1,0 +1,61 @@
+import { expect, test, type Page } from '@playwright/test';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'two-boxes.drawio');
+
+async function waitForEditor(page: Page) {
+  await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible();
+  await page.waitForFunction(() => {
+    const monaco = (window as unknown as { monaco?: { editor?: { getEditors?: () => unknown[] } } }).monaco;
+    return Boolean(monaco?.editor?.getEditors?.()?.length);
+  });
+}
+
+test.describe('draw.io dashboard import', () => {
+  test.describe.configure({ timeout: 60_000 });
+
+  test('imports a 2-box draw.io file as an editable flow board', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.getByTestId('dashboard-import').click(),
+    ]);
+    await fileChooser.setFiles(FIXTURE);
+
+    await expect(page.getByTestId('import-report')).toBeVisible();
+    await expect(page.getByTestId('import-mapped')).toHaveText('3 objects mapped, 0 skipped');
+    await expect(page.getByTestId('import-skipped')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Done' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Two Boxes' })).toBeVisible();
+    await expect(page.getByTestId('board-mode-tag')).toHaveText(/Workflow/i);
+    await page.getByRole('heading', { name: 'Two Boxes' }).click();
+    await waitForEditor(page);
+    await expect(page.getByTestId('rf__node-intake')).toBeVisible();
+    await expect(page.getByTestId('rf__node-review')).toBeVisible();
+    await expect(page.getByText(/diagram:\s*flow/).first()).toBeVisible();
+  });
+
+  test('invalid draw.io XML shows an error and does not wipe Home', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    const path = join(tmpdir(), `diagram-tool-bad-${Date.now()}.xml`);
+    writeFileSync(path, 'not a draw.io diagram');
+
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.getByTestId('dashboard-import').click(),
+    ]);
+    await fileChooser.setFiles(path);
+
+    await expect(page.getByText(/isn't a valid board file|could not be imported/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.getByTestId('import-report')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Two Boxes' })).toHaveCount(0);
+  });
+});

@@ -6,6 +6,8 @@ import {
   type ImportReport,
 } from './boardFormat';
 import { detectRawDiagramImport } from './sourceText';
+import { importDrawio, looksLikeDrawio } from './drawioImport';
+import { assertImportSize, sanitizeImportPlainText } from './importSanitizer';
 
 export type BoardMode = 'architecture' | 'flow' | 'sequence' | 'gantt';
 export type BoardSort = 'lastOpened' | 'updated' | 'created' | 'name';
@@ -831,15 +833,34 @@ export class BoardManager {
 
   async importFromFile(file: File): Promise<ImportReport> {
     await this.initialize();
+    assertImportSize(file);
     const text = await file.text();
+    assertImportSize(file, text);
     const mermaid = detectRawDiagramImport(file.name, text);
     if (mermaid) {
       const board = await this.create({
-        title: mermaid.title,
+        title: sanitizeImportPlainText(mermaid.title, 'Imported diagram'),
         mode: mermaid.mode,
         dslText: mermaid.dslText,
       });
       return { boards: [board], spaces: 0, templates: 0, versions: 0, skipped: [] };
+    }
+
+    if (looksLikeDrawio(file.name, text)) {
+      const drawio = await importDrawio(file.name, text);
+      const board = await this.create({
+        title: sanitizeImportPlainText(drawio.title, 'Imported diagram'),
+        mode: drawio.mode,
+        dslText: drawio.dslText,
+      });
+      return {
+        boards: [board],
+        spaces: 0,
+        templates: 0,
+        versions: 0,
+        skipped: drawio.skipped,
+        mapped: drawio.mapped,
+      };
     }
 
     let data: unknown;

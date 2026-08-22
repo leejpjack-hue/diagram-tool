@@ -11,6 +11,8 @@ import {
   type Board,
   type BoardManager,
 } from './boardManager';
+import { buildBoardDocument } from './boardFormat';
+import { MAX_IMPORT_BYTES } from './importSanitizer';
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -250,6 +252,47 @@ U->>A: GET /orders
     const report = await manager.importFromFile(file);
     expect(report.boards[0].mode).toBe('flow');
     expect(report.boards[0].dslText).toContain('flowchart TD');
+  });
+
+  it('imports a draw.io file as a flow board with a mapped/skipped report', async () => {
+    const xml = `<mxfile host="app.diagrams.net">
+  <diagram name="Two Boxes">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" value="Intake" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="80" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" value="Review" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="80" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" edge="1" parent="1" source="2" target="3"/>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>`;
+    const file = new File([xml], 'two-boxes.drawio', { type: 'application/xml' });
+    const report = await manager.importFromFile(file);
+    expect(report.boards[0]).toMatchObject({ mode: 'flow', title: 'Two Boxes' });
+    expect(report.boards[0].dslText).toContain('Intake -> Review');
+    expect(report.mapped).toBe(3);
+    expect(report.skipped).toEqual([]);
+    const exported = buildBoardDocument(report.boards[0]);
+    expect(exported.version).toBe('3.0');
+    expect(exported.board.frames).toEqual([]);
+  });
+
+  it('rejects huge or invalid files without wiping existing boards', async () => {
+    const existing = await manager.create({ title: 'Keep Me', mode: 'flow', dslText: 'diagram: flow\nstart A' });
+    const huge = new File(['tiny'], 'huge.drawio', { type: 'application/xml' });
+    Object.defineProperty(huge, 'size', { value: MAX_IMPORT_BYTES + 1 });
+    await expect(manager.importFromFile(huge)).rejects.toThrow(/too large/i);
+    await expect(manager.importFromFile(new File(['not-a-diagram'], 'bad.xml', { type: 'text/xml' })))
+      .rejects.toThrow(/valid board file/i);
+    const boards = await manager.list();
+    expect(boards).toHaveLength(1);
+    expect(boards[0]).toMatchObject({ id: existing.id, title: 'Keep Me', dslText: 'diagram: flow\nstart A' });
   });
 });
 

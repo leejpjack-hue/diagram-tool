@@ -251,6 +251,23 @@ describe('public portable board format', () => {
     expect(plan.skipped.map(item => item.id)).toEqual(expect.arrayContaining(['remote', 'svg']));
   });
 
+  it('drops remote and svg-xml thumbnails and keeps board.frames empty', () => {
+    const plan = parsePortableImport({
+      version: '3.0',
+      board: {
+        title: '<script>alert(1)</script>Deck',
+        mode: 'architecture',
+        source: { kind: 'dsl', text: ARCH_DSL },
+        frames: [{ id: 'f1' }],
+        thumbnail: 'https://evil.example/thumb.png',
+      },
+    });
+    expect(plan.boards[0].title).toBe('Deck');
+    expect(plan.boards[0].thumbnail).toBeUndefined();
+    expect(plan.boards[0].frames).toEqual([]);
+    expect(plan.skipped.map(item => item.kind)).toEqual(expect.arrayContaining(['frames', 'thumbnail']));
+  });
+
   it('PNG/SVG/PDF export stays free and unwatermarked', () => {
     expect(EXPORT_WATERMARK).toBeNull();
     expect(EXPORT_REQUIRES_ACCOUNT).toBe(false);

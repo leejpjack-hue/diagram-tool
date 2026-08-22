@@ -3,6 +3,12 @@ import { parseSequenceDiagram } from '../components/Sequence/sequenceParser';
 import { parseGanttDSL } from '../components/Gantt/ganttParser';
 import { calculateHierarchicalLayout } from './autoLayout';
 import { isMermaidFlow } from '../parser/mermaidFlow';
+import {
+  hasBlockedImportImage,
+  hasBlockedImportMarkup,
+  isSafeRasterDataUrl,
+  sanitizeImportPlainText,
+} from './importSanitizer';
 import type {
   Board,
   BoardMode,
@@ -19,13 +25,11 @@ export const EXPORT_REQUIRES_ACCOUNT = false;
 export const KNOWN_BOARD_MODES: readonly BoardMode[] = ['architecture', 'flow', 'sequence', 'gantt'];
 export const KNOWN_PRESENTATION_TYPES = ['image', 'note', 'text', 'arrow', 'shape', 'drawing', 'frame'] as const;
 
-const SAFE_IMAGE_DATA_URL = /^data:image\/(?:png|jpeg|webp|gif)(?:;[\w.-]+=[\w.-]+)*;base64,[A-Za-z0-9+/]+={0,2}$/i;
-
 export function isAllowedPresentationContent(type: string, content: string): boolean {
   if (typeof content !== 'string') return false;
   const value = content.trim();
-  if (/^https?:\/\//i.test(value) || /^data:image\/svg\+xml/i.test(value)) return false;
-  if (type === 'image') return SAFE_IMAGE_DATA_URL.test(value);
+  if (hasBlockedImportImage(value) || hasBlockedImportMarkup(value)) return false;
+  if (type === 'image') return isSafeRasterDataUrl(value);
   return true;
 }
 
@@ -118,6 +122,8 @@ export interface ImportReport {
   templates: number;
   versions: number;
   skipped: ImportSkip[];
+  /** Objects mapped on a best-effort file import (draw.io nodes + edges). */
+  mapped?: number;
 }
 
 export interface LayoutPoint {
@@ -390,10 +396,15 @@ export function parsePortableImport(data: unknown): PortableImportPlan {
     }
     const presentation = sanitizePresentation(record.presentation, asString(record.id), skipped);
     const graph = projectBoardGraph(mode as BoardMode, dslText);
+    let thumbnail: string | undefined;
+    if (typeof record.thumbnail === 'string' && record.thumbnail) {
+      if (isAllowedPresentationContent('image', record.thumbnail)) thumbnail = record.thumbnail;
+      else skipped.push({ kind: 'thumbnail', id: asString(record.id), reason: 'Remote or scripted images are not imported.' });
+    }
     boards.push({
       id: asString(record.id),
-      title: typeof record.title === 'string' && record.title.trim() ? record.title : 'Imported board',
-      description: typeof record.description === 'string' ? record.description : '',
+      title: sanitizeImportPlainText(typeof record.title === 'string' ? record.title : '', 'Imported board'),
+      description: typeof record.description === 'string' ? sanitizeImportPlainText(record.description) : '',
       mode: mode as BoardMode,
       dslText,
       source: { kind: sourceKindFor(mode as BoardMode, dslText), text: dslText },
@@ -403,7 +414,7 @@ export function parsePortableImport(data: unknown): PortableImportPlan {
       comments: [],
       layout: graph.layout,
       presentation,
-      thumbnail: typeof record.thumbnail === 'string' ? record.thumbnail : undefined,
+      thumbnail,
       spaceId: typeof record.spaceId === 'string' ? record.spaceId : undefined,
       tags: Array.isArray(record.tags) ? record.tags.filter((tag): tag is string => typeof tag === 'string') : [],
       starred: Boolean(record.starred),
