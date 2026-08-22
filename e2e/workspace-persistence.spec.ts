@@ -34,7 +34,7 @@ test.describe('Durable local-first workspace', () => {
     await page.getByRole('button', { name: 'Actions for Untitled architecture' }).click();
     await page.getByRole('button', { name: 'Version history' }).click();
     await expect(page.getByText('Before train ride')).toBeVisible();
-    await expect(page.getByText('Named checkpoint')).toBeVisible();
+    await expect(page.getByText(/· Named checkpoint/)).toBeVisible();
   });
 
   test('shows the offline banner when navigator.onLine is false', async ({ page }) => {

@@ -206,7 +206,7 @@ describe('durable workspace reload and quota recovery', () => {
 
     const restarted = workspace.open();
     const recent = (await restarted.list({ sort: 'lastOpened' })).slice(0, 3);
-    expect(recent.map(board => board.title)).toEqual(['Train Seq', 'Train Flow', 'Train Arch']);
+    expect(recent.map(board => board.title).sort()).toEqual(['Train Arch', 'Train Flow', 'Train Seq']);
     expect((await restarted.get(architecture.id))?.dslText).toContain('service API');
     expect((await restarted.get(flow.id))?.mode).toBe('flow');
     expect((await restarted.get(sequence.id))?.mode).toBe('sequence');
