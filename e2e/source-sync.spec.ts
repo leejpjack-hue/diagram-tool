@@ -74,6 +74,10 @@ async function createArchitectureBoard(page: Page) {
   await setEditorDsl(page, ARCH_DSL);
   await expect(page.getByTestId('rf__node-gateway')).toBeVisible();
   await expect(page.getByTestId('rf__node-api')).toBeVisible();
+  await page.getByTitle('Fit to Screen').click();
+  await expect(page.getByTestId('rf__node-gateway').getByText('Gateway', { exact: true })).toBeVisible();
+  // ZoomControls.fitView animates for 300ms — dragging mid-tween hits the pane.
+  await page.waitForTimeout(450);
 }
 
 test.describe('Bidirectional source sync', () => {
@@ -90,13 +94,17 @@ test.describe('Bidirectional source sync', () => {
     await createArchitectureBoard(page);
     const before = await getEditorDsl(page);
     const node = page.getByTestId('rf__node-gateway');
+    await expect(node).toBeVisible();
     const box = await node.boundingBox();
     expect(box).toBeTruthy();
-    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    // Grab the card body, inset from the always-on side connection handles.
+    const x = box!.x + box!.width * 0.55;
+    const y = box!.y + box!.height * 0.45;
+    await page.mouse.move(x, y);
     await page.mouse.down();
-    await page.mouse.move(box!.x + 140, box!.y + 90, { steps: 8 });
+    await page.mouse.move(x + 220, y + 160, { steps: 20 });
     await page.mouse.up();
-    await expect.poll(async () => getEditorDsl(page)).not.toBe(before);
+    await expect.poll(async () => getEditorDsl(page), { timeout: 10_000 }).not.toBe(before);
     const after = await getEditorDsl(page);
     expect(after).toMatch(/service Gateway \{[\s\S]*at:/);
     expect(after).not.toBe(before);

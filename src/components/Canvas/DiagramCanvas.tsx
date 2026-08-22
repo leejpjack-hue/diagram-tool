@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useCallback, useState } from 'react';
+import { useMemo, useEffect, useCallback, useState, useRef } from 'react';
 import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, MarkerType, ReactFlowProvider, useReactFlow, BackgroundVariant, ViewportPortal } from '@xyflow/react';
 import type { Node, Edge as ReactFlowEdge, Viewport, Connection } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -29,7 +29,7 @@ import type { FlowNode, C4Level, ServiceNode as ServiceNodeType, CloudNode as Cl
 import { calculateAutoLayout, resolveGroupOverlaps } from '../../utils/autoLayout';
 import { addConnectionDSL } from '../../utils/connectDSL';
 import { setReverseDSL, setReverseMermaidDSL } from '../../utils/flowDSL';
-import { setNodePin, setGroupPin, setMermaidNodePin } from '../../utils/pinUtils';
+import { applyCanvasPins, setGroupPin } from '../../utils/pinUtils';
 import { applyBoardSource, renameNodeInSource } from '../../utils/sourceText';
 import { isMermaidFlow } from '../../parser/mermaidFlow';
 import { parseDiagram } from '../../parser/parser';
@@ -709,9 +709,29 @@ function DiagramCanvasInternal() {
 
   const [nodes, setNodes, onNodesChange] = useNodesState(routedNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const draggingNodeIds = useRef(new Set<string>());
 
   // Alignment guides shown while dragging a node.
   const [helperLines, setHelperLines] = useState<HelperLineResult>({});
+
+  const persistCanvasPositions = useCallback((
+    positions: Map<string, { x: number; y: number }>,
+    group?: { name: string; x: number; y: number; w: number; h: number },
+  ) => {
+    if (!parsedDiagram) return;
+    const next = applyCanvasPins(dslText, parsedDiagram.nodes, positions, {
+      mode: diagramMode === 'flow' ? 'flow' : 'architecture',
+      mermaidFlow: isMermaidFlow(dslText),
+      group,
+    });
+    if (next === dslText) return;
+    setDslText(next);
+    try {
+      setParsedDiagram(parseDiagram(next));
+    } catch (err) {
+      console.error('Pin parse error:', err);
+    }
+  }, [parsedDiagram, dslText, diagramMode, setDslText, setParsedDiagram]);
 
   // Drag-follow for group containers: when a `__group_*` node moves, apply
   // the same delta to its member nodes in the same change batch so the
@@ -765,18 +785,68 @@ function DiagramCanvasInternal() {
           }
         }
       }
-      onNodesChange(extra.length > 0 ? [...changes, ...extra] : changes);
+
+      const applied = extra.length > 0 ? [...changes, ...extra] : changes;
+      for (const c of applied) {
+        if (c.type === 'position' && typeof c.id === 'string') {
+          if (c.dragging) draggingNodeIds.current.add(c.id);
+          else draggingNodeIds.current.delete(c.id);
+        }
+      }
+
+      onNodesChange(applied);
+
+      const ended = applied.filter(c => c.type === 'position' && c.dragging === false && c.position);
+      if (ended.length === 0 || !parsedDiagram) return;
+
+      const positions = new Map<string, { x: number; y: number }>();
+      for (const n of nodes) positions.set(n.id, n.position);
+      for (const c of applied) {
+        if (c.type === 'position' && c.position && typeof c.id === 'string') {
+          positions.set(c.id, c.position);
+        }
+      }
+
+      if (diagramMode === 'flow') {
+        const dragged = new Map<string, { x: number; y: number }>();
+        for (const c of ended) {
+          if (!c.id.startsWith('__') && c.position) dragged.set(c.id, c.position);
+        }
+        if (dragged.size > 0) persistCanvasPositions(dragged);
+        return;
+      }
+
+      const groupChange = ended.find(c => c.id.startsWith('__group_'));
+      let group: { name: string; x: number; y: number; w: number; h: number } | undefined;
+      if (groupChange?.position) {
+        const gid = groupChange.id.slice('__group_'.length);
+        const groupMeta = parsedDiagram.groups?.find(g => g.id === gid);
+        const rf = nodes.find(n => n.id === groupChange.id);
+        if (groupMeta) {
+          const w = Number((rf?.data as { width?: number })?.width) || 200;
+          const h = Number((rf?.data as { height?: number })?.height) || 120;
+          group = { name: groupMeta.name, x: groupChange.position.x, y: groupChange.position.y, w, h };
+        }
+      }
+      persistCanvasPositions(positions, group);
     },
-    [nodes, onNodesChange],
+    [nodes, onNodesChange, parsedDiagram, diagramMode, persistCanvasPositions],
   );
-  
-  // Update nodes/edges when parsedDiagram changes
+
+  // Rebuild RF nodes from the parsed source — but not while a drag is in
+  // flight, and not on unrelated re-renders. `routedNodes` is a new array
+  // every time its memo recomputes, which used to snap dragged nodes back
+  // before pin writeback could run.
+  const layoutSyncKey = `${diagramMode}\0${dslText}\0${c4Level}\0${drillParent ?? ''}\0${layoutDirection}`;
   useEffect(() => {
+    if (draggingNodeIds.current.size > 0) return;
     if (routedNodes.length > 0) {
       setNodes(routedNodes);
       setEdges(initialEdges);
     }
-  }, [routedNodes, initialEdges, setNodes, setEdges]);
+    // routedNodes / initialEdges are produced in the same render as this key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutSyncKey, setNodes, setEdges]);
 
   // Reset the C4 level filter and drill-down whenever a new diagram is loaded.
   useEffect(() => {
@@ -943,22 +1013,18 @@ function DiagramCanvasInternal() {
     }
   }, [parsedDiagram, dslText, diagramMode, setDslText, setParsedDiagram]);
 
-  // Persist a drag (node or group) back into the DSL as `at:` / `size:` pins
-  // so manual placement survives reload and is captured on export.
-  const onNodeDragStop = useCallback((_e: unknown, node: Node) => {
-    if (!parsedDiagram) return;
-    let next = dslText;
+  const onNodeDragStart = useCallback((_e: unknown, node: Node) => {
+    draggingNodeIds.current.add(node.id);
+  }, []);
 
-    const pinAllVisibleArchitectureNodes = (sourceDsl: string, overrides: Map<string, { x: number; y: number }>) => {
-      let pinnedDsl = sourceDsl;
-      for (const meta of parsedDiagram.nodes) {
-        if (meta.type === 'annotation') continue;
-        const position = overrides.get(meta.id) ?? nodes.find(n => n.id === meta.id)?.position;
-        if (!position) continue;
-        pinnedDsl = setNodePin(pinnedDsl, meta.name, position.x, position.y);
-      }
-      return pinnedDsl;
-    };
+  // Backup persist for the rare case the change-stream misses dragging:false.
+  // handleNodesChange is the primary writeback and no-ops if pins already match.
+  const onNodeDragStop = useCallback((_e: unknown, node: Node) => {
+    draggingNodeIds.current.delete(node.id);
+    if (!parsedDiagram) return;
+    const positions = new Map<string, { x: number; y: number }>();
+    for (const n of nodes) positions.set(n.id, n.position);
+    positions.set(node.id, node.position);
 
     if (node.id.startsWith('__group_')) {
       const gid = node.id.slice('__group_'.length);
@@ -966,43 +1032,18 @@ function DiagramCanvasInternal() {
       if (!group) return;
       const w = Number((node.data as { width?: number }).width) || 200;
       const h = Number((node.data as { height?: number }).height) || 120;
-      next = setGroupPin(next, group.name, node.position.x, node.position.y, w, h);
-      // The drag-follow handler moved members too — persist their new spots.
-      const memberIds = (node.data as { memberIds?: string[] }).memberIds ?? [];
-      const memberOverrides = new Map<string, { x: number; y: number }>();
-      for (const mid of memberIds) {
-        const rf = nodes.find(n => n.id === mid);
-        const meta = parsedDiagram.nodes.find(n => n.id === mid);
-        if (rf && meta) {
-          memberOverrides.set(mid, rf.position);
-          next = setNodePin(next, meta.name, rf.position.x, rf.position.y);
-        }
-      }
-      if (diagramMode !== 'flow') {
-        next = pinAllVisibleArchitectureNodes(next, memberOverrides);
-      }
-    } else {
-      const meta = parsedDiagram.nodes.find(n => n.id === node.id);
-      if (!meta) return;
-      if (meta.type === 'annotation') return;
-      // Mermaid-format flowcharts store positions as `%% at` comments; native
-      // DSL stores them as an `at:` line inside the node block.
-      if (diagramMode !== 'flow') {
-        next = pinAllVisibleArchitectureNodes(next, new Map([[node.id, node.position]]));
-      } else {
-        next = isMermaidFlow(dslText)
-        ? setMermaidNodePin(next, meta.name, node.position.x, node.position.y)
-        : setNodePin(next, meta.name, node.position.x, node.position.y);
-      }
+      persistCanvasPositions(positions, { name: group.name, x: node.position.x, y: node.position.y, w, h });
+      return;
     }
-    if (next === dslText) return;
-    setDslText(next);
-    try {
-      setParsedDiagram(parseDiagram(next));
-    } catch (err) {
-      console.error('Pin parse error:', err);
+
+    const meta = parsedDiagram.nodes.find(n => n.id === node.id);
+    if (!meta || meta.type === 'annotation') return;
+    if (diagramMode === 'flow') {
+      persistCanvasPositions(new Map([[node.id, node.position]]));
+      return;
     }
-  }, [parsedDiagram, dslText, diagramMode, nodes, setDslText, setParsedDiagram]);
+    persistCanvasPositions(positions);
+  }, [parsedDiagram, diagramMode, nodes, persistCanvasPositions]);
 
   if (!parsedDiagram) {
     return (
@@ -1045,15 +1086,17 @@ function DiagramCanvasInternal() {
         onSelectionChange={onSelectionChange}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
+        onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         snapToGrid
         snapGrid={[10, 10]}
+        nodeDragThreshold={0}
         connectionRadius={28}
         connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '6 4' }}
         panActivationKeyCode={null}
-        fitView
         fitViewOptions={{ padding: 0.2 }}
+        onInit={instance => { instance.fitView({ padding: 0.2 }); }}
         attributionPosition="bottom-left"
         minZoom={0.1}
         maxZoom={4}

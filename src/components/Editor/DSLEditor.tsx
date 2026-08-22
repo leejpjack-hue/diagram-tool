@@ -30,7 +30,10 @@ export function DSLEditor() {
   }, [diagramMode, setDslText, setParsedDiagram, setError, setLoading]);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
-    if (value !== undefined) applySource(value);
+    if (value === undefined) return;
+    // Ignore Monaco echoes after a canvas writeback updates `dslText`.
+    if (value === useDiagramStore.getState().dslText) return;
+    applySource(value);
   }, [applySource]);
 
   useEffect(() => {
