@@ -1,0 +1,38 @@
+{
+  "version": "3.0",
+  "kind": "board",
+  "exportedAt": "2026-08-22T12:00:00.000Z",
+  "board": {
+    "title": "Payments API",
+    "mode": "architecture",
+    "source": {
+      "kind": "dsl",
+      "text": "diagram: architecture\ntitle: Payments API\nservice Gateway {\n  connects: Ledger\n}\nservice Ledger {\n}\n"
+    },
+    "dslText": "diagram: architecture\ntitle: Payments API\nservice Gateway {\n  connects: Ledger\n}\nservice Ledger {\n}\n",
+    "nodes": [
+      { "id": "gateway", "name": "Gateway", "type": "service", "x": 40, "y": 100 }
+    ],
+    "edges": [
+      { "id": "gateway-ledger", "from": "gateway", "to": "ledger", "label": "" }
+    ],
+    "frames": [],
+    "comments": [],
+    "layout": { "pins": { "gateway": { "x": 40, "y": 100 } } },
+    "thumbnail": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "presentation": {
+      "items": [
+        {
+          "id": "img-1",
+          "type": "image",
+          "content": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "x": 0,
+          "y": 0,
+          "width": 80,
+          "height": 80
+        }
+      ],
+      "updatedAt": "2026-08-22T12:00:00.000Z"
+    }
+  }
+}

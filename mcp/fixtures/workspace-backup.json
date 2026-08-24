@@ -1,0 +1,21 @@
+{
+  "version": "3.0",
+  "kind": "workspace",
+  "exportedAt": "2026-08-22T12:00:00.000Z",
+  "boards": [
+    {
+      "title": "Should not list me",
+      "mode": "architecture",
+      "source": { "kind": "dsl", "text": "diagram: architecture\nservice Hidden" },
+      "dslText": "diagram: architecture\nservice Hidden",
+      "nodes": [],
+      "edges": [],
+      "frames": [],
+      "comments": [],
+      "layout": { "pins": {} }
+    }
+  ],
+  "spaces": [],
+  "templates": [],
+  "versions": []
+}
