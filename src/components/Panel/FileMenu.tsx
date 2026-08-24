@@ -6,13 +6,15 @@ import {
   cursorMcpJsonSnippet,
 } from '../../utils/cursorMcpSnippet';
 import { extractBoardTitle } from '../../utils/sourceText';
-import { parseOpenedBoardText, serializeBoardFile, upsertOpenedBoard } from '../../utils/boardFile';
+import { interpretOpenedFile, serializeBoardFile, upsertOpenedBoard } from '../../utils/boardFile';
 import { assertImportSize } from '../../utils/importSanitizer';
 import {
+  OPEN_FILE_ACCEPT,
   boardFileHandles,
   canUseFileSystemAccess,
   downloadBoardJson,
   isAbortError,
+  mustSaveBoardJsonAsNewFile,
   pickBoardFileToOpen,
   pickBoardFileToSave,
   readHandleText,
@@ -106,7 +108,12 @@ export function FileMenu({
   };
 
   const snapshotCurrentBoard = async (): Promise<Pick<Board, 'title' | 'mode' | 'dslText'> & Partial<Board>> => {
-    const existing = currentBoardId ? await boardManager.get(currentBoardId) : undefined;
+    let existing: Board | undefined;
+    try {
+      existing = currentBoardId ? await boardManager.get(currentBoardId) : undefined;
+    } catch {
+      existing = undefined;
+    }
     const title = extractBoardTitle(currentDsl, activeMode) || existing?.title || 'Untitled board';
     return {
       ...(existing ?? { title, mode: activeMode, dslText: currentDsl }),
@@ -116,12 +123,17 @@ export function FileMenu({
     };
   };
 
-  const applyOpenedText = async (text: string, handle?: FileSystemFileHandleLike, replaceId?: string) => {
-    const portable = parseOpenedBoardText(text);
+  const applyOpenedText = async (
+    text: string,
+    handle?: FileSystemFileHandleLike,
+    replaceId?: string,
+    filename?: string,
+  ) => {
+    const opened = await interpretOpenedFile(filename ?? handle?.name ?? 'diagram', text);
     const mappedId = replaceId ?? (handle ? await boardFileHandles.findBoardId(handle) : undefined);
-    const board = await upsertOpenedBoard(boardManager, portable, mappedId);
+    const board = await upsertOpenedBoard(boardManager, opened.portable, mappedId);
     if (handle) {
-      boardFileHandles.set(board.id, handle);
+      boardFileHandles.set(board.id, handle, opened.format);
       setLinkedToDisk(true);
     }
     onOpenWorkspaceBoard?.(board);
@@ -153,7 +165,7 @@ export function FileMenu({
       assertImportSize(file);
       const text = await file.text();
       assertImportSize(file, text);
-      await applyOpenedText(text);
+      await applyOpenedText(text, undefined, undefined, file.name);
     } catch (error) {
       notifyFileError(error);
     }
@@ -185,7 +197,8 @@ export function FileMenu({
 
   const handleSaveToDisk = async () => {
     const handle = currentBoardId ? boardFileHandles.get(currentBoardId) : undefined;
-    if (!handle) {
+    const format = currentBoardId ? boardFileHandles.getFormat(currentBoardId) : undefined;
+    if (!handle || mustSaveBoardJsonAsNewFile(handle, format)) {
       await handleSaveAs();
       return;
     }
@@ -206,8 +219,8 @@ export function FileMenu({
     handleClose();
     try {
       const text = await readHandleText(handle);
-      const portable = parseOpenedBoardText(text);
-      const board = await upsertOpenedBoard(boardManager, portable, currentBoardId);
+      const opened = await interpretOpenedFile(handle.name ?? 'diagram', text);
+      const board = await upsertOpenedBoard(boardManager, opened.portable, currentBoardId);
       onOpenWorkspaceBoard?.(board);
       notify?.('success', `Reloaded "${board.title}" from disk`);
     } catch (error) {
@@ -321,6 +334,7 @@ export function FileMenu({
             <button
               type="button"
               aria-label="Open…"
+              title="JSON board, Mermaid, native DSL, or draw.io"
               onClick={handleOpenBoardFile}
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
             >
@@ -442,7 +456,7 @@ export function FileMenu({
         ref={openBoardInputRef}
         data-testid="open-board-file"
         type="file"
-        accept=".json,.board.json"
+        accept={OPEN_FILE_ACCEPT}
         onChange={event => void handleOpenBoardInput(event)}
         className="hidden"
       />

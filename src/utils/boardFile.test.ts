@@ -7,6 +7,7 @@ import {
 } from './boardManager';
 import {
   OPEN_BOARD_FILE_ERRORS,
+  interpretOpenedFile,
   parseOpenedBoardText,
   serializeBoardFile,
   upsertOpenedBoard,
@@ -30,6 +31,42 @@ service API {}`;
 const OPENED_DSL = `diagram: architecture
 title: From Disk
 service Gateway {}`;
+
+const FLOW_MERMAID = `flowchart LR
+title: Checkout
+  Intake[Intake] --> Review[Review]
+  Review --> Done[Done]`;
+
+const NATIVE_FLOW = `diagram: flow
+title: Intake
+start FNOL
+FNOL -> Review
+end Review`;
+
+const MERMAID_GANTT = `gantt
+title Sprint Plan
+dateFormat YYYY-MM-DD
+section Build
+Design :a1, 2026-08-01, 4d
+Implement :after a1, 5d`;
+
+const DRAWIO = `<mxfile host="app.diagrams.net">
+  <diagram name="Two Boxes">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" value="Intake" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="80" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" value="Review" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="80" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" edge="1" parent="1" source="2" target="3"/>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>`;
 
 function boardDoc(overrides: Record<string, unknown> = {}) {
   return {
@@ -120,6 +157,66 @@ describe('open board file into the workspace', () => {
     const boards = await manager.list();
     expect(boards.map(board => board.id).sort()).toEqual([current.id, other.id].sort());
     expect((await manager.get(other.id))?.title).toBe('Other Board');
+  });
+
+  it('opens a valid mermaid flow without wiping other boards', async () => {
+    const { current, other } = await seedLibrary();
+    const opened = await interpretOpenedFile('checkout.mmd', FLOW_MERMAID);
+    expect(opened.format).toBe('source');
+    expect(opened.portable.mode).toBe('flow');
+    expect(opened.portable.title).toBe('Checkout');
+    expect(opened.portable.dslText).toContain('flowchart LR');
+
+    const board = await upsertOpenedBoard(manager, opened.portable);
+    expect(board.id).not.toBe(current.id);
+    expect(board.mode).toBe('flow');
+    const boards = await manager.list();
+    expect(boards).toHaveLength(3);
+    expect((await manager.get(current.id))?.dslText).toBe(ARCH_DSL);
+    expect((await manager.get(other.id))?.title).toBe('Other Board');
+  });
+
+  it('opens native DSL from content, not only the extension', async () => {
+    const opened = await interpretOpenedFile('notes.txt', NATIVE_FLOW);
+    expect(opened.format).toBe('source');
+    expect(opened.portable).toMatchObject({ mode: 'flow', title: 'Intake' });
+    expect(opened.portable.dslText).toContain('diagram: flow');
+  });
+
+  it('opens mermaid gantt as a native gantt board', async () => {
+    const opened = await interpretOpenedFile('sprint.mmd', MERMAID_GANTT);
+    expect(opened.portable.mode).toBe('gantt');
+    expect(opened.portable.dslText).toMatch(/diagram:\s*gantt/);
+    expect(opened.portable.title).toBe('Sprint Plan');
+  });
+
+  it('opens draw.io XML as a flow board', async () => {
+    const opened = await interpretOpenedFile('two-boxes.drawio', DRAWIO);
+    expect(opened.format).toBe('source');
+    expect(opened.portable.mode).toBe('flow');
+    expect(opened.portable.dslText).toContain('Intake -> Review');
+  });
+
+  it('Open erDiagram, classDiagram, and workspace backup does not clobber', async () => {
+    const { current, other } = await seedLibrary();
+    const snapshot = (board: Board) => ({ id: board.id, title: board.title, dslText: board.dslText, mode: board.mode });
+    const beforeCurrent = snapshot(current);
+    const beforeOther = snapshot(other);
+
+    const attempts: Array<[string, string, string]> = [
+      ['schema.mmd', 'erDiagram\n  CUSTOMER ||--o{ ORDER : places\n', OPEN_BOARD_FILE_ERRORS.unsupported],
+      ['model.mermaid', 'classDiagram\n  class Animal\n', OPEN_BOARD_FILE_ERRORS.unsupported],
+      ['map.mmd', 'mindmap\n  root((ideas))\n', OPEN_BOARD_FILE_ERRORS.unsupported],
+      ['backup.json', JSON.stringify({ version: '3.0', kind: 'workspace', boards: [boardDoc().board] }), OPEN_BOARD_FILE_ERRORS.workspace],
+    ];
+
+    for (const [filename, text, message] of attempts) {
+      await expect(interpretOpenedFile(filename, text)).rejects.toThrow(message);
+      const boards = await manager.list();
+      expect(boards).toHaveLength(2);
+      expect(snapshot((await manager.get(current.id))!)).toEqual(beforeCurrent);
+      expect(snapshot((await manager.get(other.id))!)).toEqual(beforeOther);
+    }
   });
 });
 

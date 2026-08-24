@@ -9,46 +9,99 @@ export interface FileSystemFileHandleLike {
   isSameEntry?(other: FileSystemFileHandleLike): Promise<boolean>;
 }
 
+type FilePickerAcceptType = { description?: string; accept: Record<string, string[]> };
+
 type FilePickerWindow = Window & {
   showOpenFilePicker?: (options?: {
     multiple?: boolean;
-    types?: Array<{ description?: string; accept: Record<string, string[]> }>;
+    types?: FilePickerAcceptType[];
   }) => Promise<FileSystemFileHandleLike[]>;
   showSaveFilePicker?: (options?: {
     suggestedName?: string;
-    types?: Array<{ description?: string; accept: Record<string, string[]> }>;
+    types?: FilePickerAcceptType[];
   }) => Promise<FileSystemFileHandleLike>;
 };
 
-export const BOARD_FILE_PICKER_TYPES = [
+export type LinkedFileFormat = 'board-json' | 'source';
+
+/** Hidden <input type="file"> accept for File → Open… */
+export const OPEN_FILE_ACCEPT = '.json,.board.json,.mmd,.mermaid,.txt,.dsl,.drawio,.xml';
+
+export const OPEN_FILE_PICKER_TYPES: FilePickerAcceptType[] = [
+  {
+    description: 'DiagramTool board',
+    accept: { 'application/json': ['.json'] },
+  },
+  {
+    description: 'Mermaid',
+    accept: { 'text/plain': ['.mmd', '.mermaid'] },
+  },
+  {
+    description: 'Native DSL',
+    accept: { 'text/plain': ['.txt', '.dsl'] },
+  },
+  {
+    description: 'draw.io',
+    accept: { 'application/xml': ['.drawio', '.xml'] },
+  },
+];
+
+/** File → Save / Save As: kind:board JSON 3.0 only. */
+export const BOARD_FILE_PICKER_TYPES: FilePickerAcceptType[] = [
   {
     description: 'DiagramTool board',
     accept: { 'application/json': ['.json'] },
   },
 ];
 
-const handles = new Map<string, FileSystemFileHandleLike>();
+interface HandleEntry {
+  handle: FileSystemFileHandleLike;
+  format: LinkedFileFormat;
+}
+
+const handles = new Map<string, HandleEntry>();
 
 export const boardFileHandles = {
   get(boardId: string): FileSystemFileHandleLike | undefined {
-    return handles.get(boardId);
+    return handles.get(boardId)?.handle;
+  },
+  getFormat(boardId: string): LinkedFileFormat | undefined {
+    return handles.get(boardId)?.format;
   },
   has(boardId: string): boolean {
     return handles.has(boardId);
   },
-  set(boardId: string, handle: FileSystemFileHandleLike): void {
-    handles.set(boardId, handle);
+  set(boardId: string, handle: FileSystemFileHandleLike, format: LinkedFileFormat = 'board-json'): void {
+    handles.set(boardId, { handle, format });
   },
   clear(): void {
     handles.clear();
   },
   async findBoardId(handle: FileSystemFileHandleLike): Promise<string | undefined> {
     for (const [id, existing] of handles) {
-      if (typeof existing.isSameEntry === 'function' && await existing.isSameEntry(handle)) return id;
+      if (typeof existing.handle.isSameEntry === 'function' && await existing.handle.isSameEntry(handle)) return id;
     }
     return undefined;
   },
 };
+
+export function isBoardJsonFilename(name?: string): boolean {
+  if (!name) return false;
+  const lower = name.toLowerCase();
+  if (/\.(mmd|mermaid|drawio)(\.|$)/.test(lower)) return false;
+  return /\.(?:board\.)?json$/.test(lower) || /\.board$/.test(lower);
+}
+
+/** Save writes JSON. Never overwrite a Mermaid / DSL / draw.io handle. */
+export function mustSaveBoardJsonAsNewFile(
+  handle: FileSystemFileHandleLike | undefined,
+  format?: LinkedFileFormat,
+): boolean {
+  if (!handle) return true;
+  if (format === 'source') return true;
+  if (format === 'board-json') return false;
+  return !isBoardJsonFilename(handle.name);
+}
 
 export function canUseFileSystemAccess(): boolean {
   if (typeof window === 'undefined' || !window.isSecureContext) return false;
@@ -108,7 +161,7 @@ export async function writeHandleText(handle: FileSystemFileHandleLike, text: st
 export async function pickBoardFileToOpen(): Promise<{ handle: FileSystemFileHandleLike; text: string } | null> {
   const picker = (window as FilePickerWindow).showOpenFilePicker;
   if (!picker) return null;
-  const [handle] = await picker({ multiple: false, types: BOARD_FILE_PICKER_TYPES });
+  const [handle] = await picker({ multiple: false, types: OPEN_FILE_PICKER_TYPES });
   return { handle, text: await readHandleText(handle) };
 }
 
