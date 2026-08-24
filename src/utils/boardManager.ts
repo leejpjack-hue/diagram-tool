@@ -499,13 +499,13 @@ export class BoardManager {
   }
 
   async create(
-    input: { title: string; description?: string; mode: BoardMode; dslText: string; thumbnail?: string; spaceId?: string; tags?: string[]; templateSourceId?: string; presentation?: PresentationItem[] },
+    input: { id?: string; title: string; description?: string; mode: BoardMode; dslText: string; thumbnail?: string; spaceId?: string; tags?: string[]; templateSourceId?: string; presentation?: PresentationItem[] },
     recordActivity = true,
   ): Promise<Board> {
     if (recordActivity) await this.initialize();
     const now = new Date().toISOString();
     const board: Board = {
-      id: generateId('board'),
+      id: typeof input.id === 'string' && input.id.trim() ? input.id.trim() : generateId('board'),
       title: input.title.trim() || 'Untitled board',
       description: input.description ?? '',
       mode: input.mode,

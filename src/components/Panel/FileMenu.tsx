@@ -1,27 +1,59 @@
 import { useState, useRef, useEffect } from 'react';
 import { saveManager, type SavedDiagram, type SavedDiagramMode } from '../../utils/saveManager';
 import {
+  CURSOR_MCP_FOLDER_SENTENCE,
   CURSOR_MCP_PRIVACY_SENTENCE,
   cursorMcpJsonSnippet,
 } from '../../utils/cursorMcpSnippet';
 import { extractBoardTitle } from '../../utils/sourceText';
+import { parseOpenedBoardText, serializeBoardFile, upsertOpenedBoard } from '../../utils/boardFile';
+import { assertImportSize } from '../../utils/importSanitizer';
+import {
+  boardFileHandles,
+  canUseFileSystemAccess,
+  downloadBoardJson,
+  isAbortError,
+  pickBoardFileToOpen,
+  pickBoardFileToSave,
+  readHandleText,
+  suggestedBoardFilename,
+  writeHandleText,
+  type FileSystemFileHandleLike,
+} from '../../utils/fileSystemAccess';
+import { boardManager, type Board, type BoardMode } from '../../utils/boardManager';
 
 interface FileMenuProps {
   currentDsl: string;
   mode: SavedDiagramMode;
+  boardMode?: BoardMode;
+  currentBoardId?: string | null;
   onLoad: (diagram: SavedDiagram) => void;
   onNew: () => void;
+  onOpenWorkspaceBoard?: (board: Board) => void;
   notify?: (type: 'success' | 'error', message: string) => void;
 }
 
-export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuProps) {
+export function FileMenu({
+  currentDsl,
+  mode,
+  boardMode,
+  currentBoardId = null,
+  onLoad,
+  onNew,
+  onOpenWorkspaceBoard,
+  notify,
+}: FileMenuProps) {
+  const activeMode: BoardMode = boardMode ?? mode;
   const [isOpen, setIsOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [recentDiagrams, setRecentDiagrams] = useState<SavedDiagram[]>([]);
+  const [linkedToDisk, setLinkedToDisk] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const openBoardInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const snippet = cursorMcpJsonSnippet();
+  const canReload = Boolean(currentBoardId && linkedToDisk && boardFileHandles.has(currentBoardId));
 
   const handleOpen = () => {
     setRecentDiagrams(saveManager.getRecentDiagrams());
@@ -64,14 +96,123 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
     handleClose();
   };
 
-  const handleSave = () => {
-    const saved = saveManager.saveDiagram({
-      title: extractBoardTitle(currentDsl, mode) || 'Untitled Diagram',
+  useEffect(() => {
+    setLinkedToDisk(Boolean(currentBoardId && boardFileHandles.has(currentBoardId)));
+  }, [currentBoardId]);
+
+  const notifyFileError = (error: unknown) => {
+    if (isAbortError(error)) return;
+    notify?.('error', error instanceof Error ? error.message : "That file couldn't be opened.");
+  };
+
+  const snapshotCurrentBoard = async (): Promise<Pick<Board, 'title' | 'mode' | 'dslText'> & Partial<Board>> => {
+    const existing = currentBoardId ? await boardManager.get(currentBoardId) : undefined;
+    const title = extractBoardTitle(currentDsl, activeMode) || existing?.title || 'Untitled board';
+    return {
+      ...(existing ?? { title, mode: activeMode, dslText: currentDsl }),
+      title,
+      mode: activeMode,
       dslText: currentDsl,
-      mode,
-    });
-    notify?.('success', `Saved "${saved.title}"`);
+    };
+  };
+
+  const applyOpenedText = async (text: string, handle?: FileSystemFileHandleLike, replaceId?: string) => {
+    const portable = parseOpenedBoardText(text);
+    const mappedId = replaceId ?? (handle ? await boardFileHandles.findBoardId(handle) : undefined);
+    const board = await upsertOpenedBoard(boardManager, portable, mappedId);
+    if (handle) {
+      boardFileHandles.set(board.id, handle);
+      setLinkedToDisk(true);
+    }
+    onOpenWorkspaceBoard?.(board);
+    notify?.('success', `Opened "${board.title}"`);
+  };
+
+  const handleOpenBoardFile = () => {
     handleClose();
+    if (canUseFileSystemAccess()) {
+      void (async () => {
+        try {
+          const picked = await pickBoardFileToOpen();
+          if (!picked) return;
+          await applyOpenedText(picked.text, picked.handle);
+        } catch (error) {
+          notifyFileError(error);
+        }
+      })();
+      return;
+    }
+    openBoardInputRef.current?.click();
+  };
+
+  const handleOpenBoardInput = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      assertImportSize(file);
+      const text = await file.text();
+      assertImportSize(file, text);
+      await applyOpenedText(text);
+    } catch (error) {
+      notifyFileError(error);
+    }
+  };
+
+  const handleSaveAs = async () => {
+    handleClose();
+    try {
+      const snapshot = await snapshotCurrentBoard();
+      const text = serializeBoardFile(snapshot);
+      const filename = suggestedBoardFilename(snapshot.title);
+      if (canUseFileSystemAccess()) {
+        const handle = await pickBoardFileToSave(filename);
+        if (!handle) return;
+        await writeHandleText(handle, text);
+        if (currentBoardId) {
+          boardFileHandles.set(currentBoardId, handle);
+          setLinkedToDisk(true);
+        }
+        notify?.('success', `Saved "${snapshot.title}"`);
+        return;
+      }
+      downloadBoardJson(text, filename);
+      notify?.('success', `Downloaded "${snapshot.title}"`);
+    } catch (error) {
+      notifyFileError(error);
+    }
+  };
+
+  const handleSaveToDisk = async () => {
+    const handle = currentBoardId ? boardFileHandles.get(currentBoardId) : undefined;
+    if (!handle) {
+      await handleSaveAs();
+      return;
+    }
+    handleClose();
+    try {
+      const snapshot = await snapshotCurrentBoard();
+      await writeHandleText(handle, serializeBoardFile(snapshot));
+      notify?.('success', `Saved "${snapshot.title}"`);
+    } catch (error) {
+      notifyFileError(error);
+    }
+  };
+
+  const handleReloadFromDisk = async () => {
+    if (!currentBoardId) return;
+    const handle = boardFileHandles.get(currentBoardId);
+    if (!handle) return;
+    handleClose();
+    try {
+      const text = await readHandleText(handle);
+      const portable = parseOpenedBoardText(text);
+      const board = await upsertOpenedBoard(boardManager, portable, currentBoardId);
+      onOpenWorkspaceBoard?.(board);
+      notify?.('success', `Reloaded "${board.title}" from disk`);
+    } catch (error) {
+      notifyFileError(error);
+    }
   };
 
   const handleExport = () => {
@@ -165,7 +306,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
         <div
           data-testid="file-menu"
           role="menu"
-          className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden"
+          className="absolute top-full left-0 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden"
         >
           {/* Menu Items */}
           <div className="py-1">
@@ -178,12 +319,45 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
             </button>
 
             <button
-              onClick={handleSave}
+              type="button"
+              aria-label="Open…"
+              onClick={handleOpenBoardFile}
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            >
+              <span>📂</span>
+              <span>Open…</span>
+            </button>
+
+            <button
+              type="button"
+              aria-label="Save"
+              onClick={() => void handleSaveToDisk()}
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
             >
               <span>💾</span>
               <span>Save</span>
               <span className="ml-auto text-xs text-gray-400">Ctrl+S</span>
+            </button>
+
+            <button
+              type="button"
+              aria-label="Save As…"
+              onClick={() => void handleSaveAs()}
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            >
+              <span>💾</span>
+              <span>Save As…</span>
+            </button>
+
+            <button
+              type="button"
+              aria-label="Reload from disk"
+              disabled={!canReload}
+              onClick={() => void handleReloadFromDisk()}
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              <span>↻</span>
+              <span>Reload from disk</span>
             </button>
 
             <button
@@ -210,6 +384,9 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
               <span>🔌</span>
               <span>Connect Cursor</span>
             </button>
+            <p className="px-4 py-2 text-[11px] leading-4 text-gray-500">
+              {CURSOR_MCP_FOLDER_SENTENCE}
+            </p>
           </div>
 
           {/* Divider */}
@@ -261,6 +438,14 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
         onChange={handleFileSelect}
         className="hidden"
       />
+      <input
+        ref={openBoardInputRef}
+        data-testid="open-board-file"
+        type="file"
+        accept=".json,.board.json"
+        onChange={event => void handleOpenBoardInput(event)}
+        className="hidden"
+      />
 
       {connectOpen && (
         <div
@@ -280,7 +465,7 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
                 Connect Cursor
               </h2>
               <p data-testid="connect-cursor-privacy" className="mt-1 text-sm text-slate-600">
-                {CURSOR_MCP_PRIVACY_SENTENCE}
+                {CURSOR_MCP_PRIVACY_SENTENCE} {CURSOR_MCP_FOLDER_SENTENCE}
               </p>
             </div>
             <div className="space-y-3 p-5">
