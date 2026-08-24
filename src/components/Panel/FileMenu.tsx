@@ -1,5 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { saveManager, type SavedDiagram, type SavedDiagramMode } from '../../utils/saveManager';
+import {
+  CURSOR_MCP_PRIVACY_SENTENCE,
+  cursorMcpJsonSnippet,
+} from '../../utils/cursorMcpSnippet';
 import { extractBoardTitle } from '../../utils/sourceText';
 
 interface FileMenuProps {
@@ -12,9 +16,12 @@ interface FileMenuProps {
 
 export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [recentDiagrams, setRecentDiagrams] = useState<SavedDiagram[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const snippet = cursorMcpJsonSnippet();
 
   const handleOpen = () => {
     setRecentDiagrams(saveManager.getRecentDiagrams());
@@ -35,6 +42,17 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!connectOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.stopPropagation();
+      setConnectOpen(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [connectOpen]);
 
   const handleNew = () => {
     if (saveManager.hasUnsavedChanges(currentDsl)) {
@@ -69,6 +87,23 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
   const handleImport = () => {
     fileInputRef.current?.click();
     handleClose();
+  };
+
+  const handleConnectCursor = () => {
+    handleClose();
+    setCopyState('idle');
+    setConnectOpen(true);
+  };
+
+  const handleCopySnippet = async () => {
+    try {
+      await navigator.clipboard.writeText(snippet);
+      setCopyState('copied');
+      notify?.('success', 'Copied mcp.json snippet. Nothing is uploaded.');
+    } catch {
+      setCopyState('failed');
+      notify?.('error', 'Could not copy the snippet.');
+    }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -166,6 +201,15 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
               <span>📤</span>
               <span>Open backup file…</span>
             </button>
+
+            <button
+              type="button"
+              onClick={handleConnectCursor}
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            >
+              <span>🔌</span>
+              <span>Connect Cursor</span>
+            </button>
           </div>
 
           {/* Divider */}
@@ -217,6 +261,57 @@ export function FileMenu({ currentDsl, mode, onLoad, onNew, notify }: FileMenuPr
         onChange={handleFileSelect}
         className="hidden"
       />
+
+      {connectOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-[2px]"
+          onMouseDown={() => setConnectOpen(false)}
+        >
+          <div
+            data-testid="connect-cursor-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="connect-cursor-title"
+            className="max-h-[90vh] w-full max-w-xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl"
+            onMouseDown={event => event.stopPropagation()}
+          >
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h2 id="connect-cursor-title" className="text-base font-bold text-slate-950">
+                Connect Cursor
+              </h2>
+              <p data-testid="connect-cursor-privacy" className="mt-1 text-sm text-slate-600">
+                {CURSOR_MCP_PRIVACY_SENTENCE}
+              </p>
+            </div>
+            <div className="space-y-3 p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                mcp.json snippet
+              </p>
+              <pre
+                data-testid="connect-cursor-snippet"
+                className="max-h-72 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-[11px] leading-5 text-slate-800"
+              >{snippet}</pre>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                  onClick={() => setConnectOpen(false)}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  data-testid="connect-cursor-copy"
+                  className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                  onClick={() => void handleCopySnippet()}
+                >
+                  {copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy snippet'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

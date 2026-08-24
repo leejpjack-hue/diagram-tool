@@ -1,0 +1,23 @@
+{
+  "name": "@diagram-tool/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local stdio MCP for DiagramTool portable board JSON. No cloud, no HTTP, no OAuth.",
+  "type": "module",
+  "bin": {
+    "diagram-tool-mcp": "src/server.ts"
+  },
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.13",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.3"
+  }
+}
