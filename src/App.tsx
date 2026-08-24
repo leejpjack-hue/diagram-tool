@@ -1106,8 +1106,11 @@ function App() {
           <FileMenu
             currentDsl={dslText}
             mode={(diagramMode === 'architecture' || diagramMode === 'flow') ? diagramMode : 'architecture'}
+            boardMode={activeTab}
+            currentBoardId={currentBoardId}
             onLoad={handleLoadDiagram}
             onNew={handleNewDiagram}
+            onOpenWorkspaceBoard={openBoard}
             notify={(type, msg) => (type === 'success' ? toast.success(msg) : toast.error(msg))}
           />
           

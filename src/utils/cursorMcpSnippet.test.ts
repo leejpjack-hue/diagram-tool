@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CURSOR_MCP_FOLDER_SENTENCE,
   CURSOR_MCP_PRIVACY_SENTENCE,
   DIAGRAM_TOOL_DIR_PLACEHOLDER,
   cursorMcpJsonSnippet,
@@ -15,5 +16,6 @@ describe('cursorMcpJsonSnippet', () => {
     expect(parsed.mcpServers['diagram-tool'].env.DIAGRAM_TOOL_DIR).toBe(DIAGRAM_TOOL_DIR_PLACEHOLDER);
     expect(snippet).toContain('src/server.ts');
     expect(CURSOR_MCP_PRIVACY_SENTENCE).toMatch(/nothing is uploaded/i);
+    expect(CURSOR_MCP_FOLDER_SENTENCE).toMatch(/DIAGRAM_TOOL_DIR/);
   });
 });

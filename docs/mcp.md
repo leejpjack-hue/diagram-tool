@@ -26,7 +26,7 @@ Point `DIAGRAM_TOOL_DIR` at a folder of **single-board** JSON files:
 - Accepted: `version` 3.x and `kind: "board"` (see [board-format.md](./board-format.md))
 - Ignored: workspace backups (`kind: "workspace"`), unknown files, nested directories, and older `1.0` / `2.0` documents
 
-Export a board from the app (JSON) into that folder, or create one with `create_board`.
+Use **File → Open…** / **File → Save** in the app on a file in that folder (the same folder `DIAGRAM_TOOL_DIR` points at), or create one with `create_board`. There is no folder watcher — **File → Reload from disk** re-reads the last handle.
 
 ## Connect Cursor
 

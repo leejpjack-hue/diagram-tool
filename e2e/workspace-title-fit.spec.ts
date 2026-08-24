@@ -142,6 +142,11 @@ node ValidateEmail {
     await page.getByRole('button', { name: 'File' }).click();
     await expect(page.getByTestId('file-menu')).toBeVisible();
     await expect(page.getByText('New diagram')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open…' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save As…' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reload from disk' })).toBeDisabled();
+    await expect(page.getByText(/DIAGRAM_TOOL_DIR points at/)).toBeVisible();
 
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('file-menu')).toHaveCount(0);
