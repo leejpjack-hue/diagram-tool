@@ -94,6 +94,9 @@ describe('FileMenu', () => {
       'title',
       'JSON board, Mermaid, native DSL, or draw.io',
     );
+    expect(screen.getByTestId('open-file-accept-copy')).toHaveTextContent(
+      'JSON board, Mermaid, native DSL, or draw.io',
+    );
   });
 
   it('invalid Open does not clobber the current board', async () => {

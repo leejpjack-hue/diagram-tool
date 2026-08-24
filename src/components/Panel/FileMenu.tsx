@@ -341,6 +341,9 @@ export function FileMenu({
               <span>📂</span>
               <span>Open…</span>
             </button>
+            <p data-testid="open-file-accept-copy" className="px-4 pb-2 text-[11px] leading-4 text-gray-500">
+              JSON board, Mermaid, native DSL, or draw.io
+            </p>
 
             <button
               type="button"
