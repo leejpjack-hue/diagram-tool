@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { buildBoardDocument, buildWorkspaceDocument } from './boardFormat';
 import {
@@ -217,6 +220,35 @@ describe('open board file into the workspace', () => {
       expect(snapshot((await manager.get(current.id))!)).toEqual(beforeCurrent);
       expect(snapshot((await manager.get(other.id))!)).toEqual(beforeOther);
     }
+  });
+
+  it('Open XXE draw.io reuses the existing sanitizer and does not clobber', async () => {
+    const { current, other } = await seedLibrary();
+    const snapshot = (board: Board) => ({ id: board.id, title: board.title, dslText: board.dslText, mode: board.mode });
+    const beforeCurrent = snapshot(current);
+    const beforeOther = snapshot(other);
+
+    await expect(interpretOpenedFile(
+      'xxe.drawio',
+      '<!DOCTYPE foo [<!ENTITY x SYSTEM "http://evil">]><mxfile><diagram/></mxfile>',
+    )).rejects.toThrow(/valid draw\.io/i);
+
+    const boards = await manager.list();
+    expect(boards).toHaveLength(2);
+    expect(snapshot((await manager.get(current.id))!)).toEqual(beforeCurrent);
+    expect(snapshot((await manager.get(other.id))!)).toEqual(beforeOther);
+  });
+});
+
+describe('File → Open stays local-first', () => {
+  it('reuses importDrawio and does not add a new XML parser, remote fetch, or window.__ hook', () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const opener = readFileSync(join(here, 'boardFile.ts'), 'utf8');
+    const menu = readFileSync(join(here, '../components/Panel/FileMenu.tsx'), 'utf8');
+    const access = readFileSync(join(here, 'fileSystemAccess.ts'), 'utf8');
+    expect(opener).toMatch(/importDrawio/);
+    expect(`${opener}\n${menu}\n${access}`).not.toMatch(/DOMParser|parseFromString|\bfetch\s*\(/);
+    expect(`${opener}\n${menu}\n${access}`).not.toMatch(/shareHost|\/api\/shares|window\.__|__setDiagramDsl/);
   });
 });
 
