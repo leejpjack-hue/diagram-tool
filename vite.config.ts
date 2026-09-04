@@ -7,6 +7,6 @@ export default defineConfig({
   preview: {
     // Allow the production hostname (requests arrive via nginx reverse proxy
     // with Host: diagram.teqcon.uk). Without this, Vite preview replies 403.
-    allowedHosts: ['diagram.teqcon.uk'],
+    allowedHosts: ['diagram.teqcon.uk', 'diagram-tool.teqcon.uk'],
   },
 })

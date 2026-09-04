@@ -1,164 +1,173 @@
 # DiagramTool
 
-Transform text into professional diagrams. Write simple DSL code, generate beautiful architecture diagrams instantly.
+Local-first text-to-diagram workspace for **architecture**, **flow**, **sequence**, and **Gantt**. Write a small native DSL, paste Mermaid, or open a draw.io file — the canvas updates in the browser. Boards stay on this device (IndexedDB workspace, optional File → Open / Save).
 
-## Features
+**Live demo:** [https://diagram-tool.teqcon.uk/](https://diagram-tool.teqcon.uk/)
 
-- **Simple DSL Syntax** - Write diagrams in plain text, no drag-and-drop required
-- **Architecture Mode** - Visualize microservices, databases, queues, and connections
-- **Flow Mode** - Model business processes, claims workflows, and decision trees
-- **CSV Import** - Import data from APM tools (Datadog, Jaeger, OpenTelemetry)
-- **Multi-Format Export** - Export to PNG, SVG, or JSON
-- **Auto-Save & History** - Automatic saving with access to last 10 diagrams
+This is a Vite + React + TypeScript app. The marketing HTML under `landing/` is **not** what production deploys — `npm run build` ships `dist/` (including everything in `public/`).
 
-## Quick Start
+## What it does
+
+| Mode | Source | Typical use |
+|------|--------|-------------|
+| **Architecture** | Native `diagram: architecture` DSL | Services, databases, queues, cloud kinds, C4 levels, groups |
+| **Flow** | Native `diagram: flow` DSL, or Mermaid `flowchart` / `graph` | Process maps, BPMN-style shapes, swimlanes |
+| **Sequence** | Mermaid `sequenceDiagram` | Request/response and participant timelines |
+| **Gantt** | Native `diagram: gantt` DSL | Tasks, groups, dependencies, milestones |
+
+**Also supported**
+
+- **File → Open** accepts portable board JSON, native DSL, Mermaid (`.mmd` / `.mermaid`), and draw.io / diagrams.net (`.drawio` / `.xml`). Draw.io imports as a **flow** board (best-effort; swimlanes, extra pages, and unclassified stencils are skipped).
+- Mermaid `gantt` files convert to native `diagram: gantt` on open. The Gantt **editor** stays native-DSL-only.
+- Mermaid types such as `erDiagram`, `classDiagram`, `mindmap`, and C4 Mermaid are not opened.
+- Export PNG, SVG, PDF, JSON backup, and CSV. CSV **import** can build a service map from APM-style rows (Datadog / Jaeger / OpenTelemetry-style columns).
+- Templates for AWS, Kubernetes, GCP, C4, ER, UML class, flows, BPMN, swimlanes, and Gantt starters.
+- Optional local MCP server (`mcp/` / `mcp-server/`) so an editor can author boards over stdio — nothing is sent to a DiagramTool cloud.
+
+There are no product screenshots in this repository yet. Use the [live demo](https://diagram-tool.teqcon.uk/) or `npm run dev` to see the workspace.
+
+## Install and quick start
+
+Requires Node.js 22 (the production workflow uses Node 22).
 
 ```bash
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
-
-# Run tests
-npm test
-
-# Build for production
-npm run build
 ```
 
-## DSL Examples
+Open the printed local URL. Pick **Architecture**, **Flow**, **Sequence**, or **Gantt**, type or paste source on the left, and watch the canvas on the right.
 
-### Architecture Mode
+```bash
+npm test          # unit tests (Vitest)
+npm run build     # production bundle → dist/
+npm run preview   # serve dist/ locally
+```
+
+DSL reference: [USAGE.md](USAGE.md). Portable board JSON: [docs/board-format.md](docs/board-format.md).
+
+## Feature bullets
+
+- Local-first workspace (IndexedDB) plus File → Open / Save on this device
+- Architecture DSL: `service`, `database`, `queue`, `cloud`, `class`, `group`, C4 `level` / `parent`
+- Flow DSL: process, decision, data, document, BPMN gateways/events/subprocesses, swimlanes
+- Sequence: Mermaid `sequenceDiagram` as the source of truth
+- Gantt: native plan DSL (groups, dates, assignees, FS/SS/FF/SF dependencies)
+- Mermaid flow import/export helpers; Mermaid gantt import via File → Open
+- draw.io import → flow board, sanitized locally (no remote fetch of the file)
+- White canvas so PNG/SVG/PDF pastes cleanly into docs and slides
+- Keyboard: `Ctrl/Cmd+S` save, `Ctrl/Cmd+Z` undo, click-to-drill C4, wheel/pinch zoom
+
+## Examples
+
+### Architecture (native DSL)
 
 ```
 diagram: architecture
-title: Claims Platform
+title: Checkout platform
+direction: horizontal
+edges: orthogonal
 
-service ClaimsAPI {
+service CheckoutAPI {
   type: api
-  connects: ClaimsService
+  tech: Node.js
+  connects: OrdersDB, EventBus
 }
 
-service ClaimsService {
-  type: microservice
-  connects: ClaimsDB, EventQueue
-}
-
-database ClaimsDB {
+database OrdersDB {
   type: postgresql
+  data: orders, payments
 }
 
-queue EventQueue {
+queue EventBus {
   type: kafka
+  topic: checkout.events
 }
 ```
 
-### Flow Mode
+### Flow (native DSL)
 
 ```
 diagram: flow
-title: Claims Processing Flow
+title: Refund decision
 
-start FNOL
+start Request
+node Eligible {
+  type: decision
+  label: Within policy?
+}
+node Refund { label: Issue refund }
+node Escalate { label: Manual review }
+end Done
 
-FNOL -> Intake
-Intake -> Assignment
-Assignment -> Investigation
+Request -> Eligible
+Eligible ->|yes| Refund -> Done
+Eligible ->|no| Escalate -> Done
+```
 
-Investigation ->|Fraud Detected| SpecialInvestigation
-Investigation ->|No Fraud| Evaluation
+### Sequence (Mermaid)
 
-Evaluation -> Settlement
-Settlement -> Payment -> Closure
+```mermaid
+sequenceDiagram
+title Checkout
+actor User
+participant API
+participant Ledger
+User->>API: POST /pay
+API->>Ledger: reserve
+Ledger-->>API: ok
+API-->>User: 201
+```
 
-end Closure
+### Gantt (native DSL)
 
-node FNOL {
-  label: First Notice of Loss
-  system: ClaimsAPI
-  duration: 1d
+```
+diagram: gantt
+title: Launch plan
+start: 2026-09-01
+
+group "Build" {
+  task Design {
+    start: 2026-09-01
+    end: 2026-09-05
+    assignee: Design
+  }
+  task Implement {
+    start: 2026-09-05
+    end: 2026-09-12
+    depends: Design
+  }
 }
 ```
 
-## Keyboard Shortcuts
+GitHub will also render the sequence example above as a diagram. In the app, paste that `sequenceDiagram` block on the **Sequence** tab.
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+S` | Save diagram |
-| `Ctrl+Z` | Undo |
-| `Ctrl+Shift+Z` | Redo |
-| `Ctrl+C` | Copy selected node |
-| `Ctrl+V` | Paste node |
-| `Ctrl+D` | Duplicate selected node |
-| `Delete` | Delete selected node |
-| `Escape` | Deselect |
+## Crawlable pages
 
-## Testing
+Static HTML (copied from `public/` into `dist/` on build):
 
-```bash
-# Run unit tests
-npm test
+- [Architecture from text](https://diagram-tool.teqcon.uk/architecture-diagram-from-text.html)
+- [Flowcharts from text](https://diagram-tool.teqcon.uk/flowchart-from-text.html)
+- [Sequence diagrams](https://diagram-tool.teqcon.uk/sequence-diagram-from-text.html)
+- [Mermaid and Gantt](https://diagram-tool.teqcon.uk/mermaid-gantt-diagram.html)
+- [Local-first workspace and draw.io](https://diagram-tool.teqcon.uk/local-first-diagram-workspace.html)
 
-# Run tests in watch mode
-npm run test:watch
+`robots.txt` and `sitemap.xml` live in `public/` so they ship as real files, not the SPA HTML shell.
 
-# Run E2E tests (requires Playwright browsers)
-npm run test:e2e
-
-# Run E2E tests with UI
-npm run test:e2e:ui
-```
-
-## Build Status
-
-| Metric | Status |
-|--------|--------|
-| Build | ✅ Passing |
-| Unit Tests | ✅ 32/32 (100%) |
-| Bundle Size | 456.79 kB JS, 29.72 kB CSS |
-| TypeScript | ✅ No errors |
-| Lint | ⚠️ 6 errors, 3 warnings |
-
-## Project Structure
+## Development
 
 ```
 diagram-tool/
-├── src/
-│   ├── components/      # React components
-│   ├── parser/          # DSL parser
-│   ├── utils/           # Utilities (save, CSV, etc.)
-│   └── types/           # TypeScript types
-├── e2e/                 # Playwright E2E tests
-├── landing/             # Marketing landing page
-├── samples/             # Sample diagrams
-└── public/              # Static assets
+├── src/           # React app, parser, canvas, Gantt, sequence
+├── public/        # Static assets copied to dist/ (SEO HTML, robots, sitemap)
+├── docs/          # Board format and MCP notes
+├── e2e/           # Playwright
+├── mcp/           # Local stdio MCP
+├── landing/       # Unused by production deploy
+└── USAGE.md       # DSL manual
 ```
 
-## Sprint Progress
-
-**Current Sprint:** Sprint 6 (Save/Load + Flow Mode + E2E Testing)
-**Progress:** 92% complete
-**Status:** Feature-complete, minor lint cleanup needed
-
-### Completed Features
-- ✅ Save/Load with auto-save (30s)
-- ✅ File export/import (.diagram format)
-- ✅ Recent diagrams history
-- ✅ Decision node diamond visuals
-- ✅ Toast notification system
-- ✅ Copy/paste/duplicate nodes
-- ✅ Marketing landing page
-
-### Pending
-- ⏸️ E2E test execution (requires browser dependencies)
-- 📝 Lint error cleanup (6 errors)
-
-## Documentation
-
-- [Sprint 6 Requirements](../memory/sprint-06-requirements.md)
-- [Productivity Tracking](../memory/productivity-tracking.md)
+Internal sprint notes under `memory/` are historical and are not the product docs.
 
 ## License
 
-MIT
+MIT (as stated for this project; there is no separate `LICENSE` file in the tree today).

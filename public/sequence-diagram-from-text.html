@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sequence diagram from text — DiagramTool</title>
+  <meta name="description" content="Paste Mermaid sequenceDiagram source and render a sequence canvas locally. DiagramTool uses Mermaid as the sequence format — not a second proprietary DSL." />
+  <link rel="canonical" href="https://diagram-tool.teqcon.uk/sequence-diagram-from-text.html" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/seo.css" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="Sequence diagram from text — DiagramTool" />
+  <meta property="og:description" content="Mermaid sequenceDiagram in a local-first workspace: participants, messages, and a dedicated Sequence tab." />
+  <meta property="og:url" content="https://diagram-tool.teqcon.uk/sequence-diagram-from-text.html" />
+  <meta property="og:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Sequence diagram from text — DiagramTool" />
+  <meta name="twitter:description" content="Render Mermaid sequence diagrams next to architecture, flow, and Gantt boards in one workspace." />
+  <meta name="twitter:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "DiagramTool",
+    "url": "https://diagram-tool.teqcon.uk/",
+    "applicationCategory": "DesignApplication",
+    "operatingSystem": "Web",
+    "description": "Local-first Mermaid sequenceDiagram editor alongside architecture, flow, and Gantt boards."
+  }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/"><img src="/favicon.svg" alt="" /> DiagramTool</a>
+      <nav>
+        <a href="/architecture-diagram-from-text.html">Architecture</a>
+        <a href="/flowchart-from-text.html">Flow</a>
+        <a href="/sequence-diagram-from-text.html" aria-current="page">Sequence</a>
+        <a href="/mermaid-gantt-diagram.html">Mermaid &amp; Gantt</a>
+        <a href="/local-first-diagram-workspace.html">Local-first</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <article>
+      <h1>Sequence diagrams from Mermaid source</h1>
+      <p class="lede">Sequence is a first-class tab, not a plugin. The source of truth is Mermaid <code>sequenceDiagram</code> — the same text you already keep in <code>.mmd</code> files. There is no separate “sequence DSL” to learn on this tab. Paste, import, or type; the sequence canvas parses that source in the browser.</p>
+      <a class="cta" href="/">Open the Sequence tab</a>
+
+      <h2>Why sequence is Mermaid when other tabs are not</h2>
+      <p>Architecture, flow, and Gantt have a native <code>diagram: …</code> language because those boards carry layout pins, C4 levels, BPMN types, or task dates that Mermaid does not model the same way. Sequence messages are already well specified by Mermaid: participants, actors, arrows, and notes. DiagramTool keeps that text as-is. Copying “as Mermaid” and “as source” both return the sequence document.</p>
+      <p>If you paste a <code>sequenceDiagram</code> while another tab is active, the app tells you to open the Sequence tab (or import the file as a sequence board). That is deliberate — mixing a call timeline into an architecture parse would throw confusing lexer errors.</p>
+
+      <h2>A payment flow you can paste</h2>
+      <pre><code>sequenceDiagram
+title Checkout — Payment Flow
+actor User
+participant API
+participant Ledger
+User->>API: POST /pay
+API->>Ledger: reserve
+Ledger-->>API: ok
+API-->>User: 201 Created</code></pre>
+      <p>Titles come from a <code>title</code> / <code>title:</code> line or the first markdown heading in the file. File → Open accepts <code>.mmd</code>, <code>.mermaid</code>, and plain text that starts with <code>sequenceDiagram</code>. Unsupported Mermaid diagrams (<code>erDiagram</code>, <code>classDiagram</code>, <code>mindmap</code>, state diagrams, pie, gitGraph, and Mermaid C4) are refused rather than half-rendered.</p>
+
+      <h2>Editing and export</h2>
+      <p>Participant display names can be renamed from the workspace without rewriting every arrow by hand. Export still goes through the shared PNG / SVG / PDF path; the sequence canvas is SVG-backed, so vector export does not depend on the architecture React Flow surface. Boards are stored in the same local workspace as your other modes — see <a href="/local-first-diagram-workspace.html">local-first storage</a>.</p>
+      <p>Sequence does not import draw.io. A diagrams.net file becomes a <a href="/flowchart-from-text.html">flow</a> board. If you need both a call trace and a component map, keep two boards in the workspace and switch tabs.</p>
+
+      <div class="related">
+        <h2>Related</h2>
+        <ul>
+          <li><a href="/">Open the app</a> and choose Sequence</li>
+          <li><a href="/mermaid-gantt-diagram.html">Mermaid flow/gantt import and native Gantt</a></li>
+          <li><a href="/architecture-diagram-from-text.html">Architecture diagrams from text</a></li>
+        </ul>
+      </div>
+    </article>
+  </main>
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>DiagramTool · text-to-diagram workspace</span>
+      <a href="https://github.com/leejpjack-hue/diagram-tool">GitHub</a>
+    </div>
+  </footer>
+</body>
+</html>

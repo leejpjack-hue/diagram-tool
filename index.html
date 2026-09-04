@@ -5,12 +5,44 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="DiagramTool — turn text into professional architecture, flow, and Gantt diagrams." />
+    <meta name="description" content="DiagramTool — local-first workspace that turns text into architecture, flow, sequence, and Gantt diagrams. Native DSL, Mermaid, and draw.io." />
     <meta name="theme-color" content="#6366f1" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>DiagramTool — Professional Diagrams from Text</title>
+    <link rel="canonical" href="https://diagram-tool.teqcon.uk/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="DiagramTool" />
+    <meta property="og:title" content="DiagramTool — Professional Diagrams from Text" />
+    <meta property="og:description" content="Local-first workspace that turns text into architecture, flow, sequence, and Gantt diagrams. Native DSL, Mermaid, and draw.io." />
+    <meta property="og:url" content="https://diagram-tool.teqcon.uk/" />
+    <meta property="og:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="DiagramTool — Professional Diagrams from Text" />
+    <meta name="twitter:description" content="Local-first workspace that turns text into architecture, flow, sequence, and Gantt diagrams. Native DSL, Mermaid, and draw.io." />
+    <meta name="twitter:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "DiagramTool",
+      "applicationCategory": "DesignApplication",
+      "operatingSystem": "Web",
+      "url": "https://diagram-tool.teqcon.uk/",
+      "description": "Local-first workspace that turns text into architecture, flow, sequence, and Gantt diagrams. Native DSL, Mermaid, and draw.io.",
+      "featureList": [
+        "Architecture diagrams from a native text DSL",
+        "Flowcharts and BPMN-style flows",
+        "Mermaid sequence diagrams",
+        "Native Gantt charts with Mermaid gantt import",
+        "draw.io import to flow boards",
+        "Local-first IndexedDB workspace"
+      ]
+    }
+    </script>
     
     <!-- Google Fonts: Inter & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,6 +51,16 @@
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <p>DiagramTool is a local-first text-to-diagram workspace for architecture, flow, sequence, and Gantt. Enable JavaScript to open the editor, or read the crawlable guides:</p>
+      <ul>
+        <li><a href="/architecture-diagram-from-text.html">Architecture diagrams from text</a></li>
+        <li><a href="/flowchart-from-text.html">Flowcharts from text</a></li>
+        <li><a href="/sequence-diagram-from-text.html">Sequence diagrams</a></li>
+        <li><a href="/mermaid-gantt-diagram.html">Mermaid and Gantt</a></li>
+        <li><a href="/local-first-diagram-workspace.html">Local-first workspace and draw.io</a></li>
+      </ul>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

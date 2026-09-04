@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flowchart from text — DiagramTool</title>
+  <meta name="description" content="Write flowcharts and BPMN-style processes as text. DiagramTool’s Flow tab accepts a native DSL or Mermaid flowchart/graph and keeps the board on this device." />
+  <link rel="canonical" href="https://diagram-tool.teqcon.uk/flowchart-from-text.html" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/seo.css" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="Flowchart from text — DiagramTool" />
+  <meta property="og:description" content="Native flow DSL plus Mermaid flowchart import: decisions, swimlanes, BPMN gateways, and labeled edges." />
+  <meta property="og:url" content="https://diagram-tool.teqcon.uk/flowchart-from-text.html" />
+  <meta property="og:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Flowchart from text — DiagramTool" />
+  <meta name="twitter:description" content="Process maps from text: native DSL or Mermaid flowchart, with BPMN shapes and swimlanes." />
+  <meta name="twitter:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "DiagramTool",
+    "url": "https://diagram-tool.teqcon.uk/",
+    "applicationCategory": "DesignApplication",
+    "operatingSystem": "Web",
+    "description": "Local-first flowchart editor that reads a native flow DSL or Mermaid flowchart source."
+  }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/"><img src="/favicon.svg" alt="" /> DiagramTool</a>
+      <nav>
+        <a href="/architecture-diagram-from-text.html">Architecture</a>
+        <a href="/flowchart-from-text.html" aria-current="page">Flow</a>
+        <a href="/sequence-diagram-from-text.html">Sequence</a>
+        <a href="/mermaid-gantt-diagram.html">Mermaid &amp; Gantt</a>
+        <a href="/local-first-diagram-workspace.html">Local-first</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <article>
+      <h1>Flowcharts from text, including Mermaid</h1>
+      <p class="lede">The Flow tab is for processes: intake, decisions, hand-offs, and BPMN-style events. You can write DiagramTool’s native <code>diagram: flow</code> DSL, paste a Mermaid <code>flowchart</code> / <code>graph</code>, or open a <code>.mmd</code> file. Draw.io files also land here as flow boards.</p>
+      <a class="cta" href="/">Open the Flow tab</a>
+
+      <h2>Native flow DSL</h2>
+      <p>Start and end nodes are first-class. Everything else is a <code>node</code> with a <code>type:</code>. Default nodes are rounded process boxes. Other shapes:</p>
+      <ul>
+        <li><code>decision</code> — diamond</li>
+        <li><code>data</code> — parallelogram</li>
+        <li><code>document</code> — wavy-bottom rectangle</li>
+        <li><code>manualinput</code> — trapezoid</li>
+        <li><code>terminator</code> — pill</li>
+        <li>BPMN gateways: exclusive (✕), parallel (+), inclusive (○)</li>
+        <li>BPMN events: start, end, timer, message</li>
+        <li>Subprocess collapsed / expanded markers</li>
+      </ul>
+      <p>Optional captions include <code>label</code>, <code>system</code> (owning service), <code>duration</code>, <code>assignee</code>, and <code>lane</code>. Edges use <code>A -&gt; B</code> or <code>A -&gt;|yes| B</code>. Unlike architecture mode, flow connectors stay on the animated bezier style — orthogonal <code>edges:</code> is an architecture-only keyword.</p>
+      <pre><code>diagram: flow
+title: Refund decision
+
+start Request
+node Eligible {
+  type: decision
+  label: Within policy?
+}
+node Refund { label: Issue refund }
+node Escalate { label: Manual review }
+end Done
+
+Request -> Eligible
+Eligible ->|yes| Refund -> Done
+Eligible ->|no| Escalate -> Done</code></pre>
+
+      <h2>Swimlanes</h2>
+      <p>Declare <code>lane Customer { color: '#FDE68A' }</code> (and other actors), then set <code>lane: Customer</code> on nodes. The canvas draws horizontal bands with the lane name on the left. Swimlanes always lay out left-to-right inside each band, even if you set <code>direction:</code> on a mixed document. Templates include a loan-application swimlane and BPMN event / subprocess starters if you want a working file instead of a blank editor.</p>
+
+      <h2>Mermaid flowchart import</h2>
+      <p>If the first significant line is <code>flowchart</code> or <code>graph</code>, DiagramTool treats the file as Mermaid flow. File → Open and raw import convert that source toward the native flow DSL so the rest of the workspace (pins, export, templates) can use it. You can also copy native flow back out as Mermaid via the mermaid helper. This is <strong>flowchart/graph only</strong> — a <code>sequenceDiagram</code> belongs on the Sequence tab, and a Mermaid <code>gantt</code> is imported as a Gantt board, not a flowchart.</p>
+      <pre><code>flowchart LR
+  Request[Refund request] --> Eligible{Within policy?}
+  Eligible -->|yes| Refund[Issue refund]
+  Eligible -->|no| Escalate[Manual review]</code></pre>
+
+      <h2>draw.io as a flowchart, not an architecture model</h2>
+      <p>Opening a <code>.drawio</code> / diagrams.net file maps rectangles, ellipses, diamonds, and basic flowchart stencils onto flow nodes, plus edges that have both ends. Swimlanes, groups, tables, images, extra pages, and unclassified shapes are skipped (you see a skip list — they are not silently dropped). Infra icons do not become architecture <code>cloud</code> nodes. Details live on the <a href="/local-first-diagram-workspace.html">local-first and draw.io</a> page.</p>
+
+      <div class="related">
+        <h2>Related</h2>
+        <ul>
+          <li><a href="/">Open the app</a> and choose Flow</li>
+          <li><a href="/architecture-diagram-from-text.html">Architecture diagrams from text</a></li>
+          <li><a href="/mermaid-gantt-diagram.html">Mermaid sequence/gantt and native Gantt</a></li>
+        </ul>
+      </div>
+    </article>
+  </main>
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>DiagramTool · text-to-diagram workspace</span>
+      <a href="https://github.com/leejpjack-hue/diagram-tool">GitHub</a>
+    </div>
+  </footer>
+</body>
+</html>

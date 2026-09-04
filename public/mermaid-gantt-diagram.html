@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mermaid and Gantt diagrams from text — DiagramTool</title>
+  <meta name="description" content="Use Mermaid where it fits (sequence, flowchart import, gantt import) and a native diagram: gantt DSL for the live Gantt editor. All local in DiagramTool." />
+  <link rel="canonical" href="https://diagram-tool.teqcon.uk/mermaid-gantt-diagram.html" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/seo.css" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="Mermaid and Gantt diagrams from text — DiagramTool" />
+  <meta property="og:description" content="Honest Mermaid coverage: sequence is native Mermaid; flowcharts and Mermaid gantt import; the Gantt editor is native DSL." />
+  <meta property="og:url" content="https://diagram-tool.teqcon.uk/mermaid-gantt-diagram.html" />
+  <meta property="og:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Mermaid and Gantt diagrams from text — DiagramTool" />
+  <meta name="twitter:description" content="Sequence, flowchart, and gantt via Mermaid import — plus a native Gantt plan editor." />
+  <meta name="twitter:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "DiagramTool",
+    "url": "https://diagram-tool.teqcon.uk/",
+    "applicationCategory": "DesignApplication",
+    "operatingSystem": "Web",
+    "description": "Local-first diagrams: Mermaid sequence and imports, native Gantt, architecture, and flow."
+  }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/"><img src="/favicon.svg" alt="" /> DiagramTool</a>
+      <nav>
+        <a href="/architecture-diagram-from-text.html">Architecture</a>
+        <a href="/flowchart-from-text.html">Flow</a>
+        <a href="/sequence-diagram-from-text.html">Sequence</a>
+        <a href="/mermaid-gantt-diagram.html" aria-current="page">Mermaid &amp; Gantt</a>
+        <a href="/local-first-diagram-workspace.html">Local-first</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <article>
+      <h1>Mermaid where it fits, native Gantt where it does not</h1>
+      <p class="lede">People search for “Mermaid Gantt” because they already have a <code>gantt</code> block in a repo. DiagramTool can open that file and convert it. The live Gantt tab still edits a native <code>diagram: gantt</code> document — dates, groups, assignees, and FS/SS/FF/SF dependencies — not a Mermaid live-preview of the original text.</p>
+      <a class="cta" href="/">Open DiagramTool</a>
+
+      <h2>Mermaid support, stated precisely</h2>
+      <ul>
+        <li><strong>Sequence:</strong> Mermaid <code>sequenceDiagram</code> is the editor format. See <a href="/sequence-diagram-from-text.html">sequence from text</a>.</li>
+        <li><strong>Flow:</strong> Mermaid <code>flowchart</code> / <code>graph</code> imports (and can be copied back out as Mermaid). The Flow tab’s everyday authoring language is the native DSL. See <a href="/flowchart-from-text.html">flowcharts from text</a>.</li>
+        <li><strong>Gantt:</strong> File → Open detects a leading <code>gantt</code> line, converts sections/tasks into native DSL, then opens a Gantt board. Pasting Mermaid gantt into the Gantt editor is not the supported path — use <code>diagram: gantt</code> there, or import the file.</li>
+        <li><strong>Not opened:</strong> <code>erDiagram</code>, <code>classDiagram</code>, <code>mindmap</code>, state diagrams, pie, gitGraph, journey, quadrant, timeline, and Mermaid C4. Architecture C4 in this app is the native <code>level:</code> / <code>parent:</code> model, not those Mermaid diagrams.</li>
+      </ul>
+
+      <h2>Native Gantt you type in the editor</h2>
+      <pre><code>diagram: gantt
+title: Launch plan
+start: 2026-09-01
+
+group "Build" {
+  task Design {
+    start: 2026-09-01
+    end: 2026-09-05
+    assignee: Design
+    progress: 40
+  }
+  task Implement {
+    start: 2026-09-05
+    end: 2026-09-12
+    depends: Design
+  }
+}</code></pre>
+      <p>Tasks can declare <code>depends: OtherTask:FS+2d</code> (and SS/FF/SF). Groups nest visually. The Gantt surface includes a timeline and a board view, filters, resources, baselines, delay impact, and print/export helpers. Starter plans cover software delivery and a few other project shapes — they are templates, not a required methodology.</p>
+
+      <h2>Mermaid gantt on disk</h2>
+      <pre><code>gantt
+title Sprint Plan
+dateFormat YYYY-MM-DD
+section Build
+Design :a1, 2026-08-01, 4d
+Implement :after a1, 5d</code></pre>
+      <p>Opening that file produces native tasks (and a group from the section name) so the rest of the Gantt UI can schedule and export. After import, what you edit is the native document. If you need to keep the original Mermaid in git, keep the <code>.mmd</code> as a source file and treat the workspace board as the working copy.</p>
+
+      <h2>Export</h2>
+      <p>Gantt export can write the chart from the Gantt SVG when the React Flow canvas is not on screen. PNG, SVG, and PDF are available without an export watermark on the free path. Architecture and flow boards share the same export family plus JSON backup and CSV.</p>
+
+      <div class="related">
+        <h2>Related</h2>
+        <ul>
+          <li><a href="/">Open the app</a> — Gantt or Sequence tab</li>
+          <li><a href="/sequence-diagram-from-text.html">Mermaid sequence diagrams</a></li>
+          <li><a href="/flowchart-from-text.html">Mermaid flowcharts and native flow</a></li>
+        </ul>
+      </div>
+    </article>
+  </main>
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>DiagramTool · text-to-diagram workspace</span>
+      <a href="https://github.com/leejpjack-hue/diagram-tool">GitHub</a>
+    </div>
+  </footer>
+</body>
+</html>
