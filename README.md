@@ -10,7 +10,7 @@ This is a Vite + React + TypeScript app.
 |-------|------------|
 | `/` | Marketing landing + waitlist. Cold HTML. Does **not** boot the Local workspace for first-time visitors. |
 | `/app` | Existing Local workspace (Home / boards / editor). |
-| `/api/waitlist` | Same-origin waitlist API. Vite preview/dev writes JSONL (`WAITLIST_FILE` or `./data/waitlist.jsonl`). Production Cloudflare Worker persists the same payload in a Durable Object. |
+| `/api/waitlist` | Same-origin waitlist API. Vite preview/dev writes JSONL (`WAITLIST_FILE` or `./data/waitlist.jsonl`). Production Cloudflare Worker accepts the same payload at `/api/waitlist`. |
 | `/pricing` | Out of scope. |
 
 `npm run build` ships `dist/` (landing `index.html`, workspace `app/index.html`, and everything in `public/`). The older mock under `landing/` is unused.

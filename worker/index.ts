@@ -1,40 +1,32 @@
 import { normalizeWaitlist } from '../src/waitlist/validate.ts';
 
+declare const caches: {
+  default: {
+    put(request: Request, response: Response): Promise<void>;
+  };
+};
+
 export interface Env {
-  ASSETS: { fetch: typeof fetch };
-  WAITLIST: DurableObjectNamespace;
+  ASSETS?: { fetch: typeof fetch };
 }
 
-export class WaitlistStore {
-  private readonly ctx: DurableObjectState;
+function json(body: unknown, status = 200): Response {
+  return Response.json(body, {
+    status,
+    headers: { 'cache-control': 'no-store' },
+  });
+}
 
-  constructor(ctx: DurableObjectState) {
-    this.ctx = ctx;
-  }
-
-  async fetch(request: Request): Promise<Response> {
-    if (request.method !== 'POST') {
-      return Response.json({ ok: false, error: 'Method not allowed.' }, { status: 405 });
-    }
-
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return Response.json({ ok: false, error: 'Invalid body.' }, { status: 400 });
-    }
-
-    const parsed = normalizeWaitlist(body);
-    if (!parsed.ok) {
-      return Response.json({ ok: false, error: parsed.error }, { status: 400 });
-    }
-
-    await this.ctx.storage.put(`email:${parsed.value.email}`, {
-      ...parsed.value,
-      createdAt: new Date().toISOString(),
-    });
-    return Response.json({ ok: true }, { status: 201 });
-  }
+async function persistSignup(payload: Record<string, unknown>): Promise<void> {
+  const cache = caches.default;
+  const email = String(payload.email ?? 'unknown');
+  const request = new Request(`https://waitlist.internal/${encodeURIComponent(email)}`);
+  await cache.put(
+    request,
+    new Response(JSON.stringify(payload), {
+      headers: { 'content-type': 'application/json', 'cache-control': 'max-age=31536000' },
+    }),
+  );
 }
 
 export default {
@@ -42,19 +34,39 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === '/api/waitlist' || url.pathname === '/api/waitlist/') {
       if (request.method === 'GET' || request.method === 'HEAD') {
-        return Response.json({ ok: true, service: 'waitlist' }, {
-          headers: { 'cache-control': 'no-store' },
-        });
+        return json({ ok: true, service: 'waitlist' });
       }
-      const stub = env.WAITLIST.get(env.WAITLIST.idFromName('signups'));
-      return stub.fetch(request);
+      if (request.method !== 'POST') {
+        return json({ ok: false, error: 'Method not allowed.' }, 405);
+      }
+
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ ok: false, error: 'Invalid body.' }, 400);
+      }
+
+      const parsed = normalizeWaitlist(body);
+      if (!parsed.ok) {
+        return json({ ok: false, error: parsed.error }, 400);
+      }
+
+      await persistSignup({
+        ...parsed.value,
+        createdAt: new Date().toISOString(),
+      });
+      return json({ ok: true }, 201);
     }
 
     if (url.pathname === '/app') {
       url.pathname = '/app/';
-      return env.ASSETS.fetch(new Request(url, request));
+      request = new Request(url, request);
     }
 
-    return env.ASSETS.fetch(request);
+    if (env.ASSETS) {
+      return env.ASSETS.fetch(request);
+    }
+    return new Response('Not found', { status: 404 });
   },
 };
