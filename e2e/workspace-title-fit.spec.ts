@@ -36,7 +36,7 @@ test.describe('Workspace title, fit, and File menu', () => {
   test.describe.configure({ timeout: 60_000 });
 
   test('applying AWS 3-Tier sets the Home title from source, not Untitled', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Create new' }).click();
@@ -63,7 +63,7 @@ test.describe('Workspace title, fit, and File menu', () => {
   });
 
   test('editing title: updates the Home board name', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.getByRole('button', { name: 'Create new' }).click();
     await page.getByRole('button', { name: 'Blank Architecture Open a clean DSL canvas.' }).click();
@@ -76,7 +76,7 @@ test.describe('Workspace title, fit, and File menu', () => {
   });
 
   test('Fit to Screen brings an off-screen node into view', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.getByRole('button', { name: 'Create new' }).click();
     await page.getByRole('button', { name: 'Blank Architecture Open a clean DSL canvas.' }).click();
@@ -102,7 +102,7 @@ test.describe('Workspace title, fit, and File menu', () => {
   });
 
   test('flow decision labels stay horizontal', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.getByRole('button', { name: 'Create new' }).click();
     await page.getByRole('button', { name: 'Blank Workflow Open a clean DSL canvas.' }).click();
@@ -133,7 +133,7 @@ node ValidateEmail {
   });
 
   test('Escape dismisses the File menu', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.getByRole('button', { name: 'Create new' }).click();
     await page.getByRole('button', { name: 'Blank Architecture Open a clean DSL canvas.' }).click();

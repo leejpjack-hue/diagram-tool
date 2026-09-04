@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Architecture Mode', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
   });
 
   test('should load with Architecture tab active', async ({ page }) => {
@@ -97,7 +97,7 @@ test.describe('Architecture Mode', () => {
 
 test.describe('Save/Load', () => {
   test('should save diagram with Ctrl+S', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     
     // Wait for load
     await page.waitForSelector('.react-flow__node', { timeout: 5000 });
@@ -110,7 +110,7 @@ test.describe('Save/Load', () => {
   });
 
   test('should show File menu', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     
     // Click File menu button
     const fileBtn = page.getByRole('button', { name: /file/i });
@@ -126,7 +126,7 @@ test.describe('Save/Load', () => {
 
 test.describe('Export', () => {
   test('should open export panel with E key', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     
     // Press E key
     await page.keyboard.press('e');

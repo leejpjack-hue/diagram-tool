@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Gantt Functional Tests - Complete Workflow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
   });
 
   test('Complete Gantt workflow: Create, Edit, Filter, Export', async ({ page }) => {
@@ -356,7 +356,7 @@ test.describe('Gantt Functional Tests - Complete Workflow', () => {
   test('Mobile view toggle works', async ({ page }) => {
     // Set mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/');
+    await page.goto('/app/');
     await page.getByRole('button', { name: /gantt/i }).click();
     await page.waitForTimeout(2000);
     

@@ -67,7 +67,7 @@ async function warmOfflineShell(page: Page) {
   await page.evaluate(async () => {
     await navigator.serviceWorker.register('/sw.js');
     await navigator.serviceWorker.ready;
-    const urls = new Set<string>([`${location.origin}/`, `${location.origin}/manifest.webmanifest`, `${location.origin}/favicon.svg`]);
+    const urls = new Set<string>([`${location.origin}/app/`, `${location.origin}/manifest.webmanifest`, `${location.origin}/favicon.svg`]);
     for (const entry of performance.getEntriesByType('resource')) {
       if (entry.name.startsWith(location.origin)) urls.add(entry.name);
     }
@@ -75,7 +75,7 @@ async function warmOfflineShell(page: Page) {
       const url = (element as HTMLScriptElement).src || (element as HTMLLinkElement).href;
       if (url.startsWith(location.origin)) urls.add(url);
     });
-    const cache = await caches.open('diagram-tool-shell-v2');
+    const cache = await caches.open('diagram-tool-shell-v3');
     for (const url of urls) {
       const response = await fetch(url);
       if (response.ok) await cache.put(url, response.clone());
@@ -88,7 +88,7 @@ test.use({ baseURL: 'http://127.0.0.1:4173' });
 test.describe('Durable local-first workspace', () => {
   test('keeps last 3 boards, a named checkpoint, and 20 autosaves offline after reload', async ({ page, context }) => {
     test.setTimeout(120_000);
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.evaluate(() => navigator.serviceWorker.ready);
 

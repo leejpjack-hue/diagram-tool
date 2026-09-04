@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Gantt Functionality - Visual Tests', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
   });
 
   test('should render Gantt chart correctly on desktop', async ({ page }) => {
@@ -144,7 +144,7 @@ test.describe('Gantt Functionality - Visual Tests', () => {
 
 test.describe('Gantt Functionality - Functional Tests', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
   });
 
   test('should switch to Gantt mode successfully', async ({ page }) => {

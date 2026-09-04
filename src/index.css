@@ -5,6 +5,7 @@
 
 /* Tailwind v4: tell the JIT where to look for class names */
 @source "../index.html";
+@source "../app/index.html";
 @source "./**/*.{js,ts,jsx,tsx}";
 
 /* Override with professional styles */

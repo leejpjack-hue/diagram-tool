@@ -1,5 +1,5 @@
-const CACHE_NAME = 'diagram-tool-shell-v2';
-const APP_SHELL = ['/', '/manifest.webmanifest', '/favicon.svg'];
+const CACHE_NAME = 'diagram-tool-shell-v3';
+const APP_SHELL = ['/', '/app/', '/manifest.webmanifest', '/favicon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
@@ -14,20 +14,26 @@ self.addEventListener('activate', event => {
   );
 });
 
+function navigationDest(pathname) {
+  return pathname === '/app' || pathname.startsWith('/app/') ? '/app/' : '/';
+}
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin) return;
+  if (requestUrl.pathname.startsWith('/api/')) return;
 
   if (event.request.mode === 'navigate') {
+    const dest = navigationDest(requestUrl.pathname);
     event.respondWith(
       fetch(event.request)
         .then(response => {
           const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put('/', copy));
+          caches.open(CACHE_NAME).then(cache => cache.put(dest, copy));
           return response;
         })
-        .catch(() => caches.match('/', { ignoreSearch: true, ignoreVary: true })),
+        .catch(() => caches.match(dest, { ignoreSearch: true, ignoreVary: true })),
     );
     return;
   }

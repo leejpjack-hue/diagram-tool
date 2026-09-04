@@ -3,64 +3,204 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="DiagramTool — local-first workspace that turns text into architecture, flow, sequence, and Gantt diagrams. Native DSL, Mermaid, and draw.io." />
+    <meta name="description" content="Describe the system. Get a board you can edit, export, and present — in the browser." />
     <meta name="theme-color" content="#6366f1" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <title>DiagramTool — Professional Diagrams from Text</title>
+    <title>DiagramTool — Turn text into architecture, flow, and Gantt diagrams</title>
     <link rel="canonical" href="https://diagram-tool.teqcon.uk/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="DiagramTool" />
-    <meta property="og:title" content="DiagramTool — Professional Diagrams from Text" />
-    <meta property="og:description" content="Local-first workspace that turns text into architecture, flow, sequence, and Gantt diagrams. Native DSL, Mermaid, and draw.io." />
+    <meta property="og:title" content="DiagramTool — Turn text into architecture, flow, and Gantt diagrams" />
+    <meta property="og:description" content="Describe the system. Get a board you can edit, export, and present — in the browser." />
     <meta property="og:url" content="https://diagram-tool.teqcon.uk/" />
     <meta property="og:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="DiagramTool — Professional Diagrams from Text" />
-    <meta name="twitter:description" content="Local-first workspace that turns text into architecture, flow, sequence, and Gantt diagrams. Native DSL, Mermaid, and draw.io." />
-    <meta name="twitter:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "DiagramTool",
-      "applicationCategory": "DesignApplication",
-      "operatingSystem": "Web",
-      "url": "https://diagram-tool.teqcon.uk/",
-      "description": "Local-first workspace that turns text into architecture, flow, sequence, and Gantt diagrams. Native DSL, Mermaid, and draw.io.",
-      "featureList": [
-        "Architecture diagrams from a native text DSL",
-        "Flowcharts and BPMN-style flows",
-        "Mermaid sequence diagrams",
-        "Native Gantt charts with Mermaid gantt import",
-        "draw.io import to flow boards",
-        "Local-first IndexedDB workspace"
-      ]
-    }
-    </script>
-    
-    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <meta name="twitter:title" content="DiagramTool — Turn text into architecture, flow, and Gantt diagrams" />
+    <meta name="twitter:description" content="Describe the system. Get a board you can edit, export, and present — in the browser." />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --ink: #1b1a17;
+        --muted: #5c584f;
+        --line: #e4dfd4;
+        --paper: #f7f4ee;
+        --card: #fffdf8;
+        --accent: #4f46e5;
+        --accent-2: #7c3aed;
+        --chip: #efeaf8;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        min-height: 100vh;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(900px 420px at 8% -10%, rgba(79, 70, 229, 0.10), transparent 60%),
+          radial-gradient(700px 360px at 110% 8%, rgba(124, 58, 237, 0.10), transparent 55%),
+          var(--paper);
+      }
+      a { color: inherit; }
+      .wrap { width: min(920px, calc(100% - 2rem)); margin: 0 auto; }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.25rem 0 0.5rem;
+      }
+      .logo {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.65rem;
+        font-family: "Plus Jakarta Sans", Inter, sans-serif;
+        font-weight: 800;
+        font-size: 1.05rem;
+        text-decoration: none;
+      }
+      .logo img { width: 32px; height: 32px; }
+      .hero { padding: 3.25rem 0 2.5rem; }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 0 0 1.25rem;
+        padding: 0;
+        list-style: none;
+      }
+      .chips li {
+        background: var(--chip);
+        border: 1px solid #ddd4f3;
+        color: #4338ca;
+        border-radius: 999px;
+        padding: 0.28rem 0.7rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+      }
+      h1 {
+        font-family: "Plus Jakarta Sans", Inter, sans-serif;
+        font-size: clamp(2rem, 5vw, 3.35rem);
+        line-height: 1.08;
+        letter-spacing: -0.035em;
+        margin: 0 0 1rem;
+        max-width: 18ch;
+      }
+      .subhead {
+        font-size: 1.125rem;
+        line-height: 1.55;
+        color: var(--muted);
+        max-width: 38rem;
+        margin: 0 0 1.5rem;
+      }
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 1rem 1.25rem;
+        margin-bottom: 1.75rem;
+      }
+      .btn {
+        appearance: none;
+        border: 0;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #fff;
+        font: inherit;
+        font-weight: 700;
+        padding: 0.85rem 1.15rem;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+      }
+      .btn:disabled { opacity: 0.65; cursor: wait; }
+      .muted-link {
+        color: var(--muted);
+        font-size: 0.95rem;
+        font-weight: 500;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 1.15rem;
+        box-shadow: 0 16px 40px rgba(27, 26, 23, 0.05);
+        max-width: 28rem;
+      }
+      label {
+        display: block;
+        font-size: 0.82rem;
+        font-weight: 600;
+        margin: 0 0 0.4rem;
+      }
+      input, textarea {
+        width: 100%;
+        border: 1px solid #d7d1c5;
+        border-radius: 10px;
+        background: #fff;
+        color: var(--ink);
+        font: inherit;
+        padding: 0.75rem 0.8rem;
+        margin-bottom: 0.85rem;
+      }
+      input:focus, textarea:focus {
+        outline: 2px solid #c7d2fe;
+        border-color: var(--accent);
+      }
+      .error { color: #b42318; font-size: 0.85rem; margin: -0.35rem 0 0.75rem; }
+      .success {
+        border: 1px solid #bbf7d0;
+        background: #f0fdf4;
+        border-radius: 16px;
+        padding: 1.15rem;
+        max-width: 28rem;
+      }
+      .success p { margin: 0 0 0.75rem; font-weight: 600; }
+      footer {
+        padding: 2rem 0 2.5rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <noscript>
-      <p>DiagramTool is a local-first text-to-diagram workspace for architecture, flow, sequence, and Gantt. Enable JavaScript to open the editor, or read the crawlable guides:</p>
-      <ul>
-        <li><a href="/architecture-diagram-from-text.html">Architecture diagrams from text</a></li>
-        <li><a href="/flowchart-from-text.html">Flowcharts from text</a></li>
-        <li><a href="/sequence-diagram-from-text.html">Sequence diagrams</a></li>
-        <li><a href="/mermaid-gantt-diagram.html">Mermaid and Gantt</a></li>
-        <li><a href="/local-first-diagram-workspace.html">Local-first workspace and draw.io</a></li>
-      </ul>
-    </noscript>
-    <script type="module" src="/src/main.tsx"></script>
+    <div class="wrap">
+      <header>
+        <a class="logo" href="/">
+          <img src="/favicon.svg" alt="" />
+          DiagramTool
+        </a>
+        <a class="muted-link js-open-app" href="/app">Open the workspace →</a>
+      </header>
+
+      <main class="hero">
+        <ul class="chips" aria-label="Diagram types">
+          <li>Architecture</li>
+          <li>Flow / Sequence</li>
+          <li>Gantt</li>
+        </ul>
+        <h1>Turn text into architecture, flow, and Gantt diagrams.</h1>
+        <p class="subhead">Describe the system. Get a board you can edit, export, and present — in the browser.</p>
+        <div class="cta-row">
+          <a class="btn" href="#waitlist">Join the waitlist</a>
+          <a class="muted-link js-open-app" href="/app">Open the workspace →</a>
+        </div>
+
+        <section id="waitlist" class="card" aria-label="Waitlist">
+          <form id="waitlist-form" action="/api/waitlist" method="post">
+            <label for="waitlist-email">Email</label>
+            <input id="waitlist-email" name="email" type="email" required placeholder="you@company.com" autocomplete="email" />
+            <label for="waitlist-note">What will you diagram first? (optional)</label>
+            <textarea id="waitlist-note" name="note" rows="3" placeholder="e.g. AWS architecture, sprint Gantt…"></textarea>
+            <p id="waitlist-error" class="error" hidden></p>
+            <button class="btn" type="submit">Join waitlist</button>
+          </form>
+        </section>
+      </main>
+
+      <footer>Local-first workspace. No account required to try the editor.</footer>
+    </div>
+    <script type="module" src="/src/landing.ts"></script>
   </body>
 </html>

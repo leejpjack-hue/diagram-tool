@@ -28,6 +28,9 @@ screenshots-gallery.html
 .env.local
 .env.*.local
 
+# Waitlist signups written by the preview/dev API
+data/
+
 # OS files
 .DS_Store
 Thumbs.db

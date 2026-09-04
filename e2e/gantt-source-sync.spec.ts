@@ -72,7 +72,7 @@ function planningBar(page: Page) {
 }
 
 async function createGanttBoard(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
   await page.getByRole('button', { name: 'Create new' }).click();
   await page.getByRole('button', { name: 'Blank Gantt Open a clean DSL canvas.' }).click();
@@ -131,7 +131,7 @@ test.describe('Gantt bidirectional source sync', () => {
   });
 
   test('existing Gantt template still opens on the canvas', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.getByRole('button', { name: 'Create new' }).click();
     await page.getByLabel('Create a board').getByRole('button', { name: 'Templates' }).click();
