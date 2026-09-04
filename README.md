@@ -21,12 +21,12 @@ The landing never blocks if these are missing — it uses safe no-op stubs.
 
 | Variable | Purpose |
 |----------|---------|
-| `VITE_POSTHOG_KEY` | Preferred. Enables pageview on `/`, `waitlist_submit_success`, and `cta_open_app_click`. |
+| `VITE_POSTHOG_KEY` | If set, PostHog is used for pageview on `/`, `waitlist_submit_success`, and `cta_open_app_click`. |
 | `VITE_POSTHOG_HOST` | Optional. Defaults to `https://us.i.posthog.com`. |
-| `VITE_GA4_MEASUREMENT_ID` | Used only when the PostHog key is unset. |
+| `VITE_GA4_MEASUREMENT_ID` | Used when the PostHog key is unset. Production is `G-HLTGGMPREJ` via `.env.production`. |
 | `WAITLIST_FILE` | Server-side JSONL path for signups. Defaults to `./data/waitlist.jsonl` on the preview/dev host. |
 
-See `.env.example`. Production deploy must pass the `VITE_*` vars at **build** time for analytics to fire.
+See `.env.example`. Vite inlines `VITE_*` at **build** time (`npm run build` / Cloudflare Workers Builds). Runtime Worker `vars` cannot enable GA4.
 
 ## What it does
 

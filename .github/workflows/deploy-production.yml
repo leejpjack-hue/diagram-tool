@@ -34,6 +34,9 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          # Public GA4 measurement ID; must be present at Vite build time (not Worker runtime).
+          VITE_GA4_MEASUREMENT_ID: G-HLTGGMPREJ
         run: npm run build
 
       - name: Install deploy tools
