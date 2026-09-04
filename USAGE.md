@@ -2,7 +2,7 @@
 
 DiagramTool turns a small text DSL into clean, copy-paste-friendly architecture, flow, and Gantt diagrams. This document is the reference for every keyword, shape, and workflow.
 
-Live: https://diagram.teqcon.uk/
+Live: https://diagram-tool.teqcon.uk/
 
 ---
 

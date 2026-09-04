@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Architecture diagram from text — DiagramTool</title>
+  <meta name="description" content="Turn a short native DSL into an architecture diagram: services, databases, queues, cloud kinds, groups, and C4 levels. Local-first in the browser." />
+  <link rel="canonical" href="https://diagram-tool.teqcon.uk/architecture-diagram-from-text.html" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/seo.css" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="Architecture diagram from text — DiagramTool" />
+  <meta property="og:description" content="Write services, databases, queues, and cloud components as text. DiagramTool lays out a local architecture canvas you can export." />
+  <meta property="og:url" content="https://diagram-tool.teqcon.uk/architecture-diagram-from-text.html" />
+  <meta property="og:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Architecture diagram from text — DiagramTool" />
+  <meta name="twitter:description" content="Native architecture DSL for services, data stores, queues, and C4 drill-down — no drag-first canvas required." />
+  <meta name="twitter:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "DiagramTool",
+    "url": "https://diagram-tool.teqcon.uk/",
+    "applicationCategory": "DesignApplication",
+    "operatingSystem": "Web",
+    "description": "Local-first workspace that renders architecture diagrams from a native text DSL."
+  }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/"><img src="/favicon.svg" alt="" /> DiagramTool</a>
+      <nav>
+        <a href="/architecture-diagram-from-text.html" aria-current="page">Architecture</a>
+        <a href="/flowchart-from-text.html">Flow</a>
+        <a href="/sequence-diagram-from-text.html">Sequence</a>
+        <a href="/mermaid-gantt-diagram.html">Mermaid &amp; Gantt</a>
+        <a href="/local-first-diagram-workspace.html">Local-first</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <article>
+      <h1>Architecture diagrams from a text DSL</h1>
+      <p class="lede">DiagramTool’s Architecture tab reads a native <code>diagram: architecture</code> document and draws services, databases, queues, cloud components, and UML classes on a white canvas. You type; the layout updates. The board stays in the browser workspace unless you save a file.</p>
+      <a class="cta" href="/">Open DiagramTool</a>
+
+      <h2>What the architecture mode actually draws</h2>
+      <p>The parser is not a generic “boxes and arrows” sketch. Each top-level keyword maps to a node kind with a palette and badge:</p>
+      <ul>
+        <li><code>service</code> — API, microservice, or lambda. Rounded rectangle; optional <code>tech</code>, <code>port</code>, <code>replicas</code>.</li>
+        <li><code>database</code> — PostgreSQL, MySQL, MongoDB, Redis, and similar <code>type:</code> values. Cylinder badge; <code>data:</code> lists show under the title.</li>
+        <li><code>queue</code> — Kafka, RabbitMQ, SQS. Envelope badge and optional <code>topic</code>.</li>
+        <li><code>cloud</code> — AWS, Azure, GCP, or Kubernetes with a <code>kind:</code> (lambda, s3, pod, apigateway, and others). Icons live as SVGs in the app; unknown kinds fall back to a short tag.</li>
+        <li><code>class</code> — UML-style box with stereotype, attributes, and methods.</li>
+      </ul>
+      <p>Edges are either explicit <code>A -&gt; B</code> lines or a <code>connects:</code> list inside a node. Labels use the <code>A -&gt;|reads| B</code> form. Connector style is a top-level <code>edges:</code> keyword: curved (default), orthogonal, step, or straight. Layout direction is <code>vertical</code> (top to bottom) or <code>horizontal</code> (left to right).</p>
+
+      <h2>A checkout platform in a few blocks</h2>
+      <pre><code>diagram: architecture
+title: Checkout platform
+direction: horizontal
+edges: orthogonal
+
+service CheckoutAPI {
+  type: api
+  tech: Node.js
+  connects: OrdersDB, EventBus
+}
+
+database OrdersDB {
+  type: postgresql
+  data: orders, payments
+}
+
+queue EventBus {
+  type: kafka
+  topic: checkout.events
+}
+
+cloud Edge {
+  provider: aws
+  kind: cloudfront
+  connects: CheckoutAPI
+}</code></pre>
+      <p>That is enough for a readable service map. Insurance claims platforms appear in some bundled templates because they are a useful multi-service example — the DSL is not limited to insurance. The same keywords describe any HTTP API, store, and bus.</p>
+
+      <h2>Groups and C4 drill-down</h2>
+      <p>Real systems have tiers. A <code>group</code> block draws a dashed, tinted rectangle around named members. Groups are auto-sized after layout, can be dragged as a unit, and do not require you to place every box by hand.</p>
+      <p>C4 is optional, not a separate product. Set <code>level: context | container | component | code</code> and <code>parent:</code> on children. The canvas pill bar filters which level is visible. Click a node that has children to drill in; a breadcrumb returns to the full graph. Nodes without <code>level:</code> stay visible as scaffolding.</p>
+      <p>Templates shipped with the app include AWS 3-tier, Kubernetes microservices, a GCP pipeline, C4 context, a hierarchical C4 example, ER, network topology, and UML class. Open <strong>Templates</strong> on the Architecture tab rather than starting from a blank file.</p>
+
+      <h2>What this page is not claiming</h2>
+      <p>Architecture boards are authored in the native DSL (or restored from portable JSON). File → Open will not turn a draw.io stencil soup into an architecture model — draw.io imports become <a href="/flowchart-from-text.html">flow</a> boards. Mermaid C4 diagrams are rejected as unsupported. For sequence calls and Gantt dates, use the <a href="/sequence-diagram-from-text.html">Sequence</a> and <a href="/mermaid-gantt-diagram.html">Gantt</a> tabs.</p>
+
+      <div class="related">
+        <h2>Related</h2>
+        <ul>
+          <li><a href="/">Open the app</a> and choose the Architecture tab</li>
+          <li><a href="/flowchart-from-text.html">Flowcharts and BPMN from text</a></li>
+          <li><a href="/local-first-diagram-workspace.html">Local-first workspace, files, and draw.io</a></li>
+        </ul>
+      </div>
+    </article>
+  </main>
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>DiagramTool · text-to-diagram workspace</span>
+      <a href="https://github.com/leejpjack-hue/diagram-tool">GitHub</a>
+    </div>
+  </footer>
+</body>
+</html>

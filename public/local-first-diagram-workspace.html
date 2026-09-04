@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Local-first diagram workspace and draw.io import — DiagramTool</title>
+  <meta name="description" content="DiagramTool stores boards in IndexedDB on this device. Open portable JSON, native DSL, Mermaid, or draw.io locally — no DiagramTool cloud required for the workspace." />
+  <link rel="canonical" href="https://diagram-tool.teqcon.uk/local-first-diagram-workspace.html" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/seo.css" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="Local-first diagram workspace and draw.io import — DiagramTool" />
+  <meta property="og:description" content="IndexedDB workspace, File → Open/Save, Mermaid, and sanitized draw.io → flow import. All in the browser." />
+  <meta property="og:url" content="https://diagram-tool.teqcon.uk/local-first-diagram-workspace.html" />
+  <meta property="og:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Local-first diagram workspace — DiagramTool" />
+  <meta name="twitter:description" content="Keep architecture, flow, sequence, and Gantt boards on this device. Import draw.io as a flow board." />
+  <meta name="twitter:image" content="https://diagram-tool.teqcon.uk/og-image.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "DiagramTool",
+    "url": "https://diagram-tool.teqcon.uk/",
+    "applicationCategory": "DesignApplication",
+    "operatingSystem": "Web",
+    "description": "Local-first text-to-diagram workspace with IndexedDB storage and draw.io import."
+  }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/"><img src="/favicon.svg" alt="" /> DiagramTool</a>
+      <nav>
+        <a href="/architecture-diagram-from-text.html">Architecture</a>
+        <a href="/flowchart-from-text.html">Flow</a>
+        <a href="/sequence-diagram-from-text.html">Sequence</a>
+        <a href="/mermaid-gantt-diagram.html">Mermaid &amp; Gantt</a>
+        <a href="/local-first-diagram-workspace.html" aria-current="page">Local-first</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <article>
+      <h1>A local-first workspace that can open draw.io</h1>
+      <p class="lede">DiagramTool is a browser app. Boards live in an IndexedDB database named <code>diagram-tool-workspace</code> on this device. You can also File → Open and File → Save against a file on disk. There is no requirement to create a DiagramTool account to use the editor, and import paths are written to fail closed rather than fetch remote content out of a diagram file.</p>
+      <a class="cta" href="/">Open the workspace</a>
+
+      <h2>What “local-first” means here</h2>
+      <p>The workspace holds architecture, flow, sequence, and Gantt boards (and presentation frames attached to a board). A size meter warns when a board is getting heavy. You can export a JSON backup or a single-board portable file. A workspace backup JSON is not treated as a single board on open — that file is rejected with a clear error so you do not overwrite one diagram with a bundle.</p>
+      <p>Where the File System Access API exists, Save writes JSON and will not overwrite a Mermaid or draw.io handle with board JSON. If you opened <code>flow.mmd</code> or <code>map.drawio</code>, saving the working board asks for a new JSON file instead of clobbering the source you imported.</p>
+      <p>An optional local MCP server in this repository talks stdio to an editor on the same machine. That is still your process and your files — it is not a hosted DiagramTool API.</p>
+
+      <h2>File → Open accept list</h2>
+      <ul>
+        <li>Portable board JSON (<code>.json</code>, <code>.board.json</code>)</li>
+        <li>Native DSL (<code>.txt</code>, <code>.dsl</code>)</li>
+        <li>Mermaid (<code>.mmd</code>, <code>.mermaid</code>) for sequence, flowchart/graph, and gantt import</li>
+        <li>draw.io / diagrams.net (<code>.drawio</code>, <code>.xml</code>)</li>
+      </ul>
+      <p>CSV import is a separate path for APM-style service maps (source, destination, protocol-style columns), not a replacement for draw.io.</p>
+
+      <h2>draw.io import — flow only, best-effort</h2>
+      <p>A valid mxfile becomes a <strong>flow</strong> board. Mapped: rectangles, rounded boxes, ellipses, diamonds, and common flowchart stencils, plus edges with both endpoints. Dropped on purpose: swimlanes, groups, containers, tables, images, text-only overlays, extra pages, dangling edges, and stencils the importer cannot classify. Infra shapes do not become architecture <code>cloud</code> nodes.</p>
+      <p>Safety checks run locally: oversized files fail, DTD/ENTITY payloads fail, labels are stripped to plain text, remote <code>http(s)</code> images and <code>svg-xml</code> data URLs are skipped. The importer does not upload your <code>.drawio</code> to a DiagramTool server.</p>
+      <p>There is no draw.io <em>export</em> and no round-trip guarantee. If you need the original file later, keep it. The workspace holds the mapped flow DSL.</p>
+
+      <h2>Four modes, one device</h2>
+      <p>Use <a href="/architecture-diagram-from-text.html">architecture</a> for service maps, <a href="/flowchart-from-text.html">flow</a> for processes (including Mermaid flowcharts and draw.io), <a href="/sequence-diagram-from-text.html">sequence</a> for Mermaid call traces, and <a href="/mermaid-gantt-diagram.html">Gantt</a> for plans. Switching tabs does not send the board anywhere. Clearing site data will clear IndexedDB — export a backup if the board matters.</p>
+
+      <div class="related">
+        <h2>Related</h2>
+        <ul>
+          <li><a href="/">Open the app</a></li>
+          <li><a href="/flowchart-from-text.html">Flowcharts and Mermaid flowchart import</a></li>
+          <li><a href="/mermaid-gantt-diagram.html">Mermaid and Gantt formats</a></li>
+        </ul>
+      </div>
+    </article>
+  </main>
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>DiagramTool · text-to-diagram workspace</span>
+      <a href="https://github.com/leejpjack-hue/diagram-tool">GitHub</a>
+    </div>
+  </footer>
+</body>
+</html>
