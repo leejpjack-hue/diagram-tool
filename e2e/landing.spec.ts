@@ -36,6 +36,26 @@ test.describe('P0 marketing landing', () => {
     expect(invalid.status()).toBe(400);
   });
 
+  test('production preview bakes GA4 and still serves waitlist', async ({ page, request }) => {
+    const preview = 'http://127.0.0.1:4173';
+    const html = await (await request.get(`${preview}/`)).text();
+    expect(html).toContain('Join the waitlist');
+    expect(html).toMatch(/src="\/assets\/main-[^"]+\.js"/);
+
+    const jsPath = html.match(/src="(\/assets\/main-[^"]+\.js)"/)?.[1];
+    expect(jsPath).toBeTruthy();
+    const js = await (await request.get(`${preview}${jsPath}`)).text();
+    expect(js).toContain('G-HLTGGMPREJ');
+    expect(js).toContain('googletagmanager.com/gtag/js');
+
+    await page.goto(preview);
+    await expect(page.locator('#ga4-gtag')).toHaveAttribute(
+      'src',
+      /googletagmanager\.com\/gtag\/js\?id=G-HLTGGMPREJ/,
+    );
+    await expect(page.getByRole('button', { name: 'Join waitlist', exact: true })).toBeVisible();
+  });
+
   test('successful submit replaces the form and does not navigate', async ({ page }) => {
     await page.goto('/?utm_source=hero');
     await page.getByPlaceholder('you@company.com').fill('you@company.com');
