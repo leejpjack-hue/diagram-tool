@@ -21,7 +21,7 @@ export default defineConfig([globalIgnores(['dist']), {
     globals: globals.browser,
   },
 }, {
-  files: ['vite.config.ts', 'vite-plugins/**/*.ts', 'tests/unit/**/*.ts'],
+  files: ['vite.config.ts', 'vite-plugins/**/*.ts', 'tests/unit/**/*.ts', 'worker/**/*.ts'],
   languageOptions: {
     globals: globals.node,
   },
