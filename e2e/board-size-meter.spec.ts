@@ -40,7 +40,7 @@ async function setEditorDsl(page: Page, dsl: string) {
 }
 
 async function createArchitectureBoard(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
   await page.getByRole('button', { name: 'Create new' }).click();
   await page.getByRole('button', { name: 'Blank Architecture Open a clean DSL canvas.' }).click();

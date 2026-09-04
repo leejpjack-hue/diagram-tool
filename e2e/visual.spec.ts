@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Visual/UI Tests - What Humans Actually See', () => {
   test('should render Architecture diagram correctly', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     
     // Wait for diagram to fully render
     await page.waitForSelector('.react-flow__node', { timeout: 10000 });
@@ -22,7 +22,7 @@ test.describe('Visual/UI Tests - What Humans Actually See', () => {
   });
 
   test('should render Flow diagram correctly', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     
     // Switch to Flow mode
     await page.getByRole('button', { name: /flow/i }).click();
@@ -37,7 +37,7 @@ test.describe('Visual/UI Tests - What Humans Actually See', () => {
   });
 
   test('should render Gantt chart correctly', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     
     // Switch to Gantt mode
     await page.getByRole('button', { name: /gantt/i }).click();
@@ -51,7 +51,7 @@ test.describe('Visual/UI Tests - What Humans Actually See', () => {
   });
 
   test('should display node details on hover', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('.react-flow__node', { timeout: 5000 });
     
     // Hover over a node
@@ -66,7 +66,7 @@ test.describe('Visual/UI Tests - What Humans Actually See', () => {
   });
 
   test('should show toast notification when saving', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('.react-flow__node', { timeout: 5000 });
     
     // Trigger save
@@ -82,7 +82,7 @@ test.describe('Visual/UI Tests - What Humans Actually See', () => {
   });
 
   test('should open and display properties panel', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('.react-flow__node', { timeout: 5000 });
     
     // Click Properties button
@@ -96,7 +96,7 @@ test.describe('Visual/UI Tests - What Humans Actually See', () => {
   });
 
   test('should open and display export panel', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('.react-flow__node', { timeout: 5000 });
     
     // Press E to open export panel
@@ -110,7 +110,7 @@ test.describe('Visual/UI Tests - What Humans Actually See', () => {
   });
 
   test('should display File menu dropdown', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('.react-flow__node', { timeout: 5000 });
     
     // Click File menu
@@ -122,7 +122,7 @@ test.describe('Visual/UI Tests - What Humans Actually See', () => {
   });
 
   test('should zoom and show visual feedback', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('.react-flow', { timeout: 5000 });
     
     // Take before screenshot
@@ -142,7 +142,7 @@ test.describe('Visual/UI Tests - What Humans Actually See', () => {
   test('should be responsive on mobile viewport', async ({ page }) => {
     // Set mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/');
+    await page.goto('/app/');
     
     await page.waitForSelector('.react-flow__node', { timeout: 5000 });
     await page.waitForTimeout(1000);
@@ -156,7 +156,7 @@ test.describe('Visual/UI Tests - What Humans Actually See', () => {
   test('should be responsive on tablet viewport', async ({ page }) => {
     // Set tablet viewport
     await page.setViewportSize({ width: 768, height: 1024 });
-    await page.goto('/');
+    await page.goto('/app/');
     
     await page.waitForSelector('.react-flow__node', { timeout: 5000 });
     await page.waitForTimeout(1000);
@@ -170,7 +170,7 @@ test.describe('Visual/UI Tests - What Humans Actually See', () => {
 
 test.describe('Accessibility Tests', () => {
   test('should not have accessibility violations', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await page.waitForSelector('.react-flow__node', { timeout: 5000 });
     
     // Run accessibility scan

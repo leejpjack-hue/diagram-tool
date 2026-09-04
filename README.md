@@ -2,9 +2,31 @@
 
 Local-first text-to-diagram workspace for **architecture**, **flow**, **sequence**, and **Gantt**. Write a small native DSL, paste Mermaid, or open a draw.io file — the canvas updates in the browser. Boards stay on this device (IndexedDB workspace, optional File → Open / Save).
 
-**Live demo:** [https://diagram-tool.teqcon.uk/](https://diagram-tool.teqcon.uk/)
+**Live demo:** [https://diagram-tool.teqcon.uk/](https://diagram-tool.teqcon.uk/) (marketing) · [workspace](https://diagram-tool.teqcon.uk/app/)
 
-This is a Vite + React + TypeScript app. The marketing HTML under `landing/` is **not** what production deploys — `npm run build` ships `dist/` (including everything in `public/`).
+This is a Vite + React + TypeScript app.
+
+| Route | What loads |
+|-------|------------|
+| `/` | Marketing landing + waitlist. Cold HTML. Does **not** boot the Local workspace for first-time visitors. |
+| `/app` | Existing Local workspace (Home / boards / editor). |
+| `/api/waitlist` | Same-origin waitlist API. Vite preview/dev writes JSONL (`WAITLIST_FILE` or `./data/waitlist.jsonl`). Production Cloudflare Worker persists the same payload in a Durable Object. |
+| `/pricing` | Out of scope. |
+
+`npm run build` ships `dist/` (landing `index.html`, workspace `app/index.html`, and everything in `public/`). The older mock under `landing/` is unused.
+
+### Analytics env (optional)
+
+The landing never blocks if these are missing — it uses safe no-op stubs.
+
+| Variable | Purpose |
+|----------|---------|
+| `VITE_POSTHOG_KEY` | Preferred. Enables pageview on `/`, `waitlist_submit_success`, and `cta_open_app_click`. |
+| `VITE_POSTHOG_HOST` | Optional. Defaults to `https://us.i.posthog.com`. |
+| `VITE_GA4_MEASUREMENT_ID` | Used only when the PostHog key is unset. |
+| `WAITLIST_FILE` | Server-side JSONL path for signups. Defaults to `./data/waitlist.jsonl` on the preview/dev host. |
+
+See `.env.example`. Production deploy must pass the `VITE_*` vars at **build** time for analytics to fire.
 
 ## What it does
 
@@ -157,7 +179,10 @@ Static HTML (copied from `public/` into `dist/` on build):
 
 ```
 diagram-tool/
-├── src/           # React app, parser, canvas, Gantt, sequence
+├── index.html     # Marketing landing (cold HTML)
+├── app/index.html # Local workspace SPA entry
+├── src/           # React app, parser, canvas, Gantt, sequence, landing JS
+├── vite-plugins/  # Waitlist API + /app fallback for dev/preview
 ├── public/        # Static assets copied to dist/ (SEO HTML, robots, sitemap)
 ├── docs/          # Board format and MCP notes
 ├── e2e/           # Playwright

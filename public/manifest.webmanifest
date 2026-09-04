@@ -2,7 +2,7 @@
   "name": "DiagramTool Workspace",
   "short_name": "DiagramTool",
   "description": "A local-first workspace for architecture, workflow, sequence, and Gantt diagrams.",
-  "start_url": "/",
+  "start_url": "/app/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#6366f1",

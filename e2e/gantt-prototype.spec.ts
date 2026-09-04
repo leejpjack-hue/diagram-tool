@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Gantt Visual Tests - With Design Prototype', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
   });
 
   test('PROTOTYPE: Desktop should show proper Gantt layout', async ({ page }) => {

@@ -23,7 +23,7 @@ test.describe('File open and save on this device', () => {
   });
 
   test('File menu lists Open, Save, Save As, and Reload from disk', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.getByRole('button', { name: 'Create new' }).click();
     await page.getByRole('button', { name: 'Blank Architecture Open a clean DSL canvas.' }).click();
@@ -38,7 +38,7 @@ test.describe('File open and save on this device', () => {
   });
 
   test('invalid Open does not clobber the current board', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.getByRole('button', { name: 'Create new' }).click();
     await page.getByRole('button', { name: 'Blank Architecture Open a clean DSL canvas.' }).click();

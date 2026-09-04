@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test.describe('Miro-style personal dashboard', () => {
   test('creates a board, organizes it, searches it, and restores it from Trash', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Create new' }).click();
@@ -40,7 +40,7 @@ test.describe('Miro-style personal dashboard', () => {
 
   test('keeps the mobile dashboard within the viewport and opens its navigation drawer', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     await page.getByRole('button', { name: 'Open navigation' }).click();

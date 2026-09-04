@@ -9,7 +9,7 @@ const STARTERS = [
 ] as const;
 
 async function openHome(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
 }
 

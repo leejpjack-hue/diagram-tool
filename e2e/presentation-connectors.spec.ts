@@ -11,7 +11,7 @@ service API {
 }`;
 
 async function openDeck(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
   await page.getByRole('button', { name: 'Create new' }).click();
   await page.getByRole('button', { name: 'Blank Architecture Open a clean DSL canvas.' }).click();
@@ -104,7 +104,7 @@ test.describe('Deck connector attachments', () => {
   });
 
   test('architecture connects: edges still render on a typed board', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.getByRole('button', { name: 'Create new' }).click();
     await page.getByRole('button', { name: 'Blank Architecture Open a clean DSL canvas.' }).click();

@@ -18,7 +18,7 @@ test.describe('draw.io dashboard import', () => {
   test.describe.configure({ timeout: 60_000 });
 
   test('imports a 2-box draw.io file as an editable flow board', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
 
     const [fileChooser] = await Promise.all([
@@ -42,7 +42,7 @@ test.describe('draw.io dashboard import', () => {
   });
 
   test('invalid draw.io XML shows an error and does not wipe Home', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     const path = join(tmpdir(), `diagram-tool-bad-${Date.now()}.xml`);
     writeFileSync(path, 'not a draw.io diagram');

@@ -34,7 +34,7 @@ async function setEditorDsl(page: Page, dsl: string) {
 }
 
 async function createKnownArchitectureBoard(page: Page) {
-  await page.goto('/');
+  await page.goto('/app/');
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
   await page.getByRole('button', { name: 'Create new' }).click();
   await page.getByRole('button', { name: 'Blank Architecture Open a clean DSL canvas.' }).click();
@@ -122,7 +122,7 @@ test.describe('Portable export and import', () => {
   test('complete backup restores a Space and board after a clean profile', async ({ browser }) => {
     const source = await browser.newContext({ baseURL: 'http://localhost:5173' });
     const page = await source.newPage();
-    await page.goto('/');
+    await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Create new' }).click();
@@ -164,7 +164,7 @@ test.describe('Portable export and import', () => {
 
     const clean = await browser.newContext({ baseURL: 'http://localhost:5173' });
     const restored = await clean.newPage();
-    await restored.goto('/');
+    await restored.goto('/app/');
     await expect(restored.getByRole('heading', { name: 'Home' })).toBeVisible();
     await expect(restored.getByRole('heading', { name: 'Backup Core API' })).toHaveCount(0);
 
