@@ -1000,6 +1000,45 @@ group BackOffice {
 }`,
   },
   {
+    id: 'flow-ai-workflow',
+    name: 'AI workflow',
+    description: 'Plain-words AI pipeline — Human ask, Model, Tool, Check, Reply — with a retry loop for wrong answers.',
+    category: 'Flow',
+    mode: 'flow',
+    tags: ['ai', 'workflow', '工作流'],
+    dsl: `diagram: flow
+title: AI workflow
+direction: LR
+
+Ask -> Model
+Model -> Tool
+Tool -> Check
+
+Check ->|retry| Model
+Check ->|ok| Reply
+
+node Ask {
+  label: Human ask
+}
+
+node Model {
+  label: Model
+}
+
+node Tool {
+  label: Tool
+}
+
+node Check {
+  type: decision
+  label: Check
+}
+
+node Reply {
+  label: Reply
+}`,
+  },
+  {
     id: 'gantt-product-launch',
     name: 'Product Launch Plan',
     description: 'Three-phase launch roadmap — strategy, build, and go-to-market — with owners and milestones.',
