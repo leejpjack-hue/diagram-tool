@@ -372,6 +372,34 @@ Process -> Done
 | `duration:` | e.g. `2m`, `45s`, `1h` (free text)                 |
 | `assignee:` | Owner / role                                       |
 | `lane:`     | Swimlane id (resolved by `lane` blocks)            |
+| `role:`     | Role chip: `human \| model \| tool \| check` (display-only) |
+
+### Role chips (DT-AI-03)
+
+Flow nodes can carry a small role badge that makes AI pipelines read at a
+glance — who asks, what answers, what runs, what verifies:
+
+```
+node Ask   { label: Human ask
+             role: human }
+node Model { label: Model
+             role: model }
+node Tool  { label: Tool
+             role: tool }
+node Check { type: decision
+             label: Check
+             role: check }
+```
+
+- Accepted values are `human`, `model`, `tool`, `check` (case-insensitive).
+- **Display-only** — a role chip is metadata, it never executes tools, calls
+  models, or changes layout.
+- Unknown values are ignored silently (no crash, no chip).
+- Chose a dedicated `role:` property over overloading `system:` — `system:`
+  already means "owning system / service", and mixing the two would make the
+  caption ambiguous.
+- Chips are static (no animation), so `prefers-reduced-motion` is satisfied
+  trivially.
 
 ---
 

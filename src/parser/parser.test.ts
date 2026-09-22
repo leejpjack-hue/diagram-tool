@@ -437,4 +437,40 @@ note "Watch the retry budget here." {
       }
     });
   });
+
+  describe('DT-AI-03 flow node role', () => {
+    const parseRole = (roleLine: string) => {
+      const dsl = `
+diagram: flow
+A -> B
+node A {
+  label: Start
+  ${roleLine}
+}
+node B {
+  label: End
+}
+`;
+      const result = parseDiagram(dsl);
+      const a = result.nodes.find(n => n.id === 'a');
+      if (!a || a.type !== 'flow') throw new Error('flow node a missing');
+      return a.properties.role;
+    };
+
+    it('parses each known role', () => {
+      expect(parseRole('role: human')).toBe('human');
+      expect(parseRole('role: model')).toBe('model');
+      expect(parseRole('role: tool')).toBe('tool');
+      expect(parseRole('role: check')).toBe('check');
+    });
+
+    it('accepts roles case-insensitively', () => {
+      expect(parseRole('role: Human')).toBe('human');
+    });
+
+    it('ignores unknown roles without crashing', () => {
+      expect(parseRole('role: alien')).toBeUndefined();
+      expect(parseRole('role: systemrole')).toBeUndefined();
+    });
+  });
 });

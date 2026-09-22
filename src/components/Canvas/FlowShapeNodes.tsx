@@ -4,6 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
 import { useLayoutHandles } from './layoutDirection';
 import { FLOW_COLORS, TITLE_FONT, MONO_FONT } from './flowShapeStyle';
+import { RoleChip } from './RoleChip';
 
 /**
  * Standard flowchart shapes beyond process/decision/start/end.
@@ -50,6 +51,7 @@ function LabelLayer({ data }: { data: FlowNodeData }) {
     >
       <div className="font-semibold text-[13px] leading-tight" style={{ fontFamily: TITLE_FONT }}>{data.label}</div>
       {data.system && <div className="text-[10px] mt-0.5" style={{ color: '#64748b', fontFamily: MONO_FONT }}>{data.system}</div>}
+      <RoleChip role={data.role} />
     </div>
   );
 }

@@ -42,6 +42,8 @@ export interface FlowNodeData {
   lane?: string;
   color?: string; // accent override for the shape
   reversed?: boolean; // flip target/source handles — set by double-click or `reverse: true`
+  /** DT-AI-03: display-only role chip (human | model | tool | check); unknown values never reach here. */
+  role?: 'human' | 'model' | 'tool' | 'check';
 }
 
 export interface CloudNodeData {
