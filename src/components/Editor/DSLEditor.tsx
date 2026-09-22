@@ -3,6 +3,9 @@ import Editor from '@monaco-editor/react';
 import { useDiagramStore } from '../../store/diagramStore';
 import { installDiagramDslTestHook } from '../../utils/devTestHook';
 import { applyBoardSource, toDslSource, toMermaidSource } from '../../utils/sourceText';
+import { plainStepsToDSL } from '../../parser/plainSteps';
+import { useToast } from '../../utils/useToast';
+import { ToastContainer } from '../Toast/ToastContainer';
 import type { BoardMode } from '../../utils/boardManager';
 
 function asBoardMode(mode: string): BoardMode {
@@ -12,6 +15,15 @@ function asBoardMode(mode: string): BoardMode {
 export function DSLEditor() {
   const { dslText, setDslText, setParsedDiagram, setError, setLoading, diagramMode, error } = useDiagramStore();
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  // DT-AI-01: thin "Type steps" box for plain sentences (Flow boards only).
+  const [showSteps, setShowSteps] = useState(false);
+  const [stepsText, setStepsText] = useState('');
+  const toast = useToast();
+
+  const STEPS_PLACEHOLDER = `Check email
+Send reply
+If error then Retry
+else Flag for review`;
 
   const applySource = useCallback((value: string) => {
     setDslText(value);
@@ -34,6 +46,26 @@ export function DSLEditor() {
     if (value === useDiagramStore.getState().dslText) return;
     applySource(value);
   }, [applySource]);
+
+  // DT-AI-01: convert typed sentences into existing flow DSL, then re-parse via
+  // the same applySource path as manual typing. Bad/empty input → one teachable
+  // toast; the board is untouched because dslText is never updated.
+  const buildFromSteps = useCallback(() => {
+    const input = stepsText.trim();
+    if (!input) {
+      toast.error('Type one step per line first. Example: "Check email", "then Send reply", "If error then Retry".');
+      return;
+    }
+    try {
+      const dsl = plainStepsToDSL(input, {
+        title: useDiagramStore.getState().dslText.match(/^\s*title\s*:\s*(.+)\s*$/im)?.[1]?.trim(),
+      });
+      setShowSteps(false);
+      applySource(dsl);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not read those steps. Type one step per line.');
+    }
+  }, [stepsText, toast, applySource]);
 
   useEffect(() => {
     applySource(dslText);
@@ -64,6 +96,18 @@ export function DSLEditor() {
       <div className="editor-header">
         <div className="editor-title">Editor</div>
         <div className="editor-subtitle">Describe your diagram in plain text</div>
+        {diagramMode === 'flow' && (
+          <div className="mt-2">
+            <button
+              type="button"
+              data-testid="toggle-type-steps"
+              onClick={() => setShowSteps(v => !v)}
+              className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400"
+            >
+              {showSteps ? 'Hide Type steps' : 'Type steps'}
+            </button>
+          </div>
+        )}
         {showCopy && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
@@ -86,6 +130,36 @@ export function DSLEditor() {
           </div>
         )}
       </div>
+
+      {diagramMode === 'flow' && showSteps && (
+        <div
+          data-testid="type-steps-box"
+          className="mx-3 mb-2 rounded-md border border-indigo-100 bg-indigo-50/60 p-3"
+        >
+          <label className="mb-1 block text-[11px] font-semibold text-indigo-700">
+            Type steps — one step per line. Optional words: then, if, else.
+          </label>
+          <textarea
+            data-testid="type-steps-input"
+            value={stepsText}
+            onChange={e => setStepsText(e.target.value)}
+            placeholder={STEPS_PLACEHOLDER}
+            rows={4}
+            className="w-full rounded border border-indigo-200 bg-white p-2 font-mono text-xs text-slate-800 focus:border-indigo-400 focus:outline-none"
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="build-steps"
+              onClick={buildFromSteps}
+              className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+            >
+              Build board
+            </button>
+            <span className="text-[11px] text-slate-500">Parsed locally — nothing leaves this device.</span>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div
@@ -121,6 +195,7 @@ export function DSLEditor() {
           />
         </div>
       </div>
+      <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
     </div>
   );
 }
