@@ -1019,23 +1019,28 @@ Check ->|ok| Reply
 
 node Ask {
   label: Human ask
+  role: human
 }
 
 node Model {
   label: Model
+  role: model
 }
 
 node Tool {
   label: Tool
+  role: tool
 }
 
 node Check {
   type: decision
   label: Check
+  role: check
 }
 
 node Reply {
   label: Reply
+  role: human
 }`,
   },
   {

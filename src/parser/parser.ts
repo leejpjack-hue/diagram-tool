@@ -1,6 +1,6 @@
 import { Lexer, TokenType } from './lexer';
 import type { Token } from './lexer';
-import type { DiagramNode, Edge, Group, Lane, ParsedDiagram, DiagramMode, FlowNode, CloudProvider, C4Level, ClassNode, AnnotationNode, LayoutDirection, EdgeStyle, ConnectionSide } from '../store/types';
+import type { DiagramNode, Edge, Group, Lane, ParsedDiagram, DiagramMode, FlowNode, CloudProvider, C4Level, ClassNode, AnnotationNode, LayoutDirection, EdgeStyle, ConnectionSide, FlowNodeRole } from '../store/types';
 import { isMermaidFlow, mermaidFlowToDSL } from './mermaidFlow';
 
 export class Parser {
@@ -1361,6 +1361,18 @@ export class Parser {
             const x = Number(valueParts[0]);
             const y = Number(valueParts[1]);
             if (!Number.isNaN(x) && !Number.isNaN(y)) this.pins[id] = { x, y };
+            break;
+          }
+          case 'role': {
+            // DT-AI-03: display-only role chip. Only the four documented roles
+            // are accepted; anything else is silently ignored (no crash, no
+            // chip) so a typo can't break rendering — same fallback philosophy
+            // as `direction:` and `edges:`.
+            const raw = firstValue.toLowerCase().trim();
+            const known: FlowNodeRole[] = ['human', 'model', 'tool', 'check'];
+            if (known.includes(raw as FlowNodeRole)) {
+              nodeData.properties!.role = raw as FlowNodeRole;
+            }
             break;
           }
         }

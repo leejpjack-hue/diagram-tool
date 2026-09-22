@@ -31,6 +31,19 @@ describe('AI workflow template (DT-AI-02)', () => {
     expect(ok?.label).toBe('ok');
   });
 
+  it('tags nodes with DT-AI-03 role chips (human → model → tool → check)', () => {
+    const result = parseDiagram(template!.dsl);
+    const roleOf = (id: string): string | undefined => {
+      const node = result.nodes.find(n => n.id === id);
+      return node?.type === 'flow' ? node.properties.role : undefined;
+    };
+    expect(roleOf('ask')).toBe('human');
+    expect(roleOf('model')).toBe('model');
+    expect(roleOf('tool')).toBe('tool');
+    expect(roleOf('check')).toBe('check');
+    expect(roleOf('reply')).toBe('human');
+  });
+
   it('is searchable like other templates', () => {
     expect(templateMatchesQuery(template!, 'ai workflow')).toBe(true);
     expect(templateMatchesQuery(template!, '工作流')).toBe(true);

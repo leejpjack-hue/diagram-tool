@@ -4,6 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
 import { FLOW_COLORS, paletteFromColor, TITLE_FONT } from './flowShapeStyle';
 import { useLayoutHandles } from './layoutDirection';
+import { RoleChip } from './RoleChip';
 
 // Decision diamond — a rotated square. Four connection points so a branch can
 // always exit to the right place, but the primary target/source follow the
@@ -64,6 +65,9 @@ export const DecisionNode = memo(({ data, selected }: NodeProps) => {
             : '0 1px 2px rgba(17,24,39,0.05), 0 10px 20px -14px rgba(17,24,39,0.3)',
         }}
       />
+
+      {/* Role chip (DT-AI-03) — top-right corner; handles sit on centre lines/points. */}
+      <RoleChip role={nodeData.role} />
 
       {/* Label sits on the unrotated node box so decision text stays horizontal.
           The diamond itself is a sibling (`rotate-45`); counter-rotating this

@@ -45,6 +45,8 @@ const KEYWORDS = [
   'edge', 'label',
   // Reverse a flow node's input/output direction (handle flip)
   'reverse', 'reversed',
+  // DT-AI-03 — display-only flow node role chip
+  'role',
 ];
 
 export class Lexer {

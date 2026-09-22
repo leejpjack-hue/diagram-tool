@@ -46,6 +46,14 @@ export interface QueueNode {
   };
 }
 
+/**
+ * DT-AI-03: display-only role tag for AI-workflow flow nodes. Declared via
+ * `role: human | model | tool | check` in the DSL. Purely decorative — the
+ * role chip never executes tools or calls models. Unknown values are ignored
+ * at parse time (no crash, no chip).
+ */
+export type FlowNodeRole = 'human' | 'model' | 'tool' | 'check';
+
 export type FlowNodeKind =
   | 'process'
   | 'decision'
@@ -86,6 +94,11 @@ export interface FlowNode {
      * via `reverse: true` in the DSL or by double-clicking the node.
      */
     reversed?: boolean;
+    /**
+     * DT-AI-03: display-only role tag (human | model | tool | check), shown
+     * as a static chip on the node. Unknown values are ignored at parse time.
+     */
+    role?: FlowNodeRole;
   };
   isStart?: boolean;
   isEnd?: boolean;
