@@ -4,6 +4,8 @@ import { useDiagramStore } from '../../store/diagramStore';
 import { installDiagramDslTestHook } from '../../utils/devTestHook';
 import { applyBoardSource, toDslSource, toMermaidSource } from '../../utils/sourceText';
 import { plainStepsToDSL } from '../../parser/plainSteps';
+import { flowToPlainSteps } from '../../parser/flowToPlainSteps';
+import { parseDiagram } from '../../parser/parser';
 import { useToast } from '../../utils/useToast';
 import { ToastContainer } from '../Toast/ToastContainer';
 import type { BoardMode } from '../../utils/boardManager';
@@ -78,7 +80,23 @@ else Flag for review`;
 
   const showCopy = diagramMode === 'flow' || diagramMode === 'sequence';
 
-  const copy = async (kind: 'mermaid' | 'dsl') => {
+  const copy = async (kind: 'mermaid' | 'dsl' | 'steps') => {
+    if (kind === 'steps') {
+      // DT-AI-05: local serialize from the live parsed board (or re-parse dslText).
+      try {
+        // Prefer re-parse of current editor text (handles Mermaid→DSL via toDslSource).
+        const source = toDslSource(dslText, 'flow');
+        const parsed = parseDiagram(source);
+        const payload = flowToPlainSteps(parsed);
+        await navigator.clipboard.writeText(payload);
+        setCopyStatus('Copied steps');
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not copy steps from this board.');
+        // clipboard unchanged on failure
+      }
+      window.setTimeout(() => setCopyStatus(null), 1600);
+      return;
+    }
     const payload = kind === 'mermaid'
       ? toMermaidSource(dslText, asBoardMode(diagramMode))
       : toDslSource(dslText, asBoardMode(diagramMode));
@@ -126,6 +144,16 @@ else Flag for review`;
             >
               Copy as DSL
             </button>
+            {diagramMode === 'flow' && (
+              <button
+                type="button"
+                data-testid="copy-as-steps"
+                onClick={() => void copy('steps')}
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:border-indigo-300 hover:text-indigo-700"
+              >
+                Copy as steps
+              </button>
+            )}
             {copyStatus && <span className="text-[11px] font-medium text-slate-500">{copyStatus}</span>}
           </div>
         )}
