@@ -14,6 +14,12 @@
 //   If invalid
 //   else Manual review                       (else on its own line)
 //
+// DT-AI-04 — optional role-word prefixes on a step (local only, no LLM):
+//   Human: ask the question
+//   Model draft reply          (bare token + space)
+//   TOOL: search docs          (case-insensitive; optional space after colon)
+// Unknown prefixes (e.g. Alien: …) stay part of the label.
+//
 // `then` links steps in order; `if <text>` makes `<text>` a decision node whose
 // following branch is labelled Yes; `else ...` reuses that decision for a No
 // branch. Anything else is a plain step, exactly like today.
@@ -44,7 +50,28 @@ function quote(s: string): string {
   return `"${s.replace(/"/g, "'")}"`;
 }
 
-interface EmittedNode { id: string; label: string; decision: boolean; }
+/** DT-AI-04: display roles that round-trip with DT-AI-03 `role:` chips. */
+export type PlainStepRole = 'human' | 'model' | 'tool' | 'check';
+
+const ROLE_PREFIX =
+  /^(human|model|tool|check)(?:\s*:\s*|\s+)(.+)$/i;
+
+/**
+ * Strip an optional leading role word from a step label.
+ * Colon form: `Human:` / `Model:` / … (optional space after colon).
+ * Bare form: `Human ` / `Model ` / … followed by the rest of the step.
+ * Unknown prefixes are left intact.
+ */
+export function stripRolePrefix(raw: string): { role?: PlainStepRole; label: string } {
+  const m = ROLE_PREFIX.exec(raw);
+  if (!m) return { label: raw };
+  const role = m[1].toLowerCase() as PlainStepRole;
+  const label = m[2].trim();
+  if (!label) return { label: raw }; // bare "Human:" with nothing after → keep as label
+  return { role, label };
+}
+
+interface EmittedNode { id: string; label: string; decision: boolean; role?: PlainStepRole; }
 
 interface State {
   nodes: EmittedNode[];
@@ -64,12 +91,12 @@ function stepId(label: string, state: State): string {
   return n === 1 ? base : `${base}_${n}`;
 }
 
-function useNode(label: string, state: State, decision: boolean): string {
+function useNode(label: string, state: State, decision: boolean, role?: PlainStepRole): string {
   const existing = state.idFor.get(label);
   if (existing) return existing;
   const id = stepId(label, state);
   state.idFor.set(label, id);
-  state.nodes.push({ id, label, decision });
+  state.nodes.push({ id, label, decision, role });
   return id;
 }
 
@@ -94,29 +121,31 @@ export function plainStepsToDSL(text: string, opts: { title?: string } = {}): st
         // `then` needs no state: the next step simply chains from `last`.
         continue;
       }
-      const label = (seg.text ?? '').replace(/\|/g, '/').trim();
+      const rawLabel = (seg.text ?? '').replace(/\|/g, '/').trim();
+      if (!rawLabel) continue;
+      const { role, label } = stripRolePrefix(rawLabel);
       if (!label) continue;
 
       let id: string;
       let labelledBranch = false;
       if (state.inIf) {
         // The text after `if` IS the condition → decision node.
-        id = useNode(label, state, true);
+        id = useNode(label, state, true, role);
         state.lastDecision = id;
         state.inIf = false;
         state.expectBranch = 'yes';
       } else if (state.expectBranch === 'yes') {
-        id = useNode(label, state, false);
+        id = useNode(label, state, false, role);
         state.edges.push({ from: state.lastDecision!, to: id, label: 'Yes' });
         state.expectBranch = null;
         labelledBranch = true;
       } else if (state.expectBranch === 'no') {
-        id = useNode(label, state, false);
+        id = useNode(label, state, false, role);
         state.edges.push({ from: state.lastDecision!, to: id, label: 'No' });
         state.expectBranch = null;
         labelledBranch = true;
       } else {
-        id = useNode(label, state, false);
+        id = useNode(label, state, false, role);
       }
 
       if (state.last && state.last !== id && !labelledBranch) {
@@ -152,6 +181,7 @@ export function plainStepsToDSL(text: string, opts: { title?: string } = {}): st
   for (const n of state.nodes) {
     const body = [`label: ${quote(n.label)}`];
     if (n.decision) body.push('type: decision');
+    if (n.role) body.push(`role: ${n.role}`);
     out.push(`node ${n.id} {`, ...body.map(l => `  ${l}`), '}', '');
   }
 
