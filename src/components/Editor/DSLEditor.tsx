@@ -22,8 +22,8 @@ export function DSLEditor() {
   const [stepsText, setStepsText] = useState('');
   const toast = useToast();
 
-  const STEPS_PLACEHOLDER = `Check email
-Send reply
+  const STEPS_PLACEHOLDER = `Model: draft reply
+then Send reply
 If error then Retry
 else Flag for review`;
 
@@ -55,7 +55,7 @@ else Flag for review`;
   const buildFromSteps = useCallback(() => {
     const input = stepsText.trim();
     if (!input) {
-      toast.error('Type one step per line first. Example: "Check email", "then Send reply", "If error then Retry".');
+      toast.error('Type one step per line first. Example: "Model: draft reply", "then Send reply", "If error then Retry".');
       return;
     }
     try {
@@ -165,7 +165,7 @@ else Flag for review`;
           className="mx-3 mb-2 rounded-md border border-indigo-100 bg-indigo-50/60 p-3"
         >
           <label className="mb-1 block text-[11px] font-semibold text-indigo-700">
-            Type steps — one step per line. Optional words: then, if, else.
+            Type steps — one step per line. Optional words: then, if, else, Human:, Model:, Tool:, Check:
           </label>
           <textarea
             data-testid="type-steps-input"
