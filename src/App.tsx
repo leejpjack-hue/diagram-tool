@@ -22,6 +22,7 @@ import { ToastContainer } from './components/Toast/ToastContainer';
 import { useDiagramStore } from './store/diagramStore';
 import { useGanttStore } from './components/Gantt/ganttStore';
 import { generateGanttDSL } from './components/Gantt/ganttGenerator';
+import { seedTypeStepsForTemplate } from './parser/boardToPlainSteps';
 import { applyBoardSource, extractBoardTitle } from './utils/sourceText';
 import { exportGanttChart } from './components/Gantt/exportUtils';
 import type { DelayImpactResult } from './components/Gantt/delayImpactUtils';
@@ -388,6 +389,7 @@ function App() {
     clipboard,
     setClipboard,
     setError,
+    queueTypeStepsSeed,
   } = useDiagramStore();
   
   const { addTask, updateTask, setProject, tasks, dependencies } = useGanttStore();
@@ -942,6 +944,20 @@ function App() {
       if (currentBoardId) {
         void boardManager.setPresentation(currentBoardId, tpl.presentation);
       }
+    }
+    // DT-AI-09: picking the AI workflow template also seeds Type steps with the
+    // same serializer Load steps uses. Other templates are untouched; an empty
+    // or unsuitable template board shows a teachable toast and leaves any
+    // existing Type steps text alone.
+    try {
+      const seedPayload = seedTypeStepsForTemplate(tpl.id, tpl.dsl);
+      if (seedPayload) queueTypeStepsSeed(seedPayload);
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'This template has no steps to pre-fill Type steps yet.',
+      );
     }
     toast.success(`Loaded template: ${tpl.name}`);
   };

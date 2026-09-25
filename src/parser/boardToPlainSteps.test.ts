@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { plainStepsFromBoardSource, applyLoadedPlainSteps } from './boardToPlainSteps';
+import { plainStepsFromBoardSource, applyLoadedPlainSteps, seedTypeStepsForTemplate } from './boardToPlainSteps';
+import { TEMPLATES } from '../components/TemplatePicker/templates';
 import { flowToPlainSteps } from './flowToPlainSteps';
 import { parseDiagram } from './parser';
 
@@ -39,5 +40,21 @@ node Model {
 title: "Empty"
 `;
     expect(() => plainStepsFromBoardSource(empty)).toThrow(/No steps on this board/);
+  });
+});
+
+describe('seedTypeStepsForTemplate (DT-AI-09 template seeds Type steps)', () => {
+  it('for flow-ai-workflow returns the same serializer output as Load steps', () => {
+    const tpl = TEMPLATES.find(entry => entry.id === 'flow-ai-workflow');
+    expect(tpl).toBeDefined();
+    const seeded = seedTypeStepsForTemplate(tpl!.id, tpl!.dsl);
+    expect(seeded).not.toBeNull();
+    expect(seeded).toBe(plainStepsFromBoardSource(tpl!.dsl));
+  });
+
+  it('other template ids return null (no mass auto-seed)', () => {
+    for (const tpl of TEMPLATES.filter(entry => entry.id !== 'flow-ai-workflow')) {
+      expect(seedTypeStepsForTemplate(tpl.id, tpl.dsl)).toBeNull();
+    }
   });
 });
