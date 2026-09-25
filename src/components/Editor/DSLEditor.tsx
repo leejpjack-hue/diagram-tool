@@ -23,6 +23,23 @@ export function DSLEditor() {
   const toast = useToast();
   // DT-AI-08: textarea ref so role-prefix buttons can read the caret/selection.
   const stepsInputRef = useRef<HTMLTextAreaElement | null>(null);
+  // DT-AI-09: one-shot seed from picking the AI workflow template.
+  const typeStepsSeed = useDiagramStore(s => s.typeStepsSeed);
+  const clearTypeStepsSeed = useDiagramStore(s => s.clearTypeStepsSeed);
+
+  // Apply a template seed like Load steps: writes the payload via
+  // applyLoadedPlainSteps (opens the panel) and clears the one-shot signal.
+  // Failure never wipes the existing stepsText — the seed payload is only
+  // queued after a successful serialize, so nothing to catch here.
+  useEffect(() => {
+    if (!typeStepsSeed) return;
+    const next = applyLoadedPlainSteps(stepsText, typeStepsSeed.payload);
+    setStepsText(next.stepsText);
+    setShowSteps(next.showSteps);
+    clearTypeStepsSeed();
+    // stepsText intentionally omitted: applyLoadedPlainSteps overwrites it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typeStepsSeed, clearTypeStepsSeed]);
 
   const STEPS_PLACEHOLDER = `Model: draft reply
 then Send reply

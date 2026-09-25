@@ -34,6 +34,11 @@ interface DiagramStore {
   setLoading: (loading: boolean) => void;
   setZoomLevel: (zoom: number) => void;
   
+  // DT-AI-09: one-shot seed payload for the Type steps panel (template pick).
+  typeStepsSeed: { payload: string; nonce: number } | null;
+  queueTypeStepsSeed: (payload: string) => void;
+  clearTypeStepsSeed: () => void;
+
   // Clipboard actions
   setClipboard: (nodes: ClipboardNode[]) => void;
   clearClipboard: () => void;
@@ -186,6 +191,7 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   error: null,
   zoomLevel: 100,
   clipboard: [],
+  typeStepsSeed: null,
   history: [],
   historyIndex: -1,
 
@@ -228,6 +234,11 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   // Clipboard actions
   setClipboard: (nodes) => set({ clipboard: nodes }),
   clearClipboard: () => set({ clipboard: [] }),
+
+  // DT-AI-09: bump nonce so repeat seeds always retrigger the DSLEditor effect.
+  queueTypeStepsSeed: (payload) =>
+    set(state => ({ typeStepsSeed: { payload, nonce: (state.typeStepsSeed?.nonce ?? 0) + 1 } })),
+  clearTypeStepsSeed: () => set({ typeStepsSeed: null }),
   
   // Undo/Redo implementation
   undo: () => {
