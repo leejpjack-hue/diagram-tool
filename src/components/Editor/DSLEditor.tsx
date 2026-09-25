@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { useDiagramStore } from '../../store/diagramStore';
 import { installDiagramDslTestHook } from '../../utils/devTestHook';
 import { applyBoardSource, toDslSource, toMermaidSource } from '../../utils/sourceText';
 import { plainStepsToDSL } from '../../parser/plainSteps';
 import { plainStepsFromBoardSource, applyLoadedPlainSteps } from '../../parser/boardToPlainSteps';
+import { insertRolePrefix, type RolePrefixRole } from '../../parser/insertRolePrefix';
 import { useToast } from '../../utils/useToast';
 import { ToastContainer } from '../Toast/ToastContainer';
 import type { BoardMode } from '../../utils/boardManager';
@@ -20,6 +21,8 @@ export function DSLEditor() {
   const [showSteps, setShowSteps] = useState(false);
   const [stepsText, setStepsText] = useState('');
   const toast = useToast();
+  // DT-AI-08: textarea ref so role-prefix buttons can read the caret/selection.
+  const stepsInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const STEPS_PLACEHOLDER = `Model: draft reply
 then Send reply
@@ -81,6 +84,20 @@ else Flag for review`;
       // textarea unchanged on failure
     }
   }, [dslText, stepsText, toast]);
+
+  // DT-AI-08: tab-reachable role-prefix buttons (no global shortcuts).
+  // Decides where the prefix goes via the pure helper; restores the
+  // caret/selection once React commits the new value.
+  const insertRole = useCallback((role: RolePrefixRole) => {
+    const input = stepsInputRef.current;
+    if (!input) return;
+    const next = insertRolePrefix(stepsText, input.selectionStart, input.selectionEnd, role);
+    setStepsText(next.text);
+    requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(next.selectionStart, next.selectionEnd);
+    });
+  }, [stepsText]);
 
   useEffect(() => {
     applySource(dslText);
@@ -188,6 +205,7 @@ else Flag for review`;
             Type steps — one step per line. Optional words: then, if, else, Human:, Model:, Tool:, Check:
           </label>
           <textarea
+            ref={stepsInputRef}
             data-testid="type-steps-input"
             value={stepsText}
             onChange={e => setStepsText(e.target.value)}
@@ -195,6 +213,21 @@ else Flag for review`;
             rows={4}
             className="w-full rounded border border-indigo-200 bg-white p-2 font-mono text-xs text-slate-800 focus:border-indigo-400 focus:outline-none"
           />
+          {/* DT-AI-08: role prefix inserts (#37) — plain buttons, tab-reachable, no shortcuts. */}
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            <span className="text-[11px] font-medium text-slate-500">Add role:</span>
+            {(['Human', 'Model', 'Tool', 'Check'] as const).map(role => (
+              <button
+                key={role}
+                type="button"
+                data-testid={`role-prefix-${role.toLowerCase()}`}
+                onClick={() => insertRole(role)}
+                className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:border-indigo-400 hover:text-indigo-700"
+              >
+                {role}:
+              </button>
+            ))}
+          </div>
           <div className="mt-2 flex items-center gap-2">
             <button
               type="button"
