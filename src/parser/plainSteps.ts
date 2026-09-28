@@ -20,6 +20,11 @@
 //   TOOL: search docs          (case-insensitive; optional space after colon)
 // Unknown prefixes (e.g. Alien: …) stay part of the label.
 //
+// DT-AI-10 — optional leading list markers are stripped before role words:
+//   1. Model: draft reply
+//   - Human: ask
+//   * Tool: search
+//
 // `then` links steps in order; `if <text>` makes `<text>` a decision node whose
 // following branch is labelled Yes; `else ...` reuses that decision for a No
 // branch. Anything else is a plain step, exactly like today.
@@ -55,6 +60,16 @@ export type PlainStepRole = 'human' | 'model' | 'tool' | 'check';
 
 const ROLE_PREFIX =
   /^(human|model|tool|check)(?:\s*:\s*|\s+)(.+)$/i;
+
+/**
+ * DT-AI-10: drop one leading list marker so pasted outlines keep role words.
+ * After leading whitespace is already trimmed: `N.` / `N)` (1+ digits) or
+ * `-` / `*` / `•`, then optional whitespace. Mid-line markers stay in the label.
+ * Does not handle nested lists or checkbox `- [ ]`.
+ */
+export function stripListMarker(line: string): string {
+  return line.replace(/^(\d+[.)]|[-*•])\s*/, '');
+}
 
 /**
  * Strip an optional leading role word from a step label.
@@ -114,7 +129,8 @@ export function plainStepsToDSL(text: string, opts: { title?: string } = {}): st
   };
 
   for (const line of lines) {
-    for (const seg of splitSegments(line)) {
+    const unmarked = stripListMarker(line);
+    for (const seg of splitSegments(unmarked)) {
       if (seg.kind === 'op') {
         if (seg.op === 'if') state.inIf = true;
         else if (seg.op === 'else' && state.lastDecision) state.expectBranch = 'no';
