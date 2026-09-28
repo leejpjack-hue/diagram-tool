@@ -6,6 +6,7 @@ import { applyBoardSource, toDslSource, toMermaidSource } from '../../utils/sour
 import { plainStepsToDSL } from '../../parser/plainSteps';
 import { plainStepsFromBoardSource, applyLoadedPlainSteps } from '../../parser/boardToPlainSteps';
 import { insertRolePrefix, type RolePrefixRole } from '../../parser/insertRolePrefix';
+import { nextShowStepsAfterBuild } from './buildFromStepsPanel';
 import { useToast } from '../../utils/useToast';
 import { ToastContainer } from '../Toast/ToastContainer';
 import type { BoardMode } from '../../utils/boardManager';
@@ -71,6 +72,8 @@ else Flag for review`;
   // DT-AI-01: convert typed sentences into existing flow DSL, then re-parse via
   // the same applySource path as manual typing. Bad/empty input → one teachable
   // toast; the board is untouched because dslText is never updated.
+  // DT-AI-11: successful Build keeps Type steps open (textarea unchanged) for
+  // iterate-create; empty/error leave panel visibility as today.
   const buildFromSteps = useCallback(() => {
     const input = stepsText.trim();
     if (!input) {
@@ -81,7 +84,7 @@ else Flag for review`;
       const dsl = plainStepsToDSL(input, {
         title: useDiagramStore.getState().dslText.match(/^\s*title\s*:\s*(.+)\s*$/im)?.[1]?.trim(),
       });
-      setShowSteps(false);
+      setShowSteps(prev => nextShowStepsAfterBuild(prev, 'success'));
       applySource(dsl);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not read those steps. Type one step per line.');
