@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { plainStepsToDSL } from './plainSteps';
+import { plainStepsToDSL, stripListMarker } from './plainSteps';
 import { parseDiagram } from './parser';
 
 describe('plainStepsToDSL (converter output shape)', () => {
@@ -163,5 +163,70 @@ describe('plainStepsToDSL (DT-AI-04 role words)', () => {
     expect((decision as { properties: { nodeType?: string } }).properties.nodeType).toBe('decision');
     expect(roleOf(parsed, 'draft_proposal')).toBe('model');
     expect(parsed.edges.find(e => e.label === 'Yes')?.to).toBe('draft_proposal');
+  });
+});
+
+describe('stripListMarker / plainStepsToDSL (DT-AI-10 list markers)', () => {
+  function roleOf(parsed: ReturnType<typeof parseDiagram>, id: string) {
+    const n = parsed.nodes.find(x => x.id === id);
+    return n && n.type === 'flow' ? n.properties.role : undefined;
+  }
+
+  function labelOf(parsed: ReturnType<typeof parseDiagram>, id: string) {
+    const n = parsed.nodes.find(x => x.id === id);
+    return n && n.type === 'flow' ? n.properties.label : undefined;
+  }
+
+  it('strips numbered markers so role words still parse', () => {
+    expect(stripListMarker('1. Model: draft reply')).toBe('Model: draft reply');
+    const parsed = parseDiagram(plainStepsToDSL('1. Model: draft reply'));
+    expect(roleOf(parsed, 'draft_reply')).toBe('model');
+    expect(labelOf(parsed, 'draft_reply')).toBe('draft reply');
+  });
+
+  it('strips parenthetical numbered markers', () => {
+    expect(stripListMarker('2) Check: review')).toBe('Check: review');
+    const parsed = parseDiagram(plainStepsToDSL('2) Check: review'));
+    expect(roleOf(parsed, 'review')).toBe('check');
+    expect(labelOf(parsed, 'review')).toBe('review');
+  });
+
+  it('strips dash markers so Human: roles parse', () => {
+    expect(stripListMarker('- Human: ask')).toBe('Human: ask');
+    const parsed = parseDiagram(plainStepsToDSL('- Human: ask'));
+    expect(roleOf(parsed, 'ask')).toBe('human');
+    expect(labelOf(parsed, 'ask')).toBe('ask');
+  });
+
+  it('strips star markers so Tool: roles parse', () => {
+    expect(stripListMarker('* Tool: search')).toBe('Tool: search');
+    const parsed = parseDiagram(plainStepsToDSL('* Tool: search'));
+    expect(roleOf(parsed, 'search')).toBe('tool');
+    expect(labelOf(parsed, 'search')).toBe('search');
+  });
+
+  it('strips bullet markers', () => {
+    expect(stripListMarker('• Model: draft')).toBe('Model: draft');
+    const parsed = parseDiagram(plainStepsToDSL('• Model: draft'));
+    expect(roleOf(parsed, 'draft')).toBe('model');
+    expect(labelOf(parsed, 'draft')).toBe('draft');
+  });
+
+  it('leaves lines without a leading marker unchanged (DT-AI-01/04 regression)', () => {
+    expect(stripListMarker('Model: draft reply')).toBe('Model: draft reply');
+    expect(stripListMarker('Verify email')).toBe('Verify email');
+    const parsed = parseDiagram(plainStepsToDSL('Model: draft reply\nVerify email'));
+    expect(roleOf(parsed, 'draft_reply')).toBe('model');
+    expect(labelOf(parsed, 'draft_reply')).toBe('draft reply');
+    expect(roleOf(parsed, 'verify_email')).toBeUndefined();
+    expect(labelOf(parsed, 'verify_email')).toBe('Verify email');
+  });
+
+  it('does not strip mid-line digits or dashes from the label', () => {
+    expect(stripListMarker('Step 1. done')).toBe('Step 1. done');
+    expect(stripListMarker('A - B')).toBe('A - B');
+    const parsed = parseDiagram(plainStepsToDSL('Human: score 1.5 - final'));
+    expect(roleOf(parsed, 'score_1_5_final')).toBe('human');
+    expect(labelOf(parsed, 'score_1_5_final')).toBe('score 1.5 - final');
   });
 });
