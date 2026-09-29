@@ -25,6 +25,11 @@
 //   - Human: ask
 //   * Tool: search
 //
+// DT-AI-12 — chat role aliases normalize to the same PlainStepRole values:
+//   User → human, Assistant|AI → model, System → check
+//   Same forms: Alias: / Alias: rest / Alias rest (case-insensitive).
+//   e.g. 1. User: ask → role human, label ask
+//
 // `then` links steps in order; `if <text>` makes `<text>` a decision node whose
 // following branch is labelled Yes; `else ...` reuses that decision for a No
 // branch. Anything else is a plain step, exactly like today.
@@ -58,8 +63,21 @@ function quote(s: string): string {
 /** DT-AI-04: display roles that round-trip with DT-AI-03 `role:` chips. */
 export type PlainStepRole = 'human' | 'model' | 'tool' | 'check';
 
+/** Canonical roles plus DT-AI-12 chat aliases (longest tokens first). */
 const ROLE_PREFIX =
-  /^(human|model|tool|check)(?:\s*:\s*|\s+)(.+)$/i;
+  /^(assistant|human|model|tool|check|system|user|ai)(?:\s*:\s*|\s+)(.+)$/i;
+
+/** Map a matched role token (lowercased) to PlainStepRole. */
+const ROLE_ALIAS: Record<string, PlainStepRole> = {
+  human: 'human',
+  user: 'human',
+  model: 'model',
+  assistant: 'model',
+  ai: 'model',
+  tool: 'tool',
+  check: 'check',
+  system: 'check',
+};
 
 /**
  * DT-AI-10: drop one leading list marker so pasted outlines keep role words.
@@ -73,14 +91,16 @@ export function stripListMarker(line: string): string {
 
 /**
  * Strip an optional leading role word from a step label.
- * Colon form: `Human:` / `Model:` / … (optional space after colon).
- * Bare form: `Human ` / `Model ` / … followed by the rest of the step.
- * Unknown prefixes are left intact.
+ * Colon form: `Human:` / `User:` / `Model:` / … (optional space after colon).
+ * Bare form: `Human ` / `AI ` / … followed by the rest of the step.
+ * DT-AI-12 aliases: User→human, Assistant|AI→model, System→check.
+ * Unknown prefixes are left intact. Tool: stays tool.
  */
 export function stripRolePrefix(raw: string): { role?: PlainStepRole; label: string } {
   const m = ROLE_PREFIX.exec(raw);
   if (!m) return { label: raw };
-  const role = m[1].toLowerCase() as PlainStepRole;
+  const role = ROLE_ALIAS[m[1].toLowerCase()];
+  if (!role) return { label: raw };
   const label = m[2].trim();
   if (!label) return { label: raw }; // bare "Human:" with nothing after → keep as label
   return { role, label };
