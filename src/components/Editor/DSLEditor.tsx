@@ -222,7 +222,7 @@ else Flag for review`;
           className="mx-3 mb-2 rounded-md border border-indigo-100 bg-indigo-50/60 p-3"
         >
           <label className="mb-1 block text-[11px] font-semibold text-indigo-700">
-            Type steps — one step per line. Optional words: then, if, else, Human:, Model:, Tool:, Check:
+            Type steps — one step per line. Optional words: then, if, else, Human:/User:, Model:/Assistant:/AI:, Tool:, Check:/System:
           </label>
           <textarea
             ref={stepsInputRef}

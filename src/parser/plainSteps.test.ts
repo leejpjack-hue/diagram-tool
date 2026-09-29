@@ -230,3 +230,71 @@ describe('stripListMarker / plainStepsToDSL (DT-AI-10 list markers)', () => {
     expect(labelOf(parsed, 'score_1_5_final')).toBe('score 1.5 - final');
   });
 });
+
+describe('plainStepsToDSL (DT-AI-12 chat role aliases)', () => {
+  function roleOf(parsed: ReturnType<typeof parseDiagram>, id: string) {
+    const n = parsed.nodes.find(x => x.id === id);
+    return n && n.type === 'flow' ? n.properties.role : undefined;
+  }
+
+  function labelOf(parsed: ReturnType<typeof parseDiagram>, id: string) {
+    const n = parsed.nodes.find(x => x.id === id);
+    return n && n.type === 'flow' ? n.properties.label : undefined;
+  }
+
+  it('maps User/Assistant/AI/System aliases to human/model/model/check', () => {
+    const parsed = parseDiagram(
+      plainStepsToDSL('User: ask\nAssistant: draft\nAI: summarize\nSystem: review')
+    );
+    expect(roleOf(parsed, 'ask')).toBe('human');
+    expect(labelOf(parsed, 'ask')).toBe('ask');
+    expect(roleOf(parsed, 'draft')).toBe('model');
+    expect(labelOf(parsed, 'draft')).toBe('draft');
+    expect(roleOf(parsed, 'summarize')).toBe('model');
+    expect(labelOf(parsed, 'summarize')).toBe('summarize');
+    expect(roleOf(parsed, 'review')).toBe('check');
+    expect(labelOf(parsed, 'review')).toBe('review');
+  });
+
+  it('accepts bare alias tokens and optional space after colon (case-insensitive)', () => {
+    const a = parseDiagram(plainStepsToDSL('USER ask me'));
+    const b = parseDiagram(plainStepsToDSL('assistant:  draft reply'));
+    const c = parseDiagram(plainStepsToDSL('Ai: outline'));
+    const d = parseDiagram(plainStepsToDSL('SYSTEM check policy'));
+    expect(roleOf(a, 'ask_me')).toBe('human');
+    expect(labelOf(a, 'ask_me')).toBe('ask me');
+    expect(roleOf(b, 'draft_reply')).toBe('model');
+    expect(labelOf(b, 'draft_reply')).toBe('draft reply');
+    expect(roleOf(c, 'outline')).toBe('model');
+    expect(roleOf(d, 'check_policy')).toBe('check');
+    expect(labelOf(d, 'check_policy')).toBe('check policy');
+  });
+
+  it('keeps existing Human/Model/Tool/Check unchanged', () => {
+    const parsed = parseDiagram(
+      plainStepsToDSL('Human: ask\nModel: draft\nTool: search\nCheck: review')
+    );
+    expect(roleOf(parsed, 'ask')).toBe('human');
+    expect(roleOf(parsed, 'draft')).toBe('model');
+    expect(roleOf(parsed, 'search')).toBe('tool');
+    expect(roleOf(parsed, 'review')).toBe('check');
+  });
+
+  it('works after DT-AI-10 list-marker strip: numbered + alias', () => {
+    const parsed = parseDiagram(plainStepsToDSL('1. User: ask'));
+    expect(roleOf(parsed, 'ask')).toBe('human');
+    expect(labelOf(parsed, 'ask')).toBe('ask');
+    const b = parseDiagram(plainStepsToDSL('- Assistant: draft\n* AI: outline\n2) System: gate'));
+    expect(roleOf(b, 'draft')).toBe('model');
+    expect(roleOf(b, 'outline')).toBe('model');
+    expect(roleOf(b, 'gate')).toBe('check');
+  });
+
+  it('leaves unknown prefixes in the label', () => {
+    const parsed = parseDiagram(plainStepsToDSL('Alien: do stuff\nBot act'));
+    expect(roleOf(parsed, 'alien_do_stuff')).toBeUndefined();
+    expect(labelOf(parsed, 'alien_do_stuff')).toBe('Alien: do stuff');
+    expect(roleOf(parsed, 'bot_act')).toBeUndefined();
+    expect(labelOf(parsed, 'bot_act')).toBe('Bot act');
+  });
+});
