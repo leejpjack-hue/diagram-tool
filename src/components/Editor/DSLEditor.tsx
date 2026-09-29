@@ -6,7 +6,7 @@ import { applyBoardSource, toDslSource, toMermaidSource } from '../../utils/sour
 import { plainStepsToDSL } from '../../parser/plainSteps';
 import { plainStepsFromBoardSource, applyLoadedPlainSteps } from '../../parser/boardToPlainSteps';
 import { insertRolePrefix, type RolePrefixRole } from '../../parser/insertRolePrefix';
-import { nextShowStepsAfterBuild } from './buildFromStepsPanel';
+import { nextShowStepsAfterBuild, statsFromPlainStepsDsl, buildFromStepsSuccessMessage } from './buildFromStepsPanel';
 import { useToast } from '../../utils/useToast';
 import { ToastContainer } from '../Toast/ToastContainer';
 import type { BoardMode } from '../../utils/boardManager';
@@ -84,8 +84,10 @@ else Flag for review`;
       const dsl = plainStepsToDSL(input, {
         title: useDiagramStore.getState().dslText.match(/^\s*title\s*:\s*(.+)\s*$/im)?.[1]?.trim(),
       });
+      // DT-AI-11: keep panel open; DT-AI-13: success toast with step→node count (+ roles).
       setShowSteps(prev => nextShowStepsAfterBuild(prev, 'success'));
       applySource(dsl);
+      toast.success(buildFromStepsSuccessMessage(statsFromPlainStepsDsl(dsl)));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not read those steps. Type one step per line.');
     }
