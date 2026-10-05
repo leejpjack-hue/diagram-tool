@@ -39,6 +39,13 @@ interface DiagramStore {
   queueTypeStepsSeed: (payload: string) => void;
   clearTypeStepsSeed: () => void;
 
+  // DT-AI-14: transient walk-through state — current step index, or null = off.
+  // Pure view state: never persisted, never written to undo history.
+  walkThroughStep: number | null;
+  enterWalkThrough: () => void;
+  setWalkThroughStep: (step: number) => void;
+  exitWalkThrough: () => void;
+
   // Clipboard actions
   setClipboard: (nodes: ClipboardNode[]) => void;
   clearClipboard: () => void;
@@ -239,6 +246,11 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   queueTypeStepsSeed: (payload) =>
     set(state => ({ typeStepsSeed: { payload, nonce: (state.typeStepsSeed?.nonce ?? 0) + 1 } })),
   clearTypeStepsSeed: () => set({ typeStepsSeed: null }),
+
+  walkThroughStep: null,
+  enterWalkThrough: () => set({ walkThroughStep: 0 }),
+  setWalkThroughStep: (step) => set({ walkThroughStep: step }),
+  exitWalkThrough: () => set({ walkThroughStep: null }),
   
   // Undo/Redo implementation
   undo: () => {

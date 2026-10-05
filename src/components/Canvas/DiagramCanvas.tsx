@@ -33,6 +33,8 @@ import { applyCanvasPins, setGroupPin } from '../../utils/pinUtils';
 import { applyBoardSource, renameNodeInSource } from '../../utils/sourceText';
 import { isMermaidFlow } from '../../parser/mermaidFlow';
 import { parseDiagram } from '../../parser/parser';
+import { flowStepList, type FlowStep } from '../../parser/flowToPlainSteps';
+import { WalkThroughOverlay } from './WalkThroughOverlay';
 import { getHelperLines, type HelperLineResult } from './helperLines';
 import { LayoutDirectionContext } from './layoutDirection';
 import { Position } from '@xyflow/react';
@@ -197,7 +199,7 @@ function computeArchitectureRouting(diagramMode: string, diagramEdges: DiagramEd
 function DiagramCanvasInternal() {
   const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode, dslText, setDslText, setParsedDiagram, setError, selectedNodeId } = useDiagramStore();
   const [renameDraft, setRenameDraft] = useState<string | null>(null);
-  const { getZoom } = useReactFlow();
+  const { getZoom, fitView } = useReactFlow();
   const [c4Level, setC4Level] = useState<C4Level | 'all'>('all');
   // When the user clicks a parent node, we filter to its direct children.
   // drillParent stores the parent id; null means no drill is active.
@@ -724,6 +726,81 @@ function DiagramCanvasInternal() {
   // Alignment guides shown while dragging a node.
   const [helperLines, setHelperLines] = useState<HelperLineResult>({});
 
+  // DT-AI-14: read-only walk-through. Step order comes straight from the
+  // Copy as steps serializer (flowStepList is the same ordered list that
+  // flowToPlainSteps renders), so the two never disagree. Purely view state —
+  // nodes, edges, positions, DSL and undo history are untouched.
+  const walkThroughStep = useDiagramStore(s => s.walkThroughStep);
+  const setWalkThroughStep = useDiagramStore(s => s.setWalkThroughStep);
+  const exitWalkThrough = useDiagramStore(s => s.exitWalkThrough);
+
+  const walkSteps = useMemo((): FlowStep[] => {
+    if (diagramMode !== 'flow' || !parsedDiagram) return [];
+    try {
+      return flowStepList(parsedDiagram);
+    } catch {
+      return [];
+    }
+  }, [diagramMode, parsedDiagram]);
+
+  const walkActive = walkThroughStep !== null && walkSteps.length > 0;
+  const walkIndex = walkActive ? Math.min(walkThroughStep!, walkSteps.length - 1) : 0;
+  const currentWalkStep = walkActive ? walkSteps[walkIndex] : null;
+  const walkCurrentId = currentWalkStep?.id ?? null;
+  const currentWalkNode = currentWalkStep && parsedDiagram
+    ? parsedDiagram.nodes.find(n => n.id === currentWalkStep.id)
+    : null;
+  const walkLabel = currentWalkNode && currentWalkNode.type === 'flow'
+    ? (currentWalkNode.properties.label || currentWalkNode.name || currentWalkNode.id).trim() || currentWalkNode.id
+    : currentWalkStep?.line ?? '';
+  const walkRole = currentWalkNode && currentWalkNode.type === 'flow'
+    ? currentWalkNode.properties.role
+    : undefined;
+
+  // Guard: board emptied or mode switched while active → leave walk-through;
+  // board shrank → clamp to the last step instead of showing a blank caption.
+  useEffect(() => {
+    if (walkThroughStep === null) return;
+    if (walkSteps.length === 0) exitWalkThrough();
+    else if (walkThroughStep >= walkSteps.length) setWalkThroughStep(walkSteps.length - 1);
+  }, [walkThroughStep, walkSteps, exitWalkThrough, setWalkThroughStep]);
+
+  // Keep the current step in view (pan/fit) on large boards.
+  useEffect(() => {
+    if (!walkCurrentId) return;
+    fitView({ nodes: [{ id: walkCurrentId }], padding: 0.8, maxZoom: 1, duration: 300 });
+  }, [walkCurrentId, fitView]);
+
+  // View-only dimming: everything except the current step fades; the edge(s)
+  // leading into the current step stay visible. Never written back to state.
+  const displayNodes = useMemo((): Node[] => {
+    if (!walkActive) return nodes;
+    return nodes.map(n => ({
+      ...n,
+      style: {
+        ...n.style,
+        opacity: n.id === walkCurrentId ? 1 : 0.15,
+        ...(n.id === walkCurrentId ? { boxShadow: '0 0 0 3px #6366f1', borderRadius: 10 } : {}),
+      },
+    }));
+  }, [nodes, walkActive, walkCurrentId]);
+
+  const displayEdges = useMemo((): ReactFlowEdge[] => {
+    if (!walkActive) return edges;
+    return edges.map(e => {
+      if (e.target === walkCurrentId) {
+        return { ...e, style: { ...e.style, strokeWidth: 3 }, zIndex: 5 };
+      }
+      return {
+        ...e,
+        style: { ...e.style, opacity: 0.12 },
+        labelStyle: { ...e.labelStyle, opacity: 0.12 },
+        labelBgStyle: { ...e.labelBgStyle, opacity: 0.12 },
+      };
+    });
+  }, [edges, walkActive, walkCurrentId]);
+
+
   const persistCanvasPositions = useCallback((
     positions: Map<string, { x: number; y: number }>,
     group?: { name: string; x: number; y: number; w: number; h: number },
@@ -1087,8 +1164,13 @@ function DiagramCanvasInternal() {
         </div>
       )}
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={displayNodes}
+        edges={displayEdges}
+        // DT-AI-14: walk-through is read-only — no dragging, connecting or
+        // selection while it is active.
+        nodesDraggable={!walkActive}
+        nodesConnectable={!walkActive}
+        elementsSelectable={!walkActive}
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -1146,6 +1228,17 @@ function DiagramCanvasInternal() {
           </ViewportPortal>
         )}
         <Controls className="bg-white border border-slate-200 rounded shadow-md" />
+        {walkActive && currentWalkStep && (
+          <WalkThroughOverlay
+            step={walkIndex + 1}
+            total={walkSteps.length}
+            label={walkLabel}
+            role={walkRole}
+            onPrev={() => setWalkThroughStep(Math.max(0, walkIndex - 1))}
+            onNext={() => setWalkThroughStep(Math.min(walkSteps.length - 1, walkIndex + 1))}
+            onExit={exitWalkThrough}
+          />
+        )}
         <Panel position="bottom-left" className="!m-4 !ml-16">
           <div className="bg-white/95 backdrop-blur-md rounded-lg shadow-md border border-slate-200 p-2">
             <ZoomControls />

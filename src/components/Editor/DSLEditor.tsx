@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { useDiagramStore } from '../../store/diagramStore';
 import { installDiagramDslTestHook } from '../../utils/devTestHook';
 import { applyBoardSource, toDslSource, toMermaidSource } from '../../utils/sourceText';
 import { plainStepsToDSL } from '../../parser/plainSteps';
+import { flowStepList, type FlowStep } from '../../parser/flowToPlainSteps';
 import { plainStepsFromBoardSource, applyLoadedPlainSteps } from '../../parser/boardToPlainSteps';
 import { insertRolePrefix, type RolePrefixRole } from '../../parser/insertRolePrefix';
 import { nextShowStepsAfterBuild, statsFromPlainStepsDsl, buildFromStepsSuccessMessage } from './buildFromStepsPanel';
@@ -16,7 +17,8 @@ function asBoardMode(mode: string): BoardMode {
 }
 
 export function DSLEditor() {
-  const { dslText, setDslText, setParsedDiagram, setError, setLoading, diagramMode, error } = useDiagramStore();
+  const { dslText, setDslText, setParsedDiagram, setError, setLoading, diagramMode, error, parsedDiagram } = useDiagramStore();
+  const enterWalkThrough = useDiagramStore(s => s.enterWalkThrough);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   // DT-AI-01: thin "Type steps" box for plain sentences (Flow boards only).
   const [showSteps, setShowSteps] = useState(false);
@@ -132,6 +134,19 @@ else Flag for review`;
 
   const showCopy = diagramMode === 'flow' || diagramMode === 'sequence';
 
+  // DT-AI-14: Walk through shares the Copy as steps serializer's ordered step
+  // list (same source of order), so the two never disagree. null = nothing to
+  // walk on this board (non-Flow or empty) → control is hidden/disabled.
+  const walkSteps = useMemo((): FlowStep[] | null => {
+    if (diagramMode !== 'flow' || !parsedDiagram) return null;
+    try {
+      return flowStepList(parsedDiagram);
+    } catch {
+      return null;
+    }
+  }, [diagramMode, parsedDiagram]);
+
+
   const copy = async (kind: 'mermaid' | 'dsl' | 'steps') => {
     if (kind === 'steps') {
       // DT-AI-05: local serialize via shared board→steps helper.
@@ -203,6 +218,22 @@ else Flag for review`;
                 >
                   Copy as steps
                 </button>
+                {/* DT-AI-14: read-only walk-through, step order = Copy as steps order. */}
+                <button
+                  type="button"
+                  data-testid="walk-through"
+                  disabled={!walkSteps}
+                  title={walkSteps ? undefined : 'No steps on this board yet. Add a few nodes, or use Type steps to build one.'}
+                  onClick={enterWalkThrough}
+                  className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-white disabled:text-slate-400"
+                >
+                  Walk through
+                </button>
+                {!walkSteps && (
+                  <span data-testid="walk-through-unavailable" className="text-[11px] font-medium text-slate-500">
+                    No steps on this board yet. Add a few nodes, or use Type steps to build one.
+                  </span>
+                )}
                 <button
                   type="button"
                   data-testid="load-steps"

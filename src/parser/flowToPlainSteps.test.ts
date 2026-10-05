@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { parseDiagram } from './parser';
-import { flowToPlainSteps } from './flowToPlainSteps';
+import { flowStepList, flowToPlainSteps } from './flowToPlainSteps';
 import { plainStepsToDSL } from './plainSteps';
+import { plainStepsFromBoardSource } from './boardToPlainSteps';
 
 describe('flowToPlainSteps (DT-AI-05)', () => {
   it('emits one node per line in topological order for a plain chain', () => {
@@ -116,5 +117,69 @@ title: "Arch"
 service web { }
 `);
     expect(() => flowToPlainSteps(arch)).toThrow(/Flow boards/i);
+  });
+});
+
+describe('flowStepList (DT-AI-14 walk-through order = Copy as steps order)', () => {
+  // Fixture flow with a decision and roles — the shape the AI workflow
+  // template produces (Human → Model → Tool → Check → ok/retry).
+  const dsl = `diagram: flow
+title: "AI workflow"
+Ask -> Model
+Model -> Tool
+Tool -> Check
+Check ->|retry| Model
+Check ->|ok| Reply
+node Ask {
+  label: "Human ask"
+  role: human
+}
+node Model {
+  label: "Model"
+  role: model
+}
+node Tool {
+  label: "Tool"
+  role: tool
+}
+node Check {
+  type: decision
+  label: "Check"
+  role: check
+}
+node Reply {
+  label: "Reply"
+  role: human
+}
+`;
+
+  it('joined step lines are exactly the Copy as steps text (one source of order)', () => {
+    const parsed = parseDiagram(dsl);
+    const steps = flowStepList(parsed);
+    expect(steps.map(s => s.line).join('\n')).toBe(flowToPlainSteps(parsed));
+    expect(steps.map(s => s.line).join('\n')).toBe(plainStepsFromBoardSource(dsl));
+  });
+
+  it('walks the decision branches in Copy-as-steps line order, ids resolve to nodes', () => {
+    const parsed = parseDiagram(dsl);
+    const nodeIds = new Set(parsed.nodes.map(n => n.id));
+    const steps = flowStepList(parsed);
+
+    expect(steps.map(s => s.line)).toEqual([
+      'Human: Human ask',
+      'Model: Model',
+      'Tool: Tool',
+      'If Check: Check',
+      'then Human: Reply',
+      'else Model: Model',
+    ]);
+    for (const step of steps) {
+      expect(nodeIds.has(step.id)).toBe(true);
+    }
+  });
+
+  it('throws the same teachable errors as Copy as steps', () => {
+    expect(() => flowStepList(parseDiagram('diagram: flow\ntitle: "Empty"\n'))).toThrow(/No steps on this board/i);
+    expect(() => flowStepList(parseDiagram('diagram: architecture\ntitle: "Arch"\nservice web { }\n'))).toThrow(/Flow boards/i);
   });
 });

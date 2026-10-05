@@ -37,10 +37,21 @@ function nodeIsDecision(n: FlowNode): boolean {
 }
 
 /**
- * Convert a parsed flow diagram into one-step-per-line Type steps text.
- * Throws a teachable Error when there is nothing to copy.
+ * DT-AI-14: one walk-through step = one line Copy as steps emits, tagged with
+ * the flow node id that line was rendered from. The single source of order:
+ * Copy as steps joins these lines; Walk through visits them in the same
+ * sequence, so the two can never disagree.
  */
-export function flowToPlainSteps(diagram: ParsedDiagram): string {
+export interface FlowStep {
+  id: string;
+  line: string;
+}
+
+/**
+ * Convert a parsed flow diagram into ordered walk-through steps.
+ * Throws a teachable Error when there is nothing to walk through.
+ */
+export function flowStepList(diagram: ParsedDiagram): FlowStep[] {
   if (diagram.mode !== 'flow') {
     throw new Error('Copy as steps works on Flow boards. Switch to Flow, then try again.');
   }
@@ -104,7 +115,7 @@ export function flowToPlainSteps(diagram: ParsedDiagram): string {
     }
   }
 
-  const lines: string[] = [];
+  const steps: FlowStep[] = [];
   const emitted = new Set<string>();
 
   for (const id of order) {
@@ -123,19 +134,19 @@ export function flowToPlainSteps(diagram: ParsedDiagram): string {
       const noEdge = no ?? retry;
 
       if (yesEdge || noEdge) {
-        lines.push(`If ${formatStep(n)}`);
+        steps.push({ id, line: `If ${formatStep(n)}` });
         emitted.add(id);
         if (yesEdge) {
           const yt = byId.get(yesEdge.to);
           if (yt) {
-            lines.push(`then ${formatStep(yt)}`);
+            steps.push({ id: yt.id, line: `then ${formatStep(yt)}` });
             emitted.add(yt.id);
           }
         }
         if (noEdge) {
           const nt = byId.get(noEdge.to);
           if (nt) {
-            lines.push(`else ${formatStep(nt)}`);
+            steps.push({ id: nt.id, line: `else ${formatStep(nt)}` });
             emitted.add(nt.id);
           }
         }
@@ -143,12 +154,16 @@ export function flowToPlainSteps(diagram: ParsedDiagram): string {
       }
     }
 
-    lines.push(formatStep(n));
+    steps.push({ id, line: formatStep(n) });
     emitted.add(id);
   }
 
-  if (lines.length === 0) {
+  if (steps.length === 0) {
     throw new Error('No steps on this board yet. Add a few nodes, or use Type steps to build one.');
   }
-  return lines.join('\n');
+  return steps;
+}
+
+export function flowToPlainSteps(diagram: ParsedDiagram): string {
+  return flowStepList(diagram).map(s => s.line).join('\n');
 }
