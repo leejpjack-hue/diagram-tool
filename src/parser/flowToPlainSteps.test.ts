@@ -110,6 +110,47 @@ node Reply {
     ]);
   });
 
+  it('round-trips step notes through Copy as steps (DT-AI-15)', () => {
+    const input = 'Model: draft reply — uses the last 3 tickets\nthen Send reply -- blocks if confidence < 0.8\nHuman: review — spot-check tone';
+    const parsed = parseDiagram(plainStepsToDSL(input));
+    const back = flowToPlainSteps(parsed);
+    expect(back.split('\n')).toEqual([
+      'Model: draft reply — uses the last 3 tickets',
+      'Send reply — blocks if confidence < 0.8',
+      'Human: review — spot-check tone',
+    ]);
+    // The emitted lines rebuild the same board: labels, notes and edges.
+    const rebuilt = parseDiagram(plainStepsToDSL(back));
+    const props = (id: string) => {
+      const n = rebuilt.nodes.find(x => x.id === id);
+      return n && n.type === 'flow' ? n.properties : undefined;
+    };
+    expect(props('draft_reply')).toMatchObject({ label: 'draft reply', role: 'model', note: 'uses the last 3 tickets' });
+    expect(props('send_reply')).toMatchObject({ label: 'Send reply', note: 'blocks if confidence < 0.8' });
+    expect(props('review')).toMatchObject({ label: 'review', role: 'human', note: 'spot-check tone' });
+    expect(rebuilt.edges.map(e => `${e.from}->${e.to}`)).toEqual([
+      'draft_reply->send_reply',
+      'send_reply->review',
+    ]);
+    // Pasting the copied text back yields byte-identical DSL.
+    expect(plainStepsToDSL(back)).toBe(plainStepsToDSL(input));
+  });
+
+  it('leaves note-less steps unchanged in Copy as steps output (DT-AI-15)', () => {
+    const parsed = parseDiagram(`diagram: flow
+title: "Plain"
+A -> B
+node A {
+  label: "Ask"
+  role: human
+}
+node B {
+  label: "Draft"
+}
+`);
+    expect(flowToPlainSteps(parsed)).toBe('Human: Ask\nDraft');
+  });
+
   it('throws a teachable error on empty / non-flow', () => {
     expect(() => flowToPlainSteps(parseDiagram('diagram: flow\ntitle: "Empty"\n'))).toThrow(/No steps/i);
     const arch = parseDiagram(`diagram: architecture

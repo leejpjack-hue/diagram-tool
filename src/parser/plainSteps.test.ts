@@ -231,6 +231,96 @@ describe('stripListMarker / plainStepsToDSL (DT-AI-10 list markers)', () => {
   });
 });
 
+describe('plainStepsToDSL (DT-AI-15 step notes)', () => {
+  function noteOf(parsed: ReturnType<typeof parseDiagram>, id: string) {
+    const n = parsed.nodes.find(x => x.id === id);
+    return n && n.type === 'flow' ? n.properties.note : undefined;
+  }
+
+  function labelOf(parsed: ReturnType<typeof parseDiagram>, id: string) {
+    const n = parsed.nodes.find(x => x.id === id);
+    return n && n.type === 'flow' ? n.properties.label : undefined;
+  }
+
+  it('parses `Label — note` into the note property, label unchanged', () => {
+    const parsed = parseDiagram(plainStepsToDSL('Model: draft reply — uses the last 3 tickets'));
+    expect(labelOf(parsed, 'draft_reply')).toBe('draft reply');
+    expect(noteOf(parsed, 'draft_reply')).toBe('uses the last 3 tickets');
+  });
+
+  it('parses `Label -- note` (two hyphens) the same way', () => {
+    const parsed = parseDiagram(plainStepsToDSL('Send reply -- blocks if confidence < 0.8'));
+    expect(labelOf(parsed, 'send_reply')).toBe('Send reply');
+    expect(noteOf(parsed, 'send_reply')).toBe('blocks if confidence < 0.8');
+  });
+
+  it('keeps a single ` - ` as part of the label (no note)', () => {
+    const parsed = parseDiagram(plainStepsToDSL('Score 1.5 - final'));
+    expect(labelOf(parsed, 'score_1_5_final')).toBe('Score 1.5 - final');
+    expect(noteOf(parsed, 'score_1_5_final')).toBeUndefined();
+  });
+
+  it('leaves steps without a note note-less and the DSL byte-identical', () => {
+    const dsl = plainStepsToDSL('Model: draft reply\nthen Send reply');
+    expect(dsl).not.toContain('note:');
+    expect(dsl).toBe(`diagram: flow
+title: "Type steps"
+direction: TB
+
+draft_reply -> send_reply
+
+node draft_reply {
+  label: "draft reply"
+  role: model
+}
+
+node send_reply {
+  label: "Send reply"
+}
+`);
+    const parsed = parseDiagram(dsl);
+    expect(noteOf(parsed, 'draft_reply')).toBeUndefined();
+    expect(noteOf(parsed, 'send_reply')).toBeUndefined();
+  });
+
+  it('attaches the note to the LAST step on a `then` chain line', () => {
+    const parsed = parseDiagram(plainStepsToDSL('Log in, then Verify email — SSO only'));
+    expect(noteOf(parsed, 'log_in')).toBeUndefined();
+    expect(labelOf(parsed, 'verify_email')).toBe('Verify email');
+    expect(noteOf(parsed, 'verify_email')).toBe('SSO only');
+  });
+
+  it('keeps role words, list markers and If/then/else working with notes', () => {
+    const parsed = parseDiagram(
+      plainStepsToDSL('1. Human: ask the question\nIf invalid then Retry — after 3 tries\nelse Flag for review')
+    );
+    const ask = parsed.nodes.find(n => n.id === 'ask_the_question');
+    expect(ask && ask.type === 'flow' ? ask.properties.role : undefined).toBe('human');
+    expect(noteOf(parsed, 'ask_the_question')).toBeUndefined();
+    const invalid = parsed.nodes.find(n => n.id === 'invalid');
+    expect(invalid && invalid.type === 'flow' ? invalid.properties.nodeType : undefined).toBe('decision');
+    expect(noteOf(parsed, 'invalid')).toBeUndefined();
+    expect(labelOf(parsed, 'retry')).toBe('Retry');
+    expect(noteOf(parsed, 'retry')).toBe('after 3 tries');
+    const branchLabels = parsed.edges.map(e => e.label).filter(Boolean).sort();
+    expect(branchLabels).toEqual(['No', 'Yes']);
+  });
+
+  it('treats connector words inside the note as note text', () => {
+    const parsed = parseDiagram(plainStepsToDSL('Draft reply — then send it once approved'));
+    expect(parsed.nodes.filter(n => n.type === 'flow')).toHaveLength(1);
+    expect(labelOf(parsed, 'draft_reply')).toBe('Draft reply');
+    expect(noteOf(parsed, 'draft_reply')).toBe('then send it once approved');
+  });
+
+  it('keeps the note in the board DSL text (survives re-parse)', () => {
+    const dsl = plainStepsToDSL('Model: draft reply — uses the last 3 tickets');
+    expect(dsl).toContain('note: "uses the last 3 tickets"');
+    const reparsed = parseDiagram(dsl);
+    expect(noteOf(reparsed, 'draft_reply')).toBe('uses the last 3 tickets');
+  });
+});
+
 describe('plainStepsToDSL (DT-AI-12 chat role aliases)', () => {
   function roleOf(parsed: ReturnType<typeof parseDiagram>, id: string) {
     const n = parsed.nodes.find(x => x.id === id);

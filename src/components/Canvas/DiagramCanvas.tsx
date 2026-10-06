@@ -756,6 +756,9 @@ function DiagramCanvasInternal() {
   const walkRole = currentWalkNode && currentWalkNode.type === 'flow'
     ? currentWalkNode.properties.role
     : undefined;
+  const walkNote = currentWalkNode && currentWalkNode.type === 'flow'
+    ? currentWalkNode.properties.note?.trim() || undefined
+    : undefined;
 
   // Guard: board emptied or mode switched while active → leave walk-through;
   // board shrank → clamp to the last step instead of showing a blank caption.
@@ -1234,6 +1237,7 @@ function DiagramCanvasInternal() {
             total={walkSteps.length}
             label={walkLabel}
             role={walkRole}
+            note={walkNote}
             onPrev={() => setWalkThroughStep(Math.max(0, walkIndex - 1))}
             onNext={() => setWalkThroughStep(Math.min(walkSteps.length - 1, walkIndex + 1))}
             onExit={exitWalkThrough}

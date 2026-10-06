@@ -14,6 +14,7 @@ interface WalkThroughOverlayProps {
   total: number;
   label: string;
   role?: FlowNodeRole;
+  note?: string; // DT-AI-15: optional why-note, shown under the caption
   onPrev: () => void;
   onNext: () => void;
   onExit: () => void;
@@ -25,7 +26,19 @@ interface WalkThroughOverlayProps {
  * arrow keys are handled here while walk-through is active (same input-guard
  * pattern as the canvas F2 handler). Purely view state — nothing is edited.
  */
-export function WalkThroughOverlay({ step, total, label, role, onPrev, onNext, onExit }: WalkThroughOverlayProps) {
+export function WalkThroughOverlay({ step, total, label, role, note, onPrev, onNext, onExit }: WalkThroughOverlayProps) {
+  // Caption kept as one span so steps without a note render exactly as
+  // DT-AI-14 did; the note only wraps it in a column when present.
+  const caption = (
+    <span data-testid="walk-through-caption" className="text-xs font-semibold text-slate-800">
+      Step {step} of {total}
+      {role && ROLE_WORD[role] ? (
+        <span data-testid="walk-through-role" className="ml-1 text-indigo-600">· {ROLE_WORD[role]}</span>
+      ) : null}
+      <span className="ml-1 font-normal text-slate-600">— {label}</span>
+    </span>
+  );
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -51,13 +64,14 @@ export function WalkThroughOverlay({ step, total, label, role, onPrev, onNext, o
         data-testid="walk-through-overlay"
         className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur"
       >
-        <span data-testid="walk-through-caption" className="text-xs font-semibold text-slate-800">
-          Step {step} of {total}
-          {role && ROLE_WORD[role] ? (
-            <span data-testid="walk-through-role" className="ml-1 text-indigo-600">· {ROLE_WORD[role]}</span>
-          ) : null}
-          <span className="ml-1 font-normal text-slate-600">— {label}</span>
-        </span>
+        {note ? (
+          <span className="flex flex-col items-start">
+            {caption}
+            <span data-testid="walk-through-note" className="text-[11px] font-normal text-slate-500">
+              {note}
+            </span>
+          </span>
+        ) : caption}
         <span className="w-px h-4 bg-slate-200" />
         <button
           type="button"

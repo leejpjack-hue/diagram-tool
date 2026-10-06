@@ -183,3 +183,26 @@ describe('walk-through session (enter, next, prev, exit)', () => {
     expect(after.walkThroughStep).toBeNull();
   });
 });
+
+describe('walk-through note (DT-AI-15)', () => {
+  const NOTED_FLOW_DSL = FLOW_DSL.replace(
+    'node Ask {\n  label: "Human ask"',
+    'node Ask {\n  label: "Human ask"\n  note: "uses the last 3 tickets"',
+  );
+
+  it('shows the current step note under the caption; steps without a note unchanged', () => {
+    setup(NOTED_FLOW_DSL);
+    fireEvent.click(screen.getByTestId('walk-through'));
+
+    // Step 1 (Ask) carries the note on a second line under the caption.
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 1 of 6');
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Human ask');
+    expect(screen.getByTestId('walk-through-note')).toHaveTextContent('uses the last 3 tickets');
+
+    // Step 2 (Model) has no note → no note line, caption exactly as DT-AI-14.
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 2 of 6');
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Model');
+    expect(screen.queryByTestId('walk-through-note')).toBeNull();
+  });
+});

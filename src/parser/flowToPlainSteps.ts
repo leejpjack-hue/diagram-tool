@@ -7,6 +7,10 @@
 // when those branch targets have not yet been listed; otherwise every flow
 // node is one line. Role chips round-trip as `Human:` / `Model:` / `Tool:` /
 // `Check:` prefixes (same vocabulary as DT-AI-04).
+//
+// DT-AI-15 — a step's why-note round-trips as `Label — note` (em dash with
+// spaces), so pasting the output back into Type steps rebuilds the same
+// board. Steps without a note are unchanged.
 
 import type { FlowNode, FlowNodeRole, ParsedDiagram } from '../store/types';
 
@@ -28,8 +32,11 @@ function nodeLabel(n: FlowNode): string {
 function formatStep(n: FlowNode): string {
   const label = nodeLabel(n);
   const role = n.properties.role;
-  if (role && ROLE_WORD[role]) return `${ROLE_WORD[role]}: ${label}`;
-  return label;
+  const base = role && ROLE_WORD[role] ? `${ROLE_WORD[role]}: ${label}` : label;
+  // DT-AI-15: round-trip the why-note as `Label — note` so pasting back into
+  // Type steps rebuilds the same board.
+  const note = n.properties.note?.trim();
+  return note ? `${base} — ${note}` : base;
 }
 
 function nodeIsDecision(n: FlowNode): boolean {
