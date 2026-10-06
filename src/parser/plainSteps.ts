@@ -30,6 +30,23 @@
 //   Same forms: Alias: / Alias: rest / Alias rest (case-insensitive).
 //   e.g. 1. User: ask → role human, label ask
 //
+// DT-AI-15 — optional short "why" note per step, typed on the same line:
+//   Model: draft reply — uses the last 3 tickets
+//   Send reply -- blocks if confidence < 0.8
+//   ` — ` (em dash with spaces) or ` -- ` (two hyphens with spaces) starts the
+//   note; the FIRST match on the line wins, so any later dash stays in the
+//   note text. A single hyphen ` - ` is NOT a separator and stays in the label.
+//   The note is not its own step: it attaches to the LAST step on that line —
+//   e.g. `Log in, then Verify email -- SSO only` puts the note on "Verify
+//   email", and `If invalid then Retry -- after 3 tries` puts it on "Retry".
+//   Splitting happens before then/if/else segmenting, so connector words inside
+//   a note are just note text. The note travels as `note: "..."` on the flow
+//   node (kept in the board's own DSL — survives save/reload and Copy as DSL),
+//   is emitted by Copy as steps as `Label — note`, and shown in Walk through.
+//   Node faces never render the note. Lines without a dash are byte-identical
+//   to DT-AI-01/04/10/12 output. Deterministic local parsing only — typed text
+//   never leaves this device.
+//
 // `then` links steps in order; `if <text>` makes `<text>` a decision node whose
 // following branch is labelled Yes; `else ...` reuses that decision for a No
 // branch. Anything else is a plain step, exactly like today.
@@ -106,7 +123,22 @@ export function stripRolePrefix(raw: string): { role?: PlainStepRole; label: str
   return { role, label };
 }
 
-interface EmittedNode { id: string; label: string; decision: boolean; role?: PlainStepRole; }
+/**
+ * DT-AI-15: split `Label — note` / `Label -- note` (first ` — ` or ` -- `
+ * with spaces on both sides). A single ` - ` is not a separator and a dash
+ * with nothing after it stays in the label.
+ */
+const NOTE_SPLIT = /(?:\s—\s|\s--\s)/;
+
+export function splitStepNote(line: string): { text: string; note?: string } {
+  const m = NOTE_SPLIT.exec(line);
+  if (!m) return { text: line };
+  const note = line.slice(m.index + m[0].length).trim();
+  if (!note) return { text: line };
+  return { text: line.slice(0, m.index).trim(), note };
+}
+
+interface EmittedNode { id: string; label: string; decision: boolean; role?: PlainStepRole; note?: string; }
 
 interface State {
   nodes: EmittedNode[];
@@ -150,7 +182,11 @@ export function plainStepsToDSL(text: string, opts: { title?: string } = {}): st
 
   for (const line of lines) {
     const unmarked = stripListMarker(line);
-    for (const seg of splitSegments(unmarked)) {
+    // DT-AI-15: peel the note off before segmenting, then attach it to the
+    // last step created on this line (a `then` chain may create several).
+    const { text: lineText, note } = splitStepNote(unmarked);
+    let lastOnLine: string | null = null;
+    for (const seg of splitSegments(lineText)) {
       if (seg.kind === 'op') {
         if (seg.op === 'if') state.inIf = true;
         else if (seg.op === 'else' && state.lastDecision) state.expectBranch = 'no';
@@ -188,6 +224,11 @@ export function plainStepsToDSL(text: string, opts: { title?: string } = {}): st
         state.edges.push({ from: state.last, to: id });
       }
       state.last = id;
+      lastOnLine = id;
+    }
+    if (note && lastOnLine) {
+      const owner = state.nodes.find(n => n.id === lastOnLine);
+      if (owner) owner.note = note;
     }
   }
 
@@ -218,6 +259,7 @@ export function plainStepsToDSL(text: string, opts: { title?: string } = {}): st
     const body = [`label: ${quote(n.label)}`];
     if (n.decision) body.push('type: decision');
     if (n.role) body.push(`role: ${n.role}`);
+    if (n.note) body.push(`note: ${quote(n.note)}`);
     out.push(`node ${n.id} {`, ...body.map(l => `  ${l}`), '}', '');
   }
 

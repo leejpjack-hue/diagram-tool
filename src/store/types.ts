@@ -99,6 +99,13 @@ export interface FlowNode {
      * as a static chip on the node. Unknown values are ignored at parse time.
      */
     role?: FlowNodeRole;
+    /**
+     * DT-AI-15: short "why/with-what" note for a typed step, declared as
+     * `note: "..."` in the DSL. Never drawn on the node face; shown on a
+     * second line in the Walk through caption and round-tripped by Copy as
+     * steps as `Label — note`.
+     */
+    note?: string;
   };
   isStart?: boolean;
   isEnd?: boolean;

@@ -1375,6 +1375,12 @@ export class Parser {
             }
             break;
           }
+          case 'note':
+            // DT-AI-15: short "why" note for a typed step. Purely a caption —
+            // never drawn on the node face; shown in Walk through and emitted
+            // by Copy as steps as `Label — note`.
+            nodeData.properties!.note = fullValue;
+            break;
         }
       } else {
         this.advance();
