@@ -89,11 +89,28 @@ else Flag for review`;
       // DT-AI-11: keep panel open; DT-AI-13: success toast with step→node count (+ roles).
       setShowSteps(prev => nextShowStepsAfterBuild(prev, 'success'));
       applySource(dsl);
-      toast.success(buildFromStepsSuccessMessage(statsFromPlainStepsDsl(dsl)));
+      // DT-AI-16: offer Walk through on the success toast when the freshly
+      // built board has steps to walk (same flowStepList rule that enables the
+      // toolbar control). Re-read the store because the walkSteps memo above
+      // still reflects the pre-build board.
+      const built = useDiagramStore.getState().parsedDiagram;
+      let canWalk = false;
+      if (diagramMode === 'flow' && built) {
+        try {
+          canWalk = flowStepList(built).length > 0;
+        } catch {
+          canWalk = false;
+        }
+      }
+      toast.success(
+        buildFromStepsSuccessMessage(statsFromPlainStepsDsl(dsl)),
+        undefined,
+        canWalk ? { label: 'Walk through', onSelect: enterWalkThrough } : undefined,
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not read those steps. Type one step per line.');
     }
-  }, [stepsText, toast, applySource]);
+  }, [stepsText, toast, applySource, diagramMode, enterWalkThrough]);
 
   // DT-AI-07: fill Type steps from the live board (same serializer as Copy; no clipboard).
   const loadSteps = useCallback(() => {
