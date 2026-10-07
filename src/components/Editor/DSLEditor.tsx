@@ -8,6 +8,7 @@ import { flowStepList, type FlowStep } from '../../parser/flowToPlainSteps';
 import { plainStepsFromBoardSource, applyLoadedPlainSteps } from '../../parser/boardToPlainSteps';
 import { insertRolePrefix, type RolePrefixRole } from '../../parser/insertRolePrefix';
 import { nextShowStepsAfterBuild, statsFromPlainStepsDsl, buildFromStepsSuccessMessage } from './buildFromStepsPanel';
+import { AI_PROMPT_TEXT } from './aiPrompt';
 import { useToast } from '../../utils/useToast';
 import { ToastContainer } from '../Toast/ToastContainer';
 import type { BoardMode } from '../../utils/boardManager';
@@ -125,6 +126,17 @@ else Flag for review`;
       // textarea unchanged on failure
     }
   }, [dslText, stepsText, toast]);
+
+  // DT-AI-17: copy the fixed AI instruction — clipboard only, never any AI call.
+  const copyAiPrompt = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(AI_PROMPT_TEXT);
+      toast.success('AI prompt copied');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not copy the AI prompt.');
+      // clipboard unchanged on failure
+    }
+  }, [toast]);
 
   // DT-AI-08: tab-reachable role-prefix buttons (no global shortcuts).
   // Decides where the prefix goes via the pure helper; restores the
@@ -272,7 +284,7 @@ else Flag for review`;
           className="mx-3 mb-2 rounded-md border border-indigo-100 bg-indigo-50/60 p-3"
         >
           <label className="mb-1 block text-[11px] font-semibold text-indigo-700">
-            Type steps — one step per line. Optional words: then, if, else, Human:/User:, Model:/Assistant:/AI:, Tool:, Check:/System:
+            Type steps — one step per line. Optional words: then, if, else, Human:/User:, Model:/Assistant:/AI:, Tool:, Check:/System:. Optional note: Step — why
           </label>
           <textarea
             ref={stepsInputRef}
@@ -306,6 +318,15 @@ else Flag for review`;
               className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
             >
               Build board
+            </button>
+            {/* DT-AI-17: hands the fixed instruction to any chat AI (copy-only). */}
+            <button
+              type="button"
+              data-testid="copy-ai-prompt"
+              onClick={() => void copyAiPrompt()}
+              className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400"
+            >
+              Copy AI prompt
             </button>
             <span className="text-[11px] text-slate-500">Parsed locally — nothing leaves this device.</span>
           </div>
