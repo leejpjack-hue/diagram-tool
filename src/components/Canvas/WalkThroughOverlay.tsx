@@ -15,6 +15,8 @@ interface WalkThroughOverlayProps {
   label: string;
   role?: FlowNodeRole;
   note?: string; // DT-AI-15: optional why-note, shown under the caption
+  arrivedBy?: string; // DT-AI-18: `If “<source>”: <label>` when this step was reached via a labelled branch edge
+  paths?: string; // DT-AI-18: `Yes → Retry once · No → Flag for review` when this step has 2+ outgoing edges
   onPrev: () => void;
   onNext: () => void;
   onExit: () => void;
@@ -26,7 +28,7 @@ interface WalkThroughOverlayProps {
  * arrow keys are handled here while walk-through is active (same input-guard
  * pattern as the canvas F2 handler). Purely view state — nothing is edited.
  */
-export function WalkThroughOverlay({ step, total, label, role, note, onPrev, onNext, onExit }: WalkThroughOverlayProps) {
+export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, paths, onPrev, onNext, onExit }: WalkThroughOverlayProps) {
   // Caption kept as one span so steps without a note render exactly as
   // DT-AI-14 did; the note only wraps it in a column when present.
   const caption = (
@@ -64,12 +66,32 @@ export function WalkThroughOverlay({ step, total, label, role, note, onPrev, onN
         data-testid="walk-through-overlay"
         className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur"
       >
-        {note ? (
+        {note || arrivedBy || paths ? (
           <span className="flex flex-col items-start">
             {caption}
-            <span data-testid="walk-through-note" className="text-[11px] font-normal text-slate-500">
-              {note}
-            </span>
+            {note ? (
+              <span data-testid="walk-through-note" className="text-[11px] font-normal text-slate-500">
+                {note}
+              </span>
+            ) : null}
+            {arrivedBy ? (
+              <span
+                data-testid="walk-through-from"
+                title={arrivedBy}
+                className="max-w-[280px] truncate text-[11px] font-normal text-slate-500"
+              >
+                {arrivedBy}
+              </span>
+            ) : null}
+            {paths ? (
+              <span
+                data-testid="walk-through-paths"
+                title={paths}
+                className="max-w-[280px] truncate text-[11px] font-normal text-slate-500"
+              >
+                {paths}
+              </span>
+            ) : null}
           </span>
         ) : caption}
         <span className="w-px h-4 bg-slate-200" />
