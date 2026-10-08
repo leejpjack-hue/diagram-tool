@@ -8,6 +8,7 @@ import { DiagramCanvas } from './DiagramCanvas';
 import { DSLEditor } from '../Editor/DSLEditor';
 import { useDiagramStore } from '../../store/diagramStore';
 import { parseDiagram } from '../../parser/parser';
+import { AI_PROMPT_TEXT } from '../Editor/aiPrompt';
 
 vi.mock('@monaco-editor/react', () => ({
   default: () => <div data-testid="monaco-stub" />,
@@ -47,6 +48,23 @@ node Reply {
 `;
 
 const EMPTY_FLOW_DSL = 'diagram: flow\ntitle: "Empty"\n';
+
+// DT-AI-18 — a decision with two unlabelled outgoing edges.
+const UNLABELLED_FORK_DSL = `diagram: flow
+title: "Unlabelled fork"
+A -> B
+A -> C
+`;
+
+// DT-AI-18 — four labelled outgoing edges to exercise the 3-path cap.
+const CAP_FORK_DSL = `diagram: flow
+title: "Cap fork"
+A ->|"one"| B
+A ->|"two"| C
+A ->|"three"| D
+A ->|"four"| E
+`;
+
 const ARCH_DSL = `diagram: architecture
 title: "Arch"
 service web { }
@@ -204,5 +222,75 @@ describe('walk-through note (DT-AI-15)', () => {
     expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 2 of 6');
     expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Model');
     expect(screen.queryByTestId('walk-through-note')).toBeNull();
+  });
+});
+
+describe('walk-through fork / arrived-by lines (DT-AI-18)', () => {
+  // The worked example at the end of AI_PROMPT_TEXT, everything after the
+  // "Example" line — same extraction rule as copyAiPrompt.test.tsx.
+  function exampleFromPrompt(): string {
+    const idx = AI_PROMPT_TEXT.indexOf('Example');
+    expect(idx).toBeGreaterThan(-1);
+    const lineEnd = AI_PROMPT_TEXT.indexOf('\n', idx);
+    return AI_PROMPT_TEXT.slice(lineEnd + 1).trim();
+  }
+
+  function typeAndBuild(steps: string) {
+    fireEvent.click(screen.getByTestId('toggle-type-steps'));
+    fireEvent.change(screen.getByTestId('type-steps-input'), { target: { value: steps } });
+    fireEvent.click(screen.getByTestId('build-steps'));
+    expect(screen.getByTestId('toast-item')).toBeInTheDocument();
+  }
+
+  it('Copy AI prompt worked example: decision step shows where each answer leads; No step shows the arrived-by line', () => {
+    setup(EMPTY_FLOW_DSL);
+    typeAndBuild(exampleFromPrompt());
+    fireEvent.click(screen.getByTestId('toast-action'));
+
+    // Step 4 of 7 is the decision; its fork line lists both branches in edge order.
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 4 of 7');
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('it bounces');
+    expect(screen.getByTestId('walk-through-paths')).toHaveTextContent('Yes → Retry once · No → Flag for review');
+    expect(screen.getByTestId('walk-through-paths')).toHaveAttribute(
+      'title',
+      'Yes → Retry once · No → Flag for review',
+    );
+
+    // The Yes step announces how it was reached; the No step likewise.
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Retry once');
+    expect(screen.getByTestId('walk-through-from')).toHaveTextContent('If “it bounces”: Yes');
+
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Flag for review');
+    expect(screen.getByTestId('walk-through-from')).toHaveTextContent('If “it bounces”: No');
+    // Flag for review has one outgoing edge → no fork line here.
+    expect(screen.queryByTestId('walk-through-paths')).toBeNull();
+  });
+
+  it('unlabelled 2-way fork shows bare arrows and no arrived-by line', () => {
+    setup(UNLABELLED_FORK_DSL);
+    fireEvent.click(screen.getByTestId('walk-through'));
+
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 1 of 3');
+    expect(screen.getByTestId('walk-through-paths')).toHaveTextContent('→ B · → C');
+
+    // Targets of an unlabelled fork get no arrived-by line.
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 2 of 3');
+    expect(screen.queryByTestId('walk-through-from')).toBeNull();
+    expect(screen.queryByTestId('walk-through-paths')).toBeNull();
+  });
+
+  it('caps the fork line at 3 paths with a +N more tail; title holds the full text', () => {
+    setup(CAP_FORK_DSL);
+    fireEvent.click(screen.getByTestId('walk-through'));
+
+    const paths = screen.getByTestId('walk-through-paths');
+    expect(paths).toHaveTextContent('one → B · two → C · three → D · +1 more');
+    expect(paths).toHaveAttribute('title', 'one → B · two → C · three → D · +1 more');
   });
 });

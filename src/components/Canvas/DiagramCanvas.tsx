@@ -760,6 +760,51 @@ function DiagramCanvasInternal() {
     ? currentWalkNode.properties.note?.trim() || undefined
     : undefined;
 
+  // DT-AI-18 — fork / arrived-by caption lines, read-only views of edges that
+  // are already on the board. Nothing is written back to the store or DSL.
+  const flowLabelOf = (id: string): string => {
+    const n = parsedDiagram?.nodes.find(n => n.id === id);
+    return n && n.type === 'flow'
+      ? (n.properties.label || n.name || n.id).trim() || n.id
+      : n?.name ?? id;
+  };
+  const walkOutgoing = walkCurrentId && parsedDiagram
+    ? parsedDiagram.edges.filter(e => e.from === walkCurrentId)
+    : [];
+  const walkIncoming = walkCurrentId && parsedDiagram
+    ? parsedDiagram.edges.filter(e => e.to === walkCurrentId)
+    : [];
+
+  // Fork line: a step with 2+ outgoing edges lists them as `<label> → <target>`,
+  // in board edge order, capped at 3 with a `+N more` tail.
+  const MAX_FORK_PATHS = 3;
+  let walkPaths: string | undefined;
+  if (walkOutgoing.length >= 2) {
+    const parts = walkOutgoing.slice(0, MAX_FORK_PATHS).map(e => {
+      const label = e.label?.trim();
+      const target = flowLabelOf(e.to);
+      return label ? `${label} → ${target}` : `→ ${target}`;
+    });
+    if (walkOutgoing.length > MAX_FORK_PATHS) {
+      parts.push(`+${walkOutgoing.length - MAX_FORK_PATHS} more`);
+    }
+    walkPaths = parts.join(' · ');
+  }
+
+  // Arrived-by line: shown only when the single incoming edge is labelled and
+  // comes from a step that itself has 2+ outgoing edges.
+  let walkArrivedBy: string | undefined;
+  if (walkIncoming.length === 1) {
+    const edge = walkIncoming[0];
+    const label = edge.label?.trim();
+    const sourceOutgoing = parsedDiagram
+      ? parsedDiagram.edges.filter(e => e.from === edge.from).length
+      : 0;
+    if (label && sourceOutgoing >= 2) {
+      walkArrivedBy = `If “${flowLabelOf(edge.from)}”: ${label}`;
+    }
+  }
+
   // Guard: board emptied or mode switched while active → leave walk-through;
   // board shrank → clamp to the last step instead of showing a blank caption.
   useEffect(() => {
@@ -1238,6 +1283,8 @@ function DiagramCanvasInternal() {
             label={walkLabel}
             role={walkRole}
             note={walkNote}
+            arrivedBy={walkArrivedBy}
+            paths={walkPaths}
             onPrev={() => setWalkThroughStep(Math.max(0, walkIndex - 1))}
             onNext={() => setWalkThroughStep(Math.min(walkSteps.length - 1, walkIndex + 1))}
             onExit={exitWalkThrough}
