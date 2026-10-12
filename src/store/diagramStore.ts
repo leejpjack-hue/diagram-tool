@@ -41,9 +41,14 @@ interface DiagramStore {
 
   // DT-AI-14: transient walk-through state — current step index, or null = off.
   // Pure view state: never persisted, never written to undo history.
+  // DT-AI-19: session stack of visited step indices for Prev — pushed on every
+  // Next or Choose, cleared when a walk session starts/ends.
   walkThroughStep: number | null;
+  walkThroughStack: number[];
   enterWalkThrough: () => void;
   setWalkThroughStep: (step: number) => void;
+  pushWalkThroughStep: (step: number) => void;
+  popWalkThroughStep: () => void;
   exitWalkThrough: () => void;
 
   // Clipboard actions
@@ -248,9 +253,32 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   clearTypeStepsSeed: () => set({ typeStepsSeed: null }),
 
   walkThroughStep: null,
-  enterWalkThrough: () => set({ walkThroughStep: 0 }),
+  walkThroughStack: [],
+  enterWalkThrough: () => set({ walkThroughStep: 0, walkThroughStack: [] }),
   setWalkThroughStep: (step) => set({ walkThroughStep: step }),
-  exitWalkThrough: () => set({ walkThroughStep: null }),
+  // DT-AI-19: Next/Choose record where the walk came from so Prev follows the
+  // path actually taken, not the board's topological order.
+  pushWalkThroughStep: (step) =>
+    set(state => {
+      if (state.walkThroughStep === null) return { walkThroughStep: step, walkThroughStack: [] };
+      return {
+        walkThroughStep: step,
+        walkThroughStack: [...state.walkThroughStack, state.walkThroughStep],
+      };
+    }),
+  popWalkThroughStep: () =>
+    set(state => {
+      if (state.walkThroughStep === null) return state;
+      if (state.walkThroughStack.length === 0) {
+        // No session history (e.g. state seeded by an older path): keep the
+        // pre-DT-AI-19 linear Prev behaviour rather than doing nothing.
+        return { walkThroughStep: Math.max(0, state.walkThroughStep - 1), walkThroughStack: [] };
+      }
+      const stack = state.walkThroughStack.slice();
+      const prev = stack.pop()!;
+      return { walkThroughStep: prev, walkThroughStack: stack };
+    }),
+  exitWalkThrough: () => set({ walkThroughStep: null, walkThroughStack: [] }),
   
   // Undo/Redo implementation
   undo: () => {
