@@ -294,3 +294,72 @@ describe('walk-through fork / arrived-by lines (DT-AI-18)', () => {
     expect(paths).toHaveAttribute('title', 'one → B · two → C · three → D · +1 more');
   });
 });
+
+describe('walk-through choose (DT-AI-19)', () => {
+  // The worked example at the end of AI_PROMPT_TEXT, everything after the
+  // "Example" line — same extraction rule as copyAiPrompt.test.tsx.
+  function exampleFromPrompt(): string {
+    const idx = AI_PROMPT_TEXT.indexOf('Example');
+    expect(idx).toBeGreaterThan(-1);
+    const lineEnd = AI_PROMPT_TEXT.indexOf('\n', idx);
+    return AI_PROMPT_TEXT.slice(lineEnd + 1).trim();
+  }
+
+  function typeAndBuild(steps: string) {
+    fireEvent.click(screen.getByTestId('toggle-type-steps'));
+    fireEvent.change(screen.getByTestId('type-steps-input'), { target: { value: steps } });
+    fireEvent.click(screen.getByTestId('build-steps'));
+    expect(screen.getByTestId('toast-item')).toBeInTheDocument();
+  }
+
+  it('worked example: clicking the No choose button jumps to the No target with its arrived-by line', () => {
+    setup(EMPTY_FLOW_DSL);
+    typeAndBuild(exampleFromPrompt());
+    fireEvent.click(screen.getByTestId('toast-action'));
+
+    // Advance to the decision (step 4 of 7) — the fork line gains choose buttons.
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 4 of 7');
+    expect(screen.getByTestId('walk-through-paths')).toHaveTextContent('Yes → Retry once · No → Flag for review');
+
+    const choose = screen.getByTestId('walk-through-choose');
+    expect(within(choose).getByTestId('walk-through-choose-0')).toHaveTextContent('Yes');
+    expect(within(choose).getByTestId('walk-through-choose-1')).toHaveTextContent('No');
+
+    // Choose No: the walk jumps to that branch's target step only.
+    fireEvent.click(within(choose).getByTestId('walk-through-choose-1'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 6 of 7');
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Flag for review');
+    expect(screen.getByTestId('walk-through-from')).toHaveTextContent('If “it bounces”: No');
+
+    // Prev follows the path taken: back to the decision, not the topological prior.
+    fireEvent.click(screen.getByTestId('walk-through-prev'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 4 of 7');
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('it bounces');
+
+    // Next keeps today's linear/topo advance for full-board tours.
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Retry once');
+  });
+
+  it('choose on an unlabelled 2-way fork jumps to the target; Prev undoes the jump', () => {
+    setup(UNLABELLED_FORK_DSL);
+    fireEvent.click(screen.getByTestId('walk-through'));
+
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 1 of 3');
+    const choose = screen.getByTestId('walk-through-choose');
+    expect(within(choose).getByTestId('walk-through-choose-0')).toHaveTextContent('→ B');
+    expect(within(choose).getByTestId('walk-through-choose-1')).toHaveTextContent('→ C');
+
+    fireEvent.click(within(choose).getByTestId('walk-through-choose-1'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 3 of 3');
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('C');
+    expect(screen.queryByTestId('walk-through-from')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('walk-through-prev'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 1 of 3');
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('A');
+  });
+});

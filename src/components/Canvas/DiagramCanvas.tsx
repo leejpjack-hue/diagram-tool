@@ -732,6 +732,8 @@ function DiagramCanvasInternal() {
   // nodes, edges, positions, DSL and undo history are untouched.
   const walkThroughStep = useDiagramStore(s => s.walkThroughStep);
   const setWalkThroughStep = useDiagramStore(s => s.setWalkThroughStep);
+  const pushWalkThroughStep = useDiagramStore(s => s.pushWalkThroughStep);
+  const popWalkThroughStep = useDiagramStore(s => s.popWalkThroughStep);
   const exitWalkThrough = useDiagramStore(s => s.exitWalkThrough);
 
   const walkSteps = useMemo((): FlowStep[] => {
@@ -804,6 +806,18 @@ function DiagramCanvasInternal() {
       walkArrivedBy = `If “${flowLabelOf(edge.from)}”: ${label}`;
     }
   }
+
+  // DT-AI-19 — choose controls: one button per outgoing edge, in board edge
+  // order, mirroring the fork line's label rule (`label` or `→ <target>`).
+  // The jump target is the edge target node's index in walkSteps — the same
+  // walk-order index Prev/Next move through. Read-only: nothing is edited.
+  const walkChoices = walkOutgoing.length >= 2
+    ? walkOutgoing.map(e => {
+        const label = e.label?.trim();
+        const text = label || `→ ${flowLabelOf(e.to)}`;
+        return { label: text, index: walkSteps.findIndex(s => s.id === e.to) };
+      })
+    : undefined;
 
   // Guard: board emptied or mode switched while active → leave walk-through;
   // board shrank → clamp to the last step instead of showing a blank caption.
@@ -1285,8 +1299,13 @@ function DiagramCanvasInternal() {
             note={walkNote}
             arrivedBy={walkArrivedBy}
             paths={walkPaths}
-            onPrev={() => setWalkThroughStep(Math.max(0, walkIndex - 1))}
-            onNext={() => setWalkThroughStep(Math.min(walkSteps.length - 1, walkIndex + 1))}
+            choices={walkChoices}
+            onChoose={index => {
+              const choice = walkChoices?.[index];
+              if (choice && choice.index >= 0) pushWalkThroughStep(choice.index);
+            }}
+            onPrev={popWalkThroughStep}
+            onNext={() => pushWalkThroughStep(Math.min(walkSteps.length - 1, walkIndex + 1))}
             onExit={exitWalkThrough}
           />
         )}

@@ -17,6 +17,8 @@ interface WalkThroughOverlayProps {
   note?: string; // DT-AI-15: optional why-note, shown under the caption
   arrivedBy?: string; // DT-AI-18: `If “<source>”: <label>` when this step was reached via a labelled branch edge
   paths?: string; // DT-AI-18: `Yes → Retry once · No → Flag for review` when this step has 2+ outgoing edges
+  choices?: { label: string }[]; // DT-AI-19: one choose button per outgoing edge, board edge order (2+ edges only)
+  onChoose?: (index: number) => void; // DT-AI-19: jump the walk to the chosen branch target
   onPrev: () => void;
   onNext: () => void;
   onExit: () => void;
@@ -28,7 +30,7 @@ interface WalkThroughOverlayProps {
  * arrow keys are handled here while walk-through is active (same input-guard
  * pattern as the canvas F2 handler). Purely view state — nothing is edited.
  */
-export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, paths, onPrev, onNext, onExit }: WalkThroughOverlayProps) {
+export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, paths, choices, onChoose, onPrev, onNext, onExit }: WalkThroughOverlayProps) {
   // Caption kept as one span so steps without a note render exactly as
   // DT-AI-14 did; the note only wraps it in a column when present.
   const caption = (
@@ -90,6 +92,22 @@ export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, 
                 className="max-w-[280px] truncate text-[11px] font-normal text-slate-500"
               >
                 {paths}
+              </span>
+            ) : null}
+            {choices && choices.length >= 2 && onChoose ? (
+              <span data-testid="walk-through-choose" className="mt-0.5 flex flex-wrap items-center gap-1">
+                {choices.map((choice, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    data-testid={`walk-through-choose-${i}`}
+                    title={choice.label}
+                    onClick={() => onChoose(i)}
+                    className="max-w-[160px] truncate rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 hover:border-indigo-300 hover:bg-indigo-100"
+                  >
+                    {choice.label}
+                  </button>
+                ))}
               </span>
             ) : null}
           </span>
