@@ -731,6 +731,7 @@ function DiagramCanvasInternal() {
   // flowToPlainSteps renders), so the two never disagree. Purely view state —
   // nodes, edges, positions, DSL and undo history are untouched.
   const walkThroughStep = useDiagramStore(s => s.walkThroughStep);
+  const walkThroughStack = useDiagramStore(s => s.walkThroughStack);
   const setWalkThroughStep = useDiagramStore(s => s.setWalkThroughStep);
   const pushWalkThroughStep = useDiagramStore(s => s.pushWalkThroughStep);
   const popWalkThroughStep = useDiagramStore(s => s.popWalkThroughStep);
@@ -819,6 +820,43 @@ function DiagramCanvasInternal() {
       })
     : undefined;
 
+  // DT-AI-20 — path highlights, derived read-only from the session state. The
+  // session path is the start step, every index pushed onto the stack (Next /
+  // Choose), then the current step; Prev pops, so the path follows the route
+  // actually taken. A hop is a board edge only when one exists from the hop's
+  // source to its target — so fork arms the walk never took stay untouched.
+  const walkSessionPath = useMemo((): number[] => {
+    if (!walkActive) return [];
+    return [0, ...walkThroughStack, walkIndex];
+  }, [walkActive, walkThroughStack, walkIndex]);
+
+  const walkHopEdgeId = useCallback((fromIdx: number, toIdx: number): string | null => {
+    const from = walkSteps[fromIdx]?.id;
+    const to = walkSteps[toIdx]?.id;
+    if (!from || !to || !parsedDiagram) return null;
+    return parsedDiagram.edges.find(e => e.from === from && e.to === to)?.id ?? null;
+  }, [walkSteps, parsedDiagram]);
+
+  // Trail: every hop before the last one, softly highlighted for the session.
+  const walkTrailEdgeIds = useMemo((): Set<string> => {
+    const ids = new Set<string>();
+    if (!walkActive) return ids;
+    for (let i = 0; i < walkSessionPath.length - 2; i++) {
+      const id = walkHopEdgeId(walkSessionPath[i], walkSessionPath[i + 1]);
+      if (id) ids.add(id);
+    }
+    return ids;
+  }, [walkActive, walkSessionPath, walkHopEdgeId]);
+
+  // Active: the arrived-by edge of the current step (the session's last hop).
+  const walkActiveEdgeId = useMemo((): string | null => {
+    if (!walkActive || walkSessionPath.length < 2) return null;
+    return walkHopEdgeId(
+      walkSessionPath[walkSessionPath.length - 2],
+      walkSessionPath[walkSessionPath.length - 1],
+    );
+  }, [walkActive, walkSessionPath, walkHopEdgeId]);
+
   // Guard: board emptied or mode switched while active → leave walk-through;
   // board shrank → clamp to the last step instead of showing a blank caption.
   useEffect(() => {
@@ -847,11 +885,28 @@ function DiagramCanvasInternal() {
     }));
   }, [nodes, walkActive, walkCurrentId]);
 
+  // View-only dimming: everything except the current step fades. Edges on the
+  // path the human took are emphasized — the arrived-by edge of the current
+  // step is active (indigo, matching the choose buttons), earlier hops keep a
+  // softer trail. Never written back to state.
   const displayEdges = useMemo((): ReactFlowEdge[] => {
     if (!walkActive) return edges;
     return edges.map(e => {
-      if (e.target === walkCurrentId) {
-        return { ...e, style: { ...e.style, strokeWidth: 3 }, zIndex: 5 };
+      if (e.id === walkActiveEdgeId) {
+        return {
+          ...e,
+          className: 'walk-through-edge-active',
+          style: { ...e.style, strokeWidth: 3, stroke: '#6366f1' },
+          zIndex: 5,
+        };
+      }
+      if (walkTrailEdgeIds.has(e.id)) {
+        return {
+          ...e,
+          className: 'walk-through-edge-trail',
+          style: { ...e.style, strokeWidth: 2.4, stroke: '#818cf8' },
+          zIndex: 4,
+        };
       }
       return {
         ...e,
@@ -860,7 +915,7 @@ function DiagramCanvasInternal() {
         labelBgStyle: { ...e.labelBgStyle, opacity: 0.12 },
       };
     });
-  }, [edges, walkActive, walkCurrentId]);
+  }, [edges, walkActive, walkActiveEdgeId, walkTrailEdgeIds]);
 
 
   const persistCanvasPositions = useCallback((
@@ -1357,6 +1412,21 @@ function DiagramCanvasInternal() {
           maskColor="rgba(15, 23, 42, 0.08)"
         />
       </ReactFlow>
+
+      {/* DT-AI-20 — path-highlight markers keyed to the walk-path edge ids.
+          The visible emphasis is applied to the edges themselves (stroke /
+          width / class); these zero-size keyed markers make the active and
+          trail edges addressable. Present only while walk-through is on. */}
+      {walkActive && (
+        <svg aria-hidden className="pointer-events-none absolute left-0 top-0 h-0 w-0 overflow-hidden">
+          {walkActiveEdgeId && (
+            <g data-testid="walk-through-edge-active" data-edge-id={walkActiveEdgeId} />
+          )}
+          {Array.from(walkTrailEdgeIds).map(id => (
+            <g key={id} data-testid="walk-through-edge-trail" data-edge-id={id} />
+          ))}
+        </svg>
+      )}
 
       {/* Shape library palette */}
       <ShapeLibrary />

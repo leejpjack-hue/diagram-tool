@@ -9,6 +9,7 @@ import { DSLEditor } from '../Editor/DSLEditor';
 import { useDiagramStore } from '../../store/diagramStore';
 import { parseDiagram } from '../../parser/parser';
 import { AI_PROMPT_TEXT } from '../Editor/aiPrompt';
+import type { DiagramNode, ParsedDiagram } from '../../store/types';
 
 vi.mock('@monaco-editor/react', () => ({
   default: () => <div data-testid="monaco-stub" />,
@@ -361,5 +362,105 @@ describe('walk-through choose (DT-AI-19)', () => {
     fireEvent.click(screen.getByTestId('walk-through-prev'));
     expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 1 of 3');
     expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('A');
+  });
+});
+
+describe('walk-through path highlights (DT-AI-20)', () => {
+  // The worked example at the end of AI_PROMPT_TEXT, everything after the
+  // "Example" line — same extraction rule as copyAiPrompt.test.tsx.
+  function exampleFromPrompt(): string {
+    const idx = AI_PROMPT_TEXT.indexOf('Example');
+    expect(idx).toBeGreaterThan(-1);
+    const lineEnd = AI_PROMPT_TEXT.indexOf('\n', idx);
+    return AI_PROMPT_TEXT.slice(lineEnd + 1).trim();
+  }
+
+  function typeAndBuild(steps: string) {
+    fireEvent.click(screen.getByTestId('toggle-type-steps'));
+    fireEvent.change(screen.getByTestId('type-steps-input'), { target: { value: steps } });
+    fireEvent.click(screen.getByTestId('build-steps'));
+    expect(screen.getByTestId('toast-item')).toBeInTheDocument();
+  }
+
+  const displayLabel = (n: DiagramNode): string =>
+    n.type === 'flow' ? (n.properties.label ?? n.name) : n.name;
+
+  function edgeIdOf(parsed: ParsedDiagram, fromLabel: string, toLabel: string): string {
+    const from = parsed.nodes.find(n => displayLabel(n) === fromLabel);
+    const to = parsed.nodes.find(n => displayLabel(n) === toLabel);
+    expect(from).toBeDefined();
+    expect(to).toBeDefined();
+    const edge = parsed.edges.find(e => e.from === from!.id && e.to === to!.id);
+    expect(edge).toBeDefined();
+    return edge!.id;
+  }
+
+  function activeEdgeId(container: HTMLElement): string | null {
+    return container.querySelector('[data-testid="walk-through-edge-active"]')?.getAttribute('data-edge-id') ?? null;
+  }
+
+  function trailEdgeIds(container: HTMLElement): string[] {
+    return Array.from(container.querySelectorAll('[data-testid="walk-through-edge-trail"]'))
+      .map(el => el.getAttribute('data-edge-id'))
+      .filter((id): id is string => id !== null)
+      .sort();
+  }
+
+  it('worked example: Choose No marks the edge into Flag for review active and earlier hops as trail; Exit clears', () => {
+    const { container } = setup(EMPTY_FLOW_DSL);
+    typeAndBuild(exampleFromPrompt());
+    fireEvent.click(screen.getByTestId('toast-action'));
+
+    // Next to the decision (step 4 of 7): its arrived-by edge is active, and
+    // its fork arms are NOT pre-highlighted.
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 4 of 7');
+    const parsed = useDiagramStore.getState().parsedDiagram!;
+    const yesEdge = edgeIdOf(parsed, 'it bounces', 'Retry once');
+    const noEdge = edgeIdOf(parsed, 'it bounces', 'Flag for review');
+    expect(activeEdgeId(container)).toBe(edgeIdOf(parsed, 'Send the reply', 'it bounces'));
+    expect(trailEdgeIds(container)).toEqual([
+      edgeIdOf(parsed, 'read the support ticket', 'Draft a reply'),
+      edgeIdOf(parsed, 'Draft a reply', 'Send the reply'),
+    ].sort());
+    for (const el of container.querySelectorAll(`[data-id="${yesEdge}"], [data-id="${noEdge}"]`)) {
+      expect(el.getAttribute('data-testid')).toBeNull();
+    }
+    // The untaken fork arm is neither active nor in the trail.
+    expect(trailEdgeIds(container)).not.toContain(yesEdge);
+
+    // Choose No → the taken edge becomes active; the session path so far trails.
+    fireEvent.click(within(screen.getByTestId('walk-through-choose')).getByTestId('walk-through-choose-1'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Flag for review');
+    expect(activeEdgeId(container)).toBe(noEdge);
+    expect(trailEdgeIds(container)).toEqual([
+      edgeIdOf(parsed, 'Draft a reply', 'Send the reply'),
+      edgeIdOf(parsed, 'Send the reply', 'it bounces'),
+      edgeIdOf(parsed, 'read the support ticket', 'Draft a reply'),
+    ].sort());
+    // The active edge is not also marked as trail.
+    expect(trailEdgeIds(container)).not.toContain(noEdge);
+
+    // Exit clears both trail and active markers.
+    fireEvent.click(screen.getByTestId('walk-through-exit'));
+    expect(container.querySelector('[data-testid="walk-through-edge-active"]')).toBeNull();
+    expect(container.querySelector('[data-testid="walk-through-edge-trail"]')).toBeNull();
+  });
+
+  it('linear no-fork board: each arrival highlights its single incoming edge; prior hops trail', () => {
+    const { container } = setup(FLOW_DSL);
+    fireEvent.click(screen.getByTestId('walk-through'));
+
+    const parsed = useDiagramStore.getState().parsedDiagram!;
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Model');
+    expect(activeEdgeId(container)).toBe(edgeIdOf(parsed, 'Human ask', 'Model'));
+
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Tool');
+    expect(activeEdgeId(container)).toBe(edgeIdOf(parsed, 'Model', 'Tool'));
+    expect(trailEdgeIds(container)).toEqual([edgeIdOf(parsed, 'Human ask', 'Model')]);
   });
 });
