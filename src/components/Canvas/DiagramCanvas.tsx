@@ -42,6 +42,9 @@ import { type ArchitectureHandleSlots } from './ArchitectureHandles';
 import { architectureHandleId } from './architectureHandleIds';
 import type { ConnectionSide, Edge as DiagramEdge } from '../../store/types';
 
+/** DT-AI-21 — mid readable opacity for walk-through session-path trail nodes. */
+const WALK_TRAIL_NODE_OPACITY = 0.55;
+
 const architectureNodeTypes = {
   service: ServiceNode,
   database: DatabaseNode,
@@ -857,6 +860,20 @@ function DiagramCanvasInternal() {
     );
   }, [walkActive, walkSessionPath, walkHopEdgeId]);
 
+  // DT-AI-21 — trail nodes: unique node ids visited on the session path so
+  // far (same stack/hops that feed walk-through-edge-trail), excluding the
+  // current step. Mid opacity keeps walked labels readable while untaken
+  // arms stay heavily dimmed.
+  const walkTrailNodeIds = useMemo((): Set<string> => {
+    const ids = new Set<string>();
+    if (!walkActive) return ids;
+    for (const stepIdx of walkSessionPath) {
+      const id = walkSteps[stepIdx]?.id;
+      if (id && id !== walkCurrentId) ids.add(id);
+    }
+    return ids;
+  }, [walkActive, walkSessionPath, walkSteps, walkCurrentId]);
+
   // Guard: board emptied or mode switched while active → leave walk-through;
   // board shrank → clamp to the last step instead of showing a blank caption.
   useEffect(() => {
@@ -871,19 +888,25 @@ function DiagramCanvasInternal() {
     fitView({ nodes: [{ id: walkCurrentId }], padding: 0.8, maxZoom: 1, duration: 300 });
   }, [walkCurrentId, fitView]);
 
-  // View-only dimming: everything except the current step fades; the edge(s)
-  // leading into the current step stay visible. Never written back to state.
+  // View-only dimming (DT-AI-21): three opacity tiers while walk-through is
+  // on — current = 1, session-path trail = mid readable, everything else =
+  // heavy dim. Never written back to state.
   const displayNodes = useMemo((): Node[] => {
     if (!walkActive) return nodes;
-    return nodes.map(n => ({
-      ...n,
-      style: {
-        ...n.style,
-        opacity: n.id === walkCurrentId ? 1 : 0.15,
-        ...(n.id === walkCurrentId ? { boxShadow: '0 0 0 3px #6366f1', borderRadius: 10 } : {}),
-      },
-    }));
-  }, [nodes, walkActive, walkCurrentId]);
+    return nodes.map(n => {
+      const isCurrent = n.id === walkCurrentId;
+      const isTrail = walkTrailNodeIds.has(n.id);
+      return {
+        ...n,
+        className: isTrail ? 'walk-through-node-trail' : n.className,
+        style: {
+          ...n.style,
+          opacity: isCurrent ? 1 : isTrail ? WALK_TRAIL_NODE_OPACITY : 0.15,
+          ...(isCurrent ? { boxShadow: '0 0 0 3px #6366f1', borderRadius: 10 } : {}),
+        },
+      };
+    });
+  }, [nodes, walkActive, walkCurrentId, walkTrailNodeIds]);
 
   // View-only dimming: everything except the current step fades. Edges on the
   // path the human took are emphasized — the arrived-by edge of the current
@@ -1413,10 +1436,10 @@ function DiagramCanvasInternal() {
         />
       </ReactFlow>
 
-      {/* DT-AI-20 — path-highlight markers keyed to the walk-path edge ids.
-          The visible emphasis is applied to the edges themselves (stroke /
-          width / class); these zero-size keyed markers make the active and
-          trail edges addressable. Present only while walk-through is on. */}
+      {/* DT-AI-20 / DT-AI-21 — path-highlight markers keyed to walk-path
+          edge and trail-node ids. Visible emphasis is on the canvas elements
+          themselves; these zero-size keyed markers make active/trail edges
+          and trail nodes addressable. Present only while walk-through is on. */}
       {walkActive && (
         <svg aria-hidden className="pointer-events-none absolute left-0 top-0 h-0 w-0 overflow-hidden">
           {walkActiveEdgeId && (
@@ -1424,6 +1447,9 @@ function DiagramCanvasInternal() {
           )}
           {Array.from(walkTrailEdgeIds).map(id => (
             <g key={id} data-testid="walk-through-edge-trail" data-edge-id={id} />
+          ))}
+          {Array.from(walkTrailNodeIds).map(id => (
+            <g key={id} data-testid="walk-through-node-trail" data-node-id={id} />
           ))}
         </svg>
       )}

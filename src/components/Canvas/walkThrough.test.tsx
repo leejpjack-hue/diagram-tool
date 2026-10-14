@@ -136,6 +136,8 @@ describe('walk-through session (enter, next, prev, exit)', () => {
     const modelNode = container.querySelector('[data-id="Model"]') as HTMLElement;
     expect(askNode.style.opacity).toBe('1');
     expect(modelNode.style.opacity).toBe('0.15');
+    // Enter: only step 1 is current; no trail nodes yet.
+    expect(container.querySelector('[data-testid="walk-through-node-trail"]')).toBeNull();
   });
 
   it('Next/Prev buttons move one step; decision branches walked in Copy-as-steps order', () => {
@@ -144,6 +146,13 @@ describe('walk-through session (enter, next, prev, exit)', () => {
 
     fireEvent.click(screen.getByTestId('walk-through-next'));
     fireEvent.click(screen.getByTestId('walk-through-next'));
+    // DT-AI-21: after two Next hops the first node is trail-mid (0.55), not 0.15.
+    const askAfterTwo = container.querySelector('[data-id="ask"]') as HTMLElement;
+    expect(askAfterTwo.style.opacity).toBe('0.55');
+    expect(
+      container.querySelector('[data-testid="walk-through-node-trail"][data-node-id="ask"]'),
+    ).not.toBeNull();
+
     fireEvent.click(screen.getByTestId('walk-through-next'));
     expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 4 of 6');
     expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Check');
@@ -166,6 +175,7 @@ describe('walk-through session (enter, next, prev, exit)', () => {
     expect(screen.queryByTestId('walk-through-overlay')).toBeNull();
     const modelNode = container.querySelector('[data-id="Model"]') as HTMLElement;
     expect(modelNode.style.opacity).toBe('');
+    expect(container.querySelector('[data-testid="walk-through-node-trail"]')).toBeNull();
   });
 
   it('Left/Right arrow keys step and Esc exits', () => {
@@ -406,6 +416,27 @@ describe('walk-through path highlights (DT-AI-20)', () => {
       .sort();
   }
 
+  function nodeIdOf(parsed: ParsedDiagram, label: string): string {
+    const node = parsed.nodes.find(n => displayLabel(n) === label);
+    expect(node).toBeDefined();
+    return node!.id;
+  }
+
+  function nodeEl(container: HTMLElement, id: string): HTMLElement {
+    return container.querySelector(`[data-id="${id}"]`) as HTMLElement;
+  }
+
+  function trailNodeIds(container: HTMLElement): string[] {
+    return Array.from(container.querySelectorAll('[data-testid="walk-through-node-trail"]'))
+      .map(el => el.getAttribute('data-node-id'))
+      .filter((id): id is string => id !== null)
+      .sort();
+  }
+
+  // DT-AI-21 mid-opacity constant for session-path trail nodes (DiagramCanvas
+  // WALK_TRAIL_NODE_OPACITY). Inclusive range allowed by acceptance: 0.45–0.65.
+  const TRAIL_MID_OPACITY = '0.55';
+
   it('worked example: Choose No marks the edge into Flag for review active and earlier hops as trail; Exit clears', () => {
     const { container } = setup(EMPTY_FLOW_DSL);
     typeAndBuild(exampleFromPrompt());
@@ -443,10 +474,40 @@ describe('walk-through path highlights (DT-AI-20)', () => {
     // The active edge is not also marked as trail.
     expect(trailEdgeIds(container)).not.toContain(noEdge);
 
-    // Exit clears both trail and active markers.
+    // DT-AI-21: taken-path nodes are current or trail-mid; untaken Yes target
+    // stays at heavy dim with no trail marker.
+    const pathLabels = [
+      'read the support ticket',
+      'Draft a reply',
+      'Send the reply',
+      'it bounces',
+      'Flag for review',
+    ];
+    const flagId = nodeIdOf(parsed, 'Flag for review');
+    const retryId = nodeIdOf(parsed, 'Retry once');
+    for (const label of pathLabels) {
+      const id = nodeIdOf(parsed, label);
+      const el = nodeEl(container, id);
+      if (id === flagId) {
+        expect(el.style.opacity).toBe('1');
+        expect(trailNodeIds(container)).not.toContain(id);
+      } else {
+        expect(el.style.opacity).toBe(TRAIL_MID_OPACITY);
+        expect(trailNodeIds(container)).toContain(id);
+      }
+    }
+    expect(nodeEl(container, retryId).style.opacity).toBe('0.15');
+    expect(trailNodeIds(container)).not.toContain(retryId);
+
+    // Exit clears both trail and active markers (edges + nodes) and restores
+    // default opacities (empty string / unset).
     fireEvent.click(screen.getByTestId('walk-through-exit'));
     expect(container.querySelector('[data-testid="walk-through-edge-active"]')).toBeNull();
     expect(container.querySelector('[data-testid="walk-through-edge-trail"]')).toBeNull();
+    expect(container.querySelector('[data-testid="walk-through-node-trail"]')).toBeNull();
+    expect(nodeEl(container, flagId).style.opacity).toBe('');
+    expect(nodeEl(container, retryId).style.opacity).toBe('');
+    expect(nodeEl(container, nodeIdOf(parsed, 'read the support ticket')).style.opacity).toBe('');
   });
 
   it('linear no-fork board: each arrival highlights its single incoming edge; prior hops trail', () => {
@@ -457,10 +518,20 @@ describe('walk-through path highlights (DT-AI-20)', () => {
     fireEvent.click(screen.getByTestId('walk-through-next'));
     expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Model');
     expect(activeEdgeId(container)).toBe(edgeIdOf(parsed, 'Human ask', 'Model'));
+    // After one hop: prior node is trail-mid; neighbour not yet visited stays 0.15.
+    expect(nodeEl(container, 'ask').style.opacity).toBe(TRAIL_MID_OPACITY);
+    expect(nodeEl(container, 'model').style.opacity).toBe('1');
+    expect(nodeEl(container, 'tool').style.opacity).toBe('0.15');
+    expect(trailNodeIds(container)).toEqual(['ask']);
 
     fireEvent.click(screen.getByTestId('walk-through-next'));
     expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Tool');
     expect(activeEdgeId(container)).toBe(edgeIdOf(parsed, 'Model', 'Tool'));
     expect(trailEdgeIds(container)).toEqual([edgeIdOf(parsed, 'Human ask', 'Model')]);
+    // After two Next hops the first node is trail-mid, not 0.15.
+    expect(nodeEl(container, 'ask').style.opacity).toBe(TRAIL_MID_OPACITY);
+    expect(nodeEl(container, 'model').style.opacity).toBe(TRAIL_MID_OPACITY);
+    expect(nodeEl(container, 'tool').style.opacity).toBe('1');
+    expect(trailNodeIds(container)).toEqual(['ask', 'model']);
   });
 });
