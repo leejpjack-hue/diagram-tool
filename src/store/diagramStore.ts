@@ -39,6 +39,11 @@ interface DiagramStore {
   queueTypeStepsSeed: (payload: string) => void;
   clearTypeStepsSeed: () => void;
 
+  // DT-SAVE-01: transient read-only mode when viewing a shared diagram link (?share=<token>).
+  isReadOnlyShared: boolean;
+  sharedBoardTitle: string | null;
+  setReadOnlyShared: (readOnly: boolean, title?: string | null) => void;
+
   // DT-AI-14: transient walk-through state — current step index, or null = off.
   // Pure view state: never persisted, never written to undo history.
   // DT-AI-19: session stack of visited step indices for Prev — pushed on every
@@ -251,6 +256,11 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   queueTypeStepsSeed: (payload) =>
     set(state => ({ typeStepsSeed: { payload, nonce: (state.typeStepsSeed?.nonce ?? 0) + 1 } })),
   clearTypeStepsSeed: () => set({ typeStepsSeed: null }),
+
+  isReadOnlyShared: false,
+  sharedBoardTitle: null,
+  setReadOnlyShared: (readOnly, title = null) =>
+    set({ isReadOnlyShared: readOnly, sharedBoardTitle: readOnly ? title : null }),
 
   walkThroughStep: null,
   walkThroughStack: [],

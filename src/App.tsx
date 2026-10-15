@@ -37,6 +37,8 @@ import { BrandLogo } from './components/BrandLogo';
 import { Dashboard, type DashboardCreateRequest } from './components/Dashboard/Dashboard';
 import { PresentationCanvas } from './components/Dashboard/PresentationCanvas';
 import { boardManager, toWorkspaceError, type Board, type BoardMode, type PresentationItem } from './utils/boardManager';
+import { upsertOpenedBoard } from './utils/boardFile';
+import { openSharedDiagramFromUrl, parseShareTokenFromUrl } from './lib/supabase';
 import { OfflineBanner, WorkspaceErrorBanner } from './components/Workspace/WorkspaceStatus';
 import { BoardSizeMeter, BoardSizeWarnBanner, useBoardSizeSnapshot } from './components/Workspace/BoardSizeMeter';
 import './styles/gantt-fixes.css';
@@ -390,6 +392,9 @@ function App() {
     setClipboard,
     setError,
     queueTypeStepsSeed,
+    isReadOnlyShared,
+    sharedBoardTitle,
+    setReadOnlyShared,
   } = useDiagramStore();
   
   const { addTask, updateTask, setProject, tasks, dependencies } = useGanttStore();
@@ -403,7 +408,9 @@ function App() {
   // Miro-style home: the board dashboard is the landing view; opening or
   // creating a board switches to the editor. A third view, `presentation`,
   // shows the per-board compose canvas for publication.
-  const [view, setView] = useState<'dashboard' | 'editor' | 'presentation'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'editor' | 'presentation'>(() =>
+    typeof window !== 'undefined' && parseShareTokenFromUrl(window.location.search) ? 'editor' : 'dashboard',
+  );
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
   // Board being presented and the freshly-rendered image of its diagram.
   const [presentationFor, setPresentationFor] = useState<Board | null>(null);
@@ -489,6 +496,7 @@ function App() {
   }, [tasks, dependencies, activeTab]);
 
   const handleTabChange = (tab: 'architecture' | 'flow' | 'sequence' | 'gantt') => {
+    setReadOnlyShared(false);
     setActiveTab(tab);
     setDiagramMode(tab);
 
@@ -734,6 +742,7 @@ function App() {
   // Auto-save setup
   useEffect(() => {
     saveManager.startAutosave(() => {
+      if (useDiagramStore.getState().isReadOnlyShared) return null;
       if (!dslText || dslText.trim().length === 0) return null;
       
       const title = extractBoardTitle(dslText, activeTab) || 'Untitled Diagram';
@@ -744,20 +753,53 @@ function App() {
     });
 
     return () => saveManager.stopAutosave();
-  }, [dslText, diagramMode]);
+  }, [dslText, diagramMode, activeTab]);
 
-  // Load saved diagram on mount
+  // Load saved diagram on mount (or shared read-only diagram when ?share=<token> is present)
   useEffect(() => {
+    const shareToken = typeof window !== 'undefined' ? parseShareTokenFromUrl(window.location.search) : null;
+    if (shareToken) {
+      let active = true;
+      void openSharedDiagramFromUrl(window.location.search)
+        .then(shared => {
+          if (!active || !shared) return;
+          setReadOnlyShared(true, shared.title);
+          setCurrentBoardId(null);
+          setDslText(shared.portable.dslText, false);
+          setDiagramMode(shared.portable.mode);
+          setActiveTab(shared.portable.mode);
+          if (shared.portable.mode !== 'gantt' && shared.portable.mode !== 'sequence') {
+            try {
+              setParsedDiagram(parseDiagram(shared.portable.dslText));
+            } catch {
+              setParsedDiagram(null);
+            }
+          } else {
+            setParsedDiagram(null);
+          }
+          setDeckItems(shared.portable.presentation?.items ?? []);
+          setView('editor');
+        })
+        .catch(err => {
+          if (!active) return;
+          toast.error(err instanceof Error ? err.message : 'Could not open shared diagram.');
+        });
+      return () => {
+        active = false;
+      };
+    }
+
     const saved = saveManager.getCurrentDiagram();
     if (saved) {
       setDslText(saved.dslText);
       setDiagramMode(saved.mode);
     }
-  }, [setDslText, setDiagramMode]);
+  }, [setDslText, setDiagramMode, setParsedDiagram, setReadOnlyShared, toast]);
 
   // ---- Board dashboard (Miro-style home) ----
 
   const openBoard = (board: Board) => {
+    setReadOnlyShared(false);
     setCurrentBoardId(board.id);
     setDslText(board.dslText);
     setDiagramMode(board.mode);
@@ -878,7 +920,7 @@ function App() {
   // Live autosave: while editing a board, write changes back to it (debounced)
   // so the dashboard always holds the latest version — like Miro.
   useEffect(() => {
-    if (view !== 'editor' || !currentBoardId) return;
+    if (view !== 'editor' || !currentBoardId || isReadOnlyShared) return;
     const t = setTimeout(() => {
       void boardManager.update(currentBoardId, boardPatchFromSource(dslText, activeTab))
         .then(() => boardManager.createVersion(currentBoardId, 'Automatic save', true))
@@ -892,9 +934,10 @@ function App() {
       }, 1200);
     }, 800);
     return () => clearTimeout(t);
-  }, [dslText, activeTab, currentBoardId, view, captureAndStoreBoardThumbnail]);
+  }, [dslText, activeTab, currentBoardId, view, isReadOnlyShared, captureAndStoreBoardThumbnail]);
 
   const handleLoadDiagram = (diagram: SavedDiagram) => {
+    setReadOnlyShared(false);
     setDslText(diagram.dslText);
     setDiagramMode(diagram.mode);
     setActiveTab(diagram.mode);
@@ -912,6 +955,7 @@ function App() {
   };
 
   const handleNewDiagram = () => {
+    setReadOnlyShared(false);
     setDslText(ARCHITECTURE_DSL);
     setDiagramMode('architecture');
     setActiveTab('architecture');
@@ -925,6 +969,7 @@ function App() {
   };
 
   const handlePickTemplate = (tpl: DiagramTemplate) => {
+    setReadOnlyShared(false);
     setDslText(tpl.dsl);
     setDiagramMode(tpl.mode);
     setActiveTab(tpl.mode);
@@ -1015,9 +1060,52 @@ function App() {
     deckItems,
   );
 
+  const handleSaveSharedAsLocalCopy = async () => {
+    try {
+      const title = sharedBoardTitle || extractBoardTitle(dslText, activeTab) || 'Shared diagram';
+      const board = await upsertOpenedBoard(boardManager, {
+        title,
+        mode: activeTab,
+        dslText,
+        source: { kind: activeTab === 'sequence' ? 'mermaid' : 'dsl', text: dslText },
+        nodes: [],
+        edges: [],
+        frames: [],
+        comments: [],
+        layout: { pins: {} },
+        presentation: deckItems.length
+          ? { items: deckItems, updatedAt: new Date().toISOString() }
+          : undefined,
+      });
+      openBoard(board);
+      toast.success(`Saved copy of "${board.title}" to your local workspace`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not save local copy.');
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       <OfflineBanner />
+      {isReadOnlyShared && (
+        <div
+          data-testid="shared-readonly-banner"
+          role="status"
+          className="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-900"
+        >
+          <span>
+            Viewing shared board <strong>{sharedBoardTitle || 'Shared diagram'}</strong> (read-only).
+          </span>
+          <button
+            type="button"
+            data-testid="shared-save-local-copy"
+            onClick={() => void handleSaveSharedAsLocalCopy()}
+            className="rounded-md bg-amber-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-800"
+          >
+            Save a copy to my workspace
+          </button>
+        </div>
+      )}
       {(view === 'editor' || view === 'presentation') && <BoardSizeWarnBanner snapshot={boardSize} />}
       {workspaceError && view === 'editor' && (
         <div className="px-4 pt-3">

@@ -18,7 +18,7 @@ function asBoardMode(mode: string): BoardMode {
 }
 
 export function DSLEditor() {
-  const { dslText, setDslText, setParsedDiagram, setError, setLoading, diagramMode, error, parsedDiagram } = useDiagramStore();
+  const { dslText, setDslText, setParsedDiagram, setError, setLoading, diagramMode, error, parsedDiagram, isReadOnlyShared } = useDiagramStore();
   const enterWalkThrough = useDiagramStore(s => s.enterWalkThrough);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   // DT-AI-01: thin "Type steps" box for plain sentences (Flow boards only).
@@ -67,6 +67,7 @@ else Flag for review`;
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (value === undefined) return;
+    if (useDiagramStore.getState().isReadOnlyShared) return;
     // Ignore Monaco echoes after a canvas writeback updates `dslText`.
     if (value === useDiagramStore.getState().dslText) return;
     applySource(value);
@@ -363,6 +364,7 @@ else Flag for review`;
               automaticLayout: true,
               tabSize: 2,
               padding: { top: 16 },
+              readOnly: isReadOnlyShared,
             }}
           />
         </div>
