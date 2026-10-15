@@ -874,6 +874,43 @@ function DiagramCanvasInternal() {
     return ids;
   }, [walkActive, walkSessionPath, walkSteps, walkCurrentId]);
 
+  // DT-AI-22 — Copy path text: one numbered line per session-path hop in walk
+  // order (start · stack · current, consecutive duplicates collapsed), using
+  // the caption's label rule. When a hop arrives via a labelled edge from a
+  // fork (2+ outgoing edges on the source), the branch label is appended as
+  // ` (label)`; untaken arms never appear.
+  const walkCopyPathText = useMemo((): string | undefined => {
+    if (!walkActive || !parsedDiagram) return undefined;
+    const kept: number[] = [];
+    let prevIdx = -1;
+    for (const idx of walkSessionPath) {
+      if (idx === prevIdx) continue;
+      kept.push(idx);
+      prevIdx = idx;
+    }
+    if (kept.length === 0) return undefined;
+    // Same label rule as the caption's flowLabelOf (parsedDiagram is in deps).
+    const labelOf = (id: string): string => {
+      const n = parsedDiagram?.nodes.find(x => x.id === id);
+      return n && n.type === 'flow' ? (n.properties.label || n.name || n.id).trim() || n.id : n?.name ?? id;
+    };
+    const sourceOutgoing = new Map<string, number>();
+    for (const e of parsedDiagram.edges) sourceOutgoing.set(e.from, (sourceOutgoing.get(e.from) ?? 0) + 1);
+    const lines: string[] = [];
+    for (let i = 0; i < kept.length; i++) {
+      const node = walkSteps[kept[i]];
+      if (!node) return undefined;
+      let text = labelOf(node.id);
+      if (i > 0) {
+        const edge = parsedDiagram.edges.find(e => e.from === walkSteps[kept[i - 1]].id && e.to === node.id);
+        const label = edge?.label?.trim();
+        if (edge && label && (sourceOutgoing.get(edge.from) ?? 0) >= 2) text = `${text} (${label})`;
+      }
+      lines.push(`${i + 1}. ${text}`);
+    }
+    return lines.join('\n');
+  }, [walkActive, parsedDiagram, walkSessionPath, walkSteps]);
+
   // Guard: board emptied or mode switched while active → leave walk-through;
   // board shrank → clamp to the last step instead of showing a blank caption.
   useEffect(() => {
@@ -1382,6 +1419,7 @@ function DiagramCanvasInternal() {
               const choice = walkChoices?.[index];
               if (choice && choice.index >= 0) pushWalkThroughStep(choice.index);
             }}
+            pathText={walkCopyPathText}
             onPrev={popWalkThroughStep}
             onNext={() => pushWalkThroughStep(Math.min(walkSteps.length - 1, walkIndex + 1))}
             onExit={exitWalkThrough}

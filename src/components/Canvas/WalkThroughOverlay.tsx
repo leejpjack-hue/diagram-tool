@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Panel } from '@xyflow/react';
 import type { FlowNodeRole } from '../../store/types';
 
@@ -19,6 +19,7 @@ interface WalkThroughOverlayProps {
   paths?: string; // DT-AI-18: `Yes → Retry once · No → Flag for review` when this step has 2+ outgoing edges
   choices?: { label: string }[]; // DT-AI-19: one choose button per outgoing edge, board edge order (2+ edges only)
   onChoose?: (index: number) => void; // DT-AI-19: jump the walk to the chosen branch target
+  pathText?: string; // DT-AI-22: numbered session-path labels for Copy path (undefined on non-flow boards)
   onPrev: () => void;
   onNext: () => void;
   onExit: () => void;
@@ -30,7 +31,32 @@ interface WalkThroughOverlayProps {
  * arrow keys are handled here while walk-through is active (same input-guard
  * pattern as the canvas F2 handler). Purely view state — nothing is edited.
  */
-export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, paths, choices, onChoose, onPrev, onNext, onExit }: WalkThroughOverlayProps) {
+export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, paths, choices, onChoose, pathText, onPrev, onNext, onExit }: WalkThroughOverlayProps) {
+  // DT-AI-22 — Copy path: writes the session path text to the clipboard and
+  // briefly flips the label to "Copied". Failures are swallowed (silent), and
+  // any pending reset timer is cleared on unmount.
+  const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+  }, []);
+  const handleCopyPath = () => {
+    if (!pathText) return;
+    navigator.clipboard
+      .writeText(pathText)
+      .then(() => {
+        setCopied(true);
+        if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = window.setTimeout(() => {
+          setCopied(false);
+          copyTimerRef.current = null;
+        }, 2000);
+      })
+      .catch(() => {
+        // Clipboard blocked → stay silent on the board, no throw.
+      });
+  };
+
   // Caption kept as one span so steps without a note render exactly as
   // DT-AI-14 did; the note only wraps it in a column when present.
   const caption = (
@@ -113,6 +139,15 @@ export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, 
           </span>
         ) : caption}
         <span className="w-px h-4 bg-slate-200" />
+        <button
+          type="button"
+          data-testid="walk-through-copy-path"
+          onClick={handleCopyPath}
+          disabled={!pathText}
+          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:border-indigo-300 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {copied ? 'Copied' : 'Copy path'}
+        </button>
         <button
           type="button"
           data-testid="walk-through-prev"

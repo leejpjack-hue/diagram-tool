@@ -1,7 +1,7 @@
 // DT-AI-14 — read-only walk-through on Flow boards.
 // Component tests render the real DSLEditor toolbar (Walk through control)
 // next to the real DiagramCanvas; Monaco is stubbed since jsdom cannot load it.
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReactFlowProvider } from '@xyflow/react';
 import { DiagramCanvas } from './DiagramCanvas';
@@ -533,5 +533,108 @@ describe('walk-through path highlights (DT-AI-20)', () => {
     expect(nodeEl(container, 'model').style.opacity).toBe(TRAIL_MID_OPACITY);
     expect(nodeEl(container, 'tool').style.opacity).toBe('1');
     expect(trailNodeIds(container)).toEqual(['ask', 'model']);
+  });
+});
+
+describe('walk-through Copy path (DT-AI-22)', () => {
+  function exampleFromPrompt(): string {
+    const idx = AI_PROMPT_TEXT.indexOf('Example');
+    expect(idx).toBeGreaterThan(-1);
+    const lineEnd = AI_PROMPT_TEXT.indexOf('\n', idx);
+    return AI_PROMPT_TEXT.slice(lineEnd + 1).trim();
+  }
+
+  function typeAndBuild(steps: string) {
+    fireEvent.click(screen.getByTestId('toggle-type-steps'));
+    fireEvent.change(screen.getByTestId('type-steps-input'), { target: { value: steps } });
+    fireEvent.click(screen.getByTestId('build-steps'));
+    expect(screen.getByTestId('toast-item')).toBeInTheDocument();
+  }
+
+  function mockClipboard(): { writeText: ReturnType<typeof vi.fn> } {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    return { writeText };
+  }
+
+  it('shows Copy path next to Prev/Next/Exit while walking and removes it after Exit', () => {
+    setup(FLOW_DSL);
+    expect(screen.queryByTestId('walk-through-copy-path')).toBeNull();
+    fireEvent.click(screen.getByTestId('walk-through'));
+    expect(screen.getByTestId('walk-through-copy-path')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('walk-through-exit'));
+    expect(screen.queryByTestId('walk-through-copy-path')).toBeNull();
+  });
+
+  it('worked example: Choose No copies the numbered taken path with (No) appended; Retry once excluded', async () => {
+    const { writeText } = mockClipboard();
+    setup(EMPTY_FLOW_DSL);
+    typeAndBuild(exampleFromPrompt());
+    fireEvent.click(screen.getByTestId('toast-action'));
+
+    // Next to the decision (step 4 of 7), then Choose No.
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    fireEvent.click(within(screen.getByTestId('walk-through-choose')).getByTestId('walk-through-choose-1'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Flag for review');
+
+    // Copy path → one numbered line per taken hop; the fork hop carries (No).
+    fireEvent.click(screen.getByTestId('walk-through-copy-path'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText).toHaveBeenCalledWith(
+      [
+        '1. read the support ticket',
+        '2. Draft a reply',
+        '3. Send the reply',
+        '4. it bounces',
+        '5. Flag for review (No)',
+      ].join('\n'),
+    );
+  });
+
+  it('button flips to Copied for a short moment, then back to Copy path', async () => {
+    mockClipboard();
+    setup(FLOW_DSL);
+    fireEvent.click(screen.getByTestId('walk-through'));
+    fireEvent.click(screen.getByTestId('walk-through-copy-path'));
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
+    await waitFor(
+      () => expect(screen.getByTestId('walk-through-copy-path')).toHaveTextContent('Copy path'),
+      { timeout: 3000 },
+    );
+  });
+
+  it('step 1 with empty stack copies a single numbered line for the start node', async () => {
+    const { writeText } = mockClipboard();
+    setup(FLOW_DSL);
+    fireEvent.click(screen.getByTestId('walk-through'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 1 of 6');
+    fireEvent.click(screen.getByTestId('walk-through-copy-path'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText).toHaveBeenCalledWith('1. Human ask');
+  });
+
+  it('unlabelled fork: choosing an arm copies the target line with no branch suffix', async () => {
+    const { writeText } = mockClipboard();
+    setup(UNLABELLED_FORK_DSL);
+    fireEvent.click(screen.getByTestId('walk-through'));
+    fireEvent.click(within(screen.getByTestId('walk-through-choose')).getByTestId('walk-through-choose-1'));
+    fireEvent.click(screen.getByTestId('walk-through-copy-path'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText).toHaveBeenCalledWith(['1. A', '2. C'].join('\n'));
+  });
+
+  it('clipboard failure stays silent on the board and keeps the Copy path label', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('clipboard blocked'));
+    Object.assign(navigator, { clipboard: { writeText } });
+    setup(FLOW_DSL);
+    fireEvent.click(screen.getByTestId('walk-through'));
+    fireEvent.click(screen.getByTestId('walk-through-copy-path'));
+    // Give the rejected promise a tick to settle.
+    await waitFor(() => {
+      expect(screen.getByTestId('walk-through-copy-path')).toHaveTextContent('Copy path');
+      expect(screen.queryByText('Copied')).toBeNull();
+    });
   });
 });
