@@ -794,7 +794,10 @@ function App() {
       setDslText(saved.dslText);
       setDiagramMode(saved.mode);
     }
-  }, [setDslText, setDiagramMode, setParsedDiagram, setReadOnlyShared, toast]);
+  // useToast() returns a new object each render; toast.error is a stable
+  // useCallback. Depending on `toast` re-ran this effect → setDiagramMode loop
+  // → React #185 blank #root for users with a saved diagram in localStorage.
+  }, [setDslText, setDiagramMode, setParsedDiagram, setReadOnlyShared, toast.error]);
 
   // ---- Board dashboard (Miro-style home) ----
 

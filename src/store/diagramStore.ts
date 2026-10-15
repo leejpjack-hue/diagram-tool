@@ -243,7 +243,10 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   
   setParsedDiagram: (diagram) => set({ parsedDiagram: diagram, diagramMode: diagram?.mode || 'architecture' }),
   setSelectedNode: (nodeId) => set({ selectedNodeId: nodeId }),
-  setDiagramMode: (mode) => set({ diagramMode: mode }),
+  setDiagramMode: (mode) => {
+    if (get().diagramMode === mode) return;
+    set({ diagramMode: mode });
+  },
   setError: (error) => set({ error }),
   setLoading: (loading) => set({ isLoading: loading }),
   setZoomLevel: (zoom) => set({ zoomLevel: zoom }),
