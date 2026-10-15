@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "@supabase/supabase-js": "^2.118.0",
     "@xyflow/react": "^12.10.0",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",

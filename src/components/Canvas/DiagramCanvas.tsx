@@ -200,7 +200,7 @@ function computeArchitectureRouting(diagramMode: string, diagramEdges: DiagramEd
 }
 
 function DiagramCanvasInternal() {
-  const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode, dslText, setDslText, setParsedDiagram, setError, selectedNodeId } = useDiagramStore();
+  const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode, dslText, setDslText, setParsedDiagram, setError, selectedNodeId, isReadOnlyShared } = useDiagramStore();
   const [renameDraft, setRenameDraft] = useState<string | null>(null);
   const { getZoom, fitView } = useReactFlow();
   const [c4Level, setC4Level] = useState<C4Level | 'all'>('all');
@@ -1343,11 +1343,11 @@ function DiagramCanvasInternal() {
       <ReactFlow
         nodes={displayNodes}
         edges={displayEdges}
-        // DT-AI-14: walk-through is read-only — no dragging, connecting or
-        // selection while it is active.
-        nodesDraggable={!walkActive}
-        nodesConnectable={!walkActive}
-        elementsSelectable={!walkActive}
+        // DT-AI-14 / DT-SAVE-01: walk-through and shared view are read-only —
+        // no dragging, connecting or selection while active.
+        nodesDraggable={!walkActive && !isReadOnlyShared}
+        nodesConnectable={!walkActive && !isReadOnlyShared}
+        elementsSelectable={!walkActive && !isReadOnlyShared}
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -1493,7 +1493,7 @@ function DiagramCanvasInternal() {
       )}
 
       {/* Shape library palette */}
-      <ShapeLibrary />
+      {!isReadOnlyShared && <ShapeLibrary />}
 
       {/* C4 Level Switcher (architecture mode, only when levels are present) */}
       {diagramMode !== 'flow' && (
