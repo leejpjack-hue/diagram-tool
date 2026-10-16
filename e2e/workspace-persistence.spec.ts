@@ -15,18 +15,21 @@ service API`;
 async function waitForEditor(page: Page) {
   await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible();
   await page.waitForFunction(() => {
-    const monaco = (window as unknown as { monaco?: { editor?: { getEditors?: () => { setValue: (value: string) => void }[] } } }).monaco;
-    return Boolean(monaco?.editor?.getEditors?.()?.length);
+    const monaco = (window as unknown as { monaco?: { editor?: { getEditors?: () => { setValue: (value: string) => void; getValue?: () => string }[] } } }).monaco;
+    const editor = monaco?.editor?.getEditors?.()?.[0];
+    return Boolean(editor && editor.getValue?.());
   });
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
 }
 
 async function setEditorDsl(page: Page, dsl: string) {
   await waitForEditor(page);
   await page.evaluate(value => {
     const editor = (window as unknown as { monaco: { editor: { getEditors: () => { setValue: (next: string) => void }[] } } }).monaco.editor.getEditors()[0];
+    editor.setValue('');
     editor.setValue(value);
   }, dsl);
-  await expect(page.getByText(dsl.split('\n').find(line => line.trim() && !line.startsWith('diagram:')) ?? dsl)).toBeVisible();
+  await expect(page.getByText(dsl.split('\n').find(line => line.trim() && !line.startsWith('diagram:')) ?? dsl).first()).toBeVisible();
 }
 
 async function createEditedBoard(page: Page, starter: RegExp, dsl: string) {
@@ -77,8 +80,12 @@ async function warmOfflineShell(page: Page) {
     });
     const cache = await caches.open('diagram-tool-shell-v3');
     for (const url of urls) {
-      const response = await fetch(url);
-      if (response.ok) await cache.put(url, response.clone());
+      try {
+        const response = await fetch(url);
+        if (response.ok) await cache.put(url, response.clone());
+      } catch {
+        // Ignore non-cacheable or transient resource entries.
+      }
     }
   });
 }
@@ -126,15 +133,18 @@ test.describe('Durable local-first workspace', () => {
     await expect(page.getByRole('heading', { name: 'Train Arch Offline Edited' })).toBeVisible();
 
     await page.getByRole('heading', { name: 'Train Arch Offline Edited' }).click();
-    await expect(page.getByText('Train Arch Offline Edited')).toBeVisible();
+    await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible();
+    await expect(page.getByText('Train Arch Offline Edited').first()).toBeVisible();
     await page.getByRole('button', { name: '⌂ Boards' }).click();
 
     await page.getByRole('heading', { name: 'Train Flow Offline' }).click();
-    await expect(page.getByText('Train Flow Offline')).toBeVisible();
+    await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible();
+    await expect(page.getByText('Train Flow Offline').first()).toBeVisible();
     await page.getByRole('button', { name: '⌂ Boards' }).click();
 
     await page.getByRole('heading', { name: 'Untitled Sequence' }).click();
-    await expect(page.getByText('train-offline')).toBeVisible();
+    await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible();
+    await expect(page.getByText('train-offline').first()).toBeVisible();
     await page.getByRole('button', { name: '⌂ Boards' }).click();
 
     await page.getByRole('button', { name: 'Actions for Train Arch Offline Edited' }).click();
