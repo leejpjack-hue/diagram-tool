@@ -6,9 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReactFlowProvider } from '@xyflow/react';
 import { DiagramCanvas } from './DiagramCanvas';
 import { DSLEditor } from '../Editor/DSLEditor';
+import App from '../../App';
 import { useDiagramStore } from '../../store/diagramStore';
 import { parseDiagram } from '../../parser/parser';
 import { AI_PROMPT_TEXT } from '../Editor/aiPrompt';
+import { setSupabaseClientForTests, type SupabaseClientLike } from '../../lib/supabase';
+import { buildBoardDocument } from '../../utils/boardFormat';
+import type { BoardMode } from '../../utils/boardManager';
 import type { DiagramNode, ParsedDiagram } from '../../store/types';
 
 vi.mock('@monaco-editor/react', () => ({
@@ -636,5 +640,157 @@ describe('walk-through Copy path (DT-AI-22)', () => {
       expect(screen.getByTestId('walk-through-copy-path')).toHaveTextContent('Copy path');
       expect(screen.queryByText('Copied')).toBeNull();
     });
+  });
+});
+
+describe('Shared read-only banner Walk through (DT-AI-23)', () => {
+  function mockSharedClient(input: { title: string; mode: BoardMode; dslText: string }): SupabaseClientLike {
+    const payload = buildBoardDocument(input, '2026-10-16T09:00:00.000Z');
+    return {
+      auth: {
+        getSession: async () => ({ data: { session: null }, error: null }),
+        signInWithOtp: async () => ({ error: null }),
+        signOut: async () => ({ error: null }),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => undefined } } }),
+      },
+      from: () => {
+        throw new Error('unexpected from() in shared read-only test');
+      },
+      rpc: vi.fn(async () => ({
+        data: [
+          {
+            id: 'shared-row-1',
+            title: input.title,
+            payload,
+            updated_at: '2026-10-16T09:00:00.000Z',
+          },
+        ],
+        error: null,
+      })),
+    };
+  }
+
+  beforeEach(() => {
+    window.matchMedia ??= ((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+    useDiagramStore.setState({
+      isReadOnlyShared: false,
+      sharedBoardTitle: null,
+      walkThroughStep: null,
+      walkThroughStack: [],
+    });
+  });
+
+  afterEach(() => {
+    setSupabaseClientForTests(undefined);
+    window.history.replaceState({}, '', '/');
+    useDiagramStore.setState({
+      isReadOnlyShared: false,
+      sharedBoardTitle: null,
+      walkThroughStep: null,
+      walkThroughStack: [],
+    });
+  });
+
+  it('shows Walk through beside Save a copy on a shared Flow board with steps, starts walk, and preserves read-only on Exit', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    setSupabaseClientForTests(
+      mockSharedClient({
+        title: 'Shared AI Workflow',
+        mode: 'flow',
+        dslText: FLOW_DSL,
+      }),
+    );
+    window.history.replaceState({}, '', '/app/?share=tok_flow_23');
+
+    const { container } = render(<App />);
+
+    const banner = await screen.findByTestId('shared-readonly-banner');
+    expect(banner).toHaveTextContent('Shared AI Workflow');
+    expect(within(banner).getByTestId('shared-save-local-copy')).toBeInTheDocument();
+    const walkBtn = within(banner).getByTestId('shared-walk-through');
+    expect(walkBtn).toHaveAccessibleName('Walk through');
+
+    // Click starts walk-through at step 1 via the existing store/canvas path.
+    fireEvent.click(walkBtn);
+    expect(useDiagramStore.getState().walkThroughStep).toBe(0);
+    expect(useDiagramStore.getState().isReadOnlyShared).toBe(true);
+    expect(screen.getByTestId('walk-through-overlay')).toBeInTheDocument();
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 1 of 6');
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Human ask');
+
+    // Advance to the decision (step 4: Check) — trails, Choose, and Copy path work as normal.
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 4 of 6');
+    expect(container.querySelector('[data-testid="walk-through-node-trail"]')).not.toBeNull();
+
+    // Choose branch at decision ('ok' -> Reply).
+    fireEvent.click(within(screen.getByTestId('walk-through-choose')).getByTestId('walk-through-choose-1'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Reply');
+
+    // Copy path works on shared Flow board.
+    fireEvent.click(screen.getByTestId('walk-through-copy-path'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText).toHaveBeenCalledWith(
+      ['1. Human ask', '2. Model', '3. Tool', '4. Check', '5. Reply (ok)'].join('\n'),
+    );
+
+    // Exit leaves isReadOnlyShared true and the amber banner intact.
+    fireEvent.click(screen.getByTestId('walk-through-exit'));
+    expect(screen.queryByTestId('walk-through-overlay')).toBeNull();
+    expect(useDiagramStore.getState().walkThroughStep).toBeNull();
+    expect(useDiagramStore.getState().isReadOnlyShared).toBe(true);
+    expect(screen.getByTestId('shared-readonly-banner')).toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      label: 'empty Flow board (zero walk steps)',
+      mode: 'flow' as BoardMode,
+      dslText: EMPTY_FLOW_DSL,
+    },
+    {
+      label: 'Architecture board',
+      mode: 'architecture' as BoardMode,
+      dslText: ARCH_DSL,
+    },
+    {
+      label: 'Sequence board',
+      mode: 'sequence' as BoardMode,
+      dslText: 'sequenceDiagram\nAlice->>Bob: hi',
+    },
+    {
+      label: 'Gantt board',
+      mode: 'gantt' as BoardMode,
+      dslText: 'diagram: gantt\ntitle: Plan\nstart: 2026-10-16\ntask T1 {\n  start: 2026-10-16\n  end: 2026-10-18\n}',
+    },
+  ])('hides Walk through on shared $label with no crash and no toast spam', async ({ mode, dslText }) => {
+    setSupabaseClientForTests(
+      mockSharedClient({
+        title: `Shared ${mode}`,
+        mode,
+        dslText,
+      }),
+    );
+    window.history.replaceState({}, '', `/app/?share=tok_${mode}`);
+
+    render(<App />);
+
+    const banner = await screen.findByTestId('shared-readonly-banner');
+    expect(within(banner).getByTestId('shared-save-local-copy')).toBeInTheDocument();
+    expect(within(banner).queryByTestId('shared-walk-through')).toBeNull();
+    expect(screen.queryByTestId('toast-item')).toBeNull();
   });
 });
