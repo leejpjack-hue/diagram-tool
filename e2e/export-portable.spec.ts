@@ -93,9 +93,9 @@ test.describe('Portable export and import', () => {
     ]);
     await fileChooser.setFiles(path!);
     await expect(page.getByText(/Imported “Portable Roundtrip”/)).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Portable Roundtrip' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Portable Roundtrip' }).first()).toBeVisible();
 
-    await page.getByRole('heading', { name: 'Portable Roundtrip' }).click();
+    await page.getByRole('heading', { name: 'Portable Roundtrip' }).first().click();
     await waitForEditor(page);
     await expect(page.getByText('Portable Roundtrip').first()).toBeVisible();
     await expect(page.getByTestId('rf__node-gateway')).toBeVisible();
