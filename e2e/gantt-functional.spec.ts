@@ -1,8 +1,16 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+async function openEditorFromDashboard(page: Page) {
+  await page.goto('/app/');
+  const blankArch = page.getByRole('button', { name: /Blank Architecture/i }).first();
+  await expect(blankArch).toBeVisible({ timeout: 10000 });
+  await blankArch.click();
+  await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible({ timeout: 10000 });
+}
 
 test.describe('Gantt Functional Tests - Complete Workflow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/app/');
+    await openEditorFromDashboard(page);
   });
 
   test('Complete Gantt workflow: Create, Edit, Filter, Export', async ({ page }) => {
