@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { DSLEditor } from './components/Editor/DSLEditor';
 import { UndoRedoControls } from './components/Editor/UndoRedoControls';
 import { DiagramCanvas } from './components/Canvas/DiagramCanvas';
@@ -23,6 +23,7 @@ import { useDiagramStore } from './store/diagramStore';
 import { useGanttStore } from './components/Gantt/ganttStore';
 import { generateGanttDSL } from './components/Gantt/ganttGenerator';
 import { seedTypeStepsForTemplate } from './parser/boardToPlainSteps';
+import { flowStepList } from './parser/flowToPlainSteps';
 import { applyBoardSource, extractBoardTitle } from './utils/sourceText';
 import { exportGanttChart } from './components/Gantt/exportUtils';
 import type { DelayImpactResult } from './components/Gantt/delayImpactUtils';
@@ -395,6 +396,7 @@ function App() {
     isReadOnlyShared,
     sharedBoardTitle,
     setReadOnlyShared,
+    enterWalkThrough,
   } = useDiagramStore();
   
   const { addTask, updateTask, setProject, tasks, dependencies } = useGanttStore();
@@ -1063,6 +1065,16 @@ function App() {
     deckItems,
   );
 
+  // DT-AI-23: same walkability gate as DSLEditor / DiagramCanvas.
+  const canWalkShared = useMemo(() => {
+    if (!isReadOnlyShared || diagramMode !== 'flow' || !parsedDiagram) return false;
+    try {
+      return flowStepList(parsedDiagram).length > 0;
+    } catch {
+      return false;
+    }
+  }, [isReadOnlyShared, diagramMode, parsedDiagram]);
+
   const handleSaveSharedAsLocalCopy = async () => {
     try {
       const title = sharedBoardTitle || extractBoardTitle(dslText, activeTab) || 'Shared diagram';
@@ -1099,14 +1111,26 @@ function App() {
           <span>
             Viewing shared board <strong>{sharedBoardTitle || 'Shared diagram'}</strong> (read-only).
           </span>
-          <button
-            type="button"
-            data-testid="shared-save-local-copy"
-            onClick={() => void handleSaveSharedAsLocalCopy()}
-            className="rounded-md bg-amber-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-800"
-          >
-            Save a copy to my workspace
-          </button>
+          <div className="flex items-center gap-2">
+            {canWalkShared && (
+              <button
+                type="button"
+                data-testid="shared-walk-through"
+                onClick={enterWalkThrough}
+                className="rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+              >
+                Walk through
+              </button>
+            )}
+            <button
+              type="button"
+              data-testid="shared-save-local-copy"
+              onClick={() => void handleSaveSharedAsLocalCopy()}
+              className="rounded-md bg-amber-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-800"
+            >
+              Save a copy to my workspace
+            </button>
+          </div>
         </div>
       )}
       {(view === 'editor' || view === 'presentation') && <BoardSizeWarnBanner snapshot={boardSize} />}
