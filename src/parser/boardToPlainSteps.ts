@@ -4,6 +4,19 @@
 import { toDslSource } from '../utils/sourceText';
 import { parseDiagram } from './parser';
 import { flowToPlainSteps } from './flowToPlainSteps';
+import { diagramMatchesRoleLanes } from './plainSteps';
+
+/**
+ * DT-AI-27: Load steps ticks Lanes by role only when the board's lanes are
+ * the role lanes. Anything else (no lanes, a custom swimlane) leaves it off.
+ */
+export function sourceMatchesRoleLanes(dslText: string): boolean {
+  try {
+    return diagramMatchesRoleLanes(parseDiagram(toDslSource(dslText, 'flow')));
+  } catch {
+    return false;
+  }
+}
 
 /** Serialize current editor source (DSL or Mermaid flow) to plain Type steps text. */
 export function plainStepsFromBoardSource(dslText: string): string {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { plainStepsFromBoardSource, applyLoadedPlainSteps, seedTypeStepsForTemplate } from './boardToPlainSteps';
+import { plainStepsFromBoardSource, applyLoadedPlainSteps, seedTypeStepsForTemplate, sourceMatchesRoleLanes } from './boardToPlainSteps';
+import { plainStepsToDSL } from './plainSteps';
 import { TEMPLATES } from '../components/TemplatePicker/templates';
 import { flowToPlainSteps } from './flowToPlainSteps';
 import { parseDiagram } from './parser';
@@ -50,6 +51,13 @@ describe('seedTypeStepsForTemplate (DT-AI-09 template seeds Type steps)', () => 
     const seeded = seedTypeStepsForTemplate(tpl!.id, tpl!.dsl);
     expect(seeded).not.toBeNull();
     expect(seeded).toBe(plainStepsFromBoardSource(tpl!.dsl));
+  });
+
+  it('matches role lanes on a typed board and not a board without them', () => {
+    const steps = 'Human: ask\nModel: draft\nSend';
+    expect(sourceMatchesRoleLanes(plainStepsToDSL(steps, { lanesByRole: true }))).toBe(true);
+    expect(sourceMatchesRoleLanes(plainStepsToDSL(steps))).toBe(false);
+    expect(sourceMatchesRoleLanes('not a diagram')).toBe(false);
   });
 
   it('other template ids return null (no mass auto-seed)', () => {

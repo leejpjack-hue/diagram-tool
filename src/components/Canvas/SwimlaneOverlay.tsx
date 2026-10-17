@@ -1,5 +1,7 @@
 import { memo } from 'react';
 import type { NodeProps } from '@xyflow/react';
+import { useDiagramStore } from '../../store/diagramStore';
+import { roleLaneColor } from './iconStyles';
 
 interface SwimlaneNodeData {
   label: string;
@@ -18,7 +20,8 @@ interface SwimlaneNodeData {
  */
 export const SwimlaneNode = memo(({ data }: NodeProps) => {
   const d = data as unknown as SwimlaneNodeData;
-  const color = d.color || '#64748b';
+  const iconStyle = useDiagramStore(s => s.iconStyle);
+  const color = roleLaneColor(d.label, iconStyle) ?? d.color ?? '#64748b';
   const HEADER_W = 56;
   const outerRadius = 14;
 
@@ -52,6 +55,8 @@ export const SwimlaneNode = memo(({ data }: NodeProps) => {
         }}
       >
         <div
+          data-testid="swimlane-label"
+          data-lane-name={d.label}
           className="text-[11px] font-bold uppercase"
           style={{
             color: '#ffffff',

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseDiagram } from './parser';
+import { TEMPLATES } from '../components/TemplatePicker/templates';
 
 describe('Architecture Parser', () => {
   it('should parse diagram mode declaration', () => {
@@ -472,5 +473,30 @@ node B {
       expect(parseRole('role: alien')).toBeUndefined();
       expect(parseRole('role: systemrole')).toBeUndefined();
     });
+  });
+});
+
+describe('lane names', () => {
+  it('keeps single-word lanes, including a keyword name, and reads a multi-word name', () => {
+    const loan = TEMPLATES.find(entry => entry.id === 'flow-swimlane-loan');
+    const parsed = parseDiagram(loan!.dsl);
+    expect(parsed.lanes?.map(lane => lane.name)).toEqual(['Customer', 'LoanOfficer', 'Underwriter', 'System']);
+    expect(parsed.lanes?.find(lane => lane.name === 'Customer')?.contains).toEqual([
+      'applicationsubmitted',
+      'collectdocs',
+      'notifyapprove',
+      'notifydecline',
+    ]);
+
+    const named = parseDiagram(`diagram: flow
+title: "Roles"
+ask -> draft
+node ask { label: "ask" }
+node draft { label: "draft" }
+lane AI agent { contains: ask, draft }
+`);
+    expect(named.lanes?.[0].name).toBe('AI agent');
+    expect(named.lanes?.[0].id).toBe('ai_agent');
+    expect(named.lanes?.[0].contains).toEqual(['ask', 'draft']);
   });
 });
