@@ -20,6 +20,18 @@ export default {
       });
     }
 
+    // run_worker_first sends /api/* here. With the signup route gone, do not
+    // hand those paths to the asset SPA fallback.
+    if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
+      return new Response('Not found', {
+        status: 404,
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'no-store',
+        },
+      });
+    }
+
     if (url.pathname === '/app') {
       url.pathname = '/app/';
       request = new Request(url, request);
