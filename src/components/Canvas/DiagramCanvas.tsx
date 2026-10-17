@@ -773,7 +773,7 @@ function DiagramCanvasInternal() {
       return {
         ...edge,
         type: 'loop',
-        data: { ...(edge.data as object | undefined), loop: true, axis: flowAxis },
+        data: { loop: true, axis: flowAxis },
       };
     });
   }, [parsedDiagram, diagramMode, c4Level, drillParent, architectureRouting, iconStyle, flowTokens, initialNodes, isLR]);
