@@ -981,11 +981,38 @@ export class Parser {
     return buffer.filter(s => s.length > 0);
   }
 
+  // Lane title: one word (`lane Human`), several words (`lane AI agent`),
+  // or a quoted string (`lane "AI agent"`). Stops before `{`.
+  private readLaneName(): string {
+    const token = this.peek();
+    if (token.type === TokenType.STRING) {
+      this.advance();
+      const name = String(token.value).trim();
+      if (!name) {
+        throw new Error(`Expected lane name at line ${token.line}, column ${token.column}`);
+      }
+      return name;
+    }
+    if (!this.isNameToken(token)) {
+      throw new Error(
+        token.type === TokenType.EOF
+          ? 'Unexpected end of input (expected lane name)'
+          : `Expected lane name but got ${token.type} at line ${token.line}, column ${token.column}`,
+      );
+    }
+    const parts: string[] = [];
+    while (this.isNameToken(this.peek())) {
+      parts.push(String(this.advance().value));
+    }
+    return parts.join(' ');
+  }
+
   private parseLane(): void {
     this.advance(); // consume 'lane'
-    const nameToken = this.expectName();
-    const name = nameToken.value as string;
+    this.skipNewlines();
+    const name = this.readLaneName();
     const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    this.skipNewlines();
 
     const lane: Lane = {
       id,

@@ -379,6 +379,54 @@ node search {
     expect(plan.boards[0].dslText).toContain('type: gatewayparallel');
   });
 
+  it('keeps role lanes inside the DSL on format 3.0 and still defaults a missing icon style', () => {
+    expect(BOARD_FORMAT_VERSION).toBe('3.0');
+    const source = (schema.$defs as { source?: { properties?: { text?: { description?: string } } } }).source;
+    expect(source?.properties?.text?.description).toContain('lane');
+    expect(source?.properties?.text?.description).toContain('AI agent');
+    expect(source?.properties?.text?.description).toContain('3.0');
+
+    const laneDsl = `diagram: flow
+title: Role lanes
+direction: TB
+ask -> draft
+node ask {
+  label: "ask"
+  role: human
+}
+node draft {
+  label: "draft"
+  role: model
+}
+lane Human {
+  contains: ask
+}
+lane "AI agent" {
+  contains: draft
+}
+`;
+    const doc = buildBoardDocument(board({ mode: 'flow', dslText: laneDsl }));
+    expect(doc.version).toBe('3.0');
+    expect(doc.board).not.toHaveProperty('iconStyle');
+    expect(doc.board).not.toHaveProperty('showStepNumbers');
+    expect(doc.board.dslText).toContain('lane Human');
+    expect(doc.board.dslText).toContain('lane "AI agent"');
+    const plan = parsePortableImport(doc);
+    expect(plan.boards[0].iconStyle).toBeUndefined();
+    expect(plan.boards[0].dslText).toContain('lane Human');
+
+    const legacy = parsePortableImport({
+      version: '3.0',
+      board: {
+        title: 'Old flow',
+        mode: 'flow',
+        source: { kind: 'dsl', text: FLOW_DSL },
+      },
+    });
+    expect(legacy.boards[0].iconStyle).toBeUndefined();
+    expect(legacy.boards[0]).not.toHaveProperty('showStepNumbers');
+  });
+
   it('PNG/SVG/PDF export stays free and unwatermarked', () => {
     expect(EXPORT_WATERMARK).toBeNull();
     expect(EXPORT_REQUIRES_ACCOUNT).toBe(false);

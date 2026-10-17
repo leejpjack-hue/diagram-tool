@@ -5,7 +5,7 @@ import { installDiagramDslTestHook } from '../../utils/devTestHook';
 import { applyBoardSource, toDslSource, toMermaidSource } from '../../utils/sourceText';
 import { plainStepsToDSL } from '../../parser/plainSteps';
 import { flowStepList, type FlowStep } from '../../parser/flowToPlainSteps';
-import { plainStepsFromBoardSource, applyLoadedPlainSteps } from '../../parser/boardToPlainSteps';
+import { plainStepsFromBoardSource, applyLoadedPlainSteps, sourceMatchesRoleLanes } from '../../parser/boardToPlainSteps';
 import { insertRolePrefix, type RolePrefixRole } from '../../parser/insertRolePrefix';
 import { nextShowStepsAfterBuild, statsFromPlainStepsDsl, buildFromStepsSuccessMessage } from './buildFromStepsPanel';
 import { AI_PROMPT_TEXT } from './aiPrompt';
@@ -25,6 +25,9 @@ export function DSLEditor() {
   // DT-AI-01: thin "Type steps" box for plain sentences (Flow boards only).
   const [showSteps, setShowSteps] = useState(false);
   const [stepsText, setStepsText] = useState('');
+  // DT-AI-27: off until the user ticks it. The board remembers it by the
+  // lane blocks in the DSL, so Load steps restores the tick. No new field.
+  const [lanesByRole, setLanesByRole] = useState(false);
   const toast = useToast();
   // DT-AI-08: textarea ref so role-prefix buttons can read the caret/selection.
   const stepsInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -96,6 +99,7 @@ else Flag for review`;
         title: useDiagramStore.getState().dslText.match(/^\s*title\s*:\s*(.+)\s*$/im)?.[1]?.trim(),
         loopMisses,
         parallelHints,
+        lanesByRole,
       });
       // DT-AI-11: keep panel open; DT-AI-13: success toast with step→node count (+ roles).
       setShowSteps(prev => nextShowStepsAfterBuild(prev, 'success'));
@@ -121,7 +125,7 @@ else Flag for review`;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not read those steps. Type one step per line.');
     }
-  }, [stepsText, toast, applySource, diagramMode, enterWalkThrough]);
+  }, [stepsText, lanesByRole, toast, applySource, diagramMode, enterWalkThrough]);
 
   // DT-AI-07: fill Type steps from the live board (same serializer as Copy; no clipboard).
   const loadSteps = useCallback(() => {
@@ -131,6 +135,7 @@ else Flag for review`;
       const next = applyLoadedPlainSteps(previous, payload);
       setStepsText(next.stepsText);
       setShowSteps(next.showSteps);
+      setLanesByRole(sourceMatchesRoleLanes(dslText));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not load steps from this board.');
       // textarea unchanged on failure
@@ -321,6 +326,15 @@ else Flag for review`;
               </button>
             ))}
           </div>
+          <label className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-slate-700">
+            <input
+              type="checkbox"
+              data-testid="type-steps-lanes-by-role"
+              checked={lanesByRole}
+              onChange={event => setLanesByRole(event.target.checked)}
+            />
+            Lanes by role
+          </label>
           <div className="mt-2 flex items-center gap-2">
             <button
               type="button"

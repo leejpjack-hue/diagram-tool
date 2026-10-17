@@ -1,3 +1,5 @@
+import type { FlowNode, Lane, ParsedDiagram } from '../store/types';
+
 // "Type steps" plain-sentence support (DT-AI-01).
 //
 // Deterministic local conversion of one-step-per-line typed sentences into the
@@ -83,6 +85,13 @@
 // line is last and nothing follows it. A plain "and" does not split. The same
 // phrase inside an if/else branch on that line stays text, and Build notes it.
 // Lines without these phrases stay byte-identical. Existing node kinds only.
+//
+// DT-AI-27 — optional role swimlanes. When `lanesByRole` is set, Build appends
+// native `lane` blocks after the nodes. Membership follows the step's role or
+// data kind: Human, AI agent (model), Tool, Check, Data (data and document),
+// Other (no role). Empty lanes are omitted. That order is fixed. Edges and
+// node blocks stay exactly as they are with the option off, so step order is
+// unchanged. The option off (the default) is byte-identical to today.
 //
 // `then` links steps in order; `if <text>` makes `<text>` a decision node whose
 // following branch is labelled Yes; `else ...` reuses that decision for a No
@@ -206,6 +215,18 @@ export function splitStepNote(line: string): { text: string; note?: string } {
   if (!note) return { text: line };
   return { text: line.slice(0, m.index).trim(), note };
 }
+
+/** Display order for DT-AI-27 role lanes. Empty lanes are not emitted. */
+export const ROLE_LANES = [
+  { key: 'human', name: 'Human' },
+  { key: 'model', name: 'AI agent' },
+  { key: 'tool', name: 'Tool' },
+  { key: 'check', name: 'Check' },
+  { key: 'data', name: 'Data' },
+  { key: 'other', name: 'Other' },
+] as const;
+
+type RoleLaneKey = (typeof ROLE_LANES)[number]['key'];
 
 interface EmittedNode {
   id: string;
@@ -382,9 +403,68 @@ function emitParallel(branches: string[], state: State, needJoin: boolean): void
   state.last = forkId;
 }
 
+function laneKeyForEmitted(node: EmittedNode): RoleLaneKey {
+  if (node.kind === 'data' || node.kind === 'document') return 'data';
+  if (node.role) return node.role;
+  return 'other';
+}
+
+function laneKeyForFlow(node: FlowNode): RoleLaneKey {
+  const kind = node.properties.nodeType;
+  if (kind === 'data' || kind === 'document') return 'data';
+  const role = node.properties.role;
+  if (role === 'human' || role === 'model' || role === 'tool' || role === 'check') return role;
+  return 'other';
+}
+
+/** A lane name that is one identifier stays bare. A space needs quotes. */
+function laneHeader(name: string): string {
+  if (/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name)) return `lane ${name} {`;
+  return `lane ${quote(name)} {`;
+}
+
+/**
+ * True when the board's lanes are exactly the non-empty role lanes for its
+ * flow nodes (same names, same order, same node ids). Custom swimlanes do
+ * not match. No lanes does not match.
+ */
+export function diagramMatchesRoleLanes(diagram: ParsedDiagram): boolean {
+  const actual = diagram.lanes;
+  if (!actual || actual.length === 0) return false;
+  const expected = roleLanesForFlowNodes(
+    diagram.nodes.filter((node): node is FlowNode => node.type === 'flow'),
+  );
+  if (expected.length !== actual.length) return false;
+  return expected.every((lane, index) => sameLane(lane, actual[index]));
+}
+
+function roleLanesForFlowNodes(nodes: FlowNode[]): { name: string; contains: string[] }[] {
+  const buckets = new Map<RoleLaneKey, string[]>();
+  for (const node of nodes) {
+    const key = laneKeyForFlow(node);
+    const ids = buckets.get(key);
+    if (ids) ids.push(node.id);
+    else buckets.set(key, [node.id]);
+  }
+  return ROLE_LANES.flatMap(lane => {
+    const contains = buckets.get(lane.key);
+    return contains && contains.length > 0 ? [{ name: lane.name, contains }] : [];
+  });
+}
+
+function sameLane(expected: { name: string; contains: string[] }, actual: Lane): boolean {
+  if (actual.name !== expected.name || actual.contains.length !== expected.contains.length) return false;
+  return expected.contains.every((id, index) => actual.contains[index] === id);
+}
+
 export function plainStepsToDSL(
   text: string,
-  opts: { title?: string; loopMisses?: { count: number }; parallelHints?: { count: number } } = {},
+  opts: {
+    title?: string;
+    loopMisses?: { count: number };
+    parallelHints?: { count: number };
+    lanesByRole?: boolean;
+  } = {},
 ): string {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   const state: State = {
@@ -531,6 +611,21 @@ export function plainStepsToDSL(
     if (n.role) body.push(`role: ${n.role}`);
     if (n.note) body.push(`note: ${quote(n.note)}`);
     out.push(`node ${n.id} {`, ...body.map(l => `  ${l}`), '}', '');
+  }
+
+  if (opts.lanesByRole) {
+    const buckets = new Map<RoleLaneKey, string[]>();
+    for (const node of state.nodes) {
+      const key = laneKeyForEmitted(node);
+      const ids = buckets.get(key);
+      if (ids) ids.push(node.id);
+      else buckets.set(key, [node.id]);
+    }
+    for (const lane of ROLE_LANES) {
+      const ids = buckets.get(lane.key);
+      if (!ids || ids.length === 0) continue;
+      out.push(laneHeader(lane.name), `  contains: ${ids.join(', ')}`, '}', '');
+    }
   }
 
   return out.join('\n');

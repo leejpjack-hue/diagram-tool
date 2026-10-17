@@ -63,6 +63,12 @@ Type steps may split one line with `and at the same time`, `in parallel with`, o
 
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 
+### Role lanes from Type steps
+
+Type steps may place steps in the existing swimlane `lane` blocks Human, AI agent, Tool, Check, Data, and Other. Only lanes that contain steps are written. These blocks live inside `source.text` / `dslText`. They are not a new board field. `version` stays **3.0**. No database migration.
+
+A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
+
 `nodes` and `edges` are a portable projection of that source plus layout pins. Re-opening the file prefers `source.text` / `dslText` and restores typed boards (architecture, flow, sequence, Gantt) so layout stays within ±2px of the export.
 
 ### Complete backup (`kind: "workspace"`)

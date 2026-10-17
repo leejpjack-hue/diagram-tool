@@ -527,3 +527,20 @@ export function contrastRatio(fg: string, bg: string): number {
   const darker = Math.min(l1, l2);
   return (lighter + 0.05) / (darker + 0.05);
 }
+
+/** DT-AI-27 role-lane titles, painted from the active style's role colours. */
+const ROLE_LANE_KIND: Record<string, StyleNodeKind> = {
+  human: 'human',
+  'ai agent': 'agent',
+  tool: 'tool',
+  check: 'check',
+  data: 'data',
+  other: 'step',
+};
+
+/** Colour for a role lane, or null when the title is not one of those lanes. */
+export function roleLaneColor(label: string, iconStyle: IconStyleId): string | null {
+  const kind = ROLE_LANE_KIND[label.trim().toLowerCase()];
+  if (!kind) return null;
+  return ICON_STYLES[iconStyle].types[kind].color;
+}

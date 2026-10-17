@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { plainStepsToDSL, stripListMarker } from './plainSteps';
+import { diagramMatchesRoleLanes, plainStepsToDSL, stripListMarker } from './plainSteps';
+import { flowToPlainSteps } from './flowToPlainSteps';
 import { parseDiagram } from './parser';
 
 describe('plainStepsToDSL (converter output shape)', () => {
@@ -749,5 +750,98 @@ node flag {
   label: "Flag"
 }
 `);
+  });
+});
+
+describe('plainStepsToDSL (DT-AI-27 lanes by role)', () => {
+  const mixed = 'Human: ask\nModel: draft\nTool: search\nCheck: review\nData: tickets\nFile: brief\nSend';
+
+  function laneContains(dsl: string, name: string): string[] | undefined {
+    const lane = parseDiagram(dsl).lanes?.find(entry => entry.name === name);
+    return lane?.contains;
+  }
+
+  it('emits one lane per role, data kind, and other, skipping empty lanes', () => {
+    const dsl = plainStepsToDSL('Human: ask\nTool: search', { lanesByRole: true });
+    const parsed = parseDiagram(dsl);
+    expect(parsed.lanes?.map(lane => lane.name)).toEqual(['Human', 'Tool']);
+    expect(laneContains(dsl, 'Human')).toEqual(['ask']);
+    expect(laneContains(dsl, 'Tool')).toEqual(['search']);
+    expect(dsl).not.toContain('AI agent');
+    expect(dsl).not.toContain('lane Check');
+    expect(dsl).not.toContain('lane Data');
+    expect(dsl).not.toContain('lane Other');
+    const ask = parsed.nodes.find(node => node.id === 'ask');
+    const search = parsed.nodes.find(node => node.id === 'search');
+    expect(ask?.type === 'flow' ? ask.properties.lane : undefined).toBe('human');
+    expect(search?.type === 'flow' ? search.properties.lane : undefined).toBe('tool');
+  });
+
+  it('puts model steps in AI agent, data and file steps in Data, and unroled steps in Other', () => {
+    const dsl = plainStepsToDSL(mixed, { lanesByRole: true });
+    expect(parseDiagram(dsl).lanes?.map(lane => lane.name)).toEqual([
+      'Human',
+      'AI agent',
+      'Tool',
+      'Check',
+      'Data',
+      'Other',
+    ]);
+    expect(laneContains(dsl, 'AI agent')).toEqual(['draft']);
+    expect(laneContains(dsl, 'Check')).toEqual(['review']);
+    expect(laneContains(dsl, 'Data')).toEqual(['tickets', 'brief']);
+    expect(laneContains(dsl, 'Other')).toEqual(['send']);
+    expect(dsl).toContain('lane "AI agent" {');
+  });
+
+  it('keeps aliases on the same role lane and puts a decision with no role in Other', () => {
+    const dsl = plainStepsToDSL(
+      'User: ask\nIf bad then Retry else Assistant: draft\nSystem: review',
+      { lanesByRole: true },
+    );
+    expect(laneContains(dsl, 'Human')).toEqual(['ask']);
+    expect(laneContains(dsl, 'AI agent')).toEqual(['draft']);
+    expect(laneContains(dsl, 'Check')).toEqual(['review']);
+    expect(laneContains(dsl, 'Other')).toEqual(['bad', 'retry']);
+    expect(dsl).not.toContain('lane Tool');
+    expect(dsl).not.toContain('lane Data');
+  });
+
+  it('puts parallel gateways in Other and leaves edge order unchanged', () => {
+    const input = 'Model: plan\nTool: search docs and at the same time Tool: search tickets\nModel: answer';
+    const off = parseDiagram(plainStepsToDSL(input));
+    const on = parseDiagram(plainStepsToDSL(input, { lanesByRole: true }));
+    expect(on.edges).toEqual(off.edges);
+    expect(on.nodes.map(node => node.id)).toEqual(off.nodes.map(node => node.id));
+    expect(on.lanes?.map(lane => lane.name)).toEqual(['AI agent', 'Tool', 'Other']);
+    expect(on.lanes?.find(lane => lane.name === 'AI agent')?.contains).toEqual(['plan', 'answer']);
+    expect(on.lanes?.find(lane => lane.name === 'Tool')?.contains).toEqual(['search_docs', 'search_tickets']);
+    expect(on.lanes?.find(lane => lane.name === 'Other')?.contains).toEqual(['in_parallel', 'join']);
+  });
+
+  it('is byte-identical when lanes by role is off', () => {
+    const off = plainStepsToDSL(mixed);
+    expect(plainStepsToDSL(mixed, { lanesByRole: false })).toBe(off);
+    expect(off).not.toMatch(/^lane /m);
+    expect(plainStepsToDSL(mixed, { lanesByRole: true }).startsWith(off)).toBe(true);
+  });
+
+  it('round-trips role lanes and rejects a board without them', () => {
+    const dsl = plainStepsToDSL(mixed, { lanesByRole: true });
+    const parsed = parseDiagram(dsl);
+    expect(diagramMatchesRoleLanes(parsed)).toBe(true);
+    expect(flowToPlainSteps(parsed)).toBe(
+      'Human: ask\nModel: draft\nTool: search\nCheck: review\nData: tickets\nFile: brief\nSend',
+    );
+    expect(diagramMatchesRoleLanes(parseDiagram(plainStepsToDSL(mixed)))).toBe(false);
+
+    const custom = parseDiagram(`diagram: flow
+title: "Loan"
+ask -> draft
+node ask { label: "ask" role: human }
+node draft { label: "draft" role: model }
+lane Customer { contains: ask, draft }
+`);
+    expect(diagramMatchesRoleLanes(custom)).toBe(false);
   });
 });
