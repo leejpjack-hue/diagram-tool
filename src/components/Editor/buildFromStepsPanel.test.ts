@@ -57,7 +57,25 @@ describe('buildFromStepsSuccessMessage / statsFromPlainStepsDsl (DT-AI-13)', () 
       buildFromStepsSuccessMessage({
         stepCount: 2,
         roles: { human: 0, model: 0, tool: 0, check: 2 },
+        dataCount: 0,
       }),
     ).toBe('Built 2 steps onto the board · 2 Check');
+  });
+
+  it('counts data and document steps and appends "N data" (DT-AI-24)', () => {
+    const dsl = plainStepsToDSL('Ask\nData: tickets\nModel: draft\nTool: search\nFile: log\nSend');
+    const stats = statsFromPlainStepsDsl(dsl);
+    expect(stats.stepCount).toBe(6);
+    expect(stats.dataCount).toBe(2);
+    expect(stats.roles).toEqual({ human: 0, model: 1, tool: 1, check: 0 });
+    expect(buildFromStepsSuccessMessage(stats)).toBe(
+      'Built 6 steps onto the board · 1 Model · 1 Tool · 2 data',
+    );
+  });
+
+  it('omits the data tally when no data steps are present', () => {
+    const stats = statsFromPlainStepsDsl(plainStepsToDSL('Verify email\nSend reply'));
+    expect(stats.dataCount).toBe(0);
+    expect(buildFromStepsSuccessMessage(stats)).toBe('Built 2 steps onto the board');
   });
 });

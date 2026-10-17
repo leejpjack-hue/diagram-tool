@@ -23,7 +23,10 @@
       "required": ["kind", "text"],
       "properties": {
         "kind": { "type": "string", "enum": ["dsl", "mermaid"] },
-        "text": { "type": "string", "description": "Authoring source: native DSL or Mermaid (sequence / flowchart)." }
+        "text": {
+          "type": "string",
+          "description": "Authoring source: native DSL or Mermaid (sequence / flowchart). Flow DSL may use the existing node kinds type: data and type: document. Format version stays 3.0."
+        }
       }
     },
     "point": {
@@ -157,6 +160,11 @@
           "enum": ["clean", "line", "bold", "blueprint"],
           "default": "clean",
           "description": "Optional Flow icon style. Omitted or unknown values load as clean. Format version stays 3.0."
+        },
+        "showStepNumbers": {
+          "type": "boolean",
+          "default": false,
+          "description": "Optional. This revision does not write the field. A diagram that omits it loads with step numbers off. Format version stays 3.0."
         }
       }
     },

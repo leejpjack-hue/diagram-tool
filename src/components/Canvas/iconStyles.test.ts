@@ -80,4 +80,16 @@ describe('ICON_STYLES', () => {
     expect(face.roleWord).toBe('tool');
     expect(face.showIcon).toBe(true);
   });
+
+  it('paints data and document nodes with the Data icon and colour in every style set (DT-AI-24)', () => {
+    for (const id of ICON_STYLE_IDS) {
+      for (const nodeType of ['data', 'document'] as const) {
+        const face = resolveFace(id, { nodeType });
+        expect(face.kind).toBe('data');
+        expect(face.icon).toBe('database');
+        expect(face.color).toBe(ICON_STYLES[id].types.data.color);
+        expect(face.roleWord).toBeUndefined();
+      }
+    }
+  });
 });

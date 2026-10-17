@@ -388,3 +388,113 @@ describe('plainStepsToDSL (DT-AI-12 chat role aliases)', () => {
     expect(labelOf(parsed, 'bot_act')).toBe('Bot act');
   });
 });
+
+describe('plainStepsToDSL (DT-AI-24 data prefixes)', () => {
+  function flowProps(parsed: ReturnType<typeof parseDiagram>, id: string) {
+    const n = parsed.nodes.find(x => x.id === id);
+    return n && n.type === 'flow' ? n.properties : undefined;
+  }
+
+  it('maps Data:/Memory:/DB: to type data and File: to type document, with no role', () => {
+    const dsl = plainStepsToDSL('Data: customer tickets\nMemory: vector store\nDB: crm\nFile: brief');
+    expect(dsl).toContain('type: data');
+    expect(dsl).toContain('type: document');
+    expect(dsl).not.toMatch(/role:/);
+    const parsed = parseDiagram(dsl);
+    expect(flowProps(parsed, 'customer_tickets')).toMatchObject({
+      label: 'customer tickets',
+      nodeType: 'data',
+    });
+    expect(flowProps(parsed, 'customer_tickets')?.role).toBeUndefined();
+    expect(flowProps(parsed, 'vector_store')).toMatchObject({ label: 'vector store', nodeType: 'data' });
+    expect(flowProps(parsed, 'crm')).toMatchObject({ label: 'crm', nodeType: 'data' });
+    expect(flowProps(parsed, 'brief')).toMatchObject({ label: 'brief', nodeType: 'document' });
+    expect(flowProps(parsed, 'brief')?.role).toBeUndefined();
+  });
+
+  it('accepts bare tokens, optional space after the colon, and any case', () => {
+    const parsed = parseDiagram(plainStepsToDSL('DATA:tickets\nmemory last 3\nDb:  customers\nFILE quarterly report'));
+    expect(flowProps(parsed, 'tickets')).toMatchObject({ label: 'tickets', nodeType: 'data' });
+    expect(flowProps(parsed, 'last_3')).toMatchObject({ label: 'last 3', nodeType: 'data' });
+    expect(flowProps(parsed, 'customers')).toMatchObject({ label: 'customers', nodeType: 'data' });
+    expect(flowProps(parsed, 'quarterly_report')).toMatchObject({ label: 'quarterly report', nodeType: 'document' });
+  });
+
+  it('strips list markers before the data word', () => {
+    const parsed = parseDiagram(plainStepsToDSL('1. Data: tickets\n- Memory: cache\n* DB: crm\n2) File: log'));
+    expect(flowProps(parsed, 'tickets')?.nodeType).toBe('data');
+    expect(flowProps(parsed, 'tickets')?.label).toBe('tickets');
+    expect(flowProps(parsed, 'cache')?.nodeType).toBe('data');
+    expect(flowProps(parsed, 'crm')?.nodeType).toBe('data');
+    expect(flowProps(parsed, 'log')?.nodeType).toBe('document');
+    expect(flowProps(parsed, 'log')?.label).toBe('log');
+  });
+
+  it('leaves unknown prefixes, including lookalikes, in the label', () => {
+    const parsed = parseDiagram(plainStepsToDSL('Store: cache\nDatabase: rows\nAlien: do stuff'));
+    expect(flowProps(parsed, 'store_cache')).toMatchObject({ label: 'Store: cache' });
+    expect(flowProps(parsed, 'store_cache')?.nodeType).toBeUndefined();
+    expect(flowProps(parsed, 'database_rows')?.label).toBe('Database: rows');
+    expect(flowProps(parsed, 'database_rows')?.nodeType).toBeUndefined();
+    expect(flowProps(parsed, 'alien_do_stuff')?.label).toBe('Alien: do stuff');
+  });
+
+  it('keeps a bare data word with nothing after it as the label', () => {
+    const parsed = parseDiagram(plainStepsToDSL('Data:\nFile:'));
+    expect(flowProps(parsed, 'data')?.label).toBe('Data:');
+    expect(flowProps(parsed, 'data')?.nodeType).toBeUndefined();
+    expect(flowProps(parsed, 'file')?.label).toBe('File:');
+    expect(flowProps(parsed, 'file')?.nodeType).toBeUndefined();
+  });
+
+  it('keeps notes and then/if/else on data lines, with no role chip', () => {
+    const parsed = parseDiagram(plainStepsToDSL(
+      'Data: tickets — last 3\nthen Model: summarize\nIf missing then Data: load cache else File: write log — audit',
+    ));
+    expect(flowProps(parsed, 'tickets')).toMatchObject({
+      label: 'tickets',
+      nodeType: 'data',
+      note: 'last 3',
+    });
+    expect(flowProps(parsed, 'tickets')?.role).toBeUndefined();
+    expect(flowProps(parsed, 'summarize')).toMatchObject({ label: 'summarize', role: 'model' });
+    expect(flowProps(parsed, 'missing')?.nodeType).toBe('decision');
+    expect(flowProps(parsed, 'missing')?.label).toBe('missing');
+    expect(flowProps(parsed, 'load_cache')).toMatchObject({ label: 'load cache', nodeType: 'data' });
+    expect(flowProps(parsed, 'load_cache')?.role).toBeUndefined();
+    expect(flowProps(parsed, 'write_log')).toMatchObject({
+      label: 'write log',
+      nodeType: 'document',
+      note: 'audit',
+    });
+    const labels = parsed.edges.map(e => e.label).filter(Boolean).sort();
+    expect(labels).toEqual(['No', 'Yes']);
+  });
+
+  it('leaves a data word on an if-condition in the decision label', () => {
+    const parsed = parseDiagram(plainStepsToDSL('If Data: empty then Retry'));
+    expect(flowProps(parsed, 'data_empty')).toMatchObject({ label: 'Data: empty', nodeType: 'decision' });
+    expect(flowProps(parsed, 'retry')?.nodeType).toBeUndefined();
+  });
+
+  it('does not change DSL for lines without a data prefix', () => {
+    const dsl = plainStepsToDSL('Model: draft reply\nthen Send reply');
+    expect(dsl).toBe(`diagram: flow
+title: "Type steps"
+direction: TB
+
+draft_reply -> send_reply
+
+node draft_reply {
+  label: "draft reply"
+  role: model
+}
+
+node send_reply {
+  label: "Send reply"
+}
+`);
+    expect(dsl).not.toMatch(/type: data/);
+    expect(dsl).not.toMatch(/type: document/);
+  });
+});
