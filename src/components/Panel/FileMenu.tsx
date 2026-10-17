@@ -363,7 +363,8 @@ export function FileMenu({
   };
 
   useEffect(() => {
-    setLinkedToDisk(Boolean(currentBoardId && boardFileHandles.has(currentBoardId)));
+    const linked = Boolean(currentBoardId && boardFileHandles.has(currentBoardId));
+    queueMicrotask(() => setLinkedToDisk(linked));
   }, [currentBoardId]);
 
   const notifyFileError = (error: unknown) => {
