@@ -32,6 +32,19 @@ Every file has a `version` string. Current writers emit `"3.0"`. Readers must st
 
 `source.text` is the diagram authoring source (native DSL, or Mermaid for sequence diagrams and Mermaid flowcharts). `dslText` is kept as an alias so older importers keep working.
 
+### Flow icon style
+
+`board.iconStyle` is optional and additive. `version` stays **3.0**. No database migration.
+
+| Value | Meaning |
+| --- | --- |
+| `clean` | Default. Today's Flow look. Writers may omit the field. |
+| `line` | Line icons |
+| `bold` | Bold filled |
+| `blueprint` | Blueprint |
+
+Missing or unknown values load as `clean`. Older readers ignore the field. This revision does not write `showStepNumbers`; a diagram that omits it loads with step numbers off.
+
 `nodes` and `edges` are a portable projection of that source plus layout pins. Re-opening the file prefers `source.text` / `dslText` and restores typed boards (architecture, flow, sequence, Gantt) so layout stays within ±2px of the export.
 
 ### Complete backup (`kind: "workspace"`)

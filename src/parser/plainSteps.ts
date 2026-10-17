@@ -158,7 +158,7 @@ function stepId(label: string, state: State): string {
   return n === 1 ? base : `${base}_${n}`;
 }
 
-function useNode(label: string, state: State, decision: boolean, role?: PlainStepRole): string {
+function placeNode(label: string, state: State, decision: boolean, role?: PlainStepRole): string {
   const existing = state.idFor.get(label);
   if (existing) return existing;
   const id = stepId(label, state);
@@ -202,22 +202,22 @@ export function plainStepsToDSL(text: string, opts: { title?: string } = {}): st
       let labelledBranch = false;
       if (state.inIf) {
         // The text after `if` IS the condition → decision node.
-        id = useNode(label, state, true, role);
+        id = placeNode(label, state, true, role);
         state.lastDecision = id;
         state.inIf = false;
         state.expectBranch = 'yes';
       } else if (state.expectBranch === 'yes') {
-        id = useNode(label, state, false, role);
+        id = placeNode(label, state, false, role);
         state.edges.push({ from: state.lastDecision!, to: id, label: 'Yes' });
         state.expectBranch = null;
         labelledBranch = true;
       } else if (state.expectBranch === 'no') {
-        id = useNode(label, state, false, role);
+        id = placeNode(label, state, false, role);
         state.edges.push({ from: state.lastDecision!, to: id, label: 'No' });
         state.expectBranch = null;
         labelledBranch = true;
       } else {
-        id = useNode(label, state, false, role);
+        id = placeNode(label, state, false, role);
       }
 
       if (state.last && state.last !== id && !labelledBranch) {

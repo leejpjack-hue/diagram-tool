@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import type { DiagramMode, ParsedDiagram, ClipboardNode } from './types';
+import { resolveIconStyle, type IconStyleId } from '../components/Canvas/iconStyles';
 
 const MAX_HISTORY = 50;
 
 interface HistoryEntry {
   dslText: string;
   diagramMode: DiagramMode;
+  iconStyle: IconStyleId;
 }
 
 interface DiagramStore {
@@ -43,6 +45,11 @@ interface DiagramStore {
   isReadOnlyShared: boolean;
   sharedBoardTitle: string | null;
   setReadOnlyShared: (readOnly: boolean, title?: string | null) => void;
+
+  // DT-STYLE-01: Flow icon style. Clean is the default and today's rendering.
+  // Persisted on the board, not in the DSL. One undo step per change.
+  iconStyle: IconStyleId;
+  setIconStyle: (style: unknown, trackHistory?: boolean) => void;
 
   // DT-AI-14: transient walk-through state — current step index, or null = off.
   // Pure view state: never persisted, never written to undo history.
@@ -209,36 +216,29 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   zoomLevel: 100,
   clipboard: [],
   typeStepsSeed: null,
+  iconStyle: 'clean',
   history: [],
   historyIndex: -1,
 
   // Actions
   setDslText: (text, trackHistory = true) => {
-    if (trackHistory) {
-      const { dslText, diagramMode, history, historyIndex } = get();
-      
-      // Don't add to history if text hasn't changed
-      if (text === dslText) return;
-      
-      // Truncate future history if we're not at the end
-      const newHistory = history.slice(0, historyIndex + 1);
-      
-      // Add current state to history
-      newHistory.push({ dslText, diagramMode });
-      
-      // Limit history size
-      if (newHistory.length > MAX_HISTORY) {
-        newHistory.shift();
-      }
-      
-      set({ 
-        dslText: text, 
-        history: newHistory, 
-        historyIndex: newHistory.length - 1 
-      });
-    } else {
+    if (!trackHistory) {
       set({ dslText: text });
+      return;
     }
+    if (text === get().dslText) return;
+    commitHistory(set, get, { dslText: text });
+  },
+
+  setIconStyle: (style, trackHistory = true) => {
+    const next = resolveIconStyle(style);
+    if (next === get().iconStyle) return;
+    if (!trackHistory) {
+      set({ iconStyle: next });
+      return;
+    }
+    if (get().isReadOnlyShared) return;
+    commitHistory(set, get, { iconStyle: next });
   },
   
   setParsedDiagram: (diagram) => set({ parsedDiagram: diagram, diagramMode: diagram?.mode || 'architecture' }),
@@ -293,44 +293,36 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
     }),
   exitWalkThrough: () => set({ walkThroughStep: null, walkThroughStack: [] }),
   
-  // Undo/Redo implementation
+  // Undo/Redo implementation. History stores full snapshots, including the
+  // live one at historyIndex, so one style or text edit is a single step
+  // that both undo and redo can restore.
   undo: () => {
     const { history, historyIndex } = get();
-    
-    if (historyIndex < 0) return;
-    
-    const previousEntry = history[historyIndex];
-    
-    // Move index back
-    const newIndex = historyIndex - 1;
-    
-    // Restore previous state (without tracking history to avoid loops)
-    set({ 
-      dslText: previousEntry.dslText, 
-      diagramMode: previousEntry.diagramMode,
-      historyIndex: newIndex 
+    if (historyIndex <= 0) return;
+    const entry = history[historyIndex - 1];
+    set({
+      dslText: entry.dslText,
+      diagramMode: entry.diagramMode,
+      iconStyle: entry.iconStyle ?? 'clean',
+      historyIndex: historyIndex - 1,
     });
   },
-  
+
   redo: () => {
     const { history, historyIndex } = get();
-    
     if (historyIndex >= history.length - 1) return;
-    
-    const newIndex = historyIndex + 1;
-    const nextEntry = history[newIndex];
-    
-    // Restore next state (without tracking history to avoid loops)
-    set({ 
-      dslText: nextEntry.dslText, 
-      diagramMode: nextEntry.diagramMode,
-      historyIndex: newIndex 
+    const entry = history[historyIndex + 1];
+    set({
+      dslText: entry.dslText,
+      diagramMode: entry.diagramMode,
+      iconStyle: entry.iconStyle ?? 'clean',
+      historyIndex: historyIndex + 1,
     });
   },
-  
+
   canUndo: () => {
     const { historyIndex } = get();
-    return historyIndex >= 0;
+    return historyIndex > 0;
   },
   
   canRedo: () => {
@@ -340,3 +332,38 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   
   clearHistory: () => set({ history: [], historyIndex: -1 }),
 }));
+
+function snapshot(state: { dslText: string; diagramMode: DiagramMode; iconStyle?: IconStyleId }): HistoryEntry {
+  return {
+    dslText: state.dslText,
+    diagramMode: state.diagramMode,
+    iconStyle: state.iconStyle ?? 'clean',
+  };
+}
+
+function commitHistory(
+  set: (partial: Partial<DiagramStore>) => void,
+  get: () => DiagramStore,
+  partial: Partial<HistoryEntry>,
+) {
+  const state = get();
+  const current = snapshot(state);
+  const next: HistoryEntry = { ...current, ...partial };
+  if (
+    next.dslText === current.dslText
+    && next.diagramMode === current.diagramMode
+    && next.iconStyle === current.iconStyle
+  ) {
+    return;
+  }
+  let history = state.history.slice(0, Math.max(0, state.historyIndex + 1));
+  const tip = history[history.length - 1];
+  const tipMatches = !!tip
+    && tip.dslText === current.dslText
+    && tip.diagramMode === current.diagramMode
+    && (tip.iconStyle ?? 'clean') === current.iconStyle;
+  if (!tipMatches) history.push(current);
+  history.push(next);
+  if (history.length > MAX_HISTORY) history = history.slice(history.length - MAX_HISTORY);
+  set({ ...partial, history, historyIndex: history.length - 1 });
+}

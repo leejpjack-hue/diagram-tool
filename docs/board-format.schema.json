@@ -151,7 +151,13 @@
         "lastOpenedAt": { "type": "string" },
         "deletedAt": { "type": "string" },
         "templateSourceId": { "type": "string" },
-        "schemaVersion": { "type": "integer" }
+        "schemaVersion": { "type": "integer" },
+        "iconStyle": {
+          "type": "string",
+          "enum": ["clean", "line", "bold", "blueprint"],
+          "default": "clean",
+          "description": "Optional Flow icon style. Omitted or unknown values load as clean. Format version stays 3.0."
+        }
       }
     },
     "space": {

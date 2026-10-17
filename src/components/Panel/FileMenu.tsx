@@ -256,6 +256,7 @@ export function FileMenu({
           presentation: portable.presentation,
           tags: portable.tags ?? [],
           starred: Boolean(portable.starred),
+          iconStyle: portable.iconStyle,
           createdAt: record.created_at || now,
           updatedAt: now,
         });
@@ -362,7 +363,8 @@ export function FileMenu({
   };
 
   useEffect(() => {
-    setLinkedToDisk(Boolean(currentBoardId && boardFileHandles.has(currentBoardId)));
+    const linked = Boolean(currentBoardId && boardFileHandles.has(currentBoardId));
+    queueMicrotask(() => setLinkedToDisk(linked));
   }, [currentBoardId]);
 
   const notifyFileError = (error: unknown) => {
@@ -378,11 +380,13 @@ export function FileMenu({
       existing = undefined;
     }
     const title = extractBoardTitle(currentDsl, activeMode) || existing?.title || 'Untitled board';
+    const iconStyle = useDiagramStore.getState().iconStyle;
     return {
       ...(existing ?? { title, mode: activeMode, dslText: currentDsl }),
       title,
       mode: activeMode,
       dslText: currentDsl,
+      iconStyle: iconStyle === 'clean' ? undefined : iconStyle,
     };
   };
 

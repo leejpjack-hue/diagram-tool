@@ -5,8 +5,18 @@ import type { FlowNodeData } from './types';
 import { useLayoutHandles } from './layoutDirection';
 import { FLOW_COLORS, flowShapeStyle, paletteFromColor, TITLE_FONT, MONO_FONT } from './flowShapeStyle';
 import { RoleChip } from './RoleChip';
+import { useDiagramStore } from '../../store/diagramStore';
+import { faceBoxShadow, ICON_STYLES, resolveFace, type IconStyleId } from './iconStyles';
+import { FlowGlyph } from './FlowGlyph';
 
-export const ProcessNode = memo(({ data, selected }: NodeProps) => {  const nodeData = data as unknown as FlowNodeData;
+export const ProcessNode = memo((props: NodeProps) => {
+  const iconStyle = useDiagramStore(s => s.iconStyle);
+  if (iconStyle === 'clean') return <CleanProcessNode {...props} />;
+  return <StyledProcessNode {...props} iconStyle={iconStyle} />;
+});
+
+function CleanProcessNode({ data, selected }: NodeProps) {
+  const nodeData = data as unknown as FlowNodeData;
   const { target, source } = useLayoutHandles(!!nodeData.reversed);
   const C = nodeData.color ? paletteFromColor(nodeData.color) : FLOW_COLORS.blue;
 
@@ -41,6 +51,47 @@ export const ProcessNode = memo(({ data, selected }: NodeProps) => {  const node
       <Handle type="source" position={source} style={{ background: C.border }} />
     </div>
   );
-});
+}
 
 ProcessNode.displayName = 'ProcessNode';
+
+function StyledProcessNode({ data, selected, iconStyle }: NodeProps & { iconStyle: IconStyleId }) {
+  const nodeData = data as unknown as FlowNodeData;
+  const { target, source } = useLayoutHandles(!!nodeData.reversed);
+  const face = resolveFace(iconStyle, nodeData, 'card');
+  const tokens = ICON_STYLES[iconStyle];
+  const shadow = faceBoxShadow(face);
+  return (
+    <div
+      className="relative px-5 py-3 min-w-[150px]"
+      data-style-kind={face.kind}
+      style={{
+        background: face.fill,
+        border: face.borderWidth ? `${face.borderWidth}px solid ${face.borderColor}` : 'none',
+        borderRadius: face.radius,
+        boxShadow: shadow,
+        outline: selected ? `${tokens.selection.width}px solid ${tokens.selection.color}` : undefined,
+        outlineOffset: selected ? tokens.selection.offset : undefined,
+      }}
+    >
+      <Handle type="target" position={target} style={{ background: face.borderWidth ? face.borderColor : face.labelColor }} />
+      <div className="flex items-center justify-center" style={{ gap: 8 }}>
+        <FlowGlyph face={face} />
+        <div className="text-[13px] text-center" style={{ color: face.labelColor, fontFamily: face.fontFamily, fontWeight: face.fontWeight }}>
+          {nodeData.label}
+        </div>
+      </div>
+      {nodeData.system && (
+        <div className="text-[10px] text-center mt-1" style={{ color: face.labelColor, opacity: 0.75, fontFamily: MONO_FONT }}>
+          {nodeData.system}
+        </div>
+      )}
+      {nodeData.duration && (
+        <div className="text-[10px] text-center mt-0.5" style={{ color: face.labelColor, opacity: 0.75, fontFamily: MONO_FONT }}>
+          {nodeData.duration}
+        </div>
+      )}
+      <Handle type="source" position={source} style={{ background: face.borderWidth ? face.borderColor : face.labelColor }} />
+    </div>
+  );
+}

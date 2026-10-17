@@ -5,6 +5,9 @@ import type { FlowNodeData } from './types';
 import { FLOW_COLORS, paletteFromColor, TITLE_FONT } from './flowShapeStyle';
 import { useLayoutHandles } from './layoutDirection';
 import { RoleChip } from './RoleChip';
+import { useDiagramStore } from '../../store/diagramStore';
+import { faceBoxShadow, ICON_STYLES, resolveFace, type IconStyleId } from './iconStyles';
+import { FlowGlyph } from './FlowGlyph';
 
 // Decision diamond — a rotated square. Four connection points so a branch can
 // always exit to the right place, but the primary target/source follow the
@@ -29,7 +32,13 @@ function diamondHandleStyle(position: Position, color: string): React.CSSPropert
   }
 }
 
-export const DecisionNode = memo(({ data, selected }: NodeProps) => {
+export const DecisionNode = memo((props: NodeProps) => {
+  const iconStyle = useDiagramStore(s => s.iconStyle);
+  if (iconStyle === 'clean') return <CleanDecisionNode {...props} />;
+  return <StyledDecisionNode {...props} iconStyle={iconStyle} />;
+});
+
+const CleanDecisionNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
   const C = nodeData.color ? paletteFromColor(nodeData.color) : FLOW_COLORS.amber;
   const { target, source, direction } = useLayoutHandles(!!nodeData.reversed);
@@ -111,3 +120,45 @@ export const DecisionNode = memo(({ data, selected }: NodeProps) => {
 });
 
 DecisionNode.displayName = 'DecisionNode';
+CleanDecisionNode.displayName = 'CleanDecisionNode';
+
+const StyledDecisionNode = memo(({ data, selected, iconStyle }: NodeProps & { iconStyle: IconStyleId }) => {
+  const nodeData = data as unknown as FlowNodeData;
+  const face = resolveFace(iconStyle, { ...nodeData, nodeType: nodeData.nodeType ?? 'decision' }, 'diamond');
+  const tokens = ICON_STYLES[iconStyle];
+  const { target, source, direction } = useLayoutHandles(!!nodeData.reversed);
+  const isLR = direction === 'LR';
+  const exitA = isLR ? Position.Right : Position.Bottom;
+  const exitB = isLR ? Position.Bottom : Position.Right;
+  const handleColor = face.borderWidth ? face.borderColor : face.labelColor;
+  const shadow = faceBoxShadow(face);
+  return (
+    <div className="relative w-28 h-28" data-style-kind={face.kind}>
+      <div
+        className="absolute transform rotate-45"
+        style={{
+          inset: 15,
+          background: face.fill,
+          border: face.borderWidth ? `${face.borderWidth}px solid ${face.borderColor}` : 'none',
+          borderRadius: face.radius,
+          boxShadow: shadow,
+          outline: selected ? `${tokens.selection.width}px solid ${tokens.selection.color}` : undefined,
+          outlineOffset: selected ? tokens.selection.offset : undefined,
+        }}
+      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="flex items-center justify-center text-center px-2" style={{ gap: 4, maxWidth: 96 }}>
+          <FlowGlyph face={{ ...face, iconSize: Math.min(face.iconSize, 14) }} />
+          <div className="leading-tight" style={{ color: face.labelColor, fontFamily: face.fontFamily, fontWeight: face.fontWeight, fontSize: 11 }}>
+            {nodeData.label}
+          </div>
+        </div>
+      </div>
+      <Handle type="target" position={target} style={diamondHandleStyle(target, handleColor)} />
+      <Handle type="source" position={source} style={diamondHandleStyle(source, handleColor)} />
+      <Handle type="source" position={exitA} id="exit-a" style={diamondHandleStyle(exitA, handleColor)} />
+      <Handle type="source" position={exitB} id="exit-b" style={diamondHandleStyle(exitB, handleColor)} />
+    </div>
+  );
+});
+StyledDecisionNode.displayName = 'StyledDecisionNode';
