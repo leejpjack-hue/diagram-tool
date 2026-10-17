@@ -93,9 +93,44 @@ import type { FlowNode, Lane, ParsedDiagram } from '../store/types';
 // node blocks stay exactly as they are with the option off, so step order is
 // unchanged. The option off (the default) is byte-identical to today.
 //
+// DT-AI-28 — optional `understood` trace for the live "Understood as" preview.
+// It records the line reading this converter already does (role, kind, label,
+// note, loop, parallel, empty `then`). Omit it and the DSL is byte-identical.
+// The preview is not a second parser and does not change the board.
+//
 // `then` links steps in order; `if <text>` makes `<text>` a decision node whose
 // following branch is labelled Yes; `else ...` reuses that decision for a No
 // branch. Anything else is a plain step, exactly like today.
+
+/** DT-AI-28: one step the converter emitted while reading a typed line. */
+export interface UnderstoodStep {
+  role?: PlainStepRole;
+  /** `loop` is a back-edge, not a new node kind. */
+  kind: 'step' | 'decision' | 'data' | 'document' | 'loop';
+  label: string;
+  note?: string;
+  /** Set when this step is the Yes or No branch of a decision. */
+  branch?: 'yes' | 'no';
+  /** Target of a loop phrase, in the earlier step's own label when it matched. */
+  loopTarget?: string;
+  /** False when a loop phrase did not match an earlier step. */
+  loopFound?: boolean;
+}
+
+/** DT-AI-28: how the converter read one non-empty typed line. */
+export interface UnderstoodLine {
+  /** 0-based index in the original text, counting empty lines. */
+  lineIndex: number;
+  steps: UnderstoodStep[];
+  /** True when a `then` on this line had no branch text. */
+  emptyThen: boolean;
+  /** True when this line became a parallel fork. */
+  parallel: boolean;
+}
+
+function remember(line: UnderstoodLine | null, step: UnderstoodStep): void {
+  line?.steps.push(step);
+}
 
 interface Segment {
   kind: 'op' | 'text';
@@ -370,7 +405,12 @@ function connectIncoming(id: string, state: State): void {
   }
 }
 
-function emitParallel(branches: string[], state: State, needJoin: boolean): void {
+function emitParallel(
+  branches: string[],
+  state: State,
+  needJoin: boolean,
+  active: UnderstoodLine | null,
+): void {
   const forkId = placeGateway(state, 'in parallel', 'in_parallel');
   connectIncoming(forkId, state);
   const branchIds: string[] = [];
@@ -391,6 +431,13 @@ function emitParallel(branches: string[], state: State, needJoin: boolean): void
     }
     state.edges.push({ from: forkId, to: id });
     branchIds.push(id);
+    if (active) active.parallel = true;
+    remember(active, {
+      kind: kind === 'data' ? 'data' : kind === 'document' ? 'document' : 'step',
+      label,
+      role,
+      note,
+    });
   }
   if (needJoin && branchIds.length > 0) {
     const joinId = placeGateway(state, 'join', 'join');
@@ -464,9 +511,21 @@ export function plainStepsToDSL(
     loopMisses?: { count: number };
     parallelHints?: { count: number };
     lanesByRole?: boolean;
+    /** DT-AI-28: filled with one entry per non-empty line. Does not change the DSL. */
+    understood?: UnderstoodLine[];
   } = {},
 ): string {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const understood = opts.understood;
+  if (understood) understood.length = 0;
+  const sourceLineIndexes: number[] = [];
+  if (understood) {
+    const rawLines = text.split('\n');
+    for (let i = 0; i < rawLines.length; i++) {
+      if (rawLines[i].trim().length > 0) sourceLineIndexes.push(i);
+    }
+  }
+  let active: UnderstoodLine | null = null;
   const state: State = {
     nodes: [],
     edges: [],
@@ -485,13 +544,23 @@ export function plainStepsToDSL(
     // last step created on this line (a `then` chain may create several).
     const { text: lineText, note } = splitStepNote(unmarked);
     let lastOnLine: string | null = null;
+    let pendingThen = false;
+    let loopMissTarget: string | null = null;
     for (const seg of splitSegments(lineText)) {
       if (seg.kind === 'op') {
+        if (seg.op === 'then') pendingThen = true;
+        else {
+          if (pendingThen) {
+            if (active) active.emptyThen = true;
+          }
+          pendingThen = false;
+        }
         if (seg.op === 'if') state.inIf = true;
         else if (seg.op === 'else' && state.lastDecision) state.expectBranch = 'no';
         // `then` needs no state: the next step simply chains from `last`.
         continue;
       }
+      if (pendingThen) pendingThen = false;
       const rawLabel = (seg.text ?? '').replace(/\|/g, '/').trim();
       if (!rawLabel) continue;
       // DT-AI-24: a leading data word is a kind, not an actor. The text after
@@ -513,32 +582,49 @@ export function plainStepsToDSL(
         if (targetLabel) {
           const earlier = findEarlierNode(targetLabel, state);
           if (earlier) {
+            const branch = state.expectBranch === 'yes' || state.expectBranch === 'no'
+              ? state.expectBranch
+              : undefined;
             linkLoop(earlier, state);
             lastOnLine = earlier;
+            const earlierLabel = state.nodes.find(n => n.id === earlier)?.label ?? targetLabel;
+            remember(active, {
+              kind: 'loop',
+              label: earlierLabel,
+              branch,
+              loopTarget: earlierLabel,
+              loopFound: true,
+            });
             continue;
           }
           state.loopMisses += 1;
+          loopMissTarget = targetLabel;
         }
       }
 
       let id: string;
       let labelledBranch = false;
+      let branch: 'yes' | 'no' | undefined;
+      let decision = false;
       if (state.inIf) {
         // The text after `if` IS the condition → decision node.
         id = placeNode(label, state, true, role, kind);
         state.lastDecision = id;
         state.inIf = false;
         state.expectBranch = 'yes';
+        decision = true;
       } else if (state.expectBranch === 'yes') {
         id = placeNode(label, state, false, role, kind);
         state.edges.push({ from: state.lastDecision!, to: id, label: 'Yes' });
         state.expectBranch = null;
         labelledBranch = true;
+        branch = 'yes';
       } else if (state.expectBranch === 'no') {
         id = placeNode(label, state, false, role, kind);
         state.edges.push({ from: state.lastDecision!, to: id, label: 'No' });
         state.expectBranch = null;
         labelledBranch = true;
+        branch = 'no';
       } else {
         id = placeNode(label, state, false, role, kind);
       }
@@ -548,14 +634,45 @@ export function plainStepsToDSL(
       }
       state.last = id;
       lastOnLine = id;
+      remember(active, {
+        kind: loopMissTarget
+          ? 'loop'
+          : decision
+            ? 'decision'
+            : kind === 'data'
+              ? 'data'
+              : kind === 'document'
+                ? 'document'
+                : 'step',
+        label,
+        role,
+        branch,
+        loopTarget: loopMissTarget ?? undefined,
+        loopFound: loopMissTarget ? false : undefined,
+      });
+      loopMissTarget = null;
     }
+    if (pendingThen && active) active.emptyThen = true;
     if (note && lastOnLine) {
       const owner = state.nodes.find(n => n.id === lastOnLine);
       if (owner) owner.note = note;
+      const last = active?.steps[active.steps.length - 1];
+      if (last) last.note = note;
     }
   };
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    if (understood) {
+      active = {
+        lineIndex: sourceLineIndexes[lineIndex] ?? lineIndex,
+        steps: [],
+        emptyThen: false,
+        parallel: false,
+      };
+      understood.push(active);
+    } else {
+      active = null;
+    }
     const unmarked = stripListMarker(lines[lineIndex]);
     const phrase = hasParallelPhrase(unmarked);
     // Same-line if/else, or the still-open condition of an `If` with no text
@@ -569,7 +686,7 @@ export function plainStepsToDSL(
         const branches = [...parts.slice(0, -1), head].map(part => part.trim()).filter(part => part.length > 0);
         if (branches.length >= 2) {
           const needJoin = chain.length > 0 || lineIndex < lines.length - 1;
-          emitParallel(branches, state, needJoin);
+          emitParallel(branches, state, needJoin, active);
           if (chain) processPlainLine(chain);
           continue;
         }
