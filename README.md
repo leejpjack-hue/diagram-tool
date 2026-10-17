@@ -8,9 +8,8 @@ This is a Vite + React + TypeScript app.
 
 | Route | What loads |
 |-------|------------|
-| `/` | Marketing landing + waitlist. Cold HTML. Does **not** boot the Local workspace for first-time visitors. |
+| `/` | Marketing landing. Cold HTML. Does **not** boot the Local workspace for first-time visitors. |
 | `/app` | Existing Local workspace (Home / boards / editor). |
-| `/api/waitlist` | Same-origin waitlist API. Vite preview/dev writes JSONL (`WAITLIST_FILE` or `./data/waitlist.jsonl`). Production Cloudflare Worker accepts the same payload at `/api/waitlist`. |
 | `/pricing` | Out of scope. |
 
 `npm run build` ships `dist/` (landing `index.html`, workspace `app/index.html`, and everything in `public/`). The older mock under `landing/` is unused.
@@ -21,10 +20,9 @@ The landing never blocks if these are missing — it uses safe no-op stubs.
 
 | Variable | Purpose |
 |----------|---------|
-| `VITE_POSTHOG_KEY` | If set, PostHog is used for pageview on `/`, `waitlist_submit_success`, and `cta_open_app_click`. |
+| `VITE_POSTHOG_KEY` | If set, PostHog is used for pageview on `/` and `cta_open_app_click`. |
 | `VITE_POSTHOG_HOST` | Optional. Defaults to `https://us.i.posthog.com`. |
 | `VITE_GA4_MEASUREMENT_ID` | Used when the PostHog key is unset. Production is `G-HLTGGMPREJ` via `.env.production`. |
-| `WAITLIST_FILE` | Server-side JSONL path for signups. Defaults to `./data/waitlist.jsonl` on the preview/dev host. |
 
 See `.env.example`. Vite inlines `VITE_*` at **build** time (`npm run build` / Cloudflare Workers Builds). Runtime Worker `vars` cannot enable GA4.
 

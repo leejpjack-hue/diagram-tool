@@ -6,7 +6,9 @@ test.describe('P0 marketing landing', () => {
     expect(response.ok()).toBeTruthy();
     const html = await response.text();
     expect(html).toContain('Turn text into architecture, flow, and Gantt diagrams.');
-    expect(html).toContain('Join the waitlist');
+    expect(html).toContain('Open the app');
+    expect(html).not.toContain('Join the waitlist');
+    expect(html).not.toContain('/api/waitlist');
     expect(html).not.toContain('>Home<');
     expect(html).not.toContain('Local workspace</div>');
   });
@@ -17,29 +19,28 @@ test.describe('P0 marketing landing', () => {
     await expect(page.locator('h1', { hasText: 'Turn text into architecture, flow, and Gantt diagrams.' })).toHaveCount(0);
   });
 
-  test('waitlist endpoint exists and persists a valid email', async ({ request }) => {
-    const probe = await request.get('/api/waitlist');
-    expect(probe.ok()).toBeTruthy();
-    expect(await probe.json()).toMatchObject({ ok: true, service: 'waitlist' });
-
-    const created = await request.post('/api/waitlist', {
-      data: {
-        email: 'jack@company.com',
-        note: 'AWS architecture',
-        utm_source: 'e2e',
-      },
-    });
-    expect(created.status()).toBe(201);
-    expect(await created.json()).toEqual({ ok: true });
-
-    const invalid = await request.post('/api/waitlist', { data: { email: 'nope' } });
-    expect(invalid.status()).toBe(400);
+  test('landing CTA opens /app', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Open the app', exact: true }).click();
+    await expect(page).toHaveURL(/\/app\/?$/);
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
   });
 
-  test('production preview bakes GA4 and still serves waitlist', async ({ page, request }) => {
+  test('/api/waitlist is not served', async ({ request }) => {
+    const get = await request.get('/api/waitlist');
+    expect(get.status()).toBe(404);
+    const post = await request.post('/api/waitlist', {
+      data: { email: 'jack@company.com' },
+    });
+    expect(post.status()).toBe(404);
+  });
+
+  test('production preview bakes GA4 and serves the Open the app CTA', async ({ page, request }) => {
     const preview = 'http://127.0.0.1:4173';
     const html = await (await request.get(`${preview}/`)).text();
-    expect(html).toContain('Join the waitlist');
+    expect(html).toContain('Open the app');
+    expect(html).not.toContain('Join the waitlist');
+    expect(html).not.toContain('/api/waitlist');
     expect(html).toMatch(/src="\/assets\/main-[^"]+\.js"/);
 
     const jsPath = html.match(/src="(\/assets\/main-[^"]+\.js)"/)?.[1];
@@ -47,23 +48,15 @@ test.describe('P0 marketing landing', () => {
     const js = await (await request.get(`${preview}${jsPath}`)).text();
     expect(js).toContain('G-HLTGGMPREJ');
     expect(js).toContain('googletagmanager.com/gtag/js');
+    expect(js).not.toContain('waitlist_submit_');
 
     await page.goto(preview);
     await expect(page.locator('#ga4-gtag')).toHaveAttribute(
       'src',
       /googletagmanager\.com\/gtag\/js\?id=G-HLTGGMPREJ/,
     );
-    await expect(page.getByRole('button', { name: 'Join waitlist', exact: true })).toBeVisible();
-  });
-
-  test('successful submit replaces the form and does not navigate', async ({ page }) => {
-    await page.goto('/?utm_source=hero');
-    await page.getByPlaceholder('you@company.com').fill('you@company.com');
-    await page.getByPlaceholder('e.g. AWS architecture, sprint Gantt…').fill('sprint Gantt');
-    await page.getByRole('button', { name: 'Join waitlist', exact: true }).click();
-    await expect(page.getByText('You’re on the list. We’ll email when accounts/sync ship.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Join waitlist', exact: true })).toHaveCount(0);
-    await expect(page).toHaveURL(/\/(\?utm_source=hero)?$/);
-    await expect(page.getByRole('link', { name: 'Open the workspace →' }).first()).toHaveAttribute('href', '/app');
+    const cta = page.getByRole('link', { name: 'Open the app', exact: true });
+    await expect(cta).toBeVisible();
+    await expect(cta).toHaveAttribute('href', '/app');
   });
 });

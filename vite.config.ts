@@ -2,10 +2,9 @@ import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { appFallback } from './vite-plugins/app-fallback'
-import { waitlistApi } from './vite-plugins/waitlist'
 
 export default defineConfig({
-  plugins: [react(), waitlistApi(), appFallback()],
+  plugins: [react(), appFallback()],
   build: {
     rollupOptions: {
       input: {
