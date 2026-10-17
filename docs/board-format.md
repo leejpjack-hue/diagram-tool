@@ -51,6 +51,12 @@ Type steps may emit the existing flow kinds `type: data` (`Data:`, `Memory:`, `D
 
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 
+### Typed loop steps
+
+Type steps may point at an earlier step with `go back to`, `back to`, `repeat from`, or `retry from`. The board stores that link as an ordinary edge inside `source.text` / `dslText`. The edge label is `loop`, or `Yes` / `No` when the link is a branch. This is not a new board field. `version` stays **3.0**. No database migration.
+
+A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
+
 `nodes` and `edges` are a portable projection of that source plus layout pins. Re-opening the file prefers `source.text` / `dslText` and restores typed boards (architecture, flow, sequence, Gantt) so layout stays within ±2px of the export.
 
 ### Complete backup (`kind: "workspace"`)

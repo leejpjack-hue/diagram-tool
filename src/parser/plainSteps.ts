@@ -58,6 +58,20 @@
 //   to DT-AI-01/04/10/12 output. Deterministic local parsing only — typed text
 //   never leaves this device.
 //
+// DT-AI-25 — loop phrases link to an earlier step instead of creating one:
+//   go back to Draft reply
+//   back to Draft reply
+//   repeat from Draft reply
+//   retry from Draft reply
+// Case-insensitive, at the start of a step or branch target (plain line, `then`,
+// `if … then …`, `else …`). The target is the first earlier node whose label
+// matches exactly (case-insensitive, trimmed). A branch keeps Yes/No; any other
+// back-edge is labelled "loop". The forward chain stays on the node that
+// emitted the back-edge, so the next line does not sprout from the loop target.
+// No earlier match → a normal step whose label is the full phrase, and Build
+// notes how many loop targets were not found. Lines without these phrases stay
+// byte-identical. Plain edges only — no schema change.
+//
 // `then` links steps in order; `if <text>` makes `<text>` a decision node whose
 // following branch is labelled Yes; `else ...` reuses that decision for a No
 // branch. Anything else is a plain step, exactly like today.
@@ -199,6 +213,49 @@ interface State {
   lastDecision: string | null;
   expectBranch: 'yes' | 'no' | null;
   inIf: boolean;
+  loopMisses: number;
+}
+
+/**
+ * DT-AI-25: `go back to` / `back to` / `repeat from` / `retry from` plus a label.
+ * `go back to` is tried before `back to` so the shorter phrase cannot eat it.
+ * A bare phrase with no label is not a loop.
+ */
+const LOOP_PHRASE = /^(?:go\s+back\s+to|back\s+to|repeat\s+from|retry\s+from)\s+(.+)$/i;
+
+export function loopTargetLabel(label: string): string | null {
+  const match = LOOP_PHRASE.exec(label.trim());
+  if (!match) return null;
+  const target = match[1].trim();
+  return target.length > 0 ? target : null;
+}
+
+/** First earlier node whose label matches exactly, case-insensitive, trimmed. */
+function findEarlierNode(label: string, state: State): string | null {
+  const key = label.trim().toLowerCase();
+  const found = state.nodes.find(node => node.label.trim().toLowerCase() === key);
+  return found?.id ?? null;
+}
+
+/**
+ * Link `id` (an existing node) as a back-edge. Branch labels stay Yes/No;
+ * every other back-edge is "loop". `last` is left where it is so the next
+ * typed step continues the forward chain from the node that looped.
+ */
+function linkLoop(id: string, state: State): void {
+  if (state.expectBranch === 'yes' && state.lastDecision) {
+    state.edges.push({ from: state.lastDecision, to: id, label: 'Yes' });
+    state.expectBranch = null;
+    return;
+  }
+  if (state.expectBranch === 'no' && state.lastDecision) {
+    state.edges.push({ from: state.lastDecision, to: id, label: 'No' });
+    state.expectBranch = null;
+    return;
+  }
+  if (state.last) {
+    state.edges.push({ from: state.last, to: id, label: 'loop' });
+  }
 }
 
 function stepId(label: string, state: State): string {
@@ -223,7 +280,7 @@ function placeNode(
   return id;
 }
 
-export function plainStepsToDSL(text: string, opts: { title?: string } = {}): string {
+export function plainStepsToDSL(text: string, opts: { title?: string; loopMisses?: { count: number } } = {}): string {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   const state: State = {
     nodes: [],
@@ -234,6 +291,7 @@ export function plainStepsToDSL(text: string, opts: { title?: string } = {}): st
     lastDecision: null,
     expectBranch: null,
     inIf: false,
+    loopMisses: 0,
   };
 
   for (const line of lines) {
@@ -263,6 +321,20 @@ export function plainStepsToDSL(text: string, opts: { title?: string } = {}): st
       const role = roleHit?.role;
       const kind = kindHit.kind;
       if (!label) continue;
+
+      // The text after `if` is the decision condition, not a branch target.
+      if (!state.inIf) {
+        const targetLabel = loopTargetLabel(label);
+        if (targetLabel) {
+          const earlier = findEarlierNode(targetLabel, state);
+          if (earlier) {
+            linkLoop(earlier, state);
+            lastOnLine = earlier;
+            continue;
+          }
+          state.loopMisses += 1;
+        }
+      }
 
       let id: string;
       let labelledBranch = false;
@@ -303,6 +375,7 @@ export function plainStepsToDSL(text: string, opts: { title?: string } = {}): st
       'No steps found. Type one step per line, e.g. "Check email", "then Send reply", "If error then Retry".'
     );
   }
+  if (opts.loopMisses) opts.loopMisses.count = state.loopMisses;
 
   // Deduplicate identical edges (same from/to/label), keeping first-seen order.
   const seen = new Set<string>();

@@ -505,3 +505,122 @@ node send_reply {
     expect(dsl).not.toMatch(/type: document/);
   });
 });
+
+describe('plainStepsToDSL (DT-AI-25 loops)', () => {
+  function flowProps(parsed: ReturnType<typeof parseDiagram>, id: string) {
+    const node = parsed.nodes.find(n => n.id === id);
+    return node && node.type === 'flow' ? node.properties : undefined;
+  }
+
+  function edge(parsed: ReturnType<typeof parseDiagram>, from: string, to: string) {
+    return parsed.edges.find(e => e.from === from && e.to === to);
+  }
+
+  it.each([
+    ['go back to'],
+    ['back to'],
+    ['repeat from'],
+    ['retry from'],
+    ['GO BACK TO'],
+    ['Back To'],
+  ])('"%s" links to the earlier node and does not duplicate it', (phrase) => {
+    const parsed = parseDiagram(plainStepsToDSL(`Draft reply\nReview notes\n${phrase} draft reply`));
+    expect(parsed.nodes.filter(n => n.type === 'flow')).toHaveLength(2);
+    expect(edge(parsed, 'review_notes', 'draft_reply')?.label).toBe('loop');
+    expect(flowProps(parsed, 'draft_reply')?.label).toBe('Draft reply');
+  });
+
+  it('matches the first earlier label, case-insensitive and trimmed', () => {
+    const parsed = parseDiagram(plainStepsToDSL('Alpha\nalpha two\ngo back to   ALPHA'));
+    expect(edge(parsed, 'alpha_two', 'alpha')?.label).toBe('loop');
+    expect(parsed.edges.find(e => e.to === 'alpha_two' && e.label === 'loop')).toBeUndefined();
+  });
+
+  it('uses the loop phrase as a then and else target and keeps Yes/No', () => {
+    const parsed = parseDiagram(plainStepsToDSL(
+      'Begin\nIf bad then go back to Begin else Continue',
+    ));
+    const yes = parsed.edges.find(e => e.label === 'Yes');
+    expect(yes?.from).toBe('bad');
+    expect(yes?.to).toBe('begin');
+    expect(parsed.edges.find(e => e.label === 'No')?.to).toBe('continue');
+    expect(flowProps(parsed, 'bad')?.nodeType).toBe('decision');
+    expect(parsed.nodes.filter(n => n.type === 'flow').map(n => n.id)).not.toContain('go_back_to_begin');
+  });
+
+  it('supports else on its own line and a following forward step from the decision', () => {
+    const misses = { count: 0 };
+    const dsl = plainStepsToDSL(
+      'Model: draft reply\nCheck: quality ok?\nIf no then go back to draft reply\nSend',
+      { loopMisses: misses },
+    );
+    const parsed = parseDiagram(dsl);
+    expect(misses.count).toBe(0);
+    expect(parsed.nodes.filter(n => n.type === 'flow')).toHaveLength(4);
+    expect(parsed.nodes.filter(n => n.type === 'flow' && n.properties.label?.toLowerCase() === 'draft reply')).toHaveLength(1);
+    expect(edge(parsed, 'no', 'draft_reply')?.label).toBe('Yes');
+    expect(edge(parsed, 'no', 'send')).toBeDefined();
+    expect(edge(parsed, 'no', 'send')?.label).toBeUndefined();
+    expect(flowProps(parsed, 'draft_reply')?.role).toBe('model');
+    expect(flowProps(parsed, 'quality_ok')?.role).toBe('check');
+  });
+
+  it('keeps a missing target as a normal step and counts it', () => {
+    const misses = { count: 0 };
+    const parsed = parseDiagram(plainStepsToDSL('Draft reply\ngo back to nowhere\nretry from also missing', { loopMisses: misses }));
+    expect(misses.count).toBe(2);
+    expect(flowProps(parsed, 'go_back_to_nowhere')?.label).toBe('go back to nowhere');
+    expect(flowProps(parsed, 'retry_from_also_missing')?.label).toBe('retry from also missing');
+    expect(parsed.edges.every(e => e.label !== 'loop')).toBe(true);
+  });
+
+  it('does not treat the phrase as a loop when it is not the whole step', () => {
+    const misses = { count: 0 };
+    const parsed = parseDiagram(plainStepsToDSL('Begin\nPlease go back to Begin', { loopMisses: misses }));
+    expect(misses.count).toBe(0);
+    expect(parsed.nodes.filter(n => n.type === 'flow')).toHaveLength(2);
+    expect(flowProps(parsed, 'please_go_back_to_begin')?.label).toBe('Please go back to Begin');
+  });
+
+  it('leaves the if-condition as a decision label', () => {
+    const parsed = parseDiagram(plainStepsToDSL('Begin\nIf go back to Begin then Retry'));
+    expect(flowProps(parsed, 'go_back_to_begin')).toMatchObject({ label: 'go back to Begin', nodeType: 'decision' });
+    expect(edge(parsed, 'go_back_to_begin', 'retry')?.label).toBe('Yes');
+  });
+
+  it('is byte-identical for lines without a loop phrase', () => {
+    const dsl = plainStepsToDSL('Model: draft reply\nthen Send reply\nIf invalid then Retry else Flag');
+    expect(dsl).not.toMatch(/\bloop\b/);
+    expect(dsl).toBe(`diagram: flow
+title: "Type steps"
+direction: TB
+
+draft_reply -> send_reply
+send_reply -> invalid
+invalid ->|"Yes"| retry
+invalid ->|"No"| flag
+
+node draft_reply {
+  label: "draft reply"
+  role: model
+}
+
+node send_reply {
+  label: "Send reply"
+}
+
+node invalid {
+  label: "invalid"
+  type: decision
+}
+
+node retry {
+  label: "Retry"
+}
+
+node flag {
+  label: "Flag"
+}
+`);
+  });
+});

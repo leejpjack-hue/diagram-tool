@@ -15,6 +15,12 @@
 // DT-AI-15 — a step's why-note round-trips as `Label — note` (em dash with
 // spaces), so pasting the output back into Type steps rebuilds the same
 // board. Steps without a note are unchanged.
+//
+// DT-AI-25 — an edge whose target was already listed is a back-edge. Branch
+// edges (Yes/No, or ok/retry) emit `then go back to <label>` / `else go back
+// to <label>`. Every other back-edge emits its own `go back to <label>` line
+// while the forward chain still sits on the source, so build → copy → build
+// stays stable. The label is the node label, without a role or note.
 
 import type { FlowNode, FlowNodeRole, ParsedDiagram } from '../store/types';
 
@@ -142,6 +148,31 @@ export function flowStepList(diagram: ParsedDiagram): FlowStep[] {
   const steps: FlowStep[] = [];
   const emitted = new Set<string>();
 
+  // Back-edges to nodes already listed. `skip` drops edges this caller just
+  // wrote as then/else, so they are not emitted a second time.
+  const pushBackRefs = (fromId: string, skip: { to: string; label?: string }[] = []) => {
+    const skipEdges = new Set(skip);
+    for (const edge of outgoing.get(fromId) ?? []) {
+      if (skipEdges.has(edge) || !emitted.has(edge.to)) continue;
+      const target = byId.get(edge.to);
+      if (!target) continue;
+      steps.push({ id: target.id, line: `go back to ${nodeLabel(target)}` });
+    }
+  };
+
+  const pushBranch = (prefix: 'then' | 'else', edge: { to: string; label?: string }) => {
+    const target = byId.get(edge.to);
+    if (!target) return;
+    const seen = emitted.has(target.id);
+    steps.push({
+      id: target.id,
+      line: seen ? `${prefix} go back to ${nodeLabel(target)}` : `${prefix} ${formatStep(target)}`,
+    });
+    emitted.add(target.id);
+    // A new target becomes `last` on rebuild, so its own back-edges belong here.
+    if (!seen) pushBackRefs(target.id);
+  };
+
   for (const id of order) {
     if (emitted.has(id)) continue;
     const n = byId.get(id);
@@ -160,19 +191,14 @@ export function flowStepList(diagram: ParsedDiagram): FlowStep[] {
       if (yesEdge || noEdge) {
         steps.push({ id, line: `If ${formatStep(n)}` });
         emitted.add(id);
-        if (yesEdge) {
-          const yt = byId.get(yesEdge.to);
-          if (yt) {
-            steps.push({ id: yt.id, line: `then ${formatStep(yt)}` });
-            emitted.add(yt.id);
-          }
-        }
-        if (noEdge) {
-          const nt = byId.get(noEdge.to);
-          if (nt) {
-            steps.push({ id: nt.id, line: `else ${formatStep(nt)}` });
-            emitted.add(nt.id);
-          }
+        const seenBeforeYes = yesEdge ? emitted.has(yesEdge.to) : true;
+        const seenBeforeNo = noEdge ? emitted.has(noEdge.to) : true;
+        if (yesEdge) pushBranch('then', yesEdge);
+        if (noEdge) pushBranch('else', noEdge);
+        // Extra back-edges from the decision itself only rebuild while `last`
+        // is still the decision — i.e. neither branch created a new node.
+        if (seenBeforeYes && seenBeforeNo) {
+          pushBackRefs(id, [yesEdge, noEdge].filter((edge): edge is { to: string; label?: string } => !!edge));
         }
         continue;
       }
@@ -180,6 +206,7 @@ export function flowStepList(diagram: ParsedDiagram): FlowStep[] {
 
     steps.push({ id, line: formatStep(n) });
     emitted.add(id);
+    pushBackRefs(id);
   }
 
   if (steps.length === 0) {

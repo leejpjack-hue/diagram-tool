@@ -78,4 +78,15 @@ describe('buildFromStepsSuccessMessage / statsFromPlainStepsDsl (DT-AI-13)', () 
     expect(stats.dataCount).toBe(0);
     expect(buildFromStepsSuccessMessage(stats)).toBe('Built 2 steps onto the board');
   });
+
+  it('notes missing loop targets on the build toast (DT-AI-25)', () => {
+    const stats = statsFromPlainStepsDsl(plainStepsToDSL('Draft reply\ngo back to nowhere'));
+    expect(buildFromStepsSuccessMessage(stats, 1)).toBe(
+      'Built 2 steps onto the board · 1 loop target not found',
+    );
+    expect(buildFromStepsSuccessMessage(stats, 2)).toBe(
+      'Built 2 steps onto the board · 2 loop targets not found',
+    );
+    expect(buildFromStepsSuccessMessage(stats, 0)).toBe('Built 2 steps onto the board');
+  });
 });
