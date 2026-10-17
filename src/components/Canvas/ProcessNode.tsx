@@ -1,9 +1,9 @@
 import { memo } from 'react';
-import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
-import { useLayoutHandles } from './layoutDirection';
 import { FLOW_COLORS, flowShapeStyle, paletteFromColor, TITLE_FONT, MONO_FONT } from './flowShapeStyle';
+import { FlowHandles } from './FlowHandles';
+import { readFlowHandleSlots } from './connectionRouting';
 import { RoleChip } from './RoleChip';
 import { useDiagramStore } from '../../store/diagramStore';
 import { faceBoxShadow, ICON_STYLES, resolveFace, type IconStyleId } from './iconStyles';
@@ -17,7 +17,6 @@ export const ProcessNode = memo((props: NodeProps) => {
 
 function CleanProcessNode({ data, selected }: NodeProps) {
   const nodeData = data as unknown as FlowNodeData;
-  const { target, source } = useLayoutHandles(!!nodeData.reversed);
   const C = nodeData.color ? paletteFromColor(nodeData.color) : FLOW_COLORS.blue;
 
   return (
@@ -30,7 +29,6 @@ function CleanProcessNode({ data, selected }: NodeProps) {
       style={flowShapeStyle(C, !!selected)}
     >
       <RoleChip role={nodeData.role} />
-      <Handle type="target" position={target} style={{ background: C.border }} />
 
       <div className="font-semibold text-[13px] text-center" style={{ color: C.text, fontFamily: TITLE_FONT }}>
         {nodeData.label}
@@ -48,7 +46,7 @@ function CleanProcessNode({ data, selected }: NodeProps) {
         </div>
       )}
 
-      <Handle type="source" position={source} style={{ background: C.border }} />
+      <FlowHandles accent={C.border} slots={readFlowHandleSlots(data)} />
     </div>
   );
 }
@@ -57,7 +55,6 @@ ProcessNode.displayName = 'ProcessNode';
 
 function StyledProcessNode({ data, selected, iconStyle }: NodeProps & { iconStyle: IconStyleId }) {
   const nodeData = data as unknown as FlowNodeData;
-  const { target, source } = useLayoutHandles(!!nodeData.reversed);
   const face = resolveFace(iconStyle, nodeData, 'card');
   const tokens = ICON_STYLES[iconStyle];
   const shadow = faceBoxShadow(face);
@@ -74,7 +71,6 @@ function StyledProcessNode({ data, selected, iconStyle }: NodeProps & { iconStyl
         outlineOffset: selected ? tokens.selection.offset : undefined,
       }}
     >
-      <Handle type="target" position={target} style={{ background: face.borderWidth ? face.borderColor : face.labelColor }} />
       <div className="flex items-center justify-center" style={{ gap: 8 }}>
         <FlowGlyph face={face} />
         <div className="text-[13px] text-center" style={{ color: face.labelColor, fontFamily: face.fontFamily, fontWeight: face.fontWeight }}>
@@ -91,7 +87,7 @@ function StyledProcessNode({ data, selected, iconStyle }: NodeProps & { iconStyl
           {nodeData.duration}
         </div>
       )}
-      <Handle type="source" position={source} style={{ background: face.borderWidth ? face.borderColor : face.labelColor }} />
+      <FlowHandles accent={face.borderWidth ? face.borderColor : face.labelColor} slots={readFlowHandleSlots(data)} />
     </div>
   );
 }

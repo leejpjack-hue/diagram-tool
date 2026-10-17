@@ -1,9 +1,9 @@
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
-import { useLayoutHandles } from './layoutDirection';
 import { useDiagramStore } from '../../store/diagramStore';
+import { FlowHandles } from './FlowHandles';
+import { readFlowHandleSlots } from './connectionRouting';
 import { ICON_STYLES, resolveFace } from './iconStyles';
 import { FlowGlyph } from './FlowGlyph';
 
@@ -40,13 +40,9 @@ function useFlowPaint(
   };
 }
 
-function GatewayShell({ glyph, selected, label, reversed, data }: { glyph: string; selected?: boolean; label?: string; reversed?: boolean; data?: FlowNodeData }) {
+function GatewayShell({ glyph, selected, label, data }: { glyph: string; selected?: boolean; label?: string; reversed?: boolean; data?: FlowNodeData }) {
   const s = GATE.size;
   const paint = useFlowPaint(data ? { ...data, nodeType: data.nodeType ?? 'gatewayexclusive' } : undefined, GATE);
-  const { target, source, direction } = useLayoutHandles(reversed);
-  // Auxiliary branch handles — the two perpendicular sides keep Y/N branches
-  // accessible by id ('left'/'right' in TB, 'top'/'bottom' in LR).
-  const isLR = direction === 'LR';
   return (
     <div
       className="relative transition-all duration-200"
@@ -91,28 +87,7 @@ function GatewayShell({ glyph, selected, label, reversed, data }: { glyph: strin
           {label}
         </div>
       )}
-      <Handle
-        type="target"
-        position={target}
-        style={{ background: paint.stroke, ...(isLR ? { top: s / 2 } : { left: s / 2 }) }}
-      />
-      <Handle
-        type="source"
-        position={source}
-        style={{ background: paint.stroke, ...(isLR ? { top: s / 2 } : { left: s / 2 }) }}
-      />
-      {/* Branch handles on the two perpendicular sides */}
-      {isLR ? (
-        <>
-          <Handle type="source" position={Position.Top} id="top" style={{ background: paint.stroke, left: s / 2 }} />
-          <Handle type="source" position={Position.Bottom} id="bottom" style={{ background: paint.stroke, left: s / 2 }} />
-        </>
-      ) : (
-        <>
-          <Handle type="source" position={Position.Right} id="right" style={{ background: paint.stroke, top: s / 2 }} />
-          <Handle type="source" position={Position.Left} id="left" style={{ background: paint.stroke, top: s / 2 }} />
-        </>
-      )}
+      <FlowHandles accent={paint.stroke} slots={readFlowHandleSlots(data)} />
     </div>
   );
 }
@@ -136,11 +111,10 @@ export const GatewayInclusiveNode = memo(({ data, selected }: NodeProps) => {
 GatewayInclusiveNode.displayName = 'GatewayInclusiveNode';
 
 function EventShell({
-  glyph, selected, label, ringWidth = 2, reversed = false, data,
+  glyph, selected, label, ringWidth = 2, data,
 }: { glyph: string; selected?: boolean; label?: string; ringWidth?: number; reversed?: boolean; data?: FlowNodeData }) {
   const s = EVT.size;
   const paint = useFlowPaint(data, EVT, 'pill');
-  const { target, source, centerStyle } = useLayoutHandles(reversed);
   const strokeWidth = paint.iconStyle === 'clean' ? ringWidth : (data?.isEnd || data?.nodeType === 'eventend' ? 3.5 : ICON_STYLES[paint.iconStyle].shape.borderWidth || 1.5);
   return (
     <div
@@ -182,8 +156,7 @@ function EventShell({
           {label}
         </div>
       )}
-      <Handle type="target" position={target} style={{ background: paint.stroke, ...centerStyle(s, s) }} />
-      <Handle type="source" position={source} style={{ background: paint.stroke, ...centerStyle(s, s) }} />
+      <FlowHandles accent={paint.stroke} slots={readFlowHandleSlots(data)} />
     </div>
   );
 }
@@ -219,16 +192,10 @@ EventMessageNode.displayName = 'EventMessageNode';
  */
 const SUB = { w: 180, h: 80, stroke: '#3B82F6', fill: '#EFF6FF', text: '#1E40AF' };
 
-function SubprocessShell({ glyph, selected, label, system, reversed = false, data }: { glyph: '+' | '−'; selected?: boolean; label?: string; system?: string; reversed?: boolean; data?: FlowNodeData }) {
+function SubprocessShell({ glyph, selected, label, system, data }: { glyph: '+' | '−'; selected?: boolean; label?: string; system?: string; reversed?: boolean; data?: FlowNodeData }) {
   const paint = useFlowPaint(data, SUB, 'card');
-  const { target, source, direction } = useLayoutHandles(reversed);
   const borderW = paint.iconStyle === 'clean' ? 2 : (ICON_STYLES[paint.iconStyle].shape.borderWidth || 1.5);
   const radius = paint.iconStyle === 'clean' ? 12 : ICON_STYLES[paint.iconStyle].shape.radius;
-  // Source handle hangs slightly below the box edge in TB so the marker badge
-  // doesn't visually swallow it; in LR we let it sit flush on the right edge.
-  const sourceStyle = direction === 'LR'
-    ? { background: paint.stroke }
-    : { background: paint.stroke, bottom: -16 };
   return (
     <div
       className="relative transition-all duration-200"
@@ -276,8 +243,7 @@ function SubprocessShell({ glyph, selected, label, system, reversed = false, dat
       >
         {glyph}
       </div>
-      <Handle type="target" position={target} style={{ background: paint.stroke }} />
-      <Handle type="source" position={source} style={sourceStyle} />
+      <FlowHandles accent={paint.stroke} slots={readFlowHandleSlots(data)} />
     </div>
   );
 }

@@ -355,6 +355,7 @@ node brief {
     expect(version.version?.enum).toEqual(['1.0', '2.0', '3.0']);
     const source = (schema.$defs as { source?: { properties?: { text?: { description?: string } } } }).source;
     expect(source?.properties?.text?.description).toContain('gatewayparallel');
+    expect(source?.properties?.text?.description).toContain('from/to');
     expect(source?.properties?.text?.description).toContain('3.0');
 
     const parallelDsl = `diagram: flow

@@ -24,6 +24,22 @@ describe('loop return routing (DT-AI-25)', () => {
     expect(geometry.channel).toBeLessThan(spine);
   });
 
+  it('keeps the return channel opposite the forward axis', () => {
+    const tb = loopReturnPath(source, target, 'TB');
+    const spineX = source.x + source.width / 2;
+    expect(tb.channel).toBeLessThan(Math.min(source.x, target.x));
+    expect(tb.channel).toBeLessThan(spineX);
+    expect(tb.path.startsWith(`M ${source.x} `)).toBe(true);
+
+    const left = { x: 100, y: 220, width: 160, height: 64 };
+    const right = { x: 540, y: 220, width: 160, height: 64 };
+    const lr = loopReturnPath(right, left, 'LR');
+    const spineY = left.y + left.height / 2;
+    expect(lr.channel).toBeLessThan(Math.min(left.y, right.y));
+    expect(lr.channel).toBeLessThan(spineY);
+    expect(lr.path).toContain(`V ${lr.channel}`);
+  });
+
   it('treats an upward or leftward target as upstream and ignores forward edges', () => {
     expect(isUpstreamEdge(source, target, 'TB')).toBe(true);
     expect(isUpstreamEdge(target, source, 'TB')).toBe(false);
