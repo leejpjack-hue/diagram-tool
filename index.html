@@ -24,9 +24,7 @@
       :root {
         --ink: #1b1a17;
         --muted: #5c584f;
-        --line: #e4dfd4;
         --paper: #f7f4ee;
-        --card: #fffdf8;
         --accent: #4f46e5;
         --accent-2: #7c3aed;
         --chip: #efeaf8;
@@ -114,49 +112,11 @@
         display: inline-flex;
         align-items: center;
       }
-      .btn:disabled { opacity: 0.65; cursor: wait; }
       .muted-link {
         color: var(--muted);
         font-size: 0.95rem;
         font-weight: 500;
       }
-      .card {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        padding: 1.15rem;
-        box-shadow: 0 16px 40px rgba(27, 26, 23, 0.05);
-        max-width: 28rem;
-      }
-      label {
-        display: block;
-        font-size: 0.82rem;
-        font-weight: 600;
-        margin: 0 0 0.4rem;
-      }
-      input, textarea {
-        width: 100%;
-        border: 1px solid #d7d1c5;
-        border-radius: 10px;
-        background: #fff;
-        color: var(--ink);
-        font: inherit;
-        padding: 0.75rem 0.8rem;
-        margin-bottom: 0.85rem;
-      }
-      input:focus, textarea:focus {
-        outline: 2px solid #c7d2fe;
-        border-color: var(--accent);
-      }
-      .error { color: #b42318; font-size: 0.85rem; margin: -0.35rem 0 0.75rem; }
-      .success {
-        border: 1px solid #bbf7d0;
-        background: #f0fdf4;
-        border-radius: 16px;
-        padding: 1.15rem;
-        max-width: 28rem;
-      }
-      .success p { margin: 0 0 0.75rem; font-weight: 600; }
       footer {
         padding: 2rem 0 2.5rem;
         color: var(--muted);
@@ -183,20 +143,9 @@
         <h1>Turn text into architecture, flow, and Gantt diagrams.</h1>
         <p class="subhead">Describe the system. Get a board you can edit, export, and present — in the browser.</p>
         <div class="cta-row">
-          <a class="btn" href="#waitlist">Join the waitlist</a>
+          <a class="btn js-open-app" href="/app">Open the app</a>
           <a class="muted-link js-open-app" href="/app">Open the workspace →</a>
         </div>
-
-        <section id="waitlist" class="card" aria-label="Waitlist">
-          <form id="waitlist-form" action="/api/waitlist" method="post">
-            <label for="waitlist-email">Email</label>
-            <input id="waitlist-email" name="email" type="email" required placeholder="you@company.com" autocomplete="email" />
-            <label for="waitlist-note">What will you diagram first? (optional)</label>
-            <textarea id="waitlist-note" name="note" rows="3" placeholder="e.g. AWS architecture, sprint Gantt…"></textarea>
-            <p id="waitlist-error" class="error" hidden></p>
-            <button class="btn" type="submit">Join waitlist</button>
-          </form>
-        </section>
       </main>
 
       <footer>Local-first workspace. No account required to try the editor.</footer>
