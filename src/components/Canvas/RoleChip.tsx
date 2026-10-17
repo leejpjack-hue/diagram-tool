@@ -1,5 +1,6 @@
 import type { FlowNodeData } from './types';
 import { MONO_FONT } from './flowShapeStyle';
+import { useDiagramStore } from '../../store/diagramStore';
 
 /**
  * DT-AI-03 — display-only role chip for flow nodes (human / model / tool /
@@ -24,6 +25,9 @@ const ROLE_STYLES: Record<string, { label: string; text: string; tint: string; b
 };
 
 export function RoleChip({ role }: { role?: FlowNodeData['role'] }) {
+  const iconStyle = useDiagramStore(s => s.iconStyle);
+  // Line / Bold / Blueprint replace the text chip with a role icon.
+  if (iconStyle !== 'clean') return null;
   if (!role || !ROLE_STYLES[role]) return null;
   const s = ROLE_STYLES[role];
   return (

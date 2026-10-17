@@ -8,6 +8,7 @@ import {
 import { detectRawDiagramImport } from './sourceText';
 import { importDrawio, looksLikeDrawio } from './drawioImport';
 import { assertImportSize, sanitizeImportPlainText } from './importSanitizer';
+import { iconStyleForStorage, type IconStyleId } from '../components/Canvas/iconStyles';
 
 export type BoardMode = 'architecture' | 'flow' | 'sequence' | 'gantt';
 export type BoardSort = 'lastOpened' | 'updated' | 'created' | 'name';
@@ -77,6 +78,11 @@ export interface Board {
   lastOpenedAt?: string;
   deletedAt?: string;
   templateSourceId?: string;
+  /**
+   * DT-STYLE-01. Optional Flow icon style. Omitted means Clean.
+   * Unknown values are dropped on load.
+   */
+  iconStyle?: IconStyleId;
   schemaVersion: 2;
 }
 
@@ -260,13 +266,17 @@ function blobToDataUrl(value: Blob): Promise<string> {
 }
 
 export function normalizeBoard(input: Partial<Board> & Pick<Board, 'id' | 'title' | 'mode' | 'dslText' | 'createdAt' | 'updatedAt'>): Board {
-  return {
+  const iconStyle = iconStyleForStorage(input.iconStyle);
+  const board: Board = {
     ...input,
     description: input.description ?? '',
     tags: Array.isArray(input.tags) ? input.tags.filter(Boolean) : [],
     starred: Boolean(input.starred),
     schemaVersion: 2,
-  } as Board;
+  };
+  if (iconStyle) board.iconStyle = iconStyle;
+  else delete board.iconStyle;
+  return board;
 }
 
 async function storeBoard(board: Board): Promise<StoredBoard> {
@@ -499,7 +509,7 @@ export class BoardManager {
   }
 
   async create(
-    input: { id?: string; title: string; description?: string; mode: BoardMode; dslText: string; thumbnail?: string; spaceId?: string; tags?: string[]; templateSourceId?: string; presentation?: PresentationItem[] },
+    input: { id?: string; title: string; description?: string; mode: BoardMode; dslText: string; thumbnail?: string; spaceId?: string; tags?: string[]; templateSourceId?: string; presentation?: PresentationItem[]; iconStyle?: IconStyleId },
     recordActivity = true,
   ): Promise<Board> {
     if (recordActivity) await this.initialize();
@@ -523,6 +533,8 @@ export class BoardManager {
         : undefined,
       schemaVersion: 2,
     };
+    const storedStyle = iconStyleForStorage(input.iconStyle);
+    if (storedStyle) board.iconStyle = storedStyle;
     return this.enqueueBoardWrite(board.id, async () => {
       await this.repository.put('boards', await storeBoard(board));
       if (recordActivity) await this.addActivity(board, 'created');
@@ -598,6 +610,7 @@ export class BoardManager {
       thumbnail: source.thumbnail,
       spaceId: source.spaceId,
       tags: source.tags,
+      iconStyle: source.iconStyle,
     });
     await this.addActivity(copy, 'duplicated', `Copied from ${source.title}`);
     return copy;
@@ -891,6 +904,7 @@ export class BoardManager {
         thumbnail: typeof candidate.thumbnail === 'string' ? candidate.thumbnail : undefined,
         tags: candidate.tags,
         spaceId: candidate.spaceId ? spaceMap.get(candidate.spaceId) : undefined,
+        iconStyle: candidate.iconStyle,
       });
       if (candidate.id) boardIdMap.set(candidate.id, board.id);
       if (candidate.presentation?.items.length) await this.setPresentation(board.id, candidate.presentation.items);

@@ -8,14 +8,13 @@ export function useOnlineStatus(): boolean {
   const [online, setOnline] = useState(readNavigatorOnline);
 
   useEffect(() => {
-    const goOnline = () => setOnline(true);
-    const goOffline = () => setOnline(false);
-    window.addEventListener('online', goOnline);
-    window.addEventListener('offline', goOffline);
-    setOnline(readNavigatorOnline());
+    const sync = () => setOnline(readNavigatorOnline());
+    window.addEventListener('online', sync);
+    window.addEventListener('offline', sync);
+    queueMicrotask(sync);
     return () => {
-      window.removeEventListener('online', goOnline);
-      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', sync);
+      window.removeEventListener('offline', sync);
     };
   }, []);
 

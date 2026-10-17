@@ -23,7 +23,8 @@ import { AnnotationNode } from './AnnotationNode';
 import { C4LevelSwitcher } from './C4LevelSwitcher';
 import { ZoomControls } from './ZoomControls';
 import { ShapeLibrary } from '../Panel/ShapeLibrary';
-import { ColorLegend } from './ColorLegend';
+import { ColorLegend, FlowStyleLegend } from './ColorLegend';
+import { ICON_STYLES } from './iconStyles';
 import { useDiagramStore } from '../../store/diagramStore';
 import type { FlowNode, C4Level, ServiceNode as ServiceNodeType, CloudNode as CloudNodeType, ClassNode as ClassNodeType, AnnotationNode as AnnotationNodeType } from '../../store/types';
 import { calculateAutoLayout, resolveGroupOverlaps } from '../../utils/autoLayout';
@@ -201,6 +202,8 @@ function computeArchitectureRouting(diagramMode: string, diagramEdges: DiagramEd
 
 function DiagramCanvasInternal() {
   const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode, dslText, setDslText, setParsedDiagram, setError, selectedNodeId, isReadOnlyShared } = useDiagramStore();
+  const iconStyle = useDiagramStore(s => s.iconStyle);
+  const flowTokens = ICON_STYLES[iconStyle];
   const [renameDraft, setRenameDraft] = useState<string | null>(null);
   const { getZoom, fitView } = useReactFlow();
   const [c4Level, setC4Level] = useState<C4Level | 'all'>('all');
@@ -719,8 +722,46 @@ function DiagramCanvasInternal() {
           color: stroke,
         },
       };
+    }).map(edge => {
+      if (diagramMode !== 'flow' || iconStyle === 'clean') return edge;
+      const tokens = flowTokens;
+      const base = edge as {
+        id: string;
+        style?: { stroke?: string };
+        label?: string;
+      };
+      const dslStroke = parsedDiagram.edges.find(item => item.id === base.id)?.color;
+      const stroke = dslStroke || tokens.edge.color;
+      return {
+        ...edge,
+        type: tokens.edge.route === 'step' ? 'step' : tokens.edge.route === 'smoothstep' ? 'smoothstep' : edge.type,
+        style: {
+          stroke,
+          strokeWidth: tokens.edge.width,
+          ...(tokens.edge.dash ? { strokeDasharray: tokens.edge.dash } : {}),
+        },
+        labelStyle: {
+          fill: tokens.edge.labelColor,
+          fontWeight: 700,
+          fontSize: 11,
+          fontFamily: "'JetBrains Mono', monospace",
+        },
+        labelBgStyle: {
+          fill: tokens.edge.labelBg,
+          fillOpacity: 0.97,
+          stroke,
+          strokeOpacity: 0.35,
+          strokeWidth: 1,
+        },
+        labelBgPadding: [6, 8] as [number, number],
+        labelBgBorderRadius: 999,
+        markerEnd: {
+          type: tokens.edge.marker === 'open' ? MarkerType.Arrow : MarkerType.ArrowClosed,
+          color: stroke,
+        },
+      };
     });
-  }, [parsedDiagram, diagramMode, c4Level, drillParent, architectureRouting]);
+  }, [parsedDiagram, diagramMode, c4Level, drillParent, architectureRouting, iconStyle, flowTokens]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(routedNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -939,11 +980,11 @@ function DiagramCanvasInternal() {
         style: {
           ...n.style,
           opacity: isCurrent ? 1 : isTrail ? WALK_TRAIL_NODE_OPACITY : 0.15,
-          ...(isCurrent ? { boxShadow: '0 0 0 3px #6366f1', borderRadius: 10 } : {}),
+          ...(isCurrent ? { boxShadow: `0 0 0 3px ${flowTokens.walk.highlight}`, borderRadius: 10 } : {}),
         },
       };
     });
-  }, [nodes, walkActive, walkCurrentId, walkTrailNodeIds]);
+  }, [nodes, walkActive, walkCurrentId, walkTrailNodeIds, flowTokens]);
 
   // View-only dimming: everything except the current step fades. Edges on the
   // path the human took are emphasized — the arrived-by edge of the current
@@ -956,7 +997,7 @@ function DiagramCanvasInternal() {
         return {
           ...e,
           className: 'walk-through-edge-active',
-          style: { ...e.style, strokeWidth: 3, stroke: '#6366f1' },
+          style: { ...e.style, strokeWidth: 3, stroke: flowTokens.walk.highlight },
           zIndex: 5,
         };
       }
@@ -964,7 +1005,7 @@ function DiagramCanvasInternal() {
         return {
           ...e,
           className: 'walk-through-edge-trail',
-          style: { ...e.style, strokeWidth: 2.4, stroke: '#818cf8' },
+          style: { ...e.style, strokeWidth: 2.4, stroke: flowTokens.walk.trail },
           zIndex: 4,
         };
       }
@@ -975,7 +1016,7 @@ function DiagramCanvasInternal() {
         labelBgStyle: { ...e.labelBgStyle, opacity: 0.12 },
       };
     });
-  }, [edges, walkActive, walkActiveEdgeId, walkTrailEdgeIds]);
+  }, [edges, walkActive, walkActiveEdgeId, walkTrailEdgeIds, flowTokens]);
 
 
   const persistCanvasPositions = useCallback((
@@ -1101,7 +1142,7 @@ function DiagramCanvasInternal() {
   // flight, and not on unrelated re-renders. `routedNodes` is a new array
   // every time its memo recomputes, which used to snap dragged nodes back
   // before pin writeback could run.
-  const layoutSyncKey = `${diagramMode}\0${dslText}\0${c4Level}\0${drillParent ?? ''}\0${layoutDirection}`;
+  const layoutSyncKey = `${diagramMode}\0${dslText}\0${c4Level}\0${drillParent ?? ''}\0${layoutDirection}\0${iconStyle}`;
   useEffect(() => {
     if (draggingNodeIds.current.size > 0) return;
     if (routedNodes.length > 0) {
@@ -1322,7 +1363,12 @@ function DiagramCanvasInternal() {
 
   return (
     <LayoutDirectionContext.Provider value={layoutDirection}>
-    <div className="w-full h-full overflow-hidden bg-white relative" data-canvas-target="primary">
+    <div
+      className="w-full h-full overflow-hidden bg-white relative"
+      data-canvas-target="primary"
+      data-icon-style={diagramMode === 'flow' ? iconStyle : undefined}
+      style={diagramMode === 'flow' && iconStyle === 'blueprint' ? { background: flowTokens.pane } : undefined}
+    >
       {renameDraft !== null && selectedNodeId && (
         <div className="absolute top-4 left-1/2 z-20 -translate-x-1/2 rounded-lg border border-indigo-200 bg-white px-3 py-2 shadow-md">
           <input
@@ -1341,6 +1387,7 @@ function DiagramCanvasInternal() {
         </div>
       )}
       <ReactFlow
+        style={diagramMode === 'flow' && iconStyle === 'blueprint' ? { background: flowTokens.pane } : undefined}
         nodes={displayNodes}
         edges={displayEdges}
         // DT-AI-14 / DT-SAVE-01: walk-through and shared view are read-only —
@@ -1371,7 +1418,11 @@ function DiagramCanvasInternal() {
         maxZoom={4}
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
       >
-        <Background color="#CBD5E1" gap={25} variant={BackgroundVariant.Dots} />
+        {diagramMode === 'flow' && flowTokens.grid ? (
+          <Background color={flowTokens.grid.color} gap={flowTokens.grid.gap} variant={BackgroundVariant.Lines} />
+        ) : (
+          <Background color="#CBD5E1" gap={25} variant={BackgroundVariant.Dots} />
+        )}
         {(helperLines.horizontal !== undefined || helperLines.vertical !== undefined) && (
           <ViewportPortal>
             {helperLines.vertical !== undefined && (
@@ -1508,6 +1559,7 @@ function DiagramCanvasInternal() {
           chip strip from the Diagram Kit reference — process / service /
           data / decision. Architecture mode only. */}
       {diagramMode !== 'flow' && <ColorLegend />}
+      {diagramMode === 'flow' && <FlowStyleLegend />}
 
       {/* Drill-down breadcrumb (architecture mode, only when drilled in) */}
       {diagramMode !== 'flow' && drillParent && (

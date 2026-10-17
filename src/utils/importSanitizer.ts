@@ -45,7 +45,7 @@ export function assertDrawioXmlSafe(xml: string): void {
 }
 
 export function sanitizeImportPlainText(value: string, fallback = ''): string {
-  let text = value.replace(/\u0000/g, '');
+  let text = value.split(String.fromCharCode(0)).join('');
   text = text.replace(/<(script|style|iframe|object|embed|svg|foreignobject)\b[\s\S]*?<\/\1>/gi, ' ');
   text = text.replace(/<(script|style|iframe|object|embed|svg|foreignobject|link|meta)\b[^>]*\/?>/gi, ' ');
   text = text.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');

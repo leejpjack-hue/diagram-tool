@@ -268,6 +268,57 @@ describe('public portable board format', () => {
     expect(plan.skipped.map(item => item.kind)).toEqual(expect.arrayContaining(['frames', 'thumbnail']));
   });
 
+  it('round-trips iconStyle and treats missing or unknown values as clean', () => {
+    expect(BOARD_FORMAT_VERSION).toBe('3.0');
+    const schemaBoard = schema.$defs.portableBoard as {
+      required: string[];
+      properties: { iconStyle: { enum: string[]; default: string } };
+    };
+    expect(schemaBoard.required).not.toContain('iconStyle');
+    expect(schemaBoard.properties.iconStyle.enum).toEqual(['clean', 'line', 'bold', 'blueprint']);
+    expect(schemaBoard.properties.iconStyle.default).toBe('clean');
+
+    const omitted = buildBoardDocument(board({ mode: 'flow', dslText: FLOW_DSL, iconStyle: 'clean' }));
+    expect(omitted.version).toBe('3.0');
+    expect(omitted.board).not.toHaveProperty('iconStyle');
+    expect(buildBoardDocument(board({ mode: 'flow', dslText: FLOW_DSL })).board).not.toHaveProperty('iconStyle');
+
+    for (const iconStyle of ['line', 'bold', 'blueprint'] as const) {
+      const exported = buildBoardDocument(board({ mode: 'flow', dslText: FLOW_DSL, iconStyle }));
+      expect(exported.version).toBe('3.0');
+      expect(exported.board.iconStyle).toBe(iconStyle);
+      const plan = parsePortableImport(exported);
+      expect(plan.boards[0].iconStyle).toBe(iconStyle);
+      expect(plan.boards[0].dslText).toBe(FLOW_DSL);
+    }
+
+    const legacy = parsePortableImport({
+      version: '3.0',
+      board: {
+        title: 'Old flow',
+        mode: 'flow',
+        source: { kind: 'dsl', text: FLOW_DSL },
+        nodes: [],
+        edges: [],
+        frames: [],
+        comments: [],
+      },
+    });
+    expect(legacy.boards[0].iconStyle).toBeUndefined();
+
+    const unknown = parsePortableImport({
+      version: '3.0',
+      board: {
+        title: 'Odd flow',
+        mode: 'flow',
+        iconStyle: 'neon',
+        source: { kind: 'dsl', text: FLOW_DSL },
+      },
+    });
+    expect(unknown.boards[0].iconStyle).toBeUndefined();
+    expect(validatePortableDocument(buildBoardDocument(board({ mode: 'flow', dslText: FLOW_DSL, iconStyle: 'bold' }))).ok).toBe(true);
+  });
+
   it('PNG/SVG/PDF export stays free and unwatermarked', () => {
     expect(EXPORT_WATERMARK).toBeNull();
     expect(EXPORT_REQUIRES_ACCOUNT).toBe(false);

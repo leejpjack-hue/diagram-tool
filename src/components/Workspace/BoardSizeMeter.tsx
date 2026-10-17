@@ -19,6 +19,8 @@ function useDevBoardSizeOverride(): number | null {
   return import.meta.env.DEV === true ? override : null;
 }
 
+// Shared with App. The DEV gate stays in this file so production builds cannot grow a window hook.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useBoardSizeSnapshot(
   nodeCount: number,
   edgeCount: number,

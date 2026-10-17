@@ -4,8 +4,17 @@ import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
 import { useLayoutHandles } from './layoutDirection';
 import { FLOW_COLORS, flowPillStyle, paletteFromColor, TITLE_FONT } from './flowShapeStyle';
+import { useDiagramStore } from '../../store/diagramStore';
+import { faceBoxShadow, ICON_STYLES, resolveFace, type IconStyleId } from './iconStyles';
+import { FlowGlyph } from './FlowGlyph';
 
-export const StartEndNode = memo(({ data, selected }: NodeProps) => {
+export const StartEndNode = memo((props: NodeProps) => {
+  const iconStyle = useDiagramStore(s => s.iconStyle);
+  if (iconStyle === 'clean') return <CleanStartEndNode {...props} />;
+  return <StyledStartEndNode {...props} iconStyle={iconStyle} />;
+});
+
+const CleanStartEndNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
   const isStart = nodeData.isStart;
   const isEnd = nodeData.isEnd;
@@ -46,3 +55,48 @@ export const StartEndNode = memo(({ data, selected }: NodeProps) => {
 });
 
 StartEndNode.displayName = 'StartEndNode';
+CleanStartEndNode.displayName = 'CleanStartEndNode';
+
+const StyledStartEndNode = memo(({ data, selected, iconStyle }: NodeProps & { iconStyle: IconStyleId }) => {
+  const nodeData = data as unknown as FlowNodeData;
+  const isStart = nodeData.isStart;
+  const isEnd = nodeData.isEnd;
+  const { target, source } = useLayoutHandles(!!nodeData.reversed);
+  const face = resolveFace(iconStyle, {
+    ...nodeData,
+    isStart: isStart || (!isEnd && !nodeData.role),
+    isEnd,
+  }, 'pill');
+  const tokens = ICON_STYLES[iconStyle];
+  const handleColor = face.borderWidth ? face.borderColor : face.labelColor;
+  return (
+    <div
+      data-style-kind={face.kind}
+      className="px-6 py-2.5 min-w-[110px] text-center"
+      style={{
+        background: face.fill,
+        border: face.borderWidth ? `${face.borderWidth}px solid ${face.borderColor}` : 'none',
+        borderRadius: face.radius,
+        boxShadow: faceBoxShadow(face),
+        outline: selected ? `${tokens.selection.width}px solid ${tokens.selection.color}` : undefined,
+        outlineOffset: selected ? tokens.selection.offset : undefined,
+      }}
+    >
+      {isStart && <Handle type="source" position={source} style={{ background: handleColor }} />}
+      {isEnd && <Handle type="target" position={target} style={{ background: handleColor }} />}
+      <div className="inline-flex items-center justify-center" style={{ gap: 8 }}>
+        <FlowGlyph face={face} />
+        <div style={{ color: face.labelColor, fontFamily: face.fontFamily, fontWeight: face.fontWeight, fontSize: 12, letterSpacing: '0.04em' }}>
+          {nodeData.label}
+        </div>
+      </div>
+      {!isStart && !isEnd && (
+        <>
+          <Handle type="target" position={target} style={{ background: handleColor }} />
+          <Handle type="source" position={source} style={{ background: handleColor }} />
+        </>
+      )}
+    </div>
+  );
+});
+StyledStartEndNode.displayName = 'StyledStartEndNode';

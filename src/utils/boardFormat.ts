@@ -18,6 +18,7 @@ import type {
   PresentationItem,
   Space,
 } from './boardManager';
+import { iconStyleForStorage, type IconStyleId } from '../components/Canvas/iconStyles';
 
 export const BOARD_FORMAT_VERSION = '3.0';
 export const EXPORT_WATERMARK = null;
@@ -81,6 +82,8 @@ export interface PortableBoard {
   deletedAt?: string;
   templateSourceId?: string;
   schemaVersion?: number;
+  /** DT-STYLE-01. Omitted when Clean. Unknown values are dropped on import. */
+  iconStyle?: IconStyleId;
 }
 
 export interface BoardDocument {
@@ -282,6 +285,7 @@ export function toPortableBoard(board: Pick<Board, 'title' | 'mode' | 'dslText'>
     deletedAt: board.deletedAt,
     templateSourceId: board.templateSourceId,
     schemaVersion: board.schemaVersion,
+    ...(iconStyleForStorage(board.iconStyle) ? { iconStyle: iconStyleForStorage(board.iconStyle) } : {}),
   };
 }
 
@@ -421,6 +425,7 @@ export function parsePortableImport(data: unknown): PortableImportPlan {
       lastOpenedAt: typeof record.lastOpenedAt === 'string' ? record.lastOpenedAt : undefined,
       deletedAt: typeof record.deletedAt === 'string' ? record.deletedAt : undefined,
       templateSourceId: typeof record.templateSourceId === 'string' ? record.templateSourceId : undefined,
+      ...(iconStyleForStorage(record.iconStyle) ? { iconStyle: iconStyleForStorage(record.iconStyle) } : {}),
     });
   };
 

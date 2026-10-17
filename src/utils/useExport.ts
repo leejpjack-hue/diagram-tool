@@ -4,9 +4,11 @@ import { useGanttStore } from '../components/Gantt/ganttStore';
 import type { DiagramNode } from '../store/types';
 import { buildBoardDocument, EXPORT_WATERMARK } from './boardFormat';
 import type { BoardMode } from './boardManager';
+import { ICON_STYLES } from '../components/Canvas/iconStyles';
 
 export const useExport = () => {
-  const { parsedDiagram, diagramMode } = useDiagramStore();
+  const { parsedDiagram, diagramMode, iconStyle } = useDiagramStore();
+  const exportBackground = diagramMode === 'flow' ? ICON_STYLES[iconStyle].canvas : null;
 
   const getFileName = (format: string) => {
     const title = parsedDiagram?.title || 'diagram';
@@ -78,7 +80,7 @@ export const useExport = () => {
 
   const exportPNG = async (quality = 3) => {
     try {
-      const dataUrl = await captureCanvas(toPng, quality, '#FDFDFD');
+      const dataUrl = await captureCanvas(toPng, quality, exportBackground ?? '#FDFDFD');
       if (dataUrl) triggerDownload(assertUnwatermarked(dataUrl), getFileName('png'));
     } catch (error) {
       console.error('Export failed:', error);
@@ -87,7 +89,7 @@ export const useExport = () => {
 
   const exportSVG = async () => {
     try {
-      const dataUrl = await captureCanvas(toSvg, 1, '#FDFDFD');
+      const dataUrl = await captureCanvas(toSvg, 1, exportBackground ?? '#FDFDFD');
       if (dataUrl) triggerDownload(assertUnwatermarked(dataUrl), getFileName('svg'));
     } catch (error) {
       console.error('Export failed:', error);
@@ -97,7 +99,7 @@ export const useExport = () => {
   const exportJPG = async (quality = 3) => {
     try {
       // JPEG has no alpha channel, so a solid background is required.
-      const dataUrl = await captureCanvas(toJpeg, quality, '#FFFFFF');
+      const dataUrl = await captureCanvas(toJpeg, quality, exportBackground ?? '#FFFFFF');
       if (dataUrl) triggerDownload(dataUrl, getFileName('jpg'));
     } catch (error) {
       console.error('Export failed:', error);
@@ -112,7 +114,7 @@ export const useExport = () => {
     }
 
     try {
-      const dataUrl = await captureCanvas(toPng, quality, '#FFFFFF');
+      const dataUrl = await captureCanvas(toPng, quality, exportBackground ?? '#FFFFFF');
       if (!dataUrl) return;
 
       // Size the PDF page to the canvas (in CSS px → pt) and embed the
@@ -134,7 +136,7 @@ export const useExport = () => {
   };
 
   const exportJSON = () => {
-    const { dslText } = useDiagramStore.getState();
+    const { dslText, iconStyle: liveStyle } = useDiagramStore.getState();
     const mode = (diagramMode === 'c4' ? 'architecture' : diagramMode) as BoardMode;
     if (!dslText.trim() && diagramMode !== 'gantt') return;
     const title = parsedDiagram?.title || 'diagram';
@@ -142,6 +144,7 @@ export const useExport = () => {
       title,
       mode,
       dslText,
+      ...(mode === 'flow' && liveStyle !== 'clean' ? { iconStyle: liveStyle } : {}),
     }), null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

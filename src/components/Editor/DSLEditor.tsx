@@ -12,6 +12,7 @@ import { AI_PROMPT_TEXT } from './aiPrompt';
 import { useToast } from '../../utils/useToast';
 import { ToastContainer } from '../Toast/ToastContainer';
 import type { BoardMode } from '../../utils/boardManager';
+import { IconStylePicker } from '../Canvas/IconStylePicker';
 
 function asBoardMode(mode: string): BoardMode {
   return mode === 'flow' || mode === 'sequence' || mode === 'gantt' ? mode : 'architecture';
@@ -37,10 +38,14 @@ export function DSLEditor() {
   // queued after a successful serialize, so nothing to catch here.
   useEffect(() => {
     if (!typeStepsSeed) return;
-    const next = applyLoadedPlainSteps(stepsText, typeStepsSeed.payload);
-    setStepsText(next.stepsText);
-    setShowSteps(next.showSteps);
-    clearTypeStepsSeed();
+    const payload = typeStepsSeed.payload;
+    const current = stepsText;
+    queueMicrotask(() => {
+      const next = applyLoadedPlainSteps(current, payload);
+      setStepsText(next.stepsText);
+      setShowSteps(next.showSteps);
+      clearTypeStepsSeed();
+    });
     // stepsText intentionally omitted: applyLoadedPlainSteps overwrites it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeStepsSeed, clearTypeStepsSeed]);
@@ -249,6 +254,7 @@ else Flag for review`;
                   Copy as steps
                 </button>
                 {/* DT-AI-14: read-only walk-through, step order = Copy as steps order. */}
+                {!isReadOnlyShared && <IconStylePicker />}
                 <button
                   type="button"
                   data-testid="walk-through"

@@ -20,6 +20,7 @@ import { isWorkshopTemplateId } from './components/TemplatePicker/workshopTempla
 import { parseDiagram } from './parser/parser';
 import { ToastContainer } from './components/Toast/ToastContainer';
 import { useDiagramStore } from './store/diagramStore';
+import { iconStyleForStorage } from './components/Canvas/iconStyles';
 import { useGanttStore } from './components/Gantt/ganttStore';
 import { generateGanttDSL } from './components/Gantt/ganttGenerator';
 import { seedTypeStepsForTemplate } from './parser/boardToPlainSteps';
@@ -398,6 +399,8 @@ function App() {
     setReadOnlyShared,
     enterWalkThrough,
   } = useDiagramStore();
+  const iconStyle = useDiagramStore(s => s.iconStyle);
+  const setIconStyle = useDiagramStore(s => s.setIconStyle);
   
   const { addTask, updateTask, setProject, tasks, dependencies } = useGanttStore();
   
@@ -767,6 +770,7 @@ function App() {
           if (!active || !shared) return;
           setReadOnlyShared(true, shared.title);
           setCurrentBoardId(null);
+          setIconStyle(shared.portable.iconStyle, false);
           setDslText(shared.portable.dslText, false);
           setDiagramMode(shared.portable.mode);
           setActiveTab(shared.portable.mode);
@@ -799,13 +803,14 @@ function App() {
   // useToast() returns a new object each render; toast.error is a stable
   // useCallback. Depending on `toast` re-ran this effect → setDiagramMode loop
   // → React #185 blank #root for users with a saved diagram in localStorage.
-  }, [setDslText, setDiagramMode, setParsedDiagram, setReadOnlyShared, toast.error]);
+  }, [setDslText, setDiagramMode, setParsedDiagram, setReadOnlyShared, setIconStyle, toast.error]);
 
   // ---- Board dashboard (Miro-style home) ----
 
   const openBoard = (board: Board) => {
     setReadOnlyShared(false);
     setCurrentBoardId(board.id);
+    setIconStyle(board.iconStyle, false);
     setDslText(board.dslText);
     setDiagramMode(board.mode);
     setActiveTab(board.mode);
@@ -939,10 +944,12 @@ function App() {
       }, 1200);
     }, 800);
     return () => clearTimeout(t);
-  }, [dslText, activeTab, currentBoardId, view, isReadOnlyShared, captureAndStoreBoardThumbnail]);
+  }, [dslText, activeTab, currentBoardId, view, isReadOnlyShared, captureAndStoreBoardThumbnail, iconStyle]);
 
   const handleLoadDiagram = (diagram: SavedDiagram) => {
     setReadOnlyShared(false);
+    // Legacy recent diagrams have no iconStyle. Load them as Clean.
+    setIconStyle('clean', false);
     setDslText(diagram.dslText);
     setDiagramMode(diagram.mode);
     setActiveTab(diagram.mode);
@@ -961,6 +968,7 @@ function App() {
 
   const handleNewDiagram = () => {
     setReadOnlyShared(false);
+    setIconStyle('clean', false);
     setDslText(ARCHITECTURE_DSL);
     setDiagramMode('architecture');
     setActiveTab('architecture');
@@ -1091,6 +1099,7 @@ function App() {
         presentation: deckItems.length
           ? { items: deckItems, updatedAt: new Date().toISOString() }
           : undefined,
+        iconStyle: iconStyleForStorage(useDiagramStore.getState().iconStyle),
       });
       openBoard(board);
       toast.success(`Saved copy of "${board.title}" to your local workspace`);
@@ -1578,6 +1587,7 @@ function boardPatchFromSource(dslText: string, mode: BoardMode) {
     dslText,
     mode,
     ...(title ? { title } : {}),
+    iconStyle: iconStyleForStorage(useDiagramStore.getState().iconStyle),
   };
 }
 
