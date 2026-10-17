@@ -440,11 +440,18 @@ describe('plainStepsToDSL (DT-AI-24 data prefixes)', () => {
   });
 
   it('keeps a bare data word with nothing after it as the label', () => {
-    const parsed = parseDiagram(plainStepsToDSL('Data:\nFile:'));
-    expect(flowProps(parsed, 'data')?.label).toBe('Data:');
-    expect(flowProps(parsed, 'data')?.nodeType).toBeUndefined();
-    expect(flowProps(parsed, 'file')?.label).toBe('File:');
+    // Trailing colon is removed by the existing segment splitter, same as "Human:".
+    // The slug `data` is a lexer keyword, so this uses Memory:/File:/DB: which stay labels.
+    const dsl = plainStepsToDSL('Memory:\nFile:\nDB:');
+    expect(dsl).not.toMatch(/type: data/);
+    expect(dsl).not.toMatch(/type: document/);
+    const parsed = parseDiagram(dsl);
+    expect(flowProps(parsed, 'memory')?.label).toBe('Memory');
+    expect(flowProps(parsed, 'memory')?.nodeType).toBeUndefined();
+    expect(flowProps(parsed, 'file')?.label).toBe('File');
     expect(flowProps(parsed, 'file')?.nodeType).toBeUndefined();
+    expect(flowProps(parsed, 'db')?.label).toBe('DB');
+    expect(flowProps(parsed, 'db')?.nodeType).toBeUndefined();
   });
 
   it('keeps notes and then/if/else on data lines, with no role chip', () => {
