@@ -1,12 +1,7 @@
-import { createContext, memo, useContext, type ComponentType } from 'react';
-import type { NodeProps } from '@xyflow/react';
+import { useContext } from 'react';
 import { useDiagramStore } from '../../store/diagramStore';
 import { ICON_STYLES } from './iconStyles';
-
-/** Stable empty map so a hidden toggle does not rebuild context every render. */
-export const NO_STEP_NUMBERS: ReadonlyMap<string, number> = new Map();
-
-export const StepNumberContext = createContext<ReadonlyMap<string, number>>(NO_STEP_NUMBERS);
+import { StepNumberContext } from './stepNumberContext';
 
 /**
  * DT-AI-29 — small walk-order badge on the top-left of a flow node.
@@ -51,16 +46,4 @@ export function StepNumberBadge({ nodeId }: { nodeId: string }) {
       {step}
     </span>
   );
-}
-
-/** Badge slot for every flow node face. The host is the positioning box. */
-export function withStepNumber(Component: ComponentType<NodeProps>) {
-  const Wrapped = (props: NodeProps) => (
-    <div style={{ position: 'relative', width: 'max-content' }}>
-      <Component {...props} />
-      <StepNumberBadge nodeId={props.id} />
-    </div>
-  );
-  Wrapped.displayName = `WithStepNumber(${Component.displayName || Component.name || 'Node'})`;
-  return memo(Wrapped);
 }
