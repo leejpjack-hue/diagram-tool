@@ -21,6 +21,11 @@
 // to <label>`. Every other back-edge emits its own `go back to <label>` line
 // while the forward chain still sits on the source, so build → copy → build
 // stays stable. The label is the node label, without a role or note.
+//
+// DT-AI-26 — a gatewayparallel fork with two or more plain branches emits one
+// line, `A and at the same time B`. The branch nodes and the matching
+// gatewayparallel join are part of that line, not steps of their own. A fork
+// whose branches do not share that shape stays one node per line.
 
 import type { FlowNode, FlowNodeRole, ParsedDiagram } from '../store/types';
 
@@ -64,6 +69,49 @@ function formatStep(n: FlowNode): string {
 
 function nodeIsDecision(n: FlowNode): boolean {
   return n.properties.nodeType === 'decision';
+}
+
+function branchCanCollapse(n: FlowNode): boolean {
+  const kind = n.properties.nodeType;
+  return kind === undefined || kind === 'data' || kind === 'document';
+}
+
+/**
+ * DT-AI-26: fork → plain branches → optional shared parallel join.
+ * Returns null when the shape is not the one Type steps emits, so other
+ * boards keep one line per node.
+ */
+function readParallelFork(
+  id: string,
+  byId: Map<string, FlowNode>,
+  outgoing: Map<string, { to: string; label?: string }[]>,
+): { branches: FlowNode[]; join: FlowNode | null } | null {
+  const node = byId.get(id);
+  if (!node || node.properties.nodeType !== 'gatewayparallel') return null;
+  const outs = outgoing.get(id) ?? [];
+  if (outs.length < 2 || outs.some(edge => edge.label?.trim())) return null;
+  const branches: FlowNode[] = [];
+  for (const edge of outs) {
+    const target = byId.get(edge.to);
+    if (!target || !branchCanCollapse(target)) return null;
+    branches.push(target);
+  }
+  const joinIds = branches.map(branch => {
+    const branchOuts = outgoing.get(branch.id) ?? [];
+    if (branchOuts.length === 0) return null;
+    if (branchOuts.length !== 1) return undefined;
+    const target = byId.get(branchOuts[0].to);
+    if (!target || target.properties.nodeType !== 'gatewayparallel') return undefined;
+    if (branchOuts[0].label?.trim()) return undefined;
+    return target.id;
+  });
+  if (joinIds.some(joinId => joinId === undefined)) return null;
+  if (joinIds.every(joinId => joinId === null)) return { branches, join: null };
+  const joinId = joinIds[0];
+  if (!joinId || joinIds.some(candidate => candidate !== joinId)) return null;
+  const join = byId.get(joinId);
+  if (!join) return null;
+  return { branches, join };
 }
 
 /**
@@ -177,6 +225,18 @@ export function flowStepList(diagram: ParsedDiagram): FlowStep[] {
     if (emitted.has(id)) continue;
     const n = byId.get(id);
     if (!n) continue;
+
+    const parallel = readParallelFork(id, byId, outgoing);
+    if (parallel) {
+      steps.push({
+        id,
+        line: parallel.branches.map(formatStep).join(' and at the same time '),
+      });
+      emitted.add(id);
+      for (const branch of parallel.branches) emitted.add(branch.id);
+      if (parallel.join) emitted.add(parallel.join.id);
+      continue;
+    }
 
     if (nodeIsDecision(n)) {
       const outs = outgoing.get(id) ?? [];

@@ -57,6 +57,12 @@ Type steps may point at an earlier step with `go back to`, `back to`, `repeat fr
 
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 
+### Typed parallel steps
+
+Type steps may split one line with `and at the same time`, `in parallel with`, or `meanwhile`. The board stores that fan-out as the existing `type: gatewayparallel` fork, the branch nodes, and — when another step follows — a `type: gatewayparallel` join, inside `source.text` / `dslText`. These kinds already exist. They are not a new board field. `version` stays **3.0**. No database migration.
+
+A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
+
 `nodes` and `edges` are a portable projection of that source plus layout pins. Re-opening the file prefers `source.text` / `dslText` and restores typed boards (architecture, flow, sequence, Gantt) so layout stays within ±2px of the export.
 
 ### Complete backup (`kind: "workspace"`)

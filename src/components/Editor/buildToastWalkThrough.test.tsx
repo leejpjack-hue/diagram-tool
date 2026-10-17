@@ -116,6 +116,14 @@ describe('Build toast Walk through (DT-AI-16)', () => {
     expect(screen.queryByTestId('toast-item')).toBeNull();
   });
 
+  it('notes a parallel phrase inside if/else on the success toast (DT-AI-26)', async () => {
+    setup();
+    await typeAndBuild('If invalid then Retry and at the same time Escalate');
+    expect(screen.getByTestId('toast-item')).toHaveTextContent(
+      'Built 2 steps onto the board · 1 parallel inside if/else left as text',
+    );
+  });
+
   it('notes a missing loop target on the success toast (DT-AI-25)', async () => {
     setup();
     await typeAndBuild('Draft reply\ngo back to nowhere');

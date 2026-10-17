@@ -10,6 +10,7 @@ Rules:
 - One step per line, in order. Use "then" to link steps: Do this, then Do that.
 - For a decision, write: If <condition> then <step> else <step>.
 - To loop, write: go back to <step>. Also: back to, repeat from, retry from.
+- For steps that run together, write: A and at the same time B. Also: in parallel with, meanwhile.
 - Optionally start a line with a role word: Human:, User:, Model:, Assistant:, AI:, Tool:, Check:, or System:.
 - For data the workflow reads or writes, start the line with Data:, Memory:, DB:, or File: (File: is a document). Do not add a role word on that line.
 - Optionally end a line with a short reason after " — ", like: Do the thing — because it is faster.

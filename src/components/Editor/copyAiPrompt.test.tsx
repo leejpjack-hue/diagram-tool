@@ -51,6 +51,7 @@ describe('AI_PROMPT_TEXT constant (DT-AI-17)', () => {
       'Human:', 'User:', 'Model:', 'Assistant:', 'AI:', 'Tool:', 'Check:', 'System:',
       'Data:', 'Memory:', 'DB:', 'File:',
       'go back to', 'back to', 'repeat from', 'retry from',
+      'and at the same time', 'in parallel with', 'meanwhile',
       'then', 'If', 'else', ' — ',
     ]) {
       expect(AI_PROMPT_TEXT).toContain(fragment);

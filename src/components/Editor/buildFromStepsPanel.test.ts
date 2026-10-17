@@ -79,6 +79,22 @@ describe('buildFromStepsSuccessMessage / statsFromPlainStepsDsl (DT-AI-13)', () 
     expect(buildFromStepsSuccessMessage(stats)).toBe('Built 2 steps onto the board');
   });
 
+  it('notes a parallel phrase left inside if/else (DT-AI-26)', () => {
+    const hints = { count: 0 };
+    const dsl = plainStepsToDSL('If invalid then Retry and at the same time Escalate', { parallelHints: hints });
+    const stats = statsFromPlainStepsDsl(dsl);
+    expect(hints.count).toBe(1);
+    expect(buildFromStepsSuccessMessage(stats, 0, hints.count)).toBe(
+      'Built 2 steps onto the board · 1 parallel inside if/else left as text',
+    );
+    expect(buildFromStepsSuccessMessage(stats, 0, 2)).toBe(
+      'Built 2 steps onto the board · 2 parallels inside if/else left as text',
+    );
+    expect(buildFromStepsSuccessMessage(stats, 1, 1)).toBe(
+      'Built 2 steps onto the board · 1 loop target not found · 1 parallel inside if/else left as text',
+    );
+  });
+
   it('notes missing loop targets on the build toast (DT-AI-25)', () => {
     const stats = statsFromPlainStepsDsl(plainStepsToDSL('Draft reply\ngo back to nowhere'));
     expect(buildFromStepsSuccessMessage(stats, 1)).toBe(

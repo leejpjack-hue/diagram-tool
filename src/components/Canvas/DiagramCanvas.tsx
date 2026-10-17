@@ -833,6 +833,14 @@ function DiagramCanvasInternal() {
   const walkOutgoing = walkCurrentId && parsedDiagram
     ? parsedDiagram.edges.filter(e => e.from === walkCurrentId)
     : [];
+  // DT-AI-26: a parallel fork's caption reads "in parallel" (the diamond label
+  // may differ on a hand-drawn board). A join has one outgoing edge and keeps
+  // its own label.
+  const walkCaption = currentWalkNode?.type === 'flow'
+    && currentWalkNode.properties.nodeType === 'gatewayparallel'
+    && walkOutgoing.length >= 2
+    ? 'in parallel'
+    : walkLabel;
   const walkIncoming = walkCurrentId && parsedDiagram
     ? parsedDiagram.edges.filter(e => e.to === walkCurrentId)
     : [];
@@ -871,11 +879,29 @@ function DiagramCanvasInternal() {
   // order, mirroring the fork line's label rule (`label` or `→ <target>`).
   // The jump target is the edge target node's index in walkSteps — the same
   // walk-order index Prev/Next move through. Read-only: nothing is edited.
+  // A parallel branch is drawn on the board but folded into the fork's one
+  // Copy-as-steps line, so it has no walk index of its own. Follow its single
+  // outgoing edge (the join, then the next step) so Choose still moves.
+  const walkIndexOf = (targetId: string): number => {
+    const direct = walkSteps.findIndex(s => s.id === targetId);
+    if (direct >= 0 || !parsedDiagram) return direct;
+    const seen = new Set<string>();
+    let current = targetId;
+    while (current && !seen.has(current)) {
+      seen.add(current);
+      const idx = walkSteps.findIndex(s => s.id === current);
+      if (idx >= 0) return idx;
+      const outs = parsedDiagram.edges.filter(e => e.from === current);
+      if (outs.length !== 1) return -1;
+      current = outs[0].to;
+    }
+    return -1;
+  };
   const walkChoices = walkOutgoing.length >= 2
     ? walkOutgoing.map(e => {
         const label = e.label?.trim();
         const text = label || `→ ${flowLabelOf(e.to)}`;
-        return { label: text, index: walkSteps.findIndex(s => s.id === e.to) };
+        return { label: text, index: walkIndexOf(e.to) };
       })
     : undefined;
 
@@ -1476,7 +1502,7 @@ function DiagramCanvasInternal() {
           <WalkThroughOverlay
             step={walkIndex + 1}
             total={walkSteps.length}
-            label={walkLabel}
+            label={walkCaption}
             role={walkRole}
             note={walkNote}
             arrivedBy={walkArrivedBy}
