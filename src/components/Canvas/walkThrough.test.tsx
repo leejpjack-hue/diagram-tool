@@ -794,3 +794,41 @@ describe('Shared read-only banner Walk through (DT-AI-23)', () => {
     expect(screen.queryByTestId('toast-item')).toBeNull();
   });
 });
+
+describe('walk-through loop target (DT-AI-25)', () => {
+  function mockClipboard(): { writeText: ReturnType<typeof vi.fn> } {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    return { writeText };
+  }
+
+  it('Choose offers the loop target and Copy path shows the revisit', async () => {
+    const { writeText } = mockClipboard();
+    setup(EMPTY_FLOW_DSL);
+    fireEvent.click(screen.getByTestId('toggle-type-steps'));
+    fireEvent.change(screen.getByTestId('type-steps-input'), {
+      target: {
+        value: 'Model: draft reply\nCheck: quality ok?\nIf no then go back to draft reply\nSend',
+      },
+    });
+    fireEvent.click(screen.getByTestId('build-steps'));
+    expect(screen.getByTestId('toast-item')).toHaveTextContent('Built 4 steps onto the board · 1 Model · 1 Check');
+    expect(screen.getByTestId('toast-item')).not.toHaveTextContent('not found');
+
+    fireEvent.click(screen.getByTestId('toast-action'));
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('no');
+
+    const choose = screen.getByTestId('walk-through-choose');
+    expect(within(choose).getByTestId('walk-through-choose-0')).toHaveTextContent('Yes');
+    fireEvent.click(within(choose).getByTestId('walk-through-choose-0'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('draft reply');
+
+    fireEvent.click(screen.getByTestId('walk-through-copy-path'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText).toHaveBeenCalledWith(
+      ['1. draft reply', '2. quality ok?', '3. no', '4. draft reply (Yes)'].join('\n'),
+    );
+  });
+});

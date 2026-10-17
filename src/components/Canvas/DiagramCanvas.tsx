@@ -36,6 +36,8 @@ import { isMermaidFlow } from '../../parser/mermaidFlow';
 import { parseDiagram } from '../../parser/parser';
 import { flowStepList, type FlowStep } from '../../parser/flowToPlainSteps';
 import { WalkThroughOverlay } from './WalkThroughOverlay';
+import { LoopEdge } from './LoopEdge';
+import { isUpstreamEdge } from './loopEdge';
 import { getHelperLines, type HelperLineResult } from './helperLines';
 import { LayoutDirectionContext } from './layoutDirection';
 import { Position } from '@xyflow/react';
@@ -55,6 +57,8 @@ const architectureNodeTypes = {
   groupcontainer: GroupContainerNode,
   annotation: AnnotationNode,
 };
+
+const flowEdgeTypes = { loop: LoopEdge };
 
 const flowNodeTypes = {
   flow: ProcessNode,
@@ -620,6 +624,9 @@ function DiagramCanvasInternal() {
 
   const initialEdges = useMemo((): ReactFlowEdge[] => {
     if (!parsedDiagram) return [];
+    // DT-AI-25: lanes are left→right even when the board direction is TB.
+    const flowAxis: 'TB' | 'LR' = (parsedDiagram.lanes?.length ?? 0) > 0 || isLR ? 'LR' : 'TB';
+    const nodePos = new Map(initialNodes.map(node => [node.id, node.position]));
 
     const getEdgeColor = (mode: string) => {
       // Neutral grey connectors (per the Diagram Kit reference) so the
@@ -760,8 +767,16 @@ function DiagramCanvasInternal() {
           color: stroke,
         },
       };
+    }).map(edge => {
+      if (diagramMode !== 'flow') return edge;
+      if (!isUpstreamEdge(nodePos.get(edge.source), nodePos.get(edge.target), flowAxis)) return edge;
+      return {
+        ...edge,
+        type: 'loop',
+        data: { ...(edge.data as object | undefined), loop: true, axis: flowAxis },
+      };
     });
-  }, [parsedDiagram, diagramMode, c4Level, drillParent, architectureRouting, iconStyle, flowTokens]);
+  }, [parsedDiagram, diagramMode, c4Level, drillParent, architectureRouting, iconStyle, flowTokens, initialNodes, isLR]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(routedNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -1405,6 +1420,7 @@ function DiagramCanvasInternal() {
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
+        edgeTypes={flowEdgeTypes}
         snapToGrid
         snapGrid={[10, 10]}
         nodeDragThreshold={0}

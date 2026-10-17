@@ -94,7 +94,7 @@ node Reply {
     expect(lines[0]).toBe('Human: Human ask');
     expect(lines).toContain('If Check: Check');
     expect(lines).toContain('then Human: Reply');
-    expect(lines).toContain('else Model: Model');
+    expect(lines).toContain('else go back to Model');
   });
 
   it('round-trips a role-word chain through plainStepsToDSL', () => {
@@ -174,6 +174,24 @@ node Brief {
     expect(flowToPlainSteps(parsed)).toBe('Human: ask\nData: tickets\nFile: brief');
   });
 
+  it('round-trips go back to through Copy as steps (DT-AI-25)', () => {
+    const input = [
+      'Model: draft reply',
+      'Check: quality ok?',
+      'If no then go back to draft reply',
+      'Send',
+    ].join('\n');
+    const once = plainStepsToDSL(input);
+    const copied = flowToPlainSteps(parseDiagram(once));
+    expect(copied).toContain('go back to draft reply');
+    expect(copied).not.toContain('go back to Model:');
+    expect(plainStepsToDSL(copied)).toBe(once);
+
+    const plain = 'Draft reply\nCheck quality\nrepeat from Draft reply\nSend';
+    const plainOnce = plainStepsToDSL(plain);
+    expect(plainStepsToDSL(flowToPlainSteps(parseDiagram(plainOnce)))).toBe(plainOnce);
+  });
+
   it('leaves note-less steps unchanged in Copy as steps output (DT-AI-15)', () => {
     const parsed = parseDiagram(`diagram: flow
 title: "Plain"
@@ -250,7 +268,7 @@ node Reply {
       'Tool: Tool',
       'If Check: Check',
       'then Human: Reply',
-      'else Model: Model',
+      'else go back to Model',
     ]);
     for (const step of steps) {
       expect(nodeIds.has(step.id)).toBe(true);

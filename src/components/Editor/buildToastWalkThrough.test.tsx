@@ -116,6 +116,12 @@ describe('Build toast Walk through (DT-AI-16)', () => {
     expect(screen.queryByTestId('toast-item')).toBeNull();
   });
 
+  it('notes a missing loop target on the success toast (DT-AI-25)', async () => {
+    setup();
+    await typeAndBuild('Draft reply\ngo back to nowhere');
+    expect(screen.getByTestId('toast-item')).toHaveTextContent('Built 2 steps onto the board · 1 loop target not found');
+  });
+
   it('keyboard focus on the toast also pauses auto-dismiss', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     setup();

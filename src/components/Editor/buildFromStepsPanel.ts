@@ -54,12 +54,17 @@ const ROLE_DISPLAY: { key: keyof PlainStepsBuildStats['roles']; label: string }[
  * DT-AI-24 appends a data tally when any step is a data/document kind,
  * e.g. "Built 6 steps onto the board · 2 data".
  */
-export function buildFromStepsSuccessMessage(stats: PlainStepsBuildStats): string {
+export function buildFromStepsSuccessMessage(stats: PlainStepsBuildStats, loopTargetsNotFound = 0): string {
   const n = stats.stepCount;
   const base = `Built ${n} step${n === 1 ? '' : 's'} onto the board`;
   const parts = ROLE_DISPLAY
     .filter(r => stats.roles[r.key] > 0)
     .map(r => `${stats.roles[r.key]} ${r.label}`);
   if (stats.dataCount > 0) parts.push(`${stats.dataCount} data`);
-  return parts.length ? `${base} · ${parts.join(' · ')}` : base;
+  const body = parts.length ? `${base} · ${parts.join(' · ')}` : base;
+  if (loopTargetsNotFound > 0) {
+    const noun = loopTargetsNotFound === 1 ? 'loop target' : 'loop targets';
+    return `${body} · ${loopTargetsNotFound} ${noun} not found`;
+  }
+  return body;
 }
