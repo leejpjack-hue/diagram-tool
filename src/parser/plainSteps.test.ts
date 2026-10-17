@@ -624,3 +624,130 @@ node flag {
 `);
   });
 });
+
+describe('plainStepsToDSL (DT-AI-26 parallel)', () => {
+  function flowProps(parsed: ReturnType<typeof parseDiagram>, id: string) {
+    const node = parsed.nodes.find(n => n.id === id);
+    return node && node.type === 'flow' ? node.properties : undefined;
+  }
+
+  function gateways(parsed: ReturnType<typeof parseDiagram>) {
+    return parsed.nodes.filter(n => n.type === 'flow' && n.properties.nodeType === 'gatewayparallel');
+  }
+
+  it.each([
+    ['and at the same time'],
+    ['in parallel with'],
+    ['meanwhile'],
+    ['AND AT THE SAME TIME'],
+    ['In Parallel With'],
+    ['Meanwhile'],
+  ])('"%s" splits a line into a fork and two branches', (phrase) => {
+    const parsed = parseDiagram(plainStepsToDSL(`Model: plan\nTool: search docs ${phrase} Tool: search tickets\nModel: answer`));
+    expect(gateways(parsed)).toHaveLength(2);
+    expect(flowProps(parsed, 'in_parallel')).toMatchObject({ label: 'in parallel', nodeType: 'gatewayparallel' });
+    expect(flowProps(parsed, 'join')).toMatchObject({ label: 'join', nodeType: 'gatewayparallel' });
+    expect(flowProps(parsed, 'search_docs')).toMatchObject({ label: 'search docs', role: 'tool' });
+    expect(flowProps(parsed, 'search_tickets')).toMatchObject({ label: 'search tickets', role: 'tool' });
+    expect(flowProps(parsed, 'plan')).toMatchObject({ label: 'plan', role: 'model' });
+    expect(flowProps(parsed, 'answer')).toMatchObject({ label: 'answer', role: 'model' });
+    expect(parsed.edges.filter(e => e.to === 'join').map(e => e.from).sort()).toEqual(['search_docs', 'search_tickets']);
+    expect(parsed.edges.find(e => e.from === 'in_parallel' && e.to === 'search_docs')).toBeDefined();
+    expect(parsed.edges.find(e => e.from === 'join' && e.to === 'answer')).toBeDefined();
+    expect(parsed.edges.find(e => e.from === 'plan' && e.to === 'in_parallel')).toBeDefined();
+  });
+
+  it('splits three ways and keeps a role and a note on each branch', () => {
+    const parsed = parseDiagram(plainStepsToDSL(
+      'Tool: search docs — latest and at the same time Model: draft — careful in parallel with Check: review — strict\nSend',
+    ));
+    expect(gateways(parsed)).toHaveLength(2);
+    expect(flowProps(parsed, 'search_docs')).toMatchObject({ label: 'search docs', role: 'tool', note: 'latest' });
+    expect(flowProps(parsed, 'draft')).toMatchObject({ label: 'draft', role: 'model', note: 'careful' });
+    expect(flowProps(parsed, 'review')).toMatchObject({ label: 'review', role: 'check', note: 'strict' });
+    expect(parsed.edges.filter(e => e.from === 'in_parallel')).toHaveLength(3);
+    expect(parsed.edges.filter(e => e.to === 'join')).toHaveLength(3);
+    expect(parsed.edges.find(e => e.from === 'join' && e.to === 'send')).toBeDefined();
+  });
+
+  it('omits the join when the parallel line is last', () => {
+    const parsed = parseDiagram(plainStepsToDSL('Tool: search docs and at the same time Tool: search tickets'));
+    expect(gateways(parsed)).toHaveLength(1);
+    expect(flowProps(parsed, 'in_parallel')?.nodeType).toBe('gatewayparallel');
+    expect(parsed.nodes.filter(n => n.type === 'flow')).toHaveLength(3);
+    expect(parsed.edges.map(e => `${e.from}->${e.to}`).sort()).toEqual([
+      'in_parallel->search_docs',
+      'in_parallel->search_tickets',
+    ]);
+  });
+
+  it('does not split a plain "and"', () => {
+    const dsl = plainStepsToDSL('Read and summarise\nSend it');
+    expect(dsl).not.toMatch(/gatewayparallel/);
+    expect(dsl).toBe(`diagram: flow
+title: "Type steps"
+direction: TB
+
+read_and_summarise -> send_it
+
+node read_and_summarise {
+  label: "Read and summarise"
+}
+
+node send_it {
+  label: "Send it"
+}
+`);
+  });
+
+  it('leaves a parallel phrase inside if/else as text and counts a hint', () => {
+    const hints = { count: 0 };
+    const parsed = parseDiagram(plainStepsToDSL(
+      'If invalid then Retry and at the same time Escalate else Flag',
+      { parallelHints: hints },
+    ));
+    expect(hints.count).toBe(1);
+    expect(gateways(parsed)).toHaveLength(0);
+    expect(flowProps(parsed, 'invalid')?.nodeType).toBe('decision');
+    const yesId = parsed.edges.find(e => e.label === 'Yes')?.to;
+    const yes = parsed.nodes.find(n => n.id === yesId);
+    expect(yes && yes.type === 'flow' ? yes.properties.label : undefined).toBe('Retry and at the same time Escalate');
+    expect(parsed.edges.find(e => e.label === 'No')?.to).toBe('flag');
+  });
+
+  it('is byte-identical for lines without a parallel phrase', () => {
+    const dsl = plainStepsToDSL('Model: draft reply\nthen Send reply\nIf invalid then Retry else Flag');
+    expect(dsl).not.toMatch(/gatewayparallel/);
+    expect(dsl).toBe(`diagram: flow
+title: "Type steps"
+direction: TB
+
+draft_reply -> send_reply
+send_reply -> invalid
+invalid ->|"Yes"| retry
+invalid ->|"No"| flag
+
+node draft_reply {
+  label: "draft reply"
+  role: model
+}
+
+node send_reply {
+  label: "Send reply"
+}
+
+node invalid {
+  label: "invalid"
+  type: decision
+}
+
+node retry {
+  label: "Retry"
+}
+
+node flag {
+  label: "Flag"
+}
+`);
+  });
+});

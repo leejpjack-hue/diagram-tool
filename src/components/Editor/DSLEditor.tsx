@@ -91,9 +91,11 @@ else Flag for review`;
     }
     try {
       const loopMisses = { count: 0 };
+      const parallelHints = { count: 0 };
       const dsl = plainStepsToDSL(input, {
         title: useDiagramStore.getState().dslText.match(/^\s*title\s*:\s*(.+)\s*$/im)?.[1]?.trim(),
         loopMisses,
+        parallelHints,
       });
       // DT-AI-11: keep panel open; DT-AI-13: success toast with step→node count (+ roles).
       setShowSteps(prev => nextShowStepsAfterBuild(prev, 'success'));
@@ -112,7 +114,7 @@ else Flag for review`;
         }
       }
       toast.success(
-        buildFromStepsSuccessMessage(statsFromPlainStepsDsl(dsl), loopMisses.count),
+        buildFromStepsSuccessMessage(statsFromPlainStepsDsl(dsl), loopMisses.count, parallelHints.count),
         undefined,
         canWalk ? { label: 'Walk through', onSelect: enterWalkThrough } : undefined,
       );
@@ -293,7 +295,7 @@ else Flag for review`;
           className="mx-3 mb-2 rounded-md border border-indigo-100 bg-indigo-50/60 p-3"
         >
           <label className="mb-1 block text-[11px] font-semibold text-indigo-700">
-            Type steps — one step per line. Optional words: then, if, else, go back to, Human:/User:, Model:/Assistant:/AI:, Tool:, Check:/System:, Data:/Memory:/DB:/File:. Optional note: Step — why
+            Type steps — one step per line. Optional words: then, if, else, go back to, and at the same time, Human:/User:, Model:/Assistant:/AI:, Tool:, Check:/System:, Data:/Memory:/DB:/File:. Optional note: Step — why
           </label>
           <textarea
             ref={stepsInputRef}

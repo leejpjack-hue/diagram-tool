@@ -348,6 +348,37 @@ node brief {
     expect(dataPlan.boards[0].dslText).toContain('type: data');
   });
 
+  it('keeps parallel gateways on format 3.0 and still defaults a missing icon style', () => {
+    expect(BOARD_FORMAT_VERSION).toBe('3.0');
+    const version = schema.$defs as { version?: { enum?: string[] } };
+    expect(version.version?.enum).toEqual(['1.0', '2.0', '3.0']);
+    const source = (schema.$defs as { source?: { properties?: { text?: { description?: string } } } }).source;
+    expect(source?.properties?.text?.description).toContain('gatewayparallel');
+    expect(source?.properties?.text?.description).toContain('3.0');
+
+    const parallelDsl = `diagram: flow
+title: Parallel
+direction: TB
+fork -> search
+node fork {
+  label: "in parallel"
+  type: gatewayparallel
+}
+node search {
+  label: "search docs"
+  role: tool
+}
+`;
+    const doc = buildBoardDocument(board({ mode: 'flow', dslText: parallelDsl }));
+    expect(doc.version).toBe('3.0');
+    expect(doc.board).not.toHaveProperty('iconStyle');
+    expect(doc.board).not.toHaveProperty('showStepNumbers');
+    expect(doc.board.dslText).toContain('type: gatewayparallel');
+    const plan = parsePortableImport(doc);
+    expect(plan.boards[0].iconStyle).toBeUndefined();
+    expect(plan.boards[0].dslText).toContain('type: gatewayparallel');
+  });
+
   it('PNG/SVG/PDF export stays free and unwatermarked', () => {
     expect(EXPORT_WATERMARK).toBeNull();
     expect(EXPORT_REQUIRES_ACCOUNT).toBe(false);

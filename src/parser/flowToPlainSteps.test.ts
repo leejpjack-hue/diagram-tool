@@ -174,6 +174,27 @@ node Brief {
     expect(flowToPlainSteps(parsed)).toBe('Human: ask\nData: tickets\nFile: brief');
   });
 
+  it('round-trips a parallel fork as one and-at-the-same-time line (DT-AI-26)', () => {
+    const input = [
+      'Model: plan',
+      'Tool: search docs and at the same time Tool: search tickets',
+      'Model: answer',
+    ].join('\n');
+    const once = plainStepsToDSL(input);
+    const copied = flowToPlainSteps(parseDiagram(once));
+    expect(copied).toBe(input);
+    expect(plainStepsToDSL(copied)).toBe(once);
+
+    const mixed = 'Search docs in parallel with Search tickets meanwhile Search mail\nSend';
+    const mixedOnce = plainStepsToDSL(mixed);
+    const mixedCopied = flowToPlainSteps(parseDiagram(mixedOnce));
+    expect(mixedCopied).toBe('Search docs and at the same time Search tickets and at the same time Search mail\nSend');
+    expect(plainStepsToDSL(mixedCopied)).toBe(mixedOnce);
+
+    const last = plainStepsToDSL('Tool: search docs — latest and at the same time Model: draft — careful');
+    expect(plainStepsToDSL(flowToPlainSteps(parseDiagram(last)))).toBe(last);
+  });
+
   it('round-trips go back to through Copy as steps (DT-AI-25)', () => {
     const input = [
       'Model: draft reply',

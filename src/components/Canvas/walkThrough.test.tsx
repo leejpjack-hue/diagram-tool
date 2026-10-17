@@ -832,3 +832,33 @@ describe('walk-through loop target (DT-AI-25)', () => {
     );
   });
 });
+
+describe('walk-through parallel fork (DT-AI-26)', () => {
+  function typeAndBuild(steps: string) {
+    fireEvent.click(screen.getByTestId('toggle-type-steps'));
+    fireEvent.change(screen.getByTestId('type-steps-input'), { target: { value: steps } });
+    fireEvent.click(screen.getByTestId('build-steps'));
+    expect(screen.getByTestId('toast-item')).toBeInTheDocument();
+  }
+
+  it('fork caption reads in parallel and both branches are choices', () => {
+    setup(EMPTY_FLOW_DSL);
+    typeAndBuild('Model: plan\nTool: search docs and at the same time Tool: search tickets\nModel: answer');
+    expect(screen.getByTestId('toast-item')).toHaveTextContent('Built 6 steps onto the board · 2 Model · 2 Tool');
+
+    fireEvent.click(screen.getByTestId('toast-action'));
+    fireEvent.click(screen.getByTestId('walk-through-next'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 2 of 3');
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('in parallel');
+
+    const choose = screen.getByTestId('walk-through-choose');
+    expect(within(choose).getByTestId('walk-through-choose-0')).toHaveTextContent('search docs');
+    expect(within(choose).getByTestId('walk-through-choose-1')).toHaveTextContent('search tickets');
+    expect(screen.getByTestId('walk-through-paths')).toHaveTextContent('search docs');
+    expect(screen.getByTestId('walk-through-paths')).toHaveTextContent('search tickets');
+
+    fireEvent.click(within(choose).getByTestId('walk-through-choose-0'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 3 of 3');
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('answer');
+  });
+});

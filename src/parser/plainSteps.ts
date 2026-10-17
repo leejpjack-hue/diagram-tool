@@ -72,6 +72,18 @@
 // notes how many loop targets were not found. Lines without these phrases stay
 // byte-identical. Plain edges only — no schema change.
 //
+// DT-AI-26 — parallel phrases split one line into branches that run together:
+//   Tool: search docs and at the same time Tool: search tickets
+//   Tool: search docs in parallel with Tool: search tickets
+//   Tool: search docs meanwhile Tool: search tickets
+// Case-insensitive, whole words, two or more branches. Each branch keeps its
+// own role or data prefix and its own note. The line becomes a gatewayparallel
+// fork, one node per branch, and — when another step follows — a
+// gatewayparallel join before that step. The join is omitted when the parallel
+// line is last and nothing follows it. A plain "and" does not split. The same
+// phrase inside an if/else branch on that line stays text, and Build notes it.
+// Lines without these phrases stay byte-identical. Existing node kinds only.
+//
 // `then` links steps in order; `if <text>` makes `<text>` a decision node whose
 // following branch is labelled Yes; `else ...` reuses that decision for a No
 // branch. Anything else is a plain step, exactly like today.
@@ -202,6 +214,8 @@ interface EmittedNode {
   role?: PlainStepRole;
   kind?: PlainStepKind;
   note?: string;
+  /** DT-AI-26: existing BPMN parallel gateway. Not a new node type. */
+  gateway?: 'gatewayparallel';
 }
 
 interface State {
@@ -214,6 +228,7 @@ interface State {
   expectBranch: 'yes' | 'no' | null;
   inIf: boolean;
   loopMisses: number;
+  parallelHints: number;
 }
 
 /**
@@ -228,6 +243,36 @@ export function loopTargetLabel(label: string): string | null {
   if (!match) return null;
   const target = match[1].trim();
   return target.length > 0 ? target : null;
+}
+
+/**
+ * DT-AI-26: separators between parallel branches. Whitespace on both sides
+ * keeps a plain "and" (and a phrase glued to another word) from splitting.
+ */
+const PARALLEL_SPLIT = /\s+(?:and\s+at\s+the\s+same\s+time|in\s+parallel\s+with|meanwhile)\s+/i;
+
+function hasParallelPhrase(line: string): boolean {
+  return PARALLEL_SPLIT.test(line);
+}
+
+function splitParallelParts(line: string): string[] | null {
+  if (!hasParallelPhrase(line)) return null;
+  const parts = line.split(PARALLEL_SPLIT).map(part => part.trim()).filter(part => part.length > 0);
+  return parts.length >= 2 ? parts : null;
+}
+
+/**
+ * A trailing `then …` on the last branch is the next step, not part of the
+ * branch. A `then` inside that branch's note stays in the note.
+ */
+function splitTrailingChain(part: string): { head: string; chain: string } {
+  const noteMatch = NOTE_SPLIT.exec(part);
+  const headRegion = noteMatch ? part.slice(0, noteMatch.index) : part;
+  const kw = /\bthen\b/i.exec(headRegion);
+  if (!kw) return { head: part.trim(), chain: '' };
+  const head = part.slice(0, kw.index).trim().replace(/[,:;]+$/g, '').trim();
+  const chain = part.slice(kw.index).trim();
+  return { head, chain };
 }
 
 /** First earlier node whose label matches exactly, case-insensitive, trimmed. */
@@ -280,7 +325,67 @@ function placeNode(
   return id;
 }
 
-export function plainStepsToDSL(text: string, opts: { title?: string; loopMisses?: { count: number } } = {}): string {
+/** A parallel gateway is never reused by label — each fork and join is its own node. */
+function placeGateway(state: State, label: string, idBase: string): string {
+  const id = stepId(idBase, state);
+  state.nodes.push({ id, label, decision: false, gateway: 'gatewayparallel' });
+  return id;
+}
+
+/** Link `id` from the open branch or from the previous step. */
+function connectIncoming(id: string, state: State): void {
+  if (state.expectBranch === 'yes' && state.lastDecision) {
+    state.edges.push({ from: state.lastDecision, to: id, label: 'Yes' });
+    state.expectBranch = null;
+    return;
+  }
+  if (state.expectBranch === 'no' && state.lastDecision) {
+    state.edges.push({ from: state.lastDecision, to: id, label: 'No' });
+    state.expectBranch = null;
+    return;
+  }
+  if (state.last && state.last !== id) {
+    state.edges.push({ from: state.last, to: id });
+  }
+}
+
+function emitParallel(branches: string[], state: State, needJoin: boolean): void {
+  const forkId = placeGateway(state, 'in parallel', 'in_parallel');
+  connectIncoming(forkId, state);
+  const branchIds: string[] = [];
+  for (const branch of branches) {
+    const { text, note } = splitStepNote(stripListMarker(branch.trim()));
+    const rawLabel = text.replace(/\|/g, '/').trim();
+    if (!rawLabel) continue;
+    const kindHit = stripKindPrefix(rawLabel);
+    const roleHit = kindHit.kind ? undefined : stripRolePrefix(rawLabel);
+    const label = kindHit.kind ? kindHit.label : roleHit!.label;
+    const role = roleHit?.role;
+    const kind = kindHit.kind;
+    if (!label) continue;
+    const id = placeNode(label, state, false, role, kind);
+    if (note) {
+      const owner = state.nodes.find(n => n.id === id);
+      if (owner && !owner.note) owner.note = note;
+    }
+    state.edges.push({ from: forkId, to: id });
+    branchIds.push(id);
+  }
+  if (needJoin && branchIds.length > 0) {
+    const joinId = placeGateway(state, 'join', 'join');
+    for (const id of branchIds) {
+      if (id !== joinId) state.edges.push({ from: id, to: joinId });
+    }
+    state.last = joinId;
+    return;
+  }
+  state.last = forkId;
+}
+
+export function plainStepsToDSL(
+  text: string,
+  opts: { title?: string; loopMisses?: { count: number }; parallelHints?: { count: number } } = {},
+): string {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   const state: State = {
     nodes: [],
@@ -292,10 +397,10 @@ export function plainStepsToDSL(text: string, opts: { title?: string; loopMisses
     expectBranch: null,
     inIf: false,
     loopMisses: 0,
+    parallelHints: 0,
   };
 
-  for (const line of lines) {
-    const unmarked = stripListMarker(line);
+  const processPlainLine = (unmarked: string) => {
     // DT-AI-15: peel the note off before segmenting, then attach it to the
     // last step created on this line (a `then` chain may create several).
     const { text: lineText, note } = splitStepNote(unmarked);
@@ -368,6 +473,29 @@ export function plainStepsToDSL(text: string, opts: { title?: string; loopMisses
       const owner = state.nodes.find(n => n.id === lastOnLine);
       if (owner) owner.note = note;
     }
+  };
+
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    const unmarked = stripListMarker(lines[lineIndex]);
+    const phrase = hasParallelPhrase(unmarked);
+    // Same-line if/else, or the still-open condition of an `If` with no text
+    // yet: leave the phrase in the label and tell Build.
+    const blocked = phrase && (/\b(?:if|else)\b/i.test(unmarked) || state.inIf);
+    if (blocked) state.parallelHints += 1;
+    if (!blocked && phrase) {
+      const parts = splitParallelParts(unmarked);
+      if (parts) {
+        const { head, chain } = splitTrailingChain(parts[parts.length - 1]);
+        const branches = [...parts.slice(0, -1), head].map(part => part.trim()).filter(part => part.length > 0);
+        if (branches.length >= 2) {
+          const needJoin = chain.length > 0 || lineIndex < lines.length - 1;
+          emitParallel(branches, state, needJoin);
+          if (chain) processPlainLine(chain);
+          continue;
+        }
+      }
+    }
+    processPlainLine(unmarked);
   }
 
   if (state.nodes.length === 0) {
@@ -376,6 +504,7 @@ export function plainStepsToDSL(text: string, opts: { title?: string; loopMisses
     );
   }
   if (opts.loopMisses) opts.loopMisses.count = state.loopMisses;
+  if (opts.parallelHints) opts.parallelHints.count = state.parallelHints;
 
   // Deduplicate identical edges (same from/to/label), keeping first-seen order.
   const seen = new Set<string>();
@@ -397,6 +526,7 @@ export function plainStepsToDSL(text: string, opts: { title?: string; loopMisses
   for (const n of state.nodes) {
     const body = [`label: ${quote(n.label)}`];
     if (n.decision) body.push('type: decision');
+    else if (n.gateway) body.push(`type: ${n.gateway}`);
     else if (n.kind) body.push(`type: ${n.kind}`);
     if (n.role) body.push(`role: ${n.role}`);
     if (n.note) body.push(`note: ${quote(n.note)}`);
