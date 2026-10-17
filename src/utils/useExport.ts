@@ -2,7 +2,7 @@ import { toPng, toJpeg, toSvg } from 'html-to-image';
 import { useDiagramStore } from '../store/diagramStore';
 import { useGanttStore } from '../components/Gantt/ganttStore';
 import type { DiagramNode } from '../store/types';
-import { buildBoardDocument, EXPORT_WATERMARK } from './boardFormat';
+import { buildBoardDocument, EXPORT_WATERMARK, showStepNumbersForStorage } from './boardFormat';
 import type { BoardMode } from './boardManager';
 import { ICON_STYLES } from '../components/Canvas/iconStyles';
 
@@ -136,7 +136,7 @@ export const useExport = () => {
   };
 
   const exportJSON = () => {
-    const { dslText, iconStyle: liveStyle } = useDiagramStore.getState();
+    const { dslText, iconStyle: liveStyle, showStepNumbers } = useDiagramStore.getState();
     const mode = (diagramMode === 'c4' ? 'architecture' : diagramMode) as BoardMode;
     if (!dslText.trim() && diagramMode !== 'gantt') return;
     const title = parsedDiagram?.title || 'diagram';
@@ -145,6 +145,7 @@ export const useExport = () => {
       mode,
       dslText,
       ...(mode === 'flow' && liveStyle !== 'clean' ? { iconStyle: liveStyle } : {}),
+      ...(showStepNumbersForStorage(showStepNumbers) ? { showStepNumbers: true } : {}),
     }), null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseDiagram } from './parser';
-import { flowStepList, flowToPlainSteps } from './flowToPlainSteps';
+import { flowStepList, flowStepNumbers, flowToPlainSteps } from './flowToPlainSteps';
 import { plainStepsToDSL } from './plainSteps';
 import { plainStepsFromBoardSource } from './boardToPlainSteps';
 
@@ -299,5 +299,111 @@ node Reply {
   it('throws the same teachable errors as Copy as steps', () => {
     expect(() => flowStepList(parseDiagram('diagram: flow\ntitle: "Empty"\n'))).toThrow(/No steps on this board/i);
     expect(() => flowStepList(parseDiagram('diagram: architecture\ntitle: "Arch"\nservice web { }\n'))).toThrow(/Flow boards/i);
+  });
+});
+
+function numbersByLabel(dsl: string): Record<string, number> {
+  const parsed = parseDiagram(dsl);
+  const numbers = flowStepNumbers(parsed);
+  const out: Record<string, number> = {};
+  for (const node of parsed.nodes) {
+    if (node.type !== 'flow') continue;
+    const label = (node.properties.label || node.name || node.id).trim();
+    const step = numbers.get(node.id);
+    if (step) out[label] = step;
+  }
+  return out;
+}
+
+describe('flowStepNumbers (DT-AI-29 walk order)', () => {
+  it('numbers a linear flow in walk order, matching Step N', () => {
+    const dsl = plainStepsToDSL('Ask the question\nDraft an answer\nReview the draft\nSend the reply');
+    const parsed = parseDiagram(dsl);
+    const steps = flowStepList(parsed);
+    const numbers = flowStepNumbers(parsed);
+    expect(steps.map(step => numbers.get(step.id))).toEqual([1, 2, 3, 4]);
+    expect(numbersByLabel(dsl)).toEqual({
+      'Ask the question': 1,
+      'Draft an answer': 2,
+      'Review the draft': 3,
+      'Send the reply': 4,
+    });
+  });
+
+  it('numbers a decision and both branches', () => {
+    const parsed = parseDiagram(`diagram: flow
+D ->|Yes| Y
+D ->|No| N
+node D {
+  type: decision
+  label: "email valid"
+}
+node Y {
+  label: "Deliver"
+}
+node N {
+  label: "Bounce"
+}
+`);
+    const steps = flowStepList(parsed);
+    const numbers = flowStepNumbers(parsed);
+    expect(steps.map(step => step.line)).toEqual(['If email valid', 'then Deliver', 'else Bounce']);
+    expect(steps.map(step => numbers.get(step.id))).toEqual([1, 2, 3]);
+    const byLabel: Record<string, number> = {};
+    for (const node of parsed.nodes) {
+      if (node.type !== 'flow') continue;
+      const step = numbers.get(node.id);
+      if (step) byLabel[node.properties.label || node.name] = step;
+    }
+    expect(byLabel).toEqual({ 'email valid': 1, Deliver: 2, Bounce: 3 });
+  });
+
+  it('does not renumber a loop back-edge and still numbers the step after it', () => {
+    const dsl = plainStepsToDSL('Draft reply\nReview quality\nrepeat from Draft reply\nSend');
+    const parsed = parseDiagram(dsl);
+    const steps = flowStepList(parsed);
+    const numbers = flowStepNumbers(parsed);
+    const back = steps.filter(step => /go back to/i.test(step.line));
+    expect(back.length).toBeGreaterThan(0);
+    for (const step of back) {
+      const first = steps.find(candidate => candidate.id === step.id && !/go back to/i.test(candidate.line));
+      expect(first).toBeTruthy();
+      expect(numbers.get(step.id)).toBe(numbers.get(first!.id));
+      expect([...numbers.values()].filter(value => value === numbers.get(step.id))).toHaveLength(1);
+    }
+    expect(numbersByLabel(dsl)).toEqual({
+      'Draft reply': 1,
+      'Review quality': 2,
+      Send: 3,
+    });
+    expect(steps).toHaveLength(4);
+    expect(numbers.size).toBe(3);
+  });
+
+  it('numbers parallel branches sequentially in branch order', () => {
+    const dsl = plainStepsToDSL([
+      'Model: plan',
+      'Tool: search docs and at the same time Tool: search tickets',
+      'Model: answer',
+    ].join('\n'));
+    const parsed = parseDiagram(dsl);
+    const numbers = flowStepNumbers(parsed);
+    expect(numbersByLabel(dsl)).toEqual({
+      plan: 1,
+      'search docs': 2,
+      'search tickets': 3,
+      answer: 4,
+    });
+    const unnumbered = parsed.nodes
+      .filter(node => node.type === 'flow' && !numbers.has(node.id))
+      .map(node => (node.type === 'flow' ? node.properties.label : node.name));
+    expect(unnumbered).toEqual(['in parallel', 'join']);
+    const values = [...numbers.values()].sort((a, b) => a - b);
+    expect(values).toEqual([1, 2, 3, 4]);
+  });
+
+  it('returns no numbers for an empty or non-flow board', () => {
+    expect(flowStepNumbers(parseDiagram('diagram: flow\ntitle: "Empty"\n')).size).toBe(0);
+    expect(flowStepNumbers(parseDiagram('diagram: architecture\ntitle: "Arch"\nservice web { }\n')).size).toBe(0);
   });
 });

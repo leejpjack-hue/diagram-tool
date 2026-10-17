@@ -34,8 +34,9 @@ import { applyCanvasPins, setGroupPin } from '../../utils/pinUtils';
 import { applyBoardSource, renameNodeInSource } from '../../utils/sourceText';
 import { isMermaidFlow } from '../../parser/mermaidFlow';
 import { parseDiagram } from '../../parser/parser';
-import { flowStepList, type FlowStep } from '../../parser/flowToPlainSteps';
+import { flowStepList, flowStepNumbers, type FlowStep } from '../../parser/flowToPlainSteps';
 import { WalkThroughOverlay } from './WalkThroughOverlay';
+import { NO_STEP_NUMBERS, StepNumberContext, withStepNumber } from './StepNumberBadge';
 import { LoopEdge } from './LoopEdge';
 import { isUpstreamEdge } from './loopEdge';
 import { getHelperLines, type HelperLineResult } from './helperLines';
@@ -61,23 +62,23 @@ const architectureNodeTypes = {
 const flowEdgeTypes = { loop: LoopEdge };
 
 const flowNodeTypes = {
-  flow: ProcessNode,
-  start: StartEndNode,
-  end: StartEndNode,
-  decision: DecisionNode,
-  data: DataNode,
-  document: DocumentNode,
-  manualinput: ManualInputNode,
-  terminator: TerminatorNode,
-  gatewayexclusive: GatewayExclusiveNode,
-  gatewayparallel: GatewayParallelNode,
-  gatewayinclusive: GatewayInclusiveNode,
-  eventstart: EventStartNode,
-  eventend: EventEndNode,
-  eventtimer: EventTimerNode,
-  eventmessage: EventMessageNode,
-  subprocesscollapsed: SubprocessNode,
-  subprocessexpanded: SubprocessExpandedNode,
+  flow: withStepNumber(ProcessNode),
+  start: withStepNumber(StartEndNode),
+  end: withStepNumber(StartEndNode),
+  decision: withStepNumber(DecisionNode),
+  data: withStepNumber(DataNode),
+  document: withStepNumber(DocumentNode),
+  manualinput: withStepNumber(ManualInputNode),
+  terminator: withStepNumber(TerminatorNode),
+  gatewayexclusive: withStepNumber(GatewayExclusiveNode),
+  gatewayparallel: withStepNumber(GatewayParallelNode),
+  gatewayinclusive: withStepNumber(GatewayInclusiveNode),
+  eventstart: withStepNumber(EventStartNode),
+  eventend: withStepNumber(EventEndNode),
+  eventtimer: withStepNumber(EventTimerNode),
+  eventmessage: withStepNumber(EventMessageNode),
+  subprocesscollapsed: withStepNumber(SubprocessNode),
+  subprocessexpanded: withStepNumber(SubprocessExpandedNode),
   swimlane: SwimlaneNode,
   // Annotations are overlay nodes — registered in both architecture and flow
   // so a sticky note in either diagram type renders correctly.
@@ -207,6 +208,7 @@ function computeArchitectureRouting(diagramMode: string, diagramEdges: DiagramEd
 function DiagramCanvasInternal() {
   const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode, dslText, setDslText, setParsedDiagram, setError, selectedNodeId, isReadOnlyShared } = useDiagramStore();
   const iconStyle = useDiagramStore(s => s.iconStyle);
+  const showStepNumbers = useDiagramStore(s => s.showStepNumbers);
   const flowTokens = ICON_STYLES[iconStyle];
   const [renameDraft, setRenameDraft] = useState<string | null>(null);
   const { getZoom, fitView } = useReactFlow();
@@ -231,6 +233,10 @@ function DiagramCanvasInternal() {
   }, [parsedDiagram, diagramMode]);
 
   const nodeTypes = diagramMode === 'flow' ? flowNodeTypes : architectureNodeTypes;
+  const stepNumbers = useMemo(() => {
+    if (!showStepNumbers || diagramMode !== 'flow' || !parsedDiagram) return NO_STEP_NUMBERS;
+    return flowStepNumbers(parsedDiagram);
+  }, [showStepNumbers, diagramMode, parsedDiagram]);
 
   // Layout direction: pulled from DSL `direction:` keyword. Default vertical.
   const layoutDirection = parsedDiagram?.direction ?? 'TB';
@@ -1427,6 +1433,7 @@ function DiagramCanvasInternal() {
           />
         </div>
       )}
+      <StepNumberContext.Provider value={stepNumbers}>
       <ReactFlow
         style={diagramMode === 'flow' && iconStyle === 'blueprint' ? { background: flowTokens.pane } : undefined}
         nodes={displayNodes}
@@ -1566,6 +1573,7 @@ function DiagramCanvasInternal() {
           maskColor="rgba(15, 23, 42, 0.08)"
         />
       </ReactFlow>
+      </StepNumberContext.Provider>
 
       {/* DT-AI-20 / DT-AI-21 — path-highlight markers keyed to walk-path
           edge and trail-node ids. Visible emphasis is on the canvas elements

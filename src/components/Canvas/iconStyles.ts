@@ -106,6 +106,8 @@ export interface StyleTokens {
   selection: { color: string; width: number; offset: number };
   walk: { highlight: string; trail: string };
   roleChip: 'text' | 'icon';
+  /** Step-number chip. Text contrast is color on background (≥4.5:1). */
+  stepBadge: { background: string; color: string; border: string };
 }
 
 const TITLE_FONT = "'Plus Jakarta Sans', Inter, system-ui, sans-serif";
@@ -239,6 +241,7 @@ export const ICON_STYLES: Record<IconStyleId, StyleTokens> = {
     selection: { color: '#1d4ed8', width: 3, offset: 0 },
     walk: { highlight: '#6366f1', trail: '#818cf8' },
     roleChip: 'text',
+    stepBadge: { background: '#1d4ed8', color: '#ffffff', border: '#1d4ed8' },
   },
   line: {
     id: 'line',
@@ -269,6 +272,7 @@ export const ICON_STYLES: Record<IconStyleId, StyleTokens> = {
     selection: { color: '#0f172a', width: 2, offset: 2 },
     walk: { highlight: '#4338ca', trail: '#4f46e5' },
     roleChip: 'icon',
+    stepBadge: { background: '#0f172a', color: '#ffffff', border: '#0f172a' },
   },
   bold: {
     id: 'bold',
@@ -299,6 +303,7 @@ export const ICON_STYLES: Record<IconStyleId, StyleTokens> = {
     selection: { color: '#0f172a', width: 3, offset: 2 },
     walk: { highlight: '#0f172a', trail: '#334155' },
     roleChip: 'icon',
+    stepBadge: { background: '#ffffff', color: '#0f172a', border: '#0f172a' },
   },
   blueprint: {
     id: 'blueprint',
@@ -330,6 +335,7 @@ export const ICON_STYLES: Record<IconStyleId, StyleTokens> = {
     selection: { color: '#e0f2fe', width: 2, offset: 2 },
     walk: { highlight: '#fde68a', trail: '#7dd3fc' },
     roleChip: 'icon',
+    stepBadge: { background: '#e0f2fe', color: '#0b1f3a', border: '#7dd3fc' },
   },
 };
 

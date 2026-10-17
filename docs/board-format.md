@@ -43,7 +43,18 @@ Every file has a `version` string. Current writers emit `"3.0"`. Readers must st
 | `bold` | Bold filled |
 | `blueprint` | Blueprint |
 
-Missing or unknown values load as `clean`. Older readers ignore the field. This revision does not write `showStepNumbers`; a diagram that omits it loads with step numbers off.
+Missing or unknown values load as `clean`. Older readers ignore the field. A diagram that omits `iconStyle` still loads as `clean`.
+
+### Step numbers
+
+`board.showStepNumbers` is optional and additive. `version` stays **3.0**. No database migration.
+
+| Value | Meaning |
+| --- | --- |
+| omitted / `false` | Default. Step numbers are off. Writers omit the field. |
+| `true` | Flow nodes show a badge in Walk through order. |
+
+Missing or non-boolean values load as off. Older readers ignore the field. A diagram saved before this field — no `showStepNumbers` and no `iconStyle` — still loads with step numbers off and Clean style. Saving that board while both settings are at their defaults omits both fields.
 
 ### Typed data steps
 

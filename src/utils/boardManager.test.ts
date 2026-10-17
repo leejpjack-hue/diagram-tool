@@ -47,6 +47,11 @@ describe('board normalization and queries', () => {
     expect(board.schemaVersion).toBe(2);
     expect(board.tags).toEqual([]);
     expect(board.starred).toBe(false);
+    expect(board).not.toHaveProperty('iconStyle');
+    expect(board).not.toHaveProperty('showStepNumbers');
+    expect(normalizeBoard({ ...board, showStepNumbers: false, iconStyle: 'clean' })).not.toHaveProperty('showStepNumbers');
+    expect(normalizeBoard({ ...board, showStepNumbers: false, iconStyle: 'clean' })).not.toHaveProperty('iconStyle');
+    expect(normalizeBoard({ ...board, showStepNumbers: true }).showStepNumbers).toBe(true);
   });
 
   it('searches title, description, tags, and DSL', () => {
@@ -75,6 +80,33 @@ describe('board normalization and queries', () => {
 });
 
 describe('board repository workflows', () => {
+  it('saves a pre-change flow with defaults omitted and keeps step numbers only when on', async () => {
+    const created = await manager.create({ title: 'Old flow', mode: 'flow', dslText: 'diagram: flow\nstart A' });
+    expect(created).not.toHaveProperty('iconStyle');
+    expect(created).not.toHaveProperty('showStepNumbers');
+    const stored = await manager.get(created.id);
+    expect(stored).not.toHaveProperty('iconStyle');
+    expect(stored).not.toHaveProperty('showStepNumbers');
+    const quiet = JSON.stringify(buildBoardDocument(stored!));
+    expect(quiet).not.toContain('iconStyle');
+    expect(quiet).not.toContain('showStepNumbers');
+    expect(buildBoardDocument(stored!).version).toBe('3.0');
+
+    await manager.update(created.id, { showStepNumbers: true });
+    const on = await manager.get(created.id);
+    expect(on?.showStepNumbers).toBe(true);
+    expect(on).not.toHaveProperty('iconStyle');
+    expect(buildBoardDocument(on!).board.showStepNumbers).toBe(true);
+
+    const copy = await manager.duplicate(created.id);
+    expect(copy?.showStepNumbers).toBe(true);
+
+    await manager.update(created.id, { showStepNumbers: undefined });
+    const off = await manager.get(created.id);
+    expect(off).not.toHaveProperty('showStepNumbers');
+    expect(JSON.stringify(buildBoardDocument(off!))).not.toContain('showStepNumbers');
+  });
+
   it('creates, updates, lists, duplicates, and permanently removes boards', async () => {
     const board = await create('Original');
     await manager.update(board.id, { description: 'Updated', tags: ['core'] });

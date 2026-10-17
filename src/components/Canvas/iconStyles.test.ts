@@ -54,6 +54,13 @@ describe('ICON_STYLES', () => {
     expect(failures).toEqual([]);
   });
 
+  it('paints step-number badges from each style at 4.5:1 or better', () => {
+    for (const id of ICON_STYLE_IDS) {
+      const badge = ICON_STYLES[id].stepBadge;
+      expect(contrastRatio(badge.color, badge.background)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it('loads missing and unknown styles as clean and omits clean when storing', () => {
     expect(resolveIconStyle(undefined)).toBe('clean');
     expect(resolveIconStyle(null)).toBe('clean');

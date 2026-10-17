@@ -9,6 +9,7 @@ import { detectRawDiagramImport } from './sourceText';
 import { importDrawio, looksLikeDrawio } from './drawioImport';
 import { assertImportSize, sanitizeImportPlainText } from './importSanitizer';
 import { iconStyleForStorage, type IconStyleId } from '../components/Canvas/iconStyles';
+import { showStepNumbersForStorage } from './boardFormat';
 
 export type BoardMode = 'architecture' | 'flow' | 'sequence' | 'gantt';
 export type BoardSort = 'lastOpened' | 'updated' | 'created' | 'name';
@@ -83,6 +84,11 @@ export interface Board {
    * Unknown values are dropped on load.
    */
   iconStyle?: IconStyleId;
+  /**
+   * DT-AI-29. Optional Flow step numbers. Omitted means off.
+   * Only `true` is stored, so a default save does not grow the file.
+   */
+  showStepNumbers?: boolean;
   schemaVersion: 2;
 }
 
@@ -267,6 +273,7 @@ function blobToDataUrl(value: Blob): Promise<string> {
 
 export function normalizeBoard(input: Partial<Board> & Pick<Board, 'id' | 'title' | 'mode' | 'dslText' | 'createdAt' | 'updatedAt'>): Board {
   const iconStyle = iconStyleForStorage(input.iconStyle);
+  const showStepNumbers = showStepNumbersForStorage(input.showStepNumbers);
   const board: Board = {
     ...input,
     description: input.description ?? '',
@@ -276,6 +283,8 @@ export function normalizeBoard(input: Partial<Board> & Pick<Board, 'id' | 'title
   };
   if (iconStyle) board.iconStyle = iconStyle;
   else delete board.iconStyle;
+  if (showStepNumbers) board.showStepNumbers = true;
+  else delete board.showStepNumbers;
   return board;
 }
 
@@ -509,7 +518,7 @@ export class BoardManager {
   }
 
   async create(
-    input: { id?: string; title: string; description?: string; mode: BoardMode; dslText: string; thumbnail?: string; spaceId?: string; tags?: string[]; templateSourceId?: string; presentation?: PresentationItem[]; iconStyle?: IconStyleId },
+    input: { id?: string; title: string; description?: string; mode: BoardMode; dslText: string; thumbnail?: string; spaceId?: string; tags?: string[]; templateSourceId?: string; presentation?: PresentationItem[]; iconStyle?: IconStyleId; showStepNumbers?: boolean },
     recordActivity = true,
   ): Promise<Board> {
     if (recordActivity) await this.initialize();
@@ -535,6 +544,7 @@ export class BoardManager {
     };
     const storedStyle = iconStyleForStorage(input.iconStyle);
     if (storedStyle) board.iconStyle = storedStyle;
+    if (showStepNumbersForStorage(input.showStepNumbers)) board.showStepNumbers = true;
     return this.enqueueBoardWrite(board.id, async () => {
       await this.repository.put('boards', await storeBoard(board));
       if (recordActivity) await this.addActivity(board, 'created');
@@ -611,6 +621,7 @@ export class BoardManager {
       spaceId: source.spaceId,
       tags: source.tags,
       iconStyle: source.iconStyle,
+      showStepNumbers: source.showStepNumbers,
     });
     await this.addActivity(copy, 'duplicated', `Copied from ${source.title}`);
     return copy;
@@ -905,6 +916,7 @@ export class BoardManager {
         tags: candidate.tags,
         spaceId: candidate.spaceId ? spaceMap.get(candidate.spaceId) : undefined,
         iconStyle: candidate.iconStyle,
+        showStepNumbers: candidate.showStepNumbers,
       });
       if (candidate.id) boardIdMap.set(candidate.id, board.id);
       if (candidate.presentation?.items.length) await this.setPresentation(board.id, candidate.presentation.items);

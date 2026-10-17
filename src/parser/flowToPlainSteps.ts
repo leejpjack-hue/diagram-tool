@@ -278,3 +278,57 @@ export function flowStepList(diagram: ParsedDiagram): FlowStep[] {
 export function flowToPlainSteps(diagram: ParsedDiagram): string {
   return flowStepList(diagram).map(s => s.line).join('\n');
 }
+
+/** A walk step that points back at a node already in the list. It is not a new step. */
+function isBackEdgeLine(line: string): boolean {
+  return /^(?:then |else )?go back to /i.test(line);
+}
+
+/**
+ * DT-AI-29 — badge numbers in Walk through order.
+ *
+ * The source is `flowStepList` (the same list as Step N of M). Each node is
+ * numbered the first time that list introduces it. A decision is its own
+ * step, so it is numbered. A loop back-edge points at a node that already
+ * has a number and does not get another. A parallel fork is one walk step;
+ * its branches are numbered one after another in branch order, and the fork
+ * and join diamonds are not steps of their own.
+ *
+ * Non-flow diagrams and empty boards return an empty map.
+ */
+export function flowStepNumbers(diagram: ParsedDiagram): Map<string, number> {
+  let steps: FlowStep[];
+  try {
+    steps = flowStepList(diagram);
+  } catch {
+    return new Map();
+  }
+
+  const nodes = flowNodes(diagram);
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  const outgoing = new Map<string, { to: string; label?: string }[]>();
+  for (const n of nodes) outgoing.set(n.id, []);
+  for (const e of diagram.edges) {
+    if (!byId.has(e.from) || !byId.has(e.to)) continue;
+    outgoing.get(e.from)!.push({ to: e.to, label: e.label });
+  }
+
+  const numbers = new Map<string, number>();
+  let next = 1;
+  const give = (id: string) => {
+    if (numbers.has(id)) return;
+    numbers.set(id, next);
+    next += 1;
+  };
+
+  for (const step of steps) {
+    if (isBackEdgeLine(step.line)) continue;
+    const parallel = readParallelFork(step.id, byId, outgoing);
+    if (parallel) {
+      for (const branch of parallel.branches) give(branch.id);
+      continue;
+    }
+    give(step.id);
+  }
+  return numbers;
+}
