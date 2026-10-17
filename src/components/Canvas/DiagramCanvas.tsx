@@ -28,7 +28,6 @@ import { ICON_STYLES } from './iconStyles';
 import { useDiagramStore } from '../../store/diagramStore';
 import type { FlowNode, C4Level, ServiceNode as ServiceNodeType, CloudNode as CloudNodeType, ClassNode as ClassNodeType, AnnotationNode as AnnotationNodeType } from '../../store/types';
 import { calculateAutoLayout, resolveGroupOverlaps } from '../../utils/autoLayout';
-import { addConnectionDSL } from '../../utils/connectDSL';
 import { setReverseDSL, setReverseMermaidDSL } from '../../utils/flowDSL';
 import { applyCanvasPins, setGroupPin } from '../../utils/pinUtils';
 import { applyBoardSource, renameNodeInSource } from '../../utils/sourceText';
@@ -43,9 +42,9 @@ import { isUpstreamEdge } from './loopEdge';
 import { getHelperLines, type HelperLineResult } from './helperLines';
 import { LayoutDirectionContext } from './layoutDirection';
 import { Position } from '@xyflow/react';
-import { type ArchitectureHandleSlots } from './ArchitectureHandles';
-import { architectureHandleId } from './architectureHandleIds';
-import type { ConnectionSide, Edge as DiagramEdge } from '../../store/types';
+import { addConnectionDSL, updateFlowEdgeDSL } from '../../utils/connectDSL';
+import { computeConnectionRouting, flowRoutingBox, sidesForConnection } from './connectionRouting';
+import { sideFromHandleId } from './architectureHandleIds';
 
 /** DT-AI-21 — mid readable opacity for walk-through session-path trail nodes. */
 const WALK_TRAIL_NODE_OPACITY = 0.55;
@@ -106,104 +105,6 @@ function isEndedDragChange(change: NodeChange<Node>): change is NodeChange<Node>
   position: { x: number; y: number };
 } {
   return change.type === 'position' && change.dragging === false && !!change.position;
-}
-
-interface ArchitectureEdgeRoute {
-  sourceHandle: string;
-  targetHandle: string;
-}
-
-interface ArchitectureRouting {
-  edgeRoutes: Map<string, ArchitectureEdgeRoute>;
-  nodeSlots: Map<string, ArchitectureHandleSlots>;
-}
-
-const EMPTY_ARCHITECTURE_ROUTING: ArchitectureRouting = {
-  edgeRoutes: new Map(),
-  nodeSlots: new Map(),
-};
-
-function oppositeSide(side: ConnectionSide): ConnectionSide {
-  switch (side) {
-    case 'top':
-      return 'bottom';
-    case 'right':
-      return 'left';
-    case 'bottom':
-      return 'top';
-    case 'left':
-      return 'right';
-  }
-}
-
-function inferConnectionSides(edge: DiagramEdge, sourceNode: Node, targetNode: Node): { sourceSide: ConnectionSide; targetSide: ConnectionSide } {
-  if (edge.sourceSide && edge.targetSide) {
-    return { sourceSide: edge.sourceSide, targetSide: edge.targetSide };
-  }
-  if (edge.sourceSide) {
-    return { sourceSide: edge.sourceSide, targetSide: oppositeSide(edge.sourceSide) };
-  }
-  if (edge.targetSide) {
-    return { sourceSide: oppositeSide(edge.targetSide), targetSide: edge.targetSide };
-  }
-
-  const dx = targetNode.position.x - sourceNode.position.x;
-  const dy = targetNode.position.y - sourceNode.position.y;
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    const sourceSide: ConnectionSide = dx >= 0 ? 'right' : 'left';
-    return { sourceSide, targetSide: oppositeSide(sourceSide) };
-  }
-
-  const sourceSide: ConnectionSide = dy >= 0 ? 'bottom' : 'top';
-  return { sourceSide, targetSide: oppositeSide(sourceSide) };
-}
-
-function ensureSlotBucket(slots: Map<string, ArchitectureHandleSlots>, nodeId: string): ArchitectureHandleSlots {
-  const existing = slots.get(nodeId);
-  if (existing) return existing;
-  const next: ArchitectureHandleSlots = { source: {}, target: {} };
-  slots.set(nodeId, next);
-  return next;
-}
-
-function computeArchitectureRouting(diagramMode: string, diagramEdges: DiagramEdge[], nodes: Node[]): ArchitectureRouting {
-  if (diagramMode === 'flow' || diagramEdges.length === 0 || nodes.length === 0) {
-    return EMPTY_ARCHITECTURE_ROUTING;
-  }
-
-  const nodesById = new Map(nodes.map((node) => [node.id, node]));
-  const nextSlotByEndpoint = new Map<string, number>();
-  const edgeRoutes = new Map<string, ArchitectureEdgeRoute>();
-  const nodeSlots = new Map<string, ArchitectureHandleSlots>();
-
-  const takeSlot = (nodeId: string, kind: 'source' | 'target', side: ConnectionSide) => {
-    const key = `${nodeId}:${kind}:${side}`;
-    const slot = nextSlotByEndpoint.get(key) ?? 0;
-    nextSlotByEndpoint.set(key, slot + 1);
-
-    const bucket = ensureSlotBucket(nodeSlots, nodeId);
-    const sideCounts = bucket[kind] ?? {};
-    sideCounts[side] = Math.max(sideCounts[side] ?? 0, slot + 1);
-    bucket[kind] = sideCounts;
-
-    return slot;
-  };
-
-  for (const edge of diagramEdges) {
-    const sourceNode = nodesById.get(edge.from);
-    const targetNode = nodesById.get(edge.to);
-    if (!sourceNode || !targetNode) continue;
-
-    const { sourceSide, targetSide } = inferConnectionSides(edge, sourceNode, targetNode);
-    const sourceSlot = takeSlot(edge.from, 'source', sourceSide);
-    const targetSlot = takeSlot(edge.to, 'target', targetSide);
-    edgeRoutes.set(edge.id, {
-      sourceHandle: architectureHandleId('source', sourceSide, sourceSlot),
-      targetHandle: architectureHandleId('target', targetSide, targetSlot),
-    });
-  }
-
-  return { edgeRoutes, nodeSlots };
 }
 
 function DiagramCanvasInternal() {
@@ -607,12 +508,20 @@ function DiagramCanvasInternal() {
   }, [parsedDiagram, diagramMode, c4Level, drillParent, layoutDirection, isLR, directionalNodeProps, onGroupResize]);
 
   const architectureRouting = useMemo(
-    () => computeArchitectureRouting(diagramMode, parsedDiagram?.edges ?? [], initialNodes),
+    () => computeConnectionRouting(
+      parsedDiagram?.edges ?? [],
+      diagramMode === 'flow'
+        ? initialNodes.map(node => {
+            const box = flowRoutingBox(node.type);
+            return box ? { ...node, width: box.w, height: box.h } : node;
+          })
+        : initialNodes,
+    ),
     [diagramMode, parsedDiagram, initialNodes],
   );
 
   const routedNodes = useMemo((): Node[] => {
-    if (diagramMode === 'flow' || architectureRouting.nodeSlots.size === 0) {
+    if (architectureRouting.nodeSlots.size === 0) {
       return initialNodes;
     }
 
@@ -627,7 +536,7 @@ function DiagramCanvasInternal() {
         },
       };
     });
-  }, [diagramMode, initialNodes, architectureRouting]);
+  }, [initialNodes, architectureRouting]);
 
   const initialEdges = useMemo((): ReactFlowEdge[] => {
     if (!parsedDiagram) return [];
@@ -701,12 +610,18 @@ function DiagramCanvasInternal() {
       const branch = branchColor(edge.label);
       const stroke = edge.color ?? branch ?? edgeColor;
       const route = architectureRouting.edgeRoutes.get(edge.id);
+      const sourceSide = sideFromHandleId(route?.sourceHandle);
+      const targetSide = sideFromHandleId(route?.targetHandle);
+      const flowAttach = diagramMode === 'flow' && sourceSide && targetSide
+        ? `flow-source-side-${sourceSide} flow-target-side-${targetSide}`
+        : undefined;
       return {
         id: edge.id,
         source: edge.from,
         target: edge.to,
         sourceHandle: route?.sourceHandle,
         targetHandle: route?.targetHandle,
+        className: flowAttach,
         label: edge.label,
         animated: false,
         type: rfEdgeType,
@@ -1351,11 +1266,17 @@ function DiagramCanvasInternal() {
     // Annotation nodes are sticky notes — they don't accept or emit connections.
     if (src.type === 'annotation' || tgt.type === 'annotation') return;
 
+    const sourceNode = nodes.find(n => n.id === conn.source);
+    const targetNode = nodes.find(n => n.id === conn.target);
+    const sides = diagramMode === 'flow' && sourceNode && targetNode
+      ? sidesForConnection(conn.sourceHandle, conn.targetHandle, sourceNode, targetNode)
+      : undefined;
     const next = addConnectionDSL(
       dslText,
       diagramMode === 'flow' ? 'flow' : 'architecture',
       src.name,
       tgt.name,
+      sides,
     );
     if (!next) return; // duplicate or source block not found
     setDslText(next);
@@ -1364,7 +1285,39 @@ function DiagramCanvasInternal() {
     } catch (err) {
       console.error('Connect parse error:', err);
     }
-  }, [parsedDiagram, dslText, diagramMode, setDslText, setParsedDiagram]);
+  }, [parsedDiagram, dslText, diagramMode, nodes, setDslText, setParsedDiagram]);
+
+  // Drag an edge end onto another handle. Flow stores the grabbed sides on the
+  // existing arrow line so the attachment survives the reparse.
+  const onReconnect = useCallback((oldEdge: ReactFlowEdge, conn: Connection) => {
+    if (diagramMode !== 'flow' || !parsedDiagram || !conn.source || !conn.target) return;
+    if (conn.source === conn.target) return;
+    if (conn.source.startsWith('__') || conn.target.startsWith('__')) return;
+    const existing = parsedDiagram.edges.find(e => e.id === oldEdge.id);
+    const oldFrom = parsedDiagram.nodes.find(n => n.id === existing?.from);
+    const oldTo = parsedDiagram.nodes.find(n => n.id === existing?.to);
+    const src = parsedDiagram.nodes.find(n => n.id === conn.source);
+    const tgt = parsedDiagram.nodes.find(n => n.id === conn.target);
+    if (!existing || !oldFrom || !oldTo || !src || !tgt) return;
+    if (src.type === 'annotation' || tgt.type === 'annotation') return;
+    const sourceNode = nodes.find(n => n.id === conn.source);
+    const targetNode = nodes.find(n => n.id === conn.target);
+    if (!sourceNode || !targetNode) return;
+    const sides = sidesForConnection(conn.sourceHandle, conn.targetHandle, sourceNode, targetNode);
+    const next = updateFlowEdgeDSL(dslText, oldFrom.name, oldTo.name, {
+      fromName: src.name,
+      toName: tgt.name,
+      sourceSide: sides.sourceSide,
+      targetSide: sides.targetSide,
+    });
+    if (!next) return;
+    setDslText(next);
+    try {
+      setParsedDiagram(parseDiagram(next));
+    } catch (err) {
+      console.error('Reconnect parse error:', err);
+    }
+  }, [diagramMode, parsedDiagram, dslText, nodes, setDslText, setParsedDiagram]);
 
   const onNodeDragStart = useCallback((_e: unknown, node: Node) => {
     draggingNodeIds.current.add(node.id);
@@ -1447,6 +1400,7 @@ function DiagramCanvasInternal() {
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onReconnect={diagramMode === 'flow' ? onReconnect : undefined}
         onMoveEnd={handleMoveEnd}
         onSelectionChange={onSelectionChange}
         onNodeClick={onNodeClick}

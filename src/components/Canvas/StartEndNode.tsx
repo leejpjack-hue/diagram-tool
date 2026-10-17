@@ -1,9 +1,9 @@
 import { memo } from 'react';
-import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
-import { useLayoutHandles } from './layoutDirection';
 import { FLOW_COLORS, flowPillStyle, paletteFromColor, TITLE_FONT } from './flowShapeStyle';
+import { FlowHandles } from './FlowHandles';
+import { readFlowHandleSlots } from './connectionRouting';
 import { useDiagramStore } from '../../store/diagramStore';
 import { faceBoxShadow, ICON_STYLES, resolveFace, type IconStyleId } from './iconStyles';
 import { FlowGlyph } from './FlowGlyph';
@@ -18,7 +18,6 @@ const CleanStartEndNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as FlowNodeData;
   const isStart = nodeData.isStart;
   const isEnd = nodeData.isEnd;
-  const { target, source } = useLayoutHandles(!!nodeData.reversed);
 
   // A `color:` override wins; otherwise start = green, end = red, else neutral.
   const c = nodeData.color
@@ -29,14 +28,11 @@ const CleanStartEndNode = memo(({ data, selected }: NodeProps) => {
     <div
       className={`
         px-6 py-2.5 rounded-full transition-all duration-200
-        ${selected ? 'scale-105' : 'hover:scale-105'}
+        relative ${selected ? 'scale-105' : 'hover:scale-105'}
         min-w-[110px] text-center
       `}
       style={flowPillStyle(c, !!selected)}
     >
-      {isStart && <Handle type="source" position={source} style={{ background: c.border }} />}
-      {isEnd && <Handle type="target" position={target} style={{ background: c.border }} />}
-
       <div
         className="font-bold text-[12px] uppercase"
         style={{ color: c.text, fontFamily: TITLE_FONT, letterSpacing: '0.05em' }}
@@ -44,12 +40,7 @@ const CleanStartEndNode = memo(({ data, selected }: NodeProps) => {
         {nodeData.label}
       </div>
 
-      {!isStart && !isEnd && (
-        <>
-          <Handle type="target" position={target} style={{ background: c.border }} />
-          <Handle type="source" position={source} style={{ background: c.border }} />
-        </>
-      )}
+      <FlowHandles accent={c.border} slots={readFlowHandleSlots(data)} />
     </div>
   );
 });
@@ -61,7 +52,6 @@ const StyledStartEndNode = memo(({ data, selected, iconStyle }: NodeProps & { ic
   const nodeData = data as unknown as FlowNodeData;
   const isStart = nodeData.isStart;
   const isEnd = nodeData.isEnd;
-  const { target, source } = useLayoutHandles(!!nodeData.reversed);
   const face = resolveFace(iconStyle, {
     ...nodeData,
     isStart: isStart || (!isEnd && !nodeData.role),
@@ -72,7 +62,7 @@ const StyledStartEndNode = memo(({ data, selected, iconStyle }: NodeProps & { ic
   return (
     <div
       data-style-kind={face.kind}
-      className="px-6 py-2.5 min-w-[110px] text-center"
+      className="relative px-6 py-2.5 min-w-[110px] text-center"
       style={{
         background: face.fill,
         border: face.borderWidth ? `${face.borderWidth}px solid ${face.borderColor}` : 'none',
@@ -82,20 +72,13 @@ const StyledStartEndNode = memo(({ data, selected, iconStyle }: NodeProps & { ic
         outlineOffset: selected ? tokens.selection.offset : undefined,
       }}
     >
-      {isStart && <Handle type="source" position={source} style={{ background: handleColor }} />}
-      {isEnd && <Handle type="target" position={target} style={{ background: handleColor }} />}
       <div className="inline-flex items-center justify-center" style={{ gap: 8 }}>
         <FlowGlyph face={face} />
         <div style={{ color: face.labelColor, fontFamily: face.fontFamily, fontWeight: face.fontWeight, fontSize: 12, letterSpacing: '0.04em' }}>
           {nodeData.label}
         </div>
       </div>
-      {!isStart && !isEnd && (
-        <>
-          <Handle type="target" position={target} style={{ background: handleColor }} />
-          <Handle type="source" position={source} style={{ background: handleColor }} />
-        </>
-      )}
+      <FlowHandles accent={handleColor} slots={readFlowHandleSlots(data)} />
     </div>
   );
 });

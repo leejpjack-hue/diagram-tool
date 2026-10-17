@@ -1,9 +1,9 @@
 import { memo, type CSSProperties } from 'react';
-import { Handle } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from './types';
-import { useLayoutHandles } from './layoutDirection';
 import { FLOW_COLORS, TITLE_FONT, MONO_FONT } from './flowShapeStyle';
+import { FlowHandles } from './FlowHandles';
+import { readFlowHandleSlots } from './connectionRouting';
 import { RoleChip } from './RoleChip';
 import { useDiagramStore } from '../../store/diagramStore';
 import { faceBoxShadow, ICON_STYLES, resolveFace, type IconStyleId, type ResolvedFace } from './iconStyles';
@@ -67,7 +67,6 @@ export const DataNode = memo((props: ShapeProps) => {
 
 const CleanDataNode = memo(({ data, selected }: ShapeProps) => {
   const d = data as unknown as FlowNodeData;
-  const { target, source, centerStyle } = useLayoutHandles(!!d.reversed);
   return (
     <Wrapper selected={selected}>
       <div className="relative" style={{ width: SIZE.w, height: SIZE.h }}>
@@ -80,8 +79,7 @@ const CleanDataNode = memo(({ data, selected }: ShapeProps) => {
           />
         </svg>
         <LabelLayer data={d} />
-        <Handle type="target" position={target} style={{ background: STROKE, ...centerStyle(SIZE.w, SIZE.h) }} />
-        <Handle type="source" position={source} style={{ background: STROKE, ...centerStyle(SIZE.w, SIZE.h) }} />
+        <FlowHandles accent={STROKE} slots={readFlowHandleSlots(data)} />
       </div>
     </Wrapper>
   );
@@ -99,13 +97,6 @@ const CleanDocumentNode = memo(({ data, selected }: ShapeProps) => {
   const d = data as unknown as FlowNodeData;
   const w = SIZE.w, h = SIZE.h;
   const path = `M 2 2 L ${w - 2} 2 L ${w - 2} ${h - 12} Q ${(w * 0.75)} ${h + 2} ${w / 2} ${h - 10} Q ${w * 0.25} ${h - 18} 2 ${h - 10} Z`;
-  const { target, source, centerStyle, direction } = useLayoutHandles(!!d.reversed);
-  // The wavy bottom drops a few px below baseline; in TB we pin the source
-  // handle slightly higher so it sits on the wave's apex. In LR the source
-  // is on the right edge and that adjustment doesn't apply.
-  const sourceStyle = direction === 'LR'
-    ? { background: STROKE, ...centerStyle(w, h) }
-    : { background: STROKE, left: w / 2, top: h - 4 };
   return (
     <Wrapper selected={selected}>
       <div className="relative" style={{ width: w, height: h }}>
@@ -113,8 +104,7 @@ const CleanDocumentNode = memo(({ data, selected }: ShapeProps) => {
           <path d={path} fill={FILL} stroke={STROKE} strokeWidth={2} strokeLinejoin="round" />
         </svg>
         <LabelLayer data={d} />
-        <Handle type="target" position={target} style={{ background: STROKE, ...centerStyle(w, h) }} />
-        <Handle type="source" position={source} style={sourceStyle} />
+        <FlowHandles accent={STROKE} slots={readFlowHandleSlots(data)} />
       </div>
     </Wrapper>
   );
@@ -131,7 +121,6 @@ export const ManualInputNode = memo((props: ShapeProps) => {
 const CleanManualInputNode = memo(({ data, selected }: ShapeProps) => {
   const d = data as unknown as FlowNodeData;
   const w = SIZE.w, h = SIZE.h;
-  const { target, source, centerStyle } = useLayoutHandles(!!d.reversed);
   return (
     <Wrapper selected={selected}>
       <div className="relative" style={{ width: w, height: h }}>
@@ -144,8 +133,7 @@ const CleanManualInputNode = memo(({ data, selected }: ShapeProps) => {
           />
         </svg>
         <LabelLayer data={d} />
-        <Handle type="target" position={target} style={{ background: STROKE, ...centerStyle(w, h) }} />
-        <Handle type="source" position={source} style={{ background: STROKE, ...centerStyle(w, h) }} />
+        <FlowHandles accent={STROKE} slots={readFlowHandleSlots(data)} />
       </div>
     </Wrapper>
   );
@@ -161,10 +149,9 @@ export const TerminatorNode = memo((props: ShapeProps) => {
 
 const CleanTerminatorNode = memo(({ data, selected }: ShapeProps) => {
   const d = data as unknown as FlowNodeData;
-  const { target, source } = useLayoutHandles(!!d.reversed);
   return (
     <div
-      className={`px-6 py-2.5 rounded-full transition-all duration-200 ${
+      className={`relative px-6 py-2.5 rounded-full transition-all duration-200 ${
         selected ? 'scale-105' : 'hover:scale-105'
       }`}
       style={{
@@ -175,9 +162,8 @@ const CleanTerminatorNode = memo(({ data, selected }: ShapeProps) => {
           : '0 1px 2px rgba(17,24,39,0.05), 0 8px 18px -12px rgba(17,24,39,0.25)',
       }}
     >
-      <Handle type="target" position={target} style={{ background: FLOW_COLORS.slate.border }} />
       <div className="font-semibold text-[13px]" style={{ color: FLOW_COLORS.slate.text, fontFamily: TITLE_FONT }}>{d.label}</div>
-      <Handle type="source" position={source} style={{ background: FLOW_COLORS.slate.border }} />
+      <FlowHandles accent={FLOW_COLORS.slate.border} slots={readFlowHandleSlots(data)} />
     </div>
   );
 });
@@ -208,7 +194,6 @@ function selectionOutline(iconStyle: IconStyleId, selected?: boolean): CSSProper
 const StyledDataNode = memo(({ data, selected, iconStyle }: ShapeProps & { iconStyle: IconStyleId }) => {
   const d = data as unknown as FlowNodeData;
   const face = resolveFace(iconStyle, { ...d, nodeType: d.nodeType ?? 'data' }, 'card');
-  const { target, source, centerStyle } = useLayoutHandles(!!d.reversed);
   const w = SIZE.w;
   const h = SIZE.h;
   const ry = 12;
@@ -226,8 +211,7 @@ const StyledDataNode = memo(({ data, selected, iconStyle }: ShapeProps & { iconS
           <ellipse cx={w / 2} cy={ry} rx={(w - 4) / 2} ry={ry - 2} fill={face.fill} stroke={stroke} strokeWidth={face.borderWidth || 1.5} />
         </svg>
         <StyledLabel face={face} data={d} />
-        <Handle type="target" position={target} style={{ background: face.color, ...centerStyle(w, h) }} />
-        <Handle type="source" position={source} style={{ background: face.color, ...centerStyle(w, h) }} />
+        <FlowHandles accent={face.color} slots={readFlowHandleSlots(data)} />
       </div>
     </div>
   );
@@ -239,14 +223,10 @@ const StyledSvgNode = memo(({ data, selected, iconStyle, variant }: ShapeProps &
   const face = resolveFace(iconStyle, { ...d, nodeType: d.nodeType ?? (variant === 'document' ? 'document' : 'manualinput') }, 'card');
   const w = SIZE.w;
   const h = SIZE.h;
-  const { target, source, centerStyle, direction } = useLayoutHandles(!!d.reversed);
   const stroke = face.borderWidth ? face.borderColor : face.color;
   const path = variant === 'document'
     ? `M 2 2 L ${w - 2} 2 L ${w - 2} ${h - 12} Q ${(w * 0.75)} ${h + 2} ${w / 2} ${h - 10} Q ${w * 0.25} ${h - 18} 2 ${h - 10} Z`
     : null;
-  const sourceStyle = variant === 'document' && direction !== 'LR'
-    ? { background: stroke, left: w / 2, top: h - 4 }
-    : { background: stroke, ...centerStyle(w, h) };
   return (
     <div style={{ width: w, height: h, ...selectionOutline(iconStyle, selected), boxShadow: faceBoxShadow(face) }} data-style-kind={face.kind}>
       <div className="relative" style={{ width: w, height: h }}>
@@ -258,8 +238,7 @@ const StyledSvgNode = memo(({ data, selected, iconStyle, variant }: ShapeProps &
           )}
         </svg>
         <StyledLabel face={face} data={d} />
-        <Handle type="target" position={target} style={{ background: stroke, ...centerStyle(w, h) }} />
-        <Handle type="source" position={source} style={sourceStyle} />
+        <FlowHandles accent={stroke} slots={readFlowHandleSlots(data)} />
       </div>
     </div>
   );
@@ -269,12 +248,11 @@ StyledSvgNode.displayName = 'StyledSvgNode';
 const StyledTerminatorNode = memo(({ data, selected, iconStyle }: ShapeProps & { iconStyle: IconStyleId }) => {
   const d = data as unknown as FlowNodeData;
   const face = resolveFace(iconStyle, { ...d, nodeType: d.nodeType ?? 'terminator', isStart: d.isStart ?? !d.isEnd }, 'pill');
-  const { target, source } = useLayoutHandles(!!d.reversed);
   const tokens = ICON_STYLES[iconStyle];
   return (
     <div
       data-style-kind={face.kind}
-      className="px-6 py-2.5 text-center"
+      className="relative px-6 py-2.5 text-center"
       style={{
         background: face.fill,
         border: face.borderWidth ? `${face.borderWidth}px solid ${face.borderColor}` : 'none',
@@ -284,12 +262,11 @@ const StyledTerminatorNode = memo(({ data, selected, iconStyle }: ShapeProps & {
         outlineOffset: selected ? tokens.selection.offset : undefined,
       }}
     >
-      <Handle type="target" position={target} style={{ background: face.borderColor }} />
       <div className="inline-flex items-center" style={{ gap: 8, color: face.labelColor, fontFamily: face.fontFamily, fontWeight: face.fontWeight, fontSize: 13 }}>
         <FlowGlyph face={face} />
         {d.label}
       </div>
-      <Handle type="source" position={source} style={{ background: face.borderColor }} />
+      <FlowHandles accent={face.borderColor} slots={readFlowHandleSlots(data)} />
     </div>
   );
 });

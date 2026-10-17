@@ -86,6 +86,18 @@ Type steps shows a live, read-only "Understood as" list while the user types. It
 
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 
+### Flow connection sides
+
+A Flow arrow in `source.text` / `dslText` may name the sides it uses:
+
+```
+Alpha -> Beta { from: right, to: left }
+```
+
+`from` and `to` are the existing connection sides: `top`, `right`, `bottom`, or `left`. They are optional. When a side is missing, the board attaches that end to the side that keeps the orthogonal path short: a neighbour to the left or right uses left/right, a neighbour above or below uses top/bottom. Dragging a handle writes the sides onto that arrow. Older arrows with no sides keep the same nodes and edges and re-attach from their positions. This is not a new board field. `version` stays **3.0**. No database migration.
+
+A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
+
 `nodes` and `edges` are a portable projection of that source plus layout pins. Re-opening the file prefers `source.text` / `dslText` and restores typed boards (architecture, flow, sequence, Gantt) so layout stays within ±2px of the export.
 
 ### Complete backup (`kind: "workspace"`)

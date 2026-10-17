@@ -439,6 +439,32 @@ note "Watch the retry budget here." {
     });
   });
 
+  describe('Flow edge sides', () => {
+    it('reads optional from/to on a flow arrow and leaves a bare arrow without sides', () => {
+      const result = parseDiagram(`diagram: flow
+title: Sides
+Alpha -> Beta { from: right, to: left }
+Alpha ->|Yes| Gamma { from: bottom, to: top }
+node Alpha { label: Alpha }
+node Beta { label: Beta }
+node Gamma { label: Gamma }
+`);
+      const horizontal = result.edges.find(e => e.to === 'beta');
+      const vertical = result.edges.find(e => e.to === 'gamma');
+      expect(horizontal?.sourceSide).toBe('right');
+      expect(horizontal?.targetSide).toBe('left');
+      expect(vertical?.label).toBe('Yes');
+      expect(vertical?.sourceSide).toBe('bottom');
+      expect(vertical?.targetSide).toBe('top');
+
+      const legacy = parseDiagram(`diagram: flow
+Alpha -> Beta
+`);
+      expect(legacy.edges[0].sourceSide).toBeUndefined();
+      expect(legacy.edges[0].targetSide).toBeUndefined();
+    });
+  });
+
   describe('DT-AI-03 flow node role', () => {
     const parseRole = (roleLine: string) => {
       const dsl = `

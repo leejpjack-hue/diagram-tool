@@ -1226,13 +1226,20 @@ export class Parser {
 
   private parseFlowConnection(): void {
     // Parse flow connections: A -> B -> C or A ->|Label| B
+    // Optional `{ from: right, to: left }` on the line records manual sides.
     const nodeNames: string[] = [];
     let currentLabel: string | undefined;
+    let edgeSettings: { sourceSide?: ConnectionSide; targetSide?: ConnectionSide; label?: string } = {};
     
     while (this.peek().type !== TokenType.NEWLINE && 
            this.peek().type !== TokenType.EOF &&
            this.peek().type !== TokenType.RBRACE) {
       const token = this.peek();
+
+      if (token.type === TokenType.LBRACE) {
+        edgeSettings = this.readOptionalArchitectureEdgeSettings();
+        break;
+      }
       
       if (token.type === TokenType.IDENTIFIER) {
         nodeNames.push(token.value as string);
@@ -1283,16 +1290,20 @@ export class Parser {
       }
     }
     
-    // Create edges between consecutive nodes
+    // Create edges between consecutive nodes. Brace sides apply to the last
+    // hop — that is the edge a drag-connect writes as its own line.
     for (let i = 0; i < nodeNames.length - 1; i++) {
       const from = nodeNames[i].toLowerCase().replace(/[^a-z0-9]/g, '_');
       const to = nodeNames[i + 1].toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const isLast = i === nodeNames.length - 2;
       
       this.edges.push({
         id: `${from}_to_${to}_${this.edges.length}`,
         from,
         to,
-        label: currentLabel,
+        label: currentLabel ?? (isLast ? edgeSettings.label : undefined),
+        sourceSide: isLast ? edgeSettings.sourceSide : undefined,
+        targetSide: isLast ? edgeSettings.targetSide : undefined,
       });
       
       // Reset label after first edge
