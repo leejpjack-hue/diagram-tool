@@ -58,7 +58,7 @@ function IconBadge({
   return (
     <span
       data-testid="type-steps-preview-icon"
-      data-icon-style={iconStyle}
+      data-preview-style={iconStyle}
       data-icon-name={face.icon}
       style={{
         display: 'inline-flex',

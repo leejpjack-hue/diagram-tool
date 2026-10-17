@@ -125,7 +125,7 @@ describe('Understood as preview (DT-AI-28)', () => {
     openTypeSteps();
     fireEvent.change(screen.getByTestId('type-steps-input'), { target: { value: 'Model: draft' } });
     await waitFor(() => {
-      expect(screen.getByTestId('type-steps-preview-icon')).toHaveAttribute('data-icon-style', 'bold');
+      expect(screen.getByTestId('type-steps-preview-icon')).toHaveAttribute('data-preview-style', 'bold');
     });
     expect(screen.getByTestId('type-steps-preview-icon')).toHaveAttribute('data-icon-name', 'sparkles');
   });

@@ -25,7 +25,7 @@ test('Humna warns, Model shows role and note, and Build still works', async ({ p
   await expect(preview.getByTestId('type-steps-preview-summary')).toHaveText('2 steps, 1 warning');
 
   await expect(page.getByText('title: Untitled Workflow')).toBeVisible();
-  await expect(page.locator('.react-flow__node', { hasText: 'Start' })).toBeVisible();
+  await expect(page.getByText('start Start')).toBeVisible();
 
   await page.getByTestId('build-steps').click();
   const toast = page.getByTestId('toast-item').filter({ hasText: 'Built 2 steps' });
