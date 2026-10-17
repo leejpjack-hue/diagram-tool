@@ -30,6 +30,17 @@
 //   Same forms: Alias: / Alias: rest / Alias rest (case-insensitive).
 //   e.g. 1. User: ask → role human, label ask
 //
+// DT-AI-24 — data-kind prefixes (a shape, not an actor; no role chip):
+//   Data: customer tickets     → type: data,    label "customer tickets"
+//   Memory last 3 tickets      → type: data     (bare token + space)
+//   DB: crm                    → type: data
+//   File: brief                → type: document
+//   Same forms as DT-AI-04 (colon or bare token + space, case-insensitive).
+//   List markers are already stripped (DT-AI-10). Unknown prefixes stay in
+//   the label. A data line never also gets a role. Notes and then/if/else
+//   attach exactly as they do on other steps. Lines without these words
+//   stay byte-identical to previous output.
+//
 // DT-AI-15 — optional short "why" note per step, typed on the same line:
 //   Model: draft reply — uses the last 3 tickets
 //   Send reply -- blocks if confidence < 0.8
@@ -80,6 +91,9 @@ function quote(s: string): string {
 /** DT-AI-04: display roles that round-trip with DT-AI-03 `role:` chips. */
 export type PlainStepRole = 'human' | 'model' | 'tool' | 'check';
 
+/** DT-AI-24: data shapes. File maps to the existing document kind. */
+export type PlainStepKind = 'data' | 'document';
+
 /** Canonical roles plus DT-AI-12 chat aliases (longest tokens first). */
 const ROLE_PREFIX =
   /^(assistant|human|model|tool|check|system|user|ai)(?:\s*:\s*|\s+)(.+)$/i;
@@ -123,6 +137,35 @@ export function stripRolePrefix(raw: string): { role?: PlainStepRole; label: str
   return { role, label };
 }
 
+/** Longest tokens first so `memory` is not eaten by a shorter word. */
+const KIND_PREFIX = /^(memory|data|file|db)(?:\s*:\s*|\s+)(.+)$/i;
+
+const KIND_ALIAS: Record<string, PlainStepKind> = {
+  data: 'data',
+  memory: 'data',
+  db: 'data',
+  file: 'document',
+};
+
+/**
+ * DT-AI-24: strip a leading data-kind word.
+ * Colon form: `Data:` / `File:` (optional space after the colon).
+ * Bare form: `Memory ` / `DB ` followed by the rest of the step.
+ * `File` → document; `Data` / `Memory` / `DB` → data.
+ * A bare word with nothing after it stays in the label. Unknown prefixes
+ * are left intact. This is a kind, not a role — callers must not also
+ * assign a role chip when a kind matches.
+ */
+export function stripKindPrefix(raw: string): { kind?: PlainStepKind; label: string } {
+  const m = KIND_PREFIX.exec(raw);
+  if (!m) return { label: raw };
+  const kind = KIND_ALIAS[m[1].toLowerCase()];
+  if (!kind) return { label: raw };
+  const label = m[2].trim();
+  if (!label) return { label: raw };
+  return { kind, label };
+}
+
 /**
  * DT-AI-15: split `Label — note` / `Label -- note` (first ` — ` or ` -- `
  * with spaces on both sides). A single ` - ` is not a separator and a dash
@@ -138,7 +181,14 @@ export function splitStepNote(line: string): { text: string; note?: string } {
   return { text: line.slice(0, m.index).trim(), note };
 }
 
-interface EmittedNode { id: string; label: string; decision: boolean; role?: PlainStepRole; note?: string; }
+interface EmittedNode {
+  id: string;
+  label: string;
+  decision: boolean;
+  role?: PlainStepRole;
+  kind?: PlainStepKind;
+  note?: string;
+}
 
 interface State {
   nodes: EmittedNode[];
@@ -158,12 +208,18 @@ function stepId(label: string, state: State): string {
   return n === 1 ? base : `${base}_${n}`;
 }
 
-function placeNode(label: string, state: State, decision: boolean, role?: PlainStepRole): string {
+function placeNode(
+  label: string,
+  state: State,
+  decision: boolean,
+  role?: PlainStepRole,
+  kind?: PlainStepKind,
+): string {
   const existing = state.idFor.get(label);
   if (existing) return existing;
   const id = stepId(label, state);
   state.idFor.set(label, id);
-  state.nodes.push({ id, label, decision, role });
+  state.nodes.push({ id, label, decision, role: kind ? undefined : role, kind });
   return id;
 }
 
@@ -195,29 +251,39 @@ export function plainStepsToDSL(text: string, opts: { title?: string } = {}): st
       }
       const rawLabel = (seg.text ?? '').replace(/\|/g, '/').trim();
       if (!rawLabel) continue;
-      const { role, label } = stripRolePrefix(rawLabel);
+      // DT-AI-24: a leading data word is a kind, not an actor. The text after
+      // `if` is the decision condition, so a data word there stays in the
+      // label (the node is a decision). Branch and plain steps take the kind.
+      // Only when it does not match do we look for a role word.
+      const kindHit: { kind?: PlainStepKind; label: string } = state.inIf
+        ? { label: rawLabel }
+        : stripKindPrefix(rawLabel);
+      const roleHit = kindHit.kind ? undefined : stripRolePrefix(rawLabel);
+      const label = kindHit.kind ? kindHit.label : roleHit!.label;
+      const role = roleHit?.role;
+      const kind = kindHit.kind;
       if (!label) continue;
 
       let id: string;
       let labelledBranch = false;
       if (state.inIf) {
         // The text after `if` IS the condition → decision node.
-        id = placeNode(label, state, true, role);
+        id = placeNode(label, state, true, role, kind);
         state.lastDecision = id;
         state.inIf = false;
         state.expectBranch = 'yes';
       } else if (state.expectBranch === 'yes') {
-        id = placeNode(label, state, false, role);
+        id = placeNode(label, state, false, role, kind);
         state.edges.push({ from: state.lastDecision!, to: id, label: 'Yes' });
         state.expectBranch = null;
         labelledBranch = true;
       } else if (state.expectBranch === 'no') {
-        id = placeNode(label, state, false, role);
+        id = placeNode(label, state, false, role, kind);
         state.edges.push({ from: state.lastDecision!, to: id, label: 'No' });
         state.expectBranch = null;
         labelledBranch = true;
       } else {
-        id = placeNode(label, state, false, role);
+        id = placeNode(label, state, false, role, kind);
       }
 
       if (state.last && state.last !== id && !labelledBranch) {
@@ -258,6 +324,7 @@ export function plainStepsToDSL(text: string, opts: { title?: string } = {}): st
   for (const n of state.nodes) {
     const body = [`label: ${quote(n.label)}`];
     if (n.decision) body.push('type: decision');
+    else if (n.kind) body.push(`type: ${n.kind}`);
     if (n.role) body.push(`role: ${n.role}`);
     if (n.note) body.push(`note: ${quote(n.note)}`);
     out.push(`node ${n.id} {`, ...body.map(l => `  ${l}`), '}', '');

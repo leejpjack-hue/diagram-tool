@@ -136,6 +136,44 @@ node Reply {
     expect(plainStepsToDSL(back)).toBe(plainStepsToDSL(input));
   });
 
+  it('round-trips Data:/File: and collapses Memory:/DB: to Data: (DT-AI-24)', () => {
+    const input = 'Human: ask\nData: customer tickets\nMemory: vector store\nDB crm\nFile: brief — signed copy';
+    const once = plainStepsToDSL(input);
+    const copied = flowToPlainSteps(parseDiagram(once));
+    expect(copied).toBe(
+      'Human: ask\nData: customer tickets\nData: vector store\nData: crm\nFile: brief — signed copy',
+    );
+    // build → copy → build is stable: aliases collapse, then the Data:/File: text rebuilds the same DSL.
+    expect(plainStepsToDSL(copied)).toBe(once);
+    const again = flowToPlainSteps(parseDiagram(plainStepsToDSL(copied)));
+    expect(again).toBe(copied);
+
+    const viaLoad = plainStepsFromBoardSource(once);
+    expect(viaLoad).toBe(copied);
+  });
+
+  it('emits Data:/File: for hand-authored data and document nodes and skips the role', () => {
+    const parsed = parseDiagram(`diagram: flow
+title: "Data"
+Ask -> Tickets
+Tickets -> Brief
+node Ask {
+  label: "ask"
+  role: human
+}
+node Tickets {
+  type: data
+  label: "tickets"
+  role: model
+}
+node Brief {
+  type: document
+  label: "brief"
+}
+`);
+    expect(flowToPlainSteps(parsed)).toBe('Human: ask\nData: tickets\nFile: brief');
+  });
+
   it('leaves note-less steps unchanged in Copy as steps output (DT-AI-15)', () => {
     const parsed = parseDiagram(`diagram: flow
 title: "Plain"

@@ -16,15 +16,18 @@ export function nextShowStepsAfterBuild(
 }
 
 
-/** Counts nodes (incl. decisions) and role: lines from plainStepsToDSL output. */
+/** Counts nodes (incl. decisions), role: lines, and data/document kinds. */
 export type PlainStepsBuildStats = {
   stepCount: number;
   roles: { human: number; model: number; tool: number; check: number };
+  /** DT-AI-24: nodes with `type: data` or `type: document`. */
+  dataCount: number;
 };
 
 /**
  * DT-AI-13: derive Build success stats from converter DSL (no parser change).
  * Node lines are steps; decision nodes count. Role tallies omit zeros in the toast.
+ * DT-AI-24: `type: data` and `type: document` count as data steps.
  */
 export function statsFromPlainStepsDsl(dsl: string): PlainStepsBuildStats {
   const stepCount = (dsl.match(/^node\s+\S+/gm) ?? []).length;
@@ -33,7 +36,8 @@ export function statsFromPlainStepsDsl(dsl: string): PlainStepsBuildStats {
     const key = m[1].toLowerCase() as keyof typeof roles;
     roles[key] += 1;
   }
-  return { stepCount, roles };
+  const dataCount = (dsl.match(/^\s*type:\s*(?:data|document)\s*$/gim) ?? []).length;
+  return { stepCount, roles, dataCount };
 }
 
 const ROLE_DISPLAY: { key: keyof PlainStepsBuildStats['roles']; label: string }[] = [
@@ -47,6 +51,8 @@ const ROLE_DISPLAY: { key: keyof PlainStepsBuildStats['roles']; label: string }[
  * DT-AI-13: one success toast body.
  * e.g. "Built 4 steps onto the board" or
  * "Built 4 steps onto the board · 1 Human · 2 Model · 1 Tool"
+ * DT-AI-24 appends a data tally when any step is a data/document kind,
+ * e.g. "Built 6 steps onto the board · 2 data".
  */
 export function buildFromStepsSuccessMessage(stats: PlainStepsBuildStats): string {
   const n = stats.stepCount;
@@ -54,5 +60,6 @@ export function buildFromStepsSuccessMessage(stats: PlainStepsBuildStats): strin
   const parts = ROLE_DISPLAY
     .filter(r => stats.roles[r.key] > 0)
     .map(r => `${stats.roles[r.key]} ${r.label}`);
+  if (stats.dataCount > 0) parts.push(`${stats.dataCount} data`);
   return parts.length ? `${base} · ${parts.join(' · ')}` : base;
 }

@@ -45,6 +45,12 @@ Every file has a `version` string. Current writers emit `"3.0"`. Readers must st
 
 Missing or unknown values load as `clean`. Older readers ignore the field. This revision does not write `showStepNumbers`; a diagram that omits it loads with step numbers off.
 
+### Typed data steps
+
+Type steps may emit the existing flow kinds `type: data` (`Data:`, `Memory:`, `DB:`) and `type: document` (`File:`) inside `source.text` / `dslText`. These kinds already exist. They are not a new board field. `version` stays **3.0**. No database migration.
+
+A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
+
 `nodes` and `edges` are a portable projection of that source plus layout pins. Re-opening the file prefers `source.text` / `dslText` and restores typed boards (architecture, flow, sequence, Gantt) so layout stays within ±2px of the export.
 
 ### Complete backup (`kind: "workspace"`)

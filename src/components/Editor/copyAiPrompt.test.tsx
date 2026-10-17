@@ -42,13 +42,14 @@ afterEach(() => {
 });
 
 describe('AI_PROMPT_TEXT constant (DT-AI-17)', () => {
-  it('is a single constant of at most 1200 characters', () => {
-    expect(AI_PROMPT_TEXT.length).toBeLessThanOrEqual(1200);
+  it('is a single constant of at most 1500 characters', () => {
+    expect(AI_PROMPT_TEXT.length).toBeLessThanOrEqual(1500);
   });
 
-  it('mentions the supported role words, then, If/then/else, and the note separator', () => {
+  it('mentions the supported role words, data words, then, If/then/else, and the note separator', () => {
     for (const fragment of [
       'Human:', 'User:', 'Model:', 'Assistant:', 'AI:', 'Tool:', 'Check:', 'System:',
+      'Data:', 'Memory:', 'DB:', 'File:',
       'then', 'If', 'else', ' — ',
     ]) {
       expect(AI_PROMPT_TEXT).toContain(fragment);
@@ -59,6 +60,14 @@ describe('AI_PROMPT_TEXT constant (DT-AI-17)', () => {
     const lines = exampleFromPrompt().split('\n').filter(l => l.trim().length > 0);
     expect(lines.length).toBeGreaterThanOrEqual(4);
     expect(lines.length).toBeLessThanOrEqual(6);
+  });
+});
+
+describe('Type steps helper (DT-AI-24)', () => {
+  it('lists Data: under Type steps', () => {
+    setup();
+    openTypeSteps();
+    expect(screen.getByTestId('type-steps-box')).toHaveTextContent('Data:');
   });
 });
 

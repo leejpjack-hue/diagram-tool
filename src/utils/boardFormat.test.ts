@@ -272,11 +272,17 @@ describe('public portable board format', () => {
     expect(BOARD_FORMAT_VERSION).toBe('3.0');
     const schemaBoard = schema.$defs.portableBoard as {
       required: string[];
-      properties: { iconStyle: { enum: string[]; default: string } };
+      properties: {
+        iconStyle: { enum: string[]; default: string };
+        showStepNumbers: { type: string; default: boolean };
+      };
     };
     expect(schemaBoard.required).not.toContain('iconStyle');
+    expect(schemaBoard.required).not.toContain('showStepNumbers');
     expect(schemaBoard.properties.iconStyle.enum).toEqual(['clean', 'line', 'bold', 'blueprint']);
     expect(schemaBoard.properties.iconStyle.default).toBe('clean');
+    expect(schemaBoard.properties.showStepNumbers.type).toBe('boolean');
+    expect(schemaBoard.properties.showStepNumbers.default).toBe(false);
 
     const omitted = buildBoardDocument(board({ mode: 'flow', dslText: FLOW_DSL, iconStyle: 'clean' }));
     expect(omitted.version).toBe('3.0');
@@ -317,6 +323,29 @@ describe('public portable board format', () => {
     });
     expect(unknown.boards[0].iconStyle).toBeUndefined();
     expect(validatePortableDocument(buildBoardDocument(board({ mode: 'flow', dslText: FLOW_DSL, iconStyle: 'bold' }))).ok).toBe(true);
+
+    const dataDsl = `diagram: flow
+title: Data steps
+direction: TB
+tickets -> brief
+node tickets {
+  label: "tickets"
+  type: data
+}
+node brief {
+  label: "brief"
+  type: document
+}
+`;
+    const dataDoc = buildBoardDocument(board({ mode: 'flow', dslText: dataDsl }));
+    expect(dataDoc.version).toBe('3.0');
+    expect(dataDoc.board).not.toHaveProperty('iconStyle');
+    expect(dataDoc.board).not.toHaveProperty('showStepNumbers');
+    expect(dataDoc.board.dslText).toContain('type: data');
+    expect(dataDoc.board.dslText).toContain('type: document');
+    const dataPlan = parsePortableImport(dataDoc);
+    expect(dataPlan.boards[0].iconStyle).toBeUndefined();
+    expect(dataPlan.boards[0].dslText).toContain('type: data');
   });
 
   it('PNG/SVG/PDF export stays free and unwatermarked', () => {

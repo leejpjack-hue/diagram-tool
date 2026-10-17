@@ -8,6 +8,10 @@
 // node is one line. Role chips round-trip as `Human:` / `Model:` / `Tool:` /
 // `Check:` prefixes (same vocabulary as DT-AI-04).
 //
+// DT-AI-24 — data and document nodes round-trip as `Data:` / `File:` (a kind,
+// not a role). Memory:/DB: aliases collapse to `Data:` because only the
+// node kind is stored.
+//
 // DT-AI-15 — a step's why-note round-trips as `Label — note` (em dash with
 // spaces), so pasting the output back into Type steps rebuilds the same
 // board. Steps without a note are unchanged.
@@ -21,6 +25,12 @@ const ROLE_WORD: Record<FlowNodeRole, string> = {
   check: 'Check',
 };
 
+/** DT-AI-24: data/document kinds emit a prefix and no role word. */
+const KIND_WORD: Partial<Record<NonNullable<FlowNode['properties']['nodeType']>, string>> = {
+  data: 'Data',
+  document: 'File',
+};
+
 function flowNodes(diagram: ParsedDiagram): FlowNode[] {
   return diagram.nodes.filter((n): n is FlowNode => n.type === 'flow');
 }
@@ -31,8 +41,15 @@ function nodeLabel(n: FlowNode): string {
 
 function formatStep(n: FlowNode): string {
   const label = nodeLabel(n);
+  const nodeType = n.properties.nodeType;
+  const kindWord = nodeType ? KIND_WORD[nodeType] : undefined;
   const role = n.properties.role;
-  const base = role && ROLE_WORD[role] ? `${ROLE_WORD[role]}: ${label}` : label;
+  // A data/document node is a kind, not an actor — the kind prefix wins.
+  const base = kindWord
+    ? `${kindWord}: ${label}`
+    : role && ROLE_WORD[role]
+      ? `${ROLE_WORD[role]}: ${label}`
+      : label;
   // DT-AI-15: round-trip the why-note as `Label — note` so pasting back into
   // Type steps rebuilds the same board.
   const note = n.properties.note?.trim();
