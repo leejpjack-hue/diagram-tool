@@ -25,7 +25,7 @@
         "kind": { "type": "string", "enum": ["dsl", "mermaid"] },
         "text": {
           "type": "string",
-          "description": "Authoring source: native DSL or Mermaid (sequence / flowchart). Flow DSL may use the existing node kinds type: data and type: document. A loop is an ordinary edge labelled loop, or Yes/No when it is a branch. A parallel fan-out uses the existing type: gatewayparallel fork and, when another step follows, a gatewayparallel join. Role lanes are existing lane blocks named Human, AI agent, Tool, Check, Data, and Other. Format version stays 3.0."
+          "description": "Authoring source: native DSL or Mermaid (sequence / flowchart). Flow DSL may use the existing node kinds type: data and type: document. A loop is an ordinary edge labelled loop, or Yes/No when it is a branch. A parallel fan-out uses the existing type: gatewayparallel fork and, when another step follows, a gatewayparallel join. Role lanes are existing lane blocks named Human, AI agent, Tool, Check, Data, and Other. The Type steps Understood-as preview is not stored on the board. Format version stays 3.0."
         }
       }
     },

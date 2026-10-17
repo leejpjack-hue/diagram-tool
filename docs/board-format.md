@@ -69,6 +69,12 @@ Type steps may place steps in the existing swimlane `lane` blocks Human, AI agen
 
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 
+### Understood as preview
+
+Type steps shows a live, read-only "Understood as" list while the user types. It uses the same local converter as Build board and is not written into `source.text`, `dslText`, or any other board field. The board changes only when the user presses Build board. `version` stays **3.0**. No database migration.
+
+A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
+
 `nodes` and `edges` are a portable projection of that source plus layout pins. Re-opening the file prefers `source.text` / `dslText` and restores typed boards (architecture, flow, sequence, Gantt) so layout stays within ±2px of the export.
 
 ### Complete backup (`kind: "workspace"`)

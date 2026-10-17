@@ -4,6 +4,8 @@ import { useDiagramStore } from '../../store/diagramStore';
 import { installDiagramDslTestHook } from '../../utils/devTestHook';
 import { applyBoardSource, toDslSource, toMermaidSource } from '../../utils/sourceText';
 import { plainStepsToDSL } from '../../parser/plainSteps';
+import { stepLineRange } from '../../parser/typeStepsPreview';
+import { TypeStepsPreview } from './TypeStepsPreview';
 import { flowStepList, type FlowStep } from '../../parser/flowToPlainSteps';
 import { plainStepsFromBoardSource, applyLoadedPlainSteps, sourceMatchesRoleLanes } from '../../parser/boardToPlainSteps';
 import { insertRolePrefix, type RolePrefixRole } from '../../parser/insertRolePrefix';
@@ -156,6 +158,15 @@ else Flag for review`;
   // DT-AI-08: tab-reachable role-prefix buttons (no global shortcuts).
   // Decides where the prefix goes via the pure helper; restores the
   // caret/selection once React commits the new value.
+  // DT-AI-28: a warning row selects that line. The board stays as it is.
+  const focusStepsLine = useCallback((lineIndex: number) => {
+    const input = stepsInputRef.current;
+    if (!input) return;
+    const range = stepLineRange(stepsText, lineIndex);
+    input.focus();
+    input.setSelectionRange(range.start, range.end);
+  }, [stepsText]);
+
   const insertRole = useCallback((role: RolePrefixRole) => {
     const input = stepsInputRef.current;
     if (!input) return;
@@ -311,6 +322,8 @@ else Flag for review`;
             rows={4}
             className="w-full rounded border border-indigo-200 bg-white p-2 font-mono text-xs text-slate-800 focus:border-indigo-400 focus:outline-none"
           />
+          {/* DT-AI-28: live reading of the same converter Build uses. Read-only. */}
+          <TypeStepsPreview text={stepsText} onFocusLine={focusStepsLine} />
           {/* DT-AI-08: role prefix inserts (#37) — plain buttons, tab-reachable, no shortcuts. */}
           <div className="mt-1 flex flex-wrap items-center gap-1">
             <span className="text-[11px] font-medium text-slate-500">Add role:</span>
