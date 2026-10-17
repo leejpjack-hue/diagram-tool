@@ -167,7 +167,7 @@
         "showStepNumbers": {
           "type": "boolean",
           "default": false,
-          "description": "Optional. This revision does not write the field. A diagram that omits it loads with step numbers off. Format version stays 3.0."
+          "description": "Optional Flow step numbers in Walk through order. Omitted, false, or any non-boolean loads as off. Writers omit the field when off so older files stay unchanged. Format version stays 3.0."
         }
       }
     },

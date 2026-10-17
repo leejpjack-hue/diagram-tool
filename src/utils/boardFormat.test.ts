@@ -14,6 +14,7 @@ import {
   isAllowedPresentationContent,
   parsePortableImport,
   projectBoardGraph,
+  showStepNumbersForStorage,
   validatePortableDocument,
 } from './boardFormat';
 import type { Board, BoardVersion, PersonalTemplate, Space } from './boardManager';
@@ -425,6 +426,75 @@ lane "AI agent" {
     });
     expect(legacy.boards[0].iconStyle).toBeUndefined();
     expect(legacy.boards[0]).not.toHaveProperty('showStepNumbers');
+  });
+
+  it('round-trips showStepNumbers and leaves a pre-change board unchanged', () => {
+    expect(BOARD_FORMAT_VERSION).toBe('3.0');
+    expect(showStepNumbersForStorage(undefined)).toBeUndefined();
+    expect(showStepNumbersForStorage(false)).toBeUndefined();
+    expect(showStepNumbersForStorage('true')).toBeUndefined();
+    expect(showStepNumbersForStorage(1)).toBeUndefined();
+    expect(showStepNumbersForStorage(true)).toBe(true);
+
+    const legacy = {
+      version: '3.0',
+      kind: 'board',
+      exportedAt: '2026-08-01T00:00:00.000Z',
+      board: {
+        title: 'Before step numbers',
+        mode: 'flow',
+        dslText: FLOW_DSL,
+        source: { kind: 'dsl', text: FLOW_DSL },
+        nodes: [],
+        edges: [],
+        frames: [],
+        comments: [],
+      },
+    };
+    const loaded = parsePortableImport(legacy);
+    expect(loaded.boards[0].iconStyle).toBeUndefined();
+    expect(loaded.boards[0].showStepNumbers).toBeUndefined();
+    const resaved = buildBoardDocument({
+      ...board({ mode: 'flow', dslText: loaded.boards[0].dslText, title: loaded.boards[0].title }),
+      iconStyle: loaded.boards[0].iconStyle,
+      showStepNumbers: loaded.boards[0].showStepNumbers,
+    });
+    expect(resaved.version).toBe('3.0');
+    expect(resaved.board).not.toHaveProperty('iconStyle');
+    expect(resaved.board).not.toHaveProperty('showStepNumbers');
+    const json = JSON.stringify(resaved);
+    expect(json).not.toContain('iconStyle');
+    expect(json).not.toContain('showStepNumbers');
+
+    const off = buildBoardDocument(board({ mode: 'flow', dslText: FLOW_DSL, iconStyle: 'clean', showStepNumbers: false }));
+    expect(off.board).not.toHaveProperty('iconStyle');
+    expect(off.board).not.toHaveProperty('showStepNumbers');
+
+    const on = buildBoardDocument(board({ mode: 'flow', dslText: FLOW_DSL, showStepNumbers: true }));
+    expect(on.version).toBe('3.0');
+    expect(on.board.showStepNumbers).toBe(true);
+    expect(on.board).not.toHaveProperty('iconStyle');
+    expect(parsePortableImport(on).boards[0].showStepNumbers).toBe(true);
+    expect(parsePortableImport(on).boards[0].iconStyle).toBeUndefined();
+    expect(validatePortableDocument(on).ok).toBe(true);
+
+    const both = buildBoardDocument(board({ mode: 'flow', dslText: FLOW_DSL, iconStyle: 'bold', showStepNumbers: true }));
+    expect(both.board.iconStyle).toBe('bold');
+    expect(both.board.showStepNumbers).toBe(true);
+    expect(parsePortableImport(both).boards[0]).toMatchObject({ iconStyle: 'bold', showStepNumbers: true });
+
+    for (const value of [false, 'yes', 1, null]) {
+      const odd = parsePortableImport({
+        version: '3.0',
+        board: {
+          title: 'Odd',
+          mode: 'flow',
+          showStepNumbers: value,
+          source: { kind: 'dsl', text: FLOW_DSL },
+        },
+      });
+      expect(odd.boards[0]).not.toHaveProperty('showStepNumbers');
+    }
   });
 
   it('PNG/SVG/PDF export stays free and unwatermarked', () => {

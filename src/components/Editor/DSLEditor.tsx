@@ -23,6 +23,8 @@ function asBoardMode(mode: string): BoardMode {
 export function DSLEditor() {
   const { dslText, setDslText, setParsedDiagram, setError, setLoading, diagramMode, error, parsedDiagram, isReadOnlyShared } = useDiagramStore();
   const enterWalkThrough = useDiagramStore(s => s.enterWalkThrough);
+  const showStepNumbers = useDiagramStore(s => s.showStepNumbers);
+  const setShowStepNumbers = useDiagramStore(s => s.setShowStepNumbers);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   // DT-AI-01: thin "Type steps" box for plain sentences (Flow boards only).
   const [showSteps, setShowSteps] = useState(false);
@@ -274,7 +276,25 @@ else Flag for review`;
                   Copy as steps
                 </button>
                 {/* DT-AI-14: read-only walk-through, step order = Copy as steps order. */}
-                {!isReadOnlyShared && <IconStylePicker />}
+                {!isReadOnlyShared && (
+                  <>
+                    <IconStylePicker />
+                    <button
+                      type="button"
+                      data-testid="toggle-step-numbers"
+                      aria-pressed={showStepNumbers}
+                      title={showStepNumbers ? 'Step numbers on' : 'Step numbers off'}
+                      onClick={() => setShowStepNumbers(!showStepNumbers)}
+                      className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${
+                        showStepNumbers
+                          ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:text-indigo-700'
+                      }`}
+                    >
+                      Step numbers
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   data-testid="walk-through"

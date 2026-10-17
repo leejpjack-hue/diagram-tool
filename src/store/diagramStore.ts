@@ -8,6 +8,7 @@ interface HistoryEntry {
   dslText: string;
   diagramMode: DiagramMode;
   iconStyle: IconStyleId;
+  showStepNumbers: boolean;
 }
 
 interface DiagramStore {
@@ -50,6 +51,11 @@ interface DiagramStore {
   // Persisted on the board, not in the DSL. One undo step per change.
   iconStyle: IconStyleId;
   setIconStyle: (style: unknown, trackHistory?: boolean) => void;
+
+  // DT-AI-29: Flow step numbers. Off when the board omits the field.
+  // Persisted on the board, not in the DSL. One undo step per change.
+  showStepNumbers: boolean;
+  setShowStepNumbers: (on: boolean, trackHistory?: boolean) => void;
 
   // DT-AI-14: transient walk-through state — current step index, or null = off.
   // Pure view state: never persisted, never written to undo history.
@@ -217,6 +223,7 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   clipboard: [],
   typeStepsSeed: null,
   iconStyle: 'clean',
+  showStepNumbers: false,
   history: [],
   historyIndex: -1,
 
@@ -239,6 +246,17 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
     }
     if (get().isReadOnlyShared) return;
     commitHistory(set, get, { iconStyle: next });
+  },
+
+  setShowStepNumbers: (on, trackHistory = true) => {
+    const next = on === true;
+    if (next === get().showStepNumbers) return;
+    if (!trackHistory) {
+      set({ showStepNumbers: next });
+      return;
+    }
+    if (get().isReadOnlyShared) return;
+    commitHistory(set, get, { showStepNumbers: next });
   },
   
   setParsedDiagram: (diagram) => set({ parsedDiagram: diagram, diagramMode: diagram?.mode || 'architecture' }),
@@ -304,6 +322,7 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
       dslText: entry.dslText,
       diagramMode: entry.diagramMode,
       iconStyle: entry.iconStyle ?? 'clean',
+      showStepNumbers: entry.showStepNumbers === true,
       historyIndex: historyIndex - 1,
     });
   },
@@ -316,6 +335,7 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
       dslText: entry.dslText,
       diagramMode: entry.diagramMode,
       iconStyle: entry.iconStyle ?? 'clean',
+      showStepNumbers: entry.showStepNumbers === true,
       historyIndex: historyIndex + 1,
     });
   },
@@ -333,11 +353,17 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   clearHistory: () => set({ history: [], historyIndex: -1 }),
 }));
 
-function snapshot(state: { dslText: string; diagramMode: DiagramMode; iconStyle?: IconStyleId }): HistoryEntry {
+function snapshot(state: {
+  dslText: string;
+  diagramMode: DiagramMode;
+  iconStyle?: IconStyleId;
+  showStepNumbers?: boolean;
+}): HistoryEntry {
   return {
     dslText: state.dslText,
     diagramMode: state.diagramMode,
     iconStyle: state.iconStyle ?? 'clean',
+    showStepNumbers: state.showStepNumbers === true,
   };
 }
 
@@ -353,6 +379,7 @@ function commitHistory(
     next.dslText === current.dslText
     && next.diagramMode === current.diagramMode
     && next.iconStyle === current.iconStyle
+    && next.showStepNumbers === current.showStepNumbers
   ) {
     return;
   }
@@ -361,7 +388,8 @@ function commitHistory(
   const tipMatches = !!tip
     && tip.dslText === current.dslText
     && tip.diagramMode === current.diagramMode
-    && (tip.iconStyle ?? 'clean') === current.iconStyle;
+    && (tip.iconStyle ?? 'clean') === current.iconStyle
+    && (tip.showStepNumbers === true) === current.showStepNumbers;
   if (!tipMatches) history.push(current);
   history.push(next);
   if (history.length > MAX_HISTORY) history = history.slice(history.length - MAX_HISTORY);

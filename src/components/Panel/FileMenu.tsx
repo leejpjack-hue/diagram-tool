@@ -257,6 +257,7 @@ export function FileMenu({
           tags: portable.tags ?? [],
           starred: Boolean(portable.starred),
           iconStyle: portable.iconStyle,
+          showStepNumbers: portable.showStepNumbers,
           createdAt: record.created_at || now,
           updatedAt: now,
         });
@@ -381,12 +382,14 @@ export function FileMenu({
     }
     const title = extractBoardTitle(currentDsl, activeMode) || existing?.title || 'Untitled board';
     const iconStyle = useDiagramStore.getState().iconStyle;
+    const showStepNumbers = useDiagramStore.getState().showStepNumbers;
     return {
       ...(existing ?? { title, mode: activeMode, dslText: currentDsl }),
       title,
       mode: activeMode,
       dslText: currentDsl,
       iconStyle: iconStyle === 'clean' ? undefined : iconStyle,
+      showStepNumbers: showStepNumbers ? true : undefined,
     };
   };
 

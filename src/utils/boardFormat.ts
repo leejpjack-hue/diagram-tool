@@ -84,6 +84,13 @@ export interface PortableBoard {
   schemaVersion?: number;
   /** DT-STYLE-01. Omitted when Clean. Unknown values are dropped on import. */
   iconStyle?: IconStyleId;
+  /** DT-AI-29. Omitted when off. Only `true` is stored. */
+  showStepNumbers?: boolean;
+}
+
+/** True is stored. False, missing, and non-booleans are omitted so old files stay unchanged. */
+export function showStepNumbersForStorage(value: unknown): true | undefined {
+  return value === true ? true : undefined;
 }
 
 export interface BoardDocument {
@@ -286,6 +293,7 @@ export function toPortableBoard(board: Pick<Board, 'title' | 'mode' | 'dslText'>
     templateSourceId: board.templateSourceId,
     schemaVersion: board.schemaVersion,
     ...(iconStyleForStorage(board.iconStyle) ? { iconStyle: iconStyleForStorage(board.iconStyle) } : {}),
+    ...(showStepNumbersForStorage(board.showStepNumbers) ? { showStepNumbers: true as const } : {}),
   };
 }
 
@@ -426,6 +434,7 @@ export function parsePortableImport(data: unknown): PortableImportPlan {
       deletedAt: typeof record.deletedAt === 'string' ? record.deletedAt : undefined,
       templateSourceId: typeof record.templateSourceId === 'string' ? record.templateSourceId : undefined,
       ...(iconStyleForStorage(record.iconStyle) ? { iconStyle: iconStyleForStorage(record.iconStyle) } : {}),
+      ...(showStepNumbersForStorage(record.showStepNumbers) ? { showStepNumbers: true as const } : {}),
     });
   };
 
