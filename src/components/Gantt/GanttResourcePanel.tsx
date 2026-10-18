@@ -4,9 +4,9 @@ import type { ResourceAllocation } from './types';
 import './GanttResourcePanel.css';
 
 export function GanttResourcePanel() {
-  const { tasks, filter, setFilter } = useGanttStore();
+  const { tasks, filter, setFilter, calendar } = useGanttStore();
   
-  const allocations = calculateResourceAllocations(tasks);
+  const allocations = calculateResourceAllocations(tasks, calendar);
   
   const handleAssigneeClick = (assignee: string) => {
     if (filter.assignee === assignee) {

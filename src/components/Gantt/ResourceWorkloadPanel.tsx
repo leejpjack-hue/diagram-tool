@@ -21,7 +21,7 @@ export const ResourceWorkloadPanel: React.FC<Props> = ({
   onSelectResource,
   selectedAssignee,
 }) => {
-  const { tasks, setFilter } = useGanttStore();
+  const { tasks, setFilter, calendar } = useGanttStore();
   const [viewMode, setViewMode] = useState<'list' | 'chart'>('chart');
   const [workHoursPerDay] = useState(8);
   
@@ -33,8 +33,8 @@ export const ResourceWorkloadPanel: React.FC<Props> = ({
   
   // Calculate workload for each resource
   const workloads = useMemo(() => {
-    return assignees.map(a => calculateResourceWorkload(a, tasks, workHoursPerDay));
-  }, [assignees, tasks, workHoursPerDay]);
+    return assignees.map(a => calculateResourceWorkload(a, tasks, workHoursPerDay, calendar));
+  }, [assignees, tasks, workHoursPerDay, calendar]);
   
   // Sort by utilization
   const sortedWorkloads = useMemo(() => {

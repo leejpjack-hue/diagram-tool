@@ -476,7 +476,7 @@ function App() {
     setError(null);
     setSourceWarning(result.warnings.length > 0 ? result.warnings.join('\n') : null);
     isUpdatingFromDSL.current = true;
-    setProject(result.project.tasks, result.project.dependencies ?? []);
+    setProject(result.project.tasks, result.project.dependencies ?? [], result.project.calendar);
     // Type tasks charts open with their groups expanded so the bars are visible.
     // Task ids are reassigned on every parse, so a collapsed group would hide
     // the chart that Build just wrote.
@@ -506,7 +506,10 @@ function App() {
     
     // Generate DSL from current tasks and dependencies
     const title = extractBoardTitle(dslText, 'gantt') || 'Gantt Chart';
-    const updatedDSL = retainTypeTasksBlock(dslText, generateGanttDSL(tasks, dependencies, title));
+    const updatedDSL = retainTypeTasksBlock(
+      dslText,
+      generateGanttDSL(tasks, dependencies, title, useGanttStore.getState().calendar),
+    );
     
     // Update DSL text and mark as unsaved
     // This is a valid synchronization pattern - we're syncing UI state to DSL

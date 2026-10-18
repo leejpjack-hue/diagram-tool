@@ -8,6 +8,7 @@
  */
 
 import type { GanttTask, Dependency, ResourceAllocation } from './types';
+import type { WorkCalendar } from './workCalendar';
 import { calculateResourceAllocations } from './resourceUtils';
 
 /**
@@ -88,7 +89,8 @@ export const DEFAULT_LEVELING_OPTIONS: LevelingOptions = {
 export function levelResources(
   tasks: GanttTask[],
   dependencies: Dependency[],
-  options: Partial<LevelingOptions> = {}
+  options: Partial<LevelingOptions> = {},
+  calendar?: WorkCalendar,
 ): LevelingResult {
   const opts = { ...DEFAULT_LEVELING_OPTIONS, ...options };
   
@@ -119,7 +121,7 @@ export function levelResources(
     hasConflicts = false;
     
     // Get current resource allocations
-    const allocations = calculateResourceAllocations(leveledTasks);
+    const allocations = calculateResourceAllocations(leveledTasks, calendar);
     const overAllocated = allocations.filter(a => a.overAllocated);
     
     if (overAllocated.length === 0) {
@@ -457,8 +459,8 @@ function calculateProjectDuration(tasks: GanttTask[]): number {
 /**
  * Quick check if leveling is needed
  */
-export function needsLeveling(tasks: GanttTask[]): boolean {
-  const allocations = calculateResourceAllocations(tasks);
+export function needsLeveling(tasks: GanttTask[], calendar?: WorkCalendar): boolean {
+  const allocations = calculateResourceAllocations(tasks, calendar);
   return allocations.some(a => a.overAllocated);
 }
 

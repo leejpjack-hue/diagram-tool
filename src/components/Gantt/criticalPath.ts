@@ -6,6 +6,7 @@
  */
 
 import type { GanttTask, Dependency } from './types';
+import { countWorkingDays, dateAfterWorkingDays, dateToIso, diffIsoDays, type WorkCalendar } from './workCalendar';
 
 export interface CriticalPathResult {
   /** Task IDs on the critical path in order */
@@ -30,8 +31,10 @@ export interface CriticalPathResult {
 export function calculateCriticalPath(
   tasks: GanttTask[],
   dependencies: Dependency[],
-  projectStart: Date
+  projectStart: Date,
+  calendar?: WorkCalendar,
 ): CriticalPathResult {
+  const useWorkdays = Boolean(calendar?.enabled);
   const slack = new Map<string, number>();
   const earlyStart = new Map<string, number>();
   const earlyFinish = new Map<string, number>();
@@ -56,16 +59,26 @@ export function calculateCriticalPath(
     predecessors.get(dep.successorId)?.push(dep.predecessorId);
   });
   
-  // Get task duration in days
+  // Get task duration in days. Working days when the plan's calendar is on.
   const getDuration = (task: GanttTask): number => {
     const ms = task.endDate.getTime() - task.startDate.getTime();
-    return Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+    const calendarDays = Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+    if (!useWorkdays || !calendar) return calendarDays;
+    const start = dateToIso(task.startDate);
+    const end = dateToIso(task.endDate);
+    if (end <= start) return calendarDays;
+    return Math.max(1, countWorkingDays(start, end, calendar));
   };
   
   // Get task start offset from project start (in days)
   const getStartOffset = (task: GanttTask): number => {
     const ms = task.startDate.getTime() - projectStart.getTime();
-    return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
+    const calendarOffset = Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
+    if (!useWorkdays || !calendar) return calendarOffset;
+    const origin = dateToIso(projectStart);
+    const start = dateToIso(task.startDate);
+    if (start <= origin) return 0;
+    return countWorkingDays(origin, start, calendar);
   };
   
   // Topological sort for forward pass
@@ -163,11 +176,20 @@ export function calculateCriticalPath(
     lateStart.set(taskId, lf - duration);
   });
   
-  // Calculate slack for each task
+  // Calculate slack for each task. The stored slack is calendar days so the
+  // slack bar still lines up with timeline columns. The project duration
+  // above stays in working days when the calendar is on.
+  const originIso = dateToIso(projectStart);
   tasks.forEach(t => {
     const es = earlyStart.get(t.id) || 0;
     const ls = lateStart.get(t.id) || 0;
-    slack.set(t.id, ls - es);
+    if (!useWorkdays || !calendar) {
+      slack.set(t.id, ls - es);
+      return;
+    }
+    const earlyDate = dateAfterWorkingDays(originIso, es, calendar);
+    const lateDate = dateAfterWorkingDays(originIso, ls, calendar);
+    slack.set(t.id, diffIsoDays(lateDate, earlyDate));
   });
   
   // Find critical path (tasks with zero slack)
