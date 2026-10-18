@@ -58,10 +58,14 @@ export class Parser {
 
   // Accept a name in a definition position (after `service`, `lane`, `class`, etc.).
   // A user-defined name may collide with a reserved keyword like `System` or `Cloud`,
-  // so allow either token type.
+  // so allow either token type. A quoted string is a multi-word name (`"Chat app"`).
   private expectName(): Token {
     const token = this.advance();
-    if (token.type !== TokenType.IDENTIFIER && token.type !== TokenType.KEYWORD) {
+    if (
+      token.type !== TokenType.IDENTIFIER &&
+      token.type !== TokenType.KEYWORD &&
+      token.type !== TokenType.STRING
+    ) {
       throw new Error(
         token.type === TokenType.EOF
           ? 'Unexpected end of input (expected name)'
@@ -91,6 +95,11 @@ export class Parser {
     return token.type === TokenType.IDENTIFIER || token.type === TokenType.KEYWORD;
   }
 
+  // A quoted multi-word name (`"Chat app"`) is an architecture endpoint too.
+  private isArchitectureEndpoint(token: Token): boolean {
+    return this.isNameToken(token) || token.type === TokenType.STRING;
+  }
+
   private looksLikeArchitectureArrow(): boolean {
     let offset = 1;
     while (this.peekAt(offset).type === TokenType.NEWLINE) offset += 1;
@@ -108,7 +117,7 @@ export class Parser {
     }
     this.advance();
     this.skipNewlines();
-    if (!this.isNameToken(this.peek())) {
+    if (!this.isArchitectureEndpoint(this.peek())) {
       throw new Error(
         `Architecture edge is missing a target after -> at line ${this.peek().line}, column ${this.peek().column}. Use connects: or A -> B.`,
       );
@@ -260,7 +269,7 @@ export class Parser {
               this.advance();
             }
         }
-      } else if (this.mode === 'architecture' && this.isNameToken(token) && this.looksLikeArchitectureArrow()) {
+      } else if (this.mode === 'architecture' && this.isArchitectureEndpoint(token) && this.looksLikeArchitectureArrow()) {
         // Bare `Client -> CDN` — do not silently drop architecture edges.
         this.parseArchitectureArrowLine();
       } else if (this.mode === 'flow' && token.type === TokenType.IDENTIFIER) {
@@ -944,7 +953,7 @@ export class Parser {
     }
     this.advance();
     this.skipNewlines();
-    if (!this.isNameToken(this.peek())) {
+    if (!this.isArchitectureEndpoint(this.peek())) {
       throw new Error(
         `Architecture edge is missing a target after -> at line ${this.peek().line}, column ${this.peek().column}`,
       );

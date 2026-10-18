@@ -6,10 +6,18 @@ import { hasNodeIcon } from './icons/registry';
 import { cardStyle, chipStyle, badgeStyle, isCode, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
 import { ArchitectureHandles, type ArchitectureHandleSlots } from './ArchitectureHandles';
 
+function partMark(icon?: string): 'AI' | 'tool' | 'user' | undefined {
+  if (icon === 'AI') return 'AI';
+  if (icon === '🔧') return 'tool';
+  if (icon === '👤') return 'user';
+  return undefined;
+}
+
 export const ServiceNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as ServiceNodeData;
   const isAPI = nodeData.type === 'api';
   const iconKey = isAPI ? 'api' : 'service';
+  const mark = partMark(nodeData.icon);
 
   // Presentation-style accent: a `color:` in the DSL overrides the default
   // api/service palette; `icon:` swaps the SVG glyph for an emoji.
@@ -23,13 +31,14 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
         ${selected ? 'scale-105' : 'hover:scale-102'}
         min-w-[180px]
       `}
+      data-part-mark={mark}
       style={cardStyle(accent, !!selected)}
     >
       <ArchitectureHandles accent={accent} slots={connectionHandles} />
 
       <div className="flex items-center gap-3 mb-1">
         <div
-          className="w-9 h-9 rounded-[9px] flex items-center justify-center font-bold shrink-0"
+          className={`w-9 h-9 flex items-center justify-center font-bold shrink-0 ${mark === 'user' ? 'rounded-full' : 'rounded-[9px]'}`}
           style={chipStyle(accent)}
         >
           {nodeData.icon ? (
@@ -56,6 +65,15 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
             style={{ ...badgeStyle(accent), fontFamily: MONO_FONT }}
           >
             {nodeData.type}
+          </span>
+        )}
+        {mark && !nodeData.type && (
+          <span
+            data-testid="service-part-badge"
+            className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded"
+            style={{ ...badgeStyle(accent), fontFamily: MONO_FONT }}
+          >
+            {mark}
           </span>
         )}
         {nodeData.tech && (

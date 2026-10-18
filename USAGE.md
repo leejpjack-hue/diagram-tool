@@ -132,6 +132,8 @@ The keyword applies to architecture diagrams only. Flow-mode connectors keep the
 
 `diagram: architecture` enables five node kinds.
 
+**Type parts.** On an Architecture board, Type parts turns short lines into that DSL. `User -> Chat app: asks` becomes two services and a labelled edge (`A > B` and `A → B` work the same way). A name ending in DB, Database, or Store — or marked `(db)` / `(database)` — is a database; Queue, Topic, or Bus — or `(queue)` — is a queue; LLM, Model, GPT, or Agent — or `(AI)` / `(model)` — is a service with an AI badge; Tool — or `(tool)` — is a service with a tool icon; User, Human, or Customer — or `(user)` — is drawn as a person. `inside Cloud: Chat app, Agent` draws a group around those parts. The Understood-as list under the box shows how each line was read and flags a line that was not. Build board replaces the source with ordinary architecture DSL, lays the board out, and attaches each edge to the short-path side; undo restores the previous source. Opening Type parts on a board it built fills the box from that source. A hand-written board leaves the box empty, so its DSL stays as it is. Nothing is sent over the network. This is not a new board field, and `version` stays 3.0.
+
 ### `service` — generic service / API / microservice
 
 ```

@@ -141,6 +141,12 @@ A bar runs from the activating row to the deactivating row. Stacked activations 
 
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 
+### Type parts
+
+Type parts writes ordinary architecture DSL into `source.text` / `dslText`: `service`, `database`, `queue`, `edge`, and `group`, plus a `# @type-parts` comment that holds the typed lines so the box can refill. Those keywords already exist. The comment is commentary, not a board field. A hand-written architecture board has no marker, so opening Type parts leaves the box empty and does not change the source. `version` stays **3.0**. No database migration.
+
+A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
+
 `nodes` and `edges` are a portable projection of that source plus layout pins. Re-opening the file prefers `source.text` / `dslText` and restores typed boards (architecture, flow, sequence, Gantt) so layout stays within ±2px of the export.
 
 ### Complete backup (`kind: "workspace"`)
