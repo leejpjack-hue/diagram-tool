@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
  * Hook-free path: open an architecture template through the Create dialog,
  * pick styles in the Style menu, reload, and export. No __setDiagramDsl.
  */
-const TEMPLATE_TITLE = 'Claims Platform - System Context';
+const TEMPLATE_TITLE = 'Multi-Tier Network Topology';
 
 const TREATMENT = {
   clean: 'chip',
@@ -33,7 +33,7 @@ async function openArchitectureTemplate(page: Page) {
   await page.getByRole('button', { name: 'Create new' }).click();
   const createDialog = page.getByRole('dialog', { name: 'Create a board' });
   await createDialog.getByRole('button', { name: 'Templates', exact: true }).click();
-  await createDialog.getByTestId('template-card-c4-context-insurance').click();
+  await createDialog.getByTestId('template-card-network-topology').click();
   await expect(page.getByTestId('toast-item').filter({ hasText: 'Board created' })).toBeVisible();
   await waitForToastsToClear(page);
   await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible();
@@ -73,7 +73,7 @@ test.describe('Architecture icon styles', () => {
         request.onerror = () => reject(request.error);
       });
       db.close();
-      return boards.find(board => board.title === 'Claims Platform - System Context')?.iconStyle ?? '';
+      return boards.find(board => board.title === 'Multi-Tier Network Topology')?.iconStyle ?? '';
     }), { timeout: 8000 }).toBe('blueprint');
 
     await page.reload();
@@ -132,7 +132,7 @@ test.describe('Architecture icon styles', () => {
       });
     });
 
-    await page.goto('/app/?share=tok_arch_03');
+    await page.goto('http://127.0.0.1:4173/app/?share=tok_arch_03');
     const banner = page.getByTestId('shared-readonly-banner');
     await expect(banner).toBeVisible();
     await expect(page.getByTestId('icon-style-picker')).toHaveCount(0);
