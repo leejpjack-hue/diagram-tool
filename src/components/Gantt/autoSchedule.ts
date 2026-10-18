@@ -9,6 +9,16 @@
  */
 
 import type { GanttTask, Dependency, DependencyType } from './types';
+import {
+  DEFAULT_WORK_CALENDAR,
+  addIsoDays,
+  dateToIso,
+  exclusiveEndAfterWorkingDays,
+  isWorkingDay,
+  isoToUtcDate,
+  nextWorkingDay,
+  type WorkCalendar,
+} from './workCalendar';
 
 export interface ScheduleResult {
   tasks: GanttTask[];
@@ -312,12 +322,14 @@ function addDays(date: Date, days: number): Date {
  * Explicit `start:` / `end:` tasks are left on their authored dates so
  * existing boards stay put. `after:` starts the day after the latest
  * predecessor ends; a milestone sits on that end day.
+ * When `calendar.enabled`, those counts skip non-working days.
  * Cycles are reported and not scheduled.
  */
 export function resolveLinkedSchedule(
   tasks: GanttTask[],
   dependencies: Dependency[],
   projectStart: Date,
+  calendar: WorkCalendar = DEFAULT_WORK_CALENDAR,
 ): { tasks: GanttTask[]; cycleNames: string[] | null } {
   const nameOf = new Map(tasks.map(task => [task.id, task.name]));
   const cycles = detectCircularDependencies(tasks, dependencies);
@@ -355,6 +367,11 @@ export function resolveLinkedSchedule(
     const afterPreds = afterNames.length === 0
       ? []
       : preds.filter(pred => afterNames.some(name => scheduleNamesMatch(name, pred.name)));
+
+    if (calendar.enabled) {
+      placeOnWorkCalendar(task, afterPreds, projectStart, calendar);
+      return;
+    }
 
     let start = new Date(task.startDate);
     if (!hint.explicitStart) {
@@ -395,6 +412,50 @@ export function resolveLinkedSchedule(
     tasks: tasks.map(task => taskMap.get(task.id) ?? task),
     cycleNames: null,
   };
+}
+
+function placeOnWorkCalendar(
+  task: GanttTask,
+  afterPreds: GanttTask[],
+  projectStart: Date,
+  calendar: WorkCalendar,
+): void {
+  const hint = task.sourceSchedule;
+  let startIso = dateToIso(task.startDate);
+  const milestoneOnPredecessor = Boolean(
+    task.milestone
+    && hint
+    && !hint.explicitStart
+    && !hint.explicitEnd
+    && afterPreds.length > 0,
+  );
+
+  if (!hint?.explicitStart) {
+    if (afterPreds.length > 0) {
+      const latest = afterPreds.reduce((max, pred) => (
+        pred.endDate.getTime() > max.getTime() ? pred.endDate : max
+      ), afterPreds[0].endDate);
+      const latestIso = dateToIso(latest);
+      startIso = milestoneOnPredecessor ? latestIso : addIsoDays(latestIso, 1);
+    } else {
+      startIso = dateToIso(projectStart);
+    }
+    if (!isWorkingDay(startIso, calendar)) startIso = nextWorkingDay(startIso, calendar);
+  }
+
+  let endIso = dateToIso(task.endDate);
+  if (milestoneOnPredecessor) {
+    endIso = startIso;
+  } else if (hint && !hint.explicitEnd && hint.durationDays != null) {
+    endIso = exclusiveEndAfterWorkingDays(startIso, hint.durationDays, calendar);
+  } else if (!hint?.explicitEnd && task.milestone) {
+    endIso = startIso;
+  } else if (hint && !hint.explicitEnd && !hint.explicitStart) {
+    endIso = exclusiveEndAfterWorkingDays(startIso, 3, calendar);
+  }
+
+  task.startDate = isoToUtcDate(startIso);
+  task.endDate = isoToUtcDate(endIso);
 }
 
 function stripScheduleName(name: string): string {

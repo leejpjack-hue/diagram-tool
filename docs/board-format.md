@@ -116,7 +116,34 @@ What wins when several keys are present:
 - A task with no `start:` and no `after:` starts on the project `start:`.
 - `milestone: true` with `after:` sits on the day the predecessor ends.
 
-Dragging a bar that has `after:` writes an explicit `start:` into the source. That start wins over `after:` for the date, and the dependency remains. Resizing a bar writes `duration:` (and drops `end:` when the length is now a duration). A cycle names the tasks in the parse error and leaves the last good chart on screen. An unknown `after:` name warns with the line number and still draws the rest of the plan.
+Dragging a bar that has `after:` writes an explicit `start:` into the source. That start wins over `after:` for the date, and the dependency remains. Resizing a bar writes `duration:` (and drops `end:` when the length is now a duration). A cycle names the tasks in the parse error and leaves the last good chart on screen. An unknown `after:` name warns with the line number and still draws the rest of the plan. These lengths are calendar days unless the plan sets `workdays: on` (see Working days).
+
+### Working days
+
+`workdays`, `weekend`, and `holidays` are project keys inside `source.text` / `dslText` for `diagram: gantt`. They are not a new board field. `version` stays **3.0**. No database migration. A plan that omits them schedules in calendar days, and the chart draws as it does today.
+
+| Key | Meaning |
+| --- | --- |
+| `workdays: on` | `duration:` and `after:` count working days. The bar still draws across non-working days. |
+| `workdays: off` | Calendar days. This is the default. Writers omit it. |
+| `weekend: sat-sun` | Saturday and Sunday are non-working. This is the default. Writers omit it. |
+| `weekend: fri-sat` | Friday and Saturday are non-working. |
+| `holidays: 2026-12-25, 2026-12-26` | Extra non-working dates. Several `holidays:` lines are allowed. |
+
+When `workdays` is on:
+
+- `duration: 5d` starting on a Friday finishes on Thursday (Friday plus the next four working days).
+- `after:` starts on the next working day. A link that would land on Saturday starts on Monday.
+- A task that would start on a non-working day moves to the next working day.
+- An explicit `start:` or `end:` stays on the typed date.
+- Non-working days are shaded light grey. A holiday band shows that date as a tooltip.
+- The critical path and the resource views use this same calendar.
+
+A week is still 7 days. With `workdays: on` those 7 days are working days.
+
+Mermaid import maps `excludes weekends` to `workdays: on`, `excludes 2026-12-25` to `holidays:`, and `weekend friday` to `weekend: fri-sat`.
+
+Writers omit each key when it is at its default.
 
 ### Type tasks
 

@@ -1,5 +1,6 @@
 import type { GanttTask, GanttProject, Dependency, DependencyType, GanttSourceSchedule } from './types';
 import { resolveLinkedSchedule } from './autoSchedule';
+import { formatWorkCalendarLines, isIsoDate, type WeekendPattern, type WorkCalendar } from './workCalendar';
 
 /**
  * Parse Gantt DSL into structured data
@@ -25,9 +26,10 @@ import { resolveLinkedSchedule } from './autoSchedule';
  * }
  * ```
  *
- * `duration:` is calendar days (`d`) or weeks (`w` = 7 days).
+ * `duration:` is calendar days (`d`) or weeks (`w` = 7 days), or working days when `workdays: on`.
  * `after:` starts the day after the latest predecessor ends and adds an FS link.
  * An explicit `start:` beats `after:`. An explicit `end:` beats `duration:`.
+ * Project keys: `workdays: on|off`, `weekend: sat-sun|fri-sat`, `holidays: YYYY-MM-DD`.
  */
 export interface GanttParseDetails {
   project: GanttProject | null;
@@ -42,6 +44,9 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
 export function parseGanttDSLDetailed(dsl: string): GanttParseDetails {
   let title = 'Untitled Project';
   let projectStart = new Date();
+  let workdaysOn = false;
+  let weekend: WeekendPattern = 'sat-sun';
+  const holidays: string[] = [];
   const tasks: GanttTask[] = [];
   const dependencies: Dependency[] = [];
   const groupStack: { id: string; name: string }[] = [];
@@ -87,6 +92,25 @@ export function parseGanttDSLDetailed(dsl: string): GanttParseDetails {
       const dateStr = line.replace('start:', '').trim();
       const parsed = parseDate(dateStr);
       if (parsed) projectStart = parsed;
+      continue;
+    }
+
+    if (!currentTask && /^workdays:/i.test(line)) {
+      workdaysOn = /^workdays:\s*on\s*$/i.test(line);
+      continue;
+    }
+
+    if (!currentTask && /^weekend:/i.test(line)) {
+      const value = line.replace(/^weekend:\s*/i, '').trim().toLowerCase();
+      if (value === 'fri-sat' || value === 'sat-sun') weekend = value;
+      continue;
+    }
+
+    if (!currentTask && /^holidays:/i.test(line)) {
+      const parts = line.replace(/^holidays:\s*/i, '').split(',').map(part => part.trim()).filter(Boolean);
+      parts.forEach(part => {
+        if (isIsoDate(part) && !holidays.includes(part)) holidays.push(part);
+      });
       continue;
     }
     
@@ -293,7 +317,8 @@ export function parseGanttDSLDetailed(dsl: string): GanttParseDetails {
     }
   });
 
-  const scheduled = resolveLinkedSchedule(tasks, dependencies, projectStart);
+  const calendar: WorkCalendar = { enabled: workdaysOn, weekend, holidays };
+  const scheduled = resolveLinkedSchedule(tasks, dependencies, projectStart, calendar);
   if (scheduled.cycleNames) {
     return {
       project: null,
@@ -320,7 +345,7 @@ export function parseGanttDSLDetailed(dsl: string): GanttParseDetails {
   
   console.log('[Parser] Parsed tasks:', scheduledTasks.map(t => ({ name: t.name, milestone: t.milestone, start: t.startDate, end: t.endDate })));
   return {
-    project: { title, startDate: projectStart, tasks: scheduledTasks, milestones: [], dependencies },
+    project: { title, startDate: projectStart, tasks: scheduledTasks, milestones: [], dependencies, calendar },
     error: null,
     warnings,
   };
@@ -434,6 +459,9 @@ export function findGanttSourceError(text: string): string | null {
   const durationError = findGanttDurationError(text);
   if (durationError) return durationError;
 
+  const calendarError = findGanttCalendarError(text);
+  if (calendarError) return calendarError;
+
   return null;
 }
 
@@ -474,6 +502,40 @@ function findGanttDateError(text: string): string | null {
     if (!value) continue;
     if (!parseDate(value)) {
       return `Invalid ${match[1].toLowerCase()} date at line ${i + 1}. Use YYYY-MM-DD or +Nd.`;
+    }
+  }
+  return null;
+}
+
+function findGanttCalendarError(text: string): string | null {
+  let depth = 0;
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    if (raw.trim().startsWith('#')) continue;
+    const line = raw.trim();
+    if (depth === 0 && line) {
+      const workdays = line.match(/^workdays:\s*(.*)$/i);
+      if (workdays && !/^(on|off)$/i.test(workdays[1].trim())) {
+        return `Invalid workdays at line ${i + 1}. Use on or off.`;
+      }
+      const weekend = line.match(/^weekend:\s*(.*)$/i);
+      if (weekend && !/^(sat-sun|fri-sat)$/i.test(weekend[1].trim())) {
+        return `Invalid weekend at line ${i + 1}. Use sat-sun or fri-sat.`;
+      }
+      const holidayLine = line.match(/^holidays:\s*(.*)$/i);
+      if (holidayLine) {
+        const parts = holidayLine[1].split(',').map(part => part.trim()).filter(Boolean);
+        for (const part of parts) {
+          if (!isIsoDate(part)) {
+            return `Invalid holiday date at line ${i + 1}. Use YYYY-MM-DD.`;
+          }
+        }
+      }
+    }
+    for (const ch of line) {
+      if (ch === '{') depth += 1;
+      if (ch === '}') depth = Math.max(0, depth - 1);
     }
   }
   return null;
@@ -625,6 +687,7 @@ export function generateGanttDSL(project: GanttProject): string {
     'diagram: gantt',
     `title: ${project.title}`,
     `start: ${formatDateISO(project.startDate)}`,
+    ...formatWorkCalendarLines(project.calendar),
     '',
   ];
   

@@ -1,5 +1,7 @@
 // Gantt Chart Types
 
+import type { WorkCalendar } from './workCalendar';
+
 export type DependencyType = 'FS' | 'SS' | 'FF' | 'SF';
 // FS: Finish-to-Start (default) - predecessor must finish before successor starts
 // SS: Start-to-Start - both tasks start at same time
@@ -21,7 +23,7 @@ export interface Dependency {
 export interface GanttSourceSchedule {
   explicitStart: boolean;
   explicitEnd: boolean;
-  /** Calendar days from `duration:`. A week is 7 days. */
+  /** Day count from `duration:`. A week is 7 days. Working days when `workdays` is on. */
   durationDays?: number;
   durationUnit?: 'd' | 'w';
   /** Predecessor names as written in `after:`. */
@@ -125,6 +127,12 @@ export interface GanttProject {
   
   // Sprint 8: Advanced dependencies
   dependencies: Dependency[];
+
+  /**
+   * Working-day calendar from project DSL keys. Omitted or disabled
+   * means calendar-day scheduling. Not a separate board JSON field.
+   */
+  calendar?: WorkCalendar;
 }
 
 export type GanttZoomLevel = 'day' | 'week' | 'month';

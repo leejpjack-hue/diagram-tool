@@ -10,6 +10,7 @@
  */
 
 import type { GanttTask, Dependency } from './types';
+import { countWorkingDays, dateToIso, isWorkingDay, type WorkCalendar } from './workCalendar';
 
 // ============================================
 // DRAG & DROP UTILITIES
@@ -211,7 +212,8 @@ export interface ResourceWorkload {
 export function calculateResourceWorkload(
   assignee: string,
   tasks: GanttTask[],
-  workHoursPerDay: number = 8
+  workHoursPerDay: number = 8,
+  calendar?: WorkCalendar,
 ): ResourceWorkload {
   const assigneeTasks = tasks.filter(t => t.assignee === assignee);
   
@@ -236,15 +238,26 @@ export function calculateResourceWorkload(
   const currentDate = new Date(minDate);
   
   while (currentDate <= maxDate) {
-    const dayTasks = assigneeTasks.filter(
-      t => currentDate >= t.startDate && currentDate <= t.endDate
-    );
+    const dayIso = dateToIso(currentDate);
+    if (calendar?.enabled && !isWorkingDay(dayIso, calendar)) {
+      currentDate.setDate(currentDate.getDate() + 1);
+      continue;
+    }
+
+    const dayTasks = assigneeTasks.filter(t => {
+      if (calendar?.enabled) {
+        return dayIso >= dateToIso(t.startDate) && dayIso < dateToIso(t.endDate);
+      }
+      return currentDate >= t.startDate && currentDate <= t.endDate;
+    });
     
     // Assume equal distribution of effort across task duration
     const dayHours = dayTasks.reduce((sum, task) => {
-      const taskDays = Math.ceil(
-        (task.endDate.getTime() - task.startDate.getTime()) / (1000 * 60 * 60 * 24)
-      ) || 1;
+      const taskDays = calendar?.enabled
+        ? Math.max(1, countWorkingDays(dateToIso(task.startDate), dateToIso(task.endDate), calendar))
+        : Math.ceil(
+          (task.endDate.getTime() - task.startDate.getTime()) / (1000 * 60 * 60 * 24)
+        ) || 1;
       // Assume 8 hours of work per task, distributed across its duration
       const taskHoursPerDay = (workHoursPerDay * (task.progress / 100)) / taskDays;
       return sum + taskHoursPerDay;
@@ -282,11 +295,12 @@ export function calculateResourceWorkload(
  */
 export function calculateAllResourceWorkloads(
   tasks: GanttTask[],
-  workHoursPerDay: number = 8
+  workHoursPerDay: number = 8,
+  calendar?: WorkCalendar,
 ): ResourceWorkload[] {
   const assignees = new Set(tasks.map(t => t.assignee).filter(Boolean));
   return Array.from(assignees).map(assignee => 
-    calculateResourceWorkload(assignee!, tasks, workHoursPerDay)
+    calculateResourceWorkload(assignee!, tasks, workHoursPerDay, calendar)
   );
 }
 
@@ -295,10 +309,11 @@ export function calculateAllResourceWorkloads(
  */
 export function detectResourceConflicts(
   tasks: GanttTask[],
-  workHoursPerDay: number = 8
+  workHoursPerDay: number = 8,
+  calendar?: WorkCalendar,
 ): { assignee: string; date: Date; tasks: string[]; hours: number }[] {
   const conflicts: { assignee: string; date: Date; tasks: string[]; hours: number }[] = [];
-  const workloads = calculateAllResourceWorkloads(tasks, workHoursPerDay);
+  const workloads = calculateAllResourceWorkloads(tasks, workHoursPerDay, calendar);
   
   workloads.forEach(workload => {
     workload.dailyWorkload.forEach(day => {

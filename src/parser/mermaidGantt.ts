@@ -42,6 +42,9 @@ export function mermaidGanttToDSL(text: string): string {
   let section: string | undefined;
   let lastEnd: string | undefined;
   let autoId = 1;
+  let workdays = false;
+  let weekendFriday = false;
+  const holidays: string[] = [];
   const idToName = new Map<string, string>();
   const resolved = new Map<string, { start: string; end: string }>();
   const tasks: MermaidTask[] = [];
@@ -57,6 +60,22 @@ export function mermaidGanttToDSL(text: string): string {
     const titleMatch = line.match(/^title\s*:?\s+(.+)$/i);
     if (titleMatch) {
       title = titleMatch[1].trim();
+      continue;
+    }
+    if (/^excludes\b/i.test(line)) {
+      const rest = line.replace(/^excludes\b/i, '').trim();
+      for (const part of rest.split(/[,\s]+/).filter(Boolean)) {
+        if (/^weekends?$/i.test(part)) workdays = true;
+        else if (/^\d{4}-\d{2}-\d{2}$/.test(part)) {
+          if (!holidays.includes(part)) holidays.push(part);
+          workdays = true;
+        }
+      }
+      continue;
+    }
+    if (/^weekend\s+friday\b/i.test(line)) {
+      weekendFriday = true;
+      workdays = true;
       continue;
     }
     if (META.test(line) && !line.includes(':')) continue;
@@ -148,6 +167,9 @@ export function mermaidGanttToDSL(text: string): string {
 
   const lines = ['diagram: gantt'];
   if (title) lines.push(`title: ${title}`);
+  if (workdays) lines.push('workdays: on');
+  if (weekendFriday) lines.push('weekend: fri-sat');
+  if (holidays.length > 0) lines.push(`holidays: ${holidays.join(', ')}`);
   lines.push('');
 
   let currentSection: string | undefined;

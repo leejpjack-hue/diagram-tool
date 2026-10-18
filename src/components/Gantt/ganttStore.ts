@@ -9,6 +9,7 @@ import {
 import { levelResources, needsLeveling } from './resourceLeveling';
 import { recomputeGroupRollups } from './wbsUtils';
 import { reconcileBarEdit } from './ganttGenerator';
+import { DEFAULT_WORK_CALENDAR, type WorkCalendar } from './workCalendar';
 
 // Sprint 11: History for undo/redo
 interface HistoryState {
@@ -25,6 +26,8 @@ interface GanttState {
   zoomLevel: GanttZoomLevel;
   widthScale: number; // manual column-width multiplier (applies on top of zoom level)
   viewStartDate: Date;
+  /** Working-day calendar from the Gantt DSL. Disabled matches calendar days. */
+  calendar: WorkCalendar;
   
   // Sprint 8: Critical path
   criticalPathResult: CriticalPathResult | null;
@@ -92,7 +95,7 @@ interface GanttState {
   getSelectedTasks: () => GanttTask[];
   
   // Project
-  setProject: (tasks: GanttTask[], dependencies: Dependency[]) => void;
+  setProject: (tasks: GanttTask[], dependencies: Dependency[], calendar?: WorkCalendar) => void;
   
   // Sprint 11: Undo/Redo
   undo: () => void;
@@ -261,6 +264,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   zoomLevel: 'week',
   widthScale: 1,
   viewStartDate: today,
+  calendar: DEFAULT_WORK_CALENDAR,
   criticalPathResult: null,
   showCriticalPath: false,
   filter: defaultFilter,
@@ -343,7 +347,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   updateTask: (id, updates) => set((state) => {
     state.pushHistory();
     const next = state.tasks.map((t) =>
-      t.id === id ? { ...t, ...reconcileBarEdit(t, updates) } : t
+      t.id === id ? { ...t, ...reconcileBarEdit(t, updates, state.calendar) } : t
     );
     return { tasks: recomputeGroupRollups(next) };
   }),
@@ -404,7 +408,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   toggleCriticalPath: () => set((state) => {
     const newShow = !state.showCriticalPath;
     if (newShow && !state.criticalPathResult) {
-      const result = calculateCriticalPath(state.tasks, state.dependencies, state.viewStartDate);
+      const result = calculateCriticalPath(state.tasks, state.dependencies, state.viewStartDate, state.calendar);
       return { showCriticalPath: newShow, criticalPathResult: result };
     }
     return { showCriticalPath: newShow };
@@ -412,7 +416,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   
   recalculateCriticalPath: () => {
     const state = get();
-    const result = calculateCriticalPath(state.tasks, state.dependencies, state.viewStartDate);
+    const result = calculateCriticalPath(state.tasks, state.dependencies, state.viewStartDate, state.calendar);
     set({ criticalPathResult: result });
   },
   
@@ -460,7 +464,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
       
       // Recalculate critical path if shown
       if (state.showCriticalPath) {
-        const criticalResult = calculateCriticalPath(result.tasks, state.dependencies, new Date());
+        const criticalResult = calculateCriticalPath(result.tasks, state.dependencies, new Date(), state.calendar);
         set({ criticalPathResult: criticalResult });
       }
     }
@@ -561,7 +565,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   },
   
   // Project
-  setProject: (tasks, dependencies) => set((state) => {
+  setProject: (tasks, dependencies, calendar = DEFAULT_WORK_CALENDAR) => set((state) => {
     const nextTasks = recomputeGroupRollups(tasks);
     const nextTaskIds = new Set(nextTasks.map(t => t.id));
     const previousSelectedTask = state.tasks.find(t => t.id === state.selectedTaskId);
@@ -575,6 +579,11 @@ export const useGanttStore = create<GanttState>((set, get) => ({
     return {
       tasks: nextTasks,
       dependencies,
+      calendar: {
+        enabled: calendar.enabled,
+        weekend: calendar.weekend,
+        holidays: [...calendar.holidays],
+      },
       selectedTaskId,
       selectedTaskIds,
     };
@@ -583,14 +592,14 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   // Sprint 13: Resource leveling
   runLeveling: (options) => {
     const state = get();
-    const result = levelResources(state.tasks, state.dependencies, options);
+    const result = levelResources(state.tasks, state.dependencies, options, state.calendar);
     set({ levelingResult: result });
     return result;
   },
   
   previewLeveling: (options) => {
     const state = get();
-    const result = levelResources(state.tasks, state.dependencies, options);
+    const result = levelResources(state.tasks, state.dependencies, options, state.calendar);
     set({ levelingResult: result, showLevelingPreview: true });
     return result;
   },
@@ -611,6 +620,6 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   
   needsLeveling: () => {
     const state = get();
-    return needsLeveling(state.tasks);
+    return needsLeveling(state.tasks, state.calendar);
   },
 }));

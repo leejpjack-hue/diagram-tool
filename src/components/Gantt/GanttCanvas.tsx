@@ -6,6 +6,7 @@ import { BulkOperationsPanel } from './BulkOperationsPanel';
 import { computeWbsCodes } from './wbsUtils';
 import type { DelayImpactResult } from './delayImpactUtils';
 import { ganttRoleTint } from '../Canvas/rolePalette';
+import { barFinishIso, dateToIso, isWorkingDay } from './workCalendar';
 
 // Constants
 const ROW_HEIGHT = 40;
@@ -60,6 +61,7 @@ export function GanttCanvas() {
     widthScale,
     showCriticalPath,
     criticalPathResult,
+    calendar,
     filter,
     expandedGroups,
     setSelectedTask, 
@@ -197,7 +199,7 @@ export function GanttCanvas() {
   //   month -> column per month, band = years
   // Columns carry day offsets/spans so task bars (which use dayWidth) stay aligned.
   const { columns, superBand } = useMemo(() => {
-    type Col = { offsetDays: number; days: number; label: string; shade: boolean };
+    type Col = { offsetDays: number; days: number; label: string; shade: boolean; iso?: string; holiday?: boolean };
     type Band = { offsetDays: number; days: number; label: string };
     const cols: Col[] = [];
     const band: Band[] = [];
@@ -227,7 +229,10 @@ export function GanttCanvas() {
       for (let i = 0; i < totalDays; i++) {
         const date = addDays(minDate, i);
         const dow = date.getDay();
-        cols.push({ offsetDays: i, days: 1, label: String(date.getDate()), shade: dow === 0 || dow === 6 });
+        const iso = dateToIso(date);
+        const holiday = calendar.enabled && calendar.holidays.includes(iso);
+        const shade = calendar.enabled ? !isWorkingDay(iso, calendar) : (dow === 0 || dow === 6);
+        cols.push({ offsetDays: i, days: 1, label: String(date.getDate()), shade, iso, holiday });
       }
     } else if (zoomLevel === 'week') {
       // week-of-month: days 1-7 -> wk1, 8-14 -> wk2, ...
@@ -260,7 +265,18 @@ export function GanttCanvas() {
     band.push(...bandCols.map(({ offsetDays, days, label }) => ({ offsetDays, days, label })));
 
     return { columns: cols, superBand: band };
-  }, [zoomLevel, minDate, totalDays]);
+  }, [zoomLevel, minDate, totalDays, calendar]);
+
+  const calendarDays = useMemo(() => {
+    if (!calendar.enabled) return [];
+    const days: { offset: number; iso: string; off: boolean; holiday: boolean }[] = [];
+    for (let i = 0; i < totalDays; i++) {
+      const iso = dateToIso(addDays(minDate, i));
+      const holiday = calendar.holidays.includes(iso);
+      days.push({ offset: i, iso, off: !isWorkingDay(iso, calendar), holiday });
+    }
+    return days;
+  }, [calendar, minDate, totalDays]);
 
   // Handle task bar interactions
   const handleMouseDown = useCallback((e: React.MouseEvent, task: GanttTask, type: 'move' | 'resize-start' | 'resize-end') => {
@@ -461,9 +477,14 @@ export function GanttCanvas() {
                   y={0}
                   width={col.days * dayWidth}
                   height={36}
-                  fill={col.shade ? '#f8fafc' : '#ffffff'}
+                  fill={col.shade ? (calendar.enabled ? '#e5e7eb' : '#f8fafc') : '#ffffff'}
                   stroke="#e2e8f0"
-                />
+                  data-testid={calendar.enabled && col.shade ? 'gantt-nonworking-band' : undefined}
+                  data-date={calendar.enabled && col.shade ? col.iso : undefined}
+                  data-holiday={col.holiday ? 'true' : undefined}
+                >
+                  {col.holiday ? <title>{col.iso}</title> : null}
+                </rect>
                 <text
                   x={TASK_NAME_WIDTH + col.offsetDays * dayWidth + (col.days * dayWidth) / 2}
                   y={24}
@@ -586,19 +607,37 @@ export function GanttCanvas() {
                   </>
                 )}
                 
-                {/* Chart row background */}
-                {columns.map((col, i) => (
-                  <rect
-                    key={i}
-                    x={TASK_NAME_WIDTH + col.offsetDays * dayWidth}
-                    y={rowY}
-                    width={col.days * dayWidth}
-                    height={ROW_HEIGHT}
-                    fill={col.shade ? '#f8fafc' : '#ffffff'}
-                    stroke="#f1f5f9"
-                    strokeWidth={0.5}
-                  />
-                ))}
+                {/* Chart row background. Working-day bands are day columns; off keeps the existing grid. */}
+                {calendar.enabled
+                  ? calendarDays.map(day => (
+                    <rect
+                      key={day.offset}
+                      x={TASK_NAME_WIDTH + day.offset * dayWidth}
+                      y={rowY}
+                      width={dayWidth}
+                      height={ROW_HEIGHT}
+                      fill={day.off ? '#e5e7eb' : '#ffffff'}
+                      stroke="#f1f5f9"
+                      strokeWidth={0.5}
+                      data-testid={day.off ? 'gantt-nonworking-band' : undefined}
+                      data-date={day.off ? day.iso : undefined}
+                      data-holiday={day.holiday ? 'true' : undefined}
+                    >
+                      {day.holiday ? <title>{day.iso}</title> : null}
+                    </rect>
+                  ))
+                  : columns.map((col, i) => (
+                    <rect
+                      key={i}
+                      x={TASK_NAME_WIDTH + col.offsetDays * dayWidth}
+                      y={rowY}
+                      width={col.days * dayWidth}
+                      height={ROW_HEIGHT}
+                      fill={col.shade ? '#f8fafc' : '#ffffff'}
+                      stroke="#f1f5f9"
+                      strokeWidth={0.5}
+                    />
+                  ))}
                 
                 {/* Task bar (skip for groups and milestones) */}
                 {!task.isGroup && !isMilestone && (
@@ -614,6 +653,7 @@ export function GanttCanvas() {
                     }}
                     onMouseDown={(e) => handleMouseDown(e, task, 'move')}
                   >
+                    <title>{`Ends ${barFinishIso(task.startDate, task.endDate)}`}</title>
                     {/* Slack indicator (if showing critical path) */}
                     {showCriticalPath && slack > 0 && (
                       <rect

@@ -1,4 +1,5 @@
 import type { GanttTask, Dependency, GanttSourceSchedule } from './types';
+import { countWorkingDays, dateToIso, formatWorkCalendarLines, type WorkCalendar } from './workCalendar';
 
 /**
  * Generate Gantt DSL from tasks and dependencies
@@ -7,7 +8,8 @@ import type { GanttTask, Dependency, GanttSourceSchedule } from './types';
 export function generateGanttDSL(
   tasks: GanttTask[],
   dependencies: Dependency[],
-  title: string = 'Gantt Chart'
+  title: string = 'Gantt Chart',
+  calendar?: WorkCalendar,
 ): string {
   const lines: string[] = [];
   
@@ -31,6 +33,7 @@ export function generateGanttDSL(
   };
   
   lines.push(`start: ${formatDate(startDate)}`);
+  formatWorkCalendarLines(calendar).forEach(line => lines.push(line));
   lines.push('');
   
   // Separate groups and standalone tasks
@@ -191,7 +194,13 @@ function stripScheduleName(name: string): string {
   return trimmed;
 }
 
-function spanDays(end: Date, start: Date): number {
+function spanDays(end: Date, start: Date, calendar?: WorkCalendar): number {
+  if (calendar?.enabled) {
+    const startIso = dateToIso(start);
+    const endIso = dateToIso(end);
+    if (endIso <= startIso) return 1;
+    return Math.max(1, countWorkingDays(startIso, endIso, calendar));
+  }
   return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000));
 }
 
@@ -200,7 +209,11 @@ function spanDays(end: Date, start: Date): number {
  * has `after:` records an explicit start (that start wins). A resize
  * records `duration:` and drops an explicit end.
  */
-export function reconcileBarEdit(task: GanttTask, updates: Partial<GanttTask>): Partial<GanttTask> {
+export function reconcileBarEdit(
+  task: GanttTask,
+  updates: Partial<GanttTask>,
+  calendar?: WorkCalendar,
+): Partial<GanttTask> {
   if (updates.sourceSchedule) return updates;
   const nextStart = updates.startDate ?? task.startDate;
   const nextEnd = updates.endDate ?? task.endDate;
@@ -219,7 +232,7 @@ export function reconcileBarEdit(task: GanttTask, updates: Partial<GanttTask>): 
   }
 
   if (endChanged && !startChanged) {
-    next.durationDays = spanDays(nextEnd, nextStart);
+    next.durationDays = spanDays(nextEnd, nextStart, calendar);
     next.durationUnit = 'd';
     next.explicitEnd = false;
     return { ...updates, sourceSchedule: next };
@@ -227,7 +240,7 @@ export function reconcileBarEdit(task: GanttTask, updates: Partial<GanttTask>): 
 
   next.explicitStart = true;
   if (next.durationDays != null || !next.explicitEnd) {
-    next.durationDays = spanDays(nextEnd, nextStart);
+    next.durationDays = spanDays(nextEnd, nextStart, calendar);
     next.durationUnit = 'd';
     next.explicitEnd = false;
   }

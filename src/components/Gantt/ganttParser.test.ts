@@ -3,8 +3,11 @@ import { applyTemplate, softwareDevelopmentTemplate } from '../../data/ganttTemp
 import { mermaidGanttToDSL } from '../../parser/mermaidGantt';
 import { TEMPLATES } from '../TemplatePicker/templates';
 import { csvToDSL } from '../../utils/csvToDiagram';
+import { calculateCriticalPath } from './criticalPath';
 import { generateGanttDSL, reconcileBarEdit } from './ganttGenerator';
 import { parseGanttDSL, parseGanttSource } from './ganttParser';
+import { calculateResourceAllocations, getWorkloadDistribution } from './resourceUtils';
+import { barFinishIso } from './workCalendar';
 
 function iso(date: Date): string {
   const year = date.getFullYear();
@@ -324,5 +327,203 @@ describe('existing Gantt templates and task templates', () => {
     expect(dsl).toMatch(/diagram:\s*architecture/);
     expect(dsl).toContain('service Gateway');
     expect(dsl).toContain('Orders');
+  });
+});
+
+describe('working days', () => {
+  // 2026-03-06 is a Friday. Duration is exclusive, so the bar's last day is the day before data-end.
+  const friday = `diagram: gantt
+title: Working days
+start: 2026-03-06
+workdays: on
+
+task Build {
+  start: 2026-03-06
+  duration: 5d
+  assignee: Ada
+}`;
+
+  it('counts 5d from Friday as Thursday', () => {
+    const { task, result } = taskByName(friday, 'Build');
+    expect(barFinishIso(task.startDate, task.endDate)).toBe('2026-03-12');
+    expect(iso(task.endDate)).toBe('2026-03-13');
+    expect(result.project?.calendar?.enabled).toBe(true);
+    expect(result.project?.calendar?.weekend).toBe('sat-sun');
+
+    const withCalendar = calculateCriticalPath(
+      result.project!.tasks,
+      result.project!.dependencies,
+      result.project!.startDate,
+      result.project!.calendar,
+    );
+    const calendarDays = calculateCriticalPath(
+      result.project!.tasks,
+      result.project!.dependencies,
+      result.project!.startDate,
+    );
+    expect(withCalendar.duration).toBe(5);
+    expect(calendarDays.duration).toBe(7);
+
+    const working = calculateResourceAllocations(result.project!.tasks, result.project!.calendar);
+    const plain = calculateResourceAllocations(result.project!.tasks);
+    expect(working[0].totalDays).toBe(5);
+    expect(plain[0].totalDays).toBe(7);
+  });
+
+  it('skips a holiday inside a task', () => {
+    const dsl = `diagram: gantt
+title: Holiday
+start: 2026-03-09
+workdays: on
+holidays: 2026-03-10
+holidays: 2026-03-11
+
+task Build {
+  start: 2026-03-09
+  duration: 3d
+  assignee: Ada
+}`;
+    const { task, result } = taskByName(dsl, 'Build');
+    expect(result.project?.calendar?.holidays).toEqual(['2026-03-10', '2026-03-11']);
+    // Mon 9, Tue 10 holiday, Wed 11 holiday, Thu 12, Fri 13. Exclusive end Sat 14.
+    expect(barFinishIso(task.startDate, task.endDate)).toBe('2026-03-13');
+    expect(iso(task.endDate)).toBe('2026-03-14');
+    const load = getWorkloadDistribution(
+      result.project!.tasks,
+      'Ada',
+      task.startDate,
+      task.endDate,
+      result.project!.calendar,
+    );
+    const byDay = new Map(load.map(day => [iso(day.date), day.load]));
+    expect(byDay.get('2026-03-10')).toBe(0);
+    expect(byDay.get('2026-03-11')).toBe(0);
+    expect(byDay.get('2026-03-09')).toBe(1);
+    expect(byDay.get('2026-03-12')).toBe(1);
+  });
+
+  it('treats fri-sat as the weekend', () => {
+    const { task } = taskByName(`diagram: gantt
+title: Fri Sat
+start: 2026-03-04
+workdays: on
+weekend: fri-sat
+
+task Build {
+  start: 2026-03-04
+  duration: 3d
+}`, 'Build');
+    // Wed 4, Thu 5, Sun 8. Exclusive end Mon 9.
+    expect(barFinishIso(task.startDate, task.endDate)).toBe('2026-03-08');
+    expect(iso(task.endDate)).toBe('2026-03-09');
+  });
+
+  it('moves after across a weekend to the next working day', () => {
+    const result = parseGanttSource(`diagram: gantt
+title: After
+start: 2026-03-06
+workdays: on
+
+task Design {
+  start: 2026-03-06
+  duration: 1d
+}
+task Build {
+  duration: 1d
+  after: Design
+}`);
+    expect(result.error).toBeNull();
+    const build = result.project!.tasks.find(task => task.name === 'Build')!;
+    expect(iso(build.startDate)).toBe('2026-03-09');
+    expect(barFinishIso(build.startDate, build.endDate)).toBe('2026-03-09');
+    expect(result.project!.dependencies).toHaveLength(1);
+  });
+
+  it('keeps workdays off as calendar days', () => {
+    const off = friday.replace('workdays: on', 'workdays: off');
+    const omitted = friday.replace('workdays: on\n', '');
+    const offTask = taskByName(off, 'Build').task;
+    const omittedTask = taskByName(omitted, 'Build').task;
+    expect(barFinishIso(offTask.startDate, offTask.endDate)).toBe('2026-03-10');
+    expect(iso(offTask.endDate)).toBe('2026-03-11');
+    expect(iso(omittedTask.endDate)).toBe(iso(offTask.endDate));
+    expect(iso(omittedTask.startDate)).toBe('2026-03-06');
+  });
+
+  it('snaps a computed start off a non-working day and keeps an explicit start', () => {
+    const snapped = taskByName(`diagram: gantt
+title: Snap
+start: 2026-03-07
+workdays: on
+
+task Build {
+  duration: 1d
+}`, 'Build');
+    expect(iso(snapped.task.startDate)).toBe('2026-03-09');
+
+    const explicit = taskByName(`diagram: gantt
+title: Stay
+start: 2026-03-07
+workdays: on
+
+task Build {
+  start: 2026-03-07
+  end: 2026-03-08
+}`, 'Build');
+    expect(iso(explicit.task.startDate)).toBe('2026-03-07');
+    expect(iso(explicit.task.endDate)).toBe('2026-03-08');
+  });
+
+  it('omits default calendar keys when writing the source', () => {
+    const plain = parseGanttSource(`diagram: gantt
+title: Plain
+start: 2026-03-01
+
+task Build {
+  start: 2026-03-01
+  end: 2026-03-05
+}`);
+    const written = generateGanttDSL(
+      plain.project!.tasks,
+      plain.project!.dependencies,
+      plain.project!.title,
+      plain.project!.calendar,
+    );
+    expect(written).not.toContain('workdays:');
+    expect(written).not.toContain('weekend:');
+    expect(written).not.toContain('holidays:');
+
+    const scheduled = parseGanttSource(`diagram: gantt
+title: On
+start: 2026-03-06
+workdays: on
+weekend: fri-sat
+holidays: 2026-12-25, 2026-12-26
+
+task Build {
+  start: 2026-03-04
+  duration: 3d
+}`);
+    const again = generateGanttDSL(
+      scheduled.project!.tasks,
+      scheduled.project!.dependencies,
+      scheduled.project!.title,
+      scheduled.project!.calendar,
+    );
+    expect(again).toContain('workdays: on');
+    expect(again).toContain('weekend: fri-sat');
+    expect(again).toContain('holidays: 2026-12-25, 2026-12-26');
+    expect(again).not.toContain('workdays: off');
+  });
+
+  it('rejects a bad workdays value and keeps the message on the line', () => {
+    const result = parseGanttSource(`diagram: gantt
+title: Bad
+workdays: sometimes
+task Build {
+  duration: 1d
+}`);
+    expect(result.project).toBeNull();
+    expect(result.error).toMatch(/Invalid workdays at line 3/);
   });
 });
