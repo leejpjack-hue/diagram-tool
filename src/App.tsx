@@ -1246,8 +1246,8 @@ function App() {
         
         {/* Status */}
         <div className="flex shrink-0 items-center gap-2">
-          <span className="status-badge badge-primary">
-            <span className="capitalize">{diagramMode} Mode</span>
+          <span className="status-badge badge-primary" data-testid="board-mode-status">
+            <span className="capitalize">{activeTab === 'sequence' ? 'Sequence' : `${diagramMode} Mode`}</span>
           </span>
           <BoardSizeMeter snapshot={boardSize} />
         </div>
@@ -1582,7 +1582,7 @@ function App() {
       {/* Footer - Minimal */}
       {view === 'editor' && (
       <footer className="app-footer">
-        <span className="font-semibold text-gray-900">{diagramMode.charAt(0).toUpperCase() + diagramMode.slice(1)} Mode</span>
+        <span className="font-semibold text-gray-900">{activeTab === 'sequence' ? 'Sequence' : `${diagramMode.charAt(0).toUpperCase() + diagramMode.slice(1)} Mode`}</span>
       </footer>
       )}
       

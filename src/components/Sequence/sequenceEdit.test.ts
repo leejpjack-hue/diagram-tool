@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renameParticipant, editMessageText, toggleMessageDashed } from './sequenceEdit';
-import { parseSequenceDiagram } from './sequenceParser';
+import { messageLineIndices, parseSequenceDiagram } from './sequenceParser';
 
 const SAMPLE = `sequenceDiagram
 title Checkout
@@ -67,5 +67,25 @@ describe('toggleMessageDashed', () => {
     const out = toggleMessageDashed(SAMPLE, 1); // A-->>U becomes solid
     const msgs = parseSequenceDiagram(out).items.filter(i => i.kind === 'message');
     expect(msgs[1]).toMatchObject({ dashed: false });
+  });
+
+  it('keeps + / - and the arrow type in the source text', () => {
+    const src = 'sequenceDiagram\nA->>+B: call\nB--)A: later\nA--xB: lost';
+    const before = messageLineIndices(src);
+    const dashed = toggleMessageDashed(src, 0);
+    expect(dashed).toContain('A-->>+B: call');
+    const solidAsync = toggleMessageDashed(src, 1);
+    expect(solidAsync).toContain('B-)A: later');
+    const solidLost = toggleMessageDashed(src, 2);
+    expect(solidLost).toContain('A-xB: lost');
+    expect(messageLineIndices(dashed)).toEqual(before);
+    expect(messageLineIndices(solidAsync)).toEqual(before);
+    expect(messageLineIndices(solidLost)).toEqual(before);
+
+    const parsed = parseSequenceDiagram(dashed).items.filter(i => i.kind === 'message');
+    expect(parsed[0]).toMatchObject({ dashed: true, arrow: 'sync', activate: true, text: 'call' });
+    const relabeled = editMessageText(dashed, 0, 'ring');
+    expect(relabeled).toContain('A-->>+B: ring');
+    expect(messageLineIndices(relabeled)).toEqual(before);
   });
 });

@@ -120,6 +120,27 @@ Dragging a bar that has `after:` writes an explicit `start:` into the source. Th
 
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 
+### Sequence arrows, activation, and autonumber
+
+Sequence boards keep these Mermaid keywords inside `source.text` / `dslText`. They are not a new board field. `version` stays **3.0**. No database migration. A diagram that does not use them draws the same arrows it does today.
+
+| Source | Meaning |
+| --- | --- |
+| `A->>B` / `A-->>B` | Solid or dashed call with a filled arrowhead. |
+| `A->B` / `A-->B` | Solid or dashed line with no arrowhead. |
+| `A-)B` / `A--)B` | Solid or dashed async message with an open arrowhead. |
+| `A-xB` / `A--xB` | Solid or dashed lost or failed message with a cross. |
+| `+` on an arrow | Activates the receiver. A narrow bar starts on that lifeline. |
+| `-` on an arrow | Deactivates the sender. The newest bar on that lifeline ends. |
+| `activate X` / `deactivate X` | Start or end an activation bar on X. |
+| `autonumber` | Number each message from 1, stepping by 1. |
+| `autonumber 10` | Start at 10, step 1. |
+| `autonumber 10 5` | Start at 10, step 5. |
+
+A bar runs from the activating row to the deactivating row. Stacked activations of one participant are offset. An activation that never closes runs to the last row. A `deactivate` with nothing active is ignored. Boards that omit these keywords render as they do today.
+
+A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
+
 `nodes` and `edges` are a portable projection of that source plus layout pins. Re-opening the file prefers `source.text` / `dslText` and restores typed boards (architecture, flow, sequence, Gantt) so layout stays within ±2px of the export.
 
 ### Complete backup (`kind: "workspace"`)
