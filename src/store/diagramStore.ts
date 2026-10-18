@@ -265,10 +265,13 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   
   setParsedDiagram: (diagram) => set(state => ({
     parsedDiagram: diagram,
-    // Clearing the architecture/flow graph must not relabel a Sequence board.
-    // Gantt still falls through to architecture, which is what the status showed before.
+    // Clearing the architecture/flow graph must not relabel Sequence or Gantt.
+    // Gantt has no parsed graph; dropping the mode showed Architecture controls
+    // on a Gantt board, so Type tasks could not tell which board was open.
     diagramMode: diagram?.mode
-      || (diagram === null && state.diagramMode === 'sequence' ? 'sequence' : 'architecture'),
+      || ((diagram === null && (state.diagramMode === 'sequence' || state.diagramMode === 'gantt'))
+        ? state.diagramMode
+        : 'architecture'),
   })),
   setSelectedNode: (nodeId) => set({ selectedNodeId: nodeId }),
   setDiagramMode: (mode) => {

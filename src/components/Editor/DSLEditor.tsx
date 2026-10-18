@@ -6,10 +6,12 @@ import { applyBoardSource, toDslSource, toMermaidSource } from '../../utils/sour
 import { plainStepsToDSL } from '../../parser/plainSteps';
 import { plainArchitectureToDSL, plainPartsFromBoardSource, typePartsSuccessMessage } from '../../parser/plainArchitecture';
 import { plainSequenceToMermaid, plainMessagesFromBoardSource, typeMessagesSuccessMessage } from '../../parser/plainSequence';
+import { plainGanttToDSL, plainTasksFromBoardSource, typeTasksSuccessMessage } from '../../parser/plainGantt';
 import { stepLineRange } from '../../parser/typeStepsPreview';
 import { TypeStepsPreview } from './TypeStepsPreview';
 import { TypePartsPreview } from './TypePartsPreview';
 import { TypeMessagesPreview } from './TypeMessagesPreview';
+import { TypeTasksPreview } from './TypeTasksPreview';
 import { flowStepList, type FlowStep } from '../../parser/flowToPlainSteps';
 import { plainStepsFromBoardSource, applyLoadedPlainSteps, sourceMatchesRoleLanes } from '../../parser/boardToPlainSteps';
 import { insertRolePrefix, type RolePrefixRole } from '../../parser/insertRolePrefix';
@@ -46,6 +48,11 @@ export function DSLEditor() {
   const [messagesText, setMessagesText] = useState('');
   const [messagesHandwritten, setMessagesHandwritten] = useState(false);
   const messagesInputRef = useRef<HTMLTextAreaElement | null>(null);
+  // DT-GANTT-02: "Type tasks" is the Gantt twin of Type steps.
+  const [showTasks, setShowTasks] = useState(false);
+  const [tasksText, setTasksText] = useState('');
+  const [tasksHandwritten, setTasksHandwritten] = useState(false);
+  const tasksInputRef = useRef<HTMLTextAreaElement | null>(null);
   const toast = useToast();
   // DT-AI-08: textarea ref so role-prefix buttons can read the caret/selection.
   const stepsInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -258,6 +265,57 @@ end`;
     }
   }, [messagesText, toast, applySource]);
 
+  const TASKS_PLACEHOLDER = `Phase: Build
+Collect data — 3d — Human: Jack
+Train model — 5d after Collect data — AI agent
+Review — 2d after Train model — Human: May
+Go live — milestone after Review`;
+
+  const toggleTasks = useCallback(() => {
+    setShowTasks(open => {
+      const next = !open;
+      if (!next) return next;
+      const loaded = plainTasksFromBoardSource(useDiagramStore.getState().dslText);
+      if (loaded == null) {
+        setTasksText('');
+        setTasksHandwritten(true);
+      } else {
+        setTasksText(loaded);
+        setTasksHandwritten(false);
+      }
+      return next;
+    });
+  }, []);
+
+  const buildFromTasks = useCallback(() => {
+    const input = tasksText.trim();
+    if (!input) {
+      toast.error('Type one task per line first. Example: "Collect data — 3d — Human: Jack".');
+      return;
+    }
+    try {
+      const stats = { tasks: 0, groups: 0, milestones: 0 };
+      const dsl = plainGanttToDSL(input, {
+        title: useDiagramStore.getState().dslText.match(/^\s*title\s*:\s*(.+)\s*$/im)?.[1]?.trim(),
+        stats,
+      });
+      setShowTasks(true);
+      setTasksHandwritten(false);
+      applySource(dsl);
+      toast.success(typeTasksSuccessMessage(stats.tasks, stats.groups));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not read those tasks. Type one task per line.');
+    }
+  }, [tasksText, toast, applySource]);
+
+  const focusTasksLine = useCallback((lineIndex: number) => {
+    const input = tasksInputRef.current;
+    if (!input) return;
+    const range = stepLineRange(tasksText, lineIndex);
+    input.focus();
+    input.setSelectionRange(range.start, range.end);
+  }, [tasksText]);
+
   const focusMessagesLine = useCallback((lineIndex: number) => {
     const input = messagesInputRef.current;
     if (!input) return;
@@ -403,6 +461,18 @@ end`;
               className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400"
             >
               {showMessages ? 'Hide Type messages' : 'Type messages'}
+            </button>
+          </div>
+        )}
+        {diagramMode === 'gantt' && (
+          <div className="mt-2">
+            <button
+              type="button"
+              data-testid="toggle-type-tasks"
+              onClick={toggleTasks}
+              className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400"
+            >
+              {showTasks ? 'Hide Type tasks' : 'Type tasks'}
             </button>
           </div>
         )}
@@ -584,6 +654,46 @@ end`;
               className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
             >
               Build board
+            </button>
+            <span className="text-[11px] text-slate-500">Parsed locally — nothing leaves this device.</span>
+          </div>
+        </div>
+      )}
+
+      {diagramMode === 'gantt' && showTasks && (
+        <div
+          data-testid="type-tasks-box"
+          className="mx-3 mb-2 rounded-md border border-indigo-100 bg-indigo-50/60 p-3"
+        >
+          <label className="mb-1 block text-[11px] font-semibold text-indigo-700">
+            Type tasks — one task per line. Length: 3d, 2w, or 3 days. Waits for: after X, or after X and Y. milestone. Owner: Human: Name, AI agent, AI:, Tool:. Phase: Build or ## Build starts a group. 50% done. starts 2026-11-02. Separators: —, -, or comma.
+          </label>
+          <textarea
+            ref={tasksInputRef}
+            data-testid="type-tasks-input"
+            value={tasksText}
+            onChange={e => {
+              setTasksText(e.target.value);
+              if (e.target.value.trim()) setTasksHandwritten(false);
+            }}
+            placeholder={TASKS_PLACEHOLDER}
+            rows={5}
+            className="w-full rounded border border-indigo-200 bg-white p-2 font-mono text-xs text-slate-800 focus:border-indigo-400 focus:outline-none"
+          />
+          {tasksHandwritten && !tasksText.trim() && (
+            <p data-testid="type-tasks-handwritten-hint" className="mt-1 text-[11px] text-slate-500">
+              This board was not built with Type tasks. The box starts empty so the current plan stays as it is.
+            </p>
+          )}
+          <TypeTasksPreview text={tasksText} onFocusLine={focusTasksLine} />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="build-tasks"
+              onClick={buildFromTasks}
+              className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+            >
+              Build chart
             </button>
             <span className="text-[11px] text-slate-500">Parsed locally — nothing leaves this device.</span>
           </div>

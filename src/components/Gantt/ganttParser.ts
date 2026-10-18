@@ -213,8 +213,9 @@ export function parseGanttDSLDetailed(dsl: string): GanttParseDetails {
         currentTask.timeTracking.remaining = currentTask.timeTracking.estimated - currentTask.timeTracking.logged;
       } else if (line.startsWith('custom:')) {
         // Sprint 12: Custom fields syntax: custom: { priority: high, storyPoints: 5 }
+        // DT-GANTT-02 also writes custom: role=ai|human|tool
         const customStr = line.replace('custom:', '').trim();
-        currentTask.customFields = parseCustomFields(customStr);
+        currentTask.customFields = parseCustomAssignment(customStr) ?? parseCustomFields(customStr);
       } else if (line === '}') {
         // Close task block
         if (currentTask && currentTask.name) {
@@ -450,6 +451,8 @@ function findGanttBraceError(text: string): string | null {
   let depth = 0;
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
+    // `#` comments (including the Type tasks stash) are not blocks.
+    if (lines[i].trim().startsWith('#')) continue;
     for (const ch of lines[i]) {
       if (ch === '{') depth += 1;
       if (ch === '}') {
@@ -524,6 +527,33 @@ function parseHours(str: string): number {
     return parseFloat(match[1]);
   }
   return 0;
+}
+
+/** `custom: role=ai` (and `role=ai, priority=high`). Brace form stays in parseCustomFields. */
+function parseCustomAssignment(str: string): Record<string, string | number | boolean> | null {
+  const content = str.trim();
+  if (!content || content.startsWith('{') || !content.includes('=')) return null;
+  const fields: Record<string, string | number | boolean> = {};
+  for (const part of content.split(',')) {
+    const eq = part.indexOf('=');
+    if (eq <= 0) return null;
+    const key = part.slice(0, eq).trim();
+    if (!key) return null;
+    fields[key] = parseCustomValue(part.slice(eq + 1).trim());
+  }
+  return fields;
+}
+
+function parseCustomValue(raw: string): string | number | boolean {
+  let value: string | number | boolean = raw.trim();
+  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    value = value.slice(1, -1);
+  }
+  const numValue = typeof value === 'string' && /^-?\d+(?:\.\d+)?$/.test(value) ? parseFloat(value) : NaN;
+  if (!Number.isNaN(numValue) && value !== '') return numValue;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return value;
 }
 
 /**

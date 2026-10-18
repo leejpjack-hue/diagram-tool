@@ -5,6 +5,7 @@ import { isCritical } from './criticalPath';
 import { BulkOperationsPanel } from './BulkOperationsPanel';
 import { computeWbsCodes } from './wbsUtils';
 import type { DelayImpactResult } from './delayImpactUtils';
+import { ganttRoleTint } from '../Canvas/rolePalette';
 
 // Constants
 const ROW_HEIGHT = 40;
@@ -502,12 +503,16 @@ export function GanttCanvas() {
               console.log(`[Milestone] Task: ${task.name}, milestone prop: ${task.milestone}, isMilestone: ${isMilestone}, days: ${diffDays(task.endDate, task.startDate)}`);
             }
             
-            // Group styling
+            // Group styling. A role from Type tasks tints the bar with the
+            // Flow role-chip palette unless the task has its own colour.
+            const roleValue = task.customFields?.role;
+            const role = typeof roleValue === 'string' ? roleValue : undefined;
+            const roleTint = ganttRoleTint(role);
             const taskColor = task.isGroup 
               ? '#64748b' 
               : isCriticalTask 
                 ? CRITICAL_COLOR 
-                : task.color || COLORS[index % COLORS.length];
+                : task.color || roleTint || COLORS[index % COLORS.length];
             
             return (
               <g
@@ -601,6 +606,8 @@ export function GanttCanvas() {
                     className="cursor-pointer"
                     data-testid={`gantt-task-bar-${task.id}`}
                     data-task-name={task.name}
+                    data-gantt-bar="true"
+                    data-role={roleTint ? role : undefined}
                     onClick={(e) => {
                       const isMultiSelect = e.ctrlKey || e.metaKey;
                       toggleTaskSelection(task.id, isMultiSelect);
@@ -797,6 +804,7 @@ export function GanttCanvas() {
                     className="cursor-pointer"
                     data-testid={`gantt-milestone-${task.id}`}
                     data-task-name={task.name}
+                    data-role={roleTint ? role : undefined}
                     onClick={(e) => {
                       const isMultiSelect = e.ctrlKey || e.metaKey;
                       toggleTaskSelection(task.id, isMultiSelect);
@@ -828,6 +836,9 @@ export function GanttCanvas() {
                 {task.isGroup && (
                   <g
                     className="cursor-pointer"
+                    data-testid={`gantt-group-bar-${task.id}`}
+                    data-task-name={task.name}
+                    data-gantt-bar="true"
                     onClick={(e) => {
                       const isMultiSelect = e.ctrlKey || e.metaKey;
                       toggleTaskSelection(task.id, isMultiSelect);

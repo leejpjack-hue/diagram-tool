@@ -1,5 +1,6 @@
 import type { FlowNodeData } from './types';
 import { MONO_FONT } from './flowShapeStyle';
+import { ROLE_CHIP_PALETTE } from './rolePalette';
 import { useDiagramStore } from '../../store/diagramStore';
 
 /**
@@ -17,12 +18,7 @@ import { useDiagramStore } from '../../store/diagramStore';
  * the parser drops them, but it also bails defensively on anything that
  * isn't in the known set.
  */
-const ROLE_STYLES: Record<string, { label: string; text: string; tint: string; border: string }> = {
-  human: { label: 'human', text: '#1d4ed8', tint: '#eff6ff', border: '#93c5fd' },
-  model: { label: 'model', text: '#6d28d9', tint: '#f5f3ff', border: '#c4b5fd' },
-  tool: { label: 'tool', text: '#b45309', tint: '#fffbeb', border: '#fcd34d' },
-  check: { label: 'check', text: '#15803d', tint: '#f0fdf4', border: '#86efac' },
-};
+const ROLE_STYLES = ROLE_CHIP_PALETTE;
 
 export function RoleChip({ role }: { role?: FlowNodeData['role'] }) {
   const iconStyle = useDiagramStore(s => s.iconStyle);
