@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSequenceDiagram, parseSequenceSource } from './sequenceParser';
+import { activationSpans, messageLineIndices, parseSequenceDiagram, parseSequenceSource } from './sequenceParser';
 
 const SAMPLE = `sequenceDiagram
 title Checkout
@@ -71,10 +71,124 @@ A -> B
     expect(m.participants.map(p => p.id)).toEqual(['X', 'Y']);
   });
 
-  it('ignores activation markers and autonumber', () => {
-    const m = parseSequenceDiagram('sequenceDiagram\nautonumber\nA->>+B: call\nB-->>-A: reply\nactivate B');
-    const msgs = m.items.filter(i => i.kind === 'message');
-    expect(msgs).toHaveLength(2);
-    expect(msgs[0]).toMatchObject({ from: 'A', to: 'B', text: 'call' });
+  it('leaves autonumber off and arrow sync when the keywords are absent', () => {
+    expect(model.autonumber).toBeNull();
+    const msgs = model.items.filter(i => i.kind === 'message');
+    expect(msgs[0]).toMatchObject({ arrow: 'sync', dashed: false });
+    expect(msgs[0]).not.toHaveProperty('activate');
+    expect(msgs[0]).not.toHaveProperty('deactivate');
+    expect(msgs.find(i => i.kind === 'message' && i.from === 'U' && i.to === 'U')).toMatchObject({
+      arrow: 'open',
+      dashed: false,
+    });
+  });
+
+  it('keeps messageLineIndices on the message lines only', () => {
+    expect(messageLineIndices(SAMPLE)).toEqual([6, 7, 8, 12, 16, 18]);
+    const rich = `sequenceDiagram
+autonumber 10 5
+participant A
+activate A
+A->>+B: one
+Note over A: n
+B-->>-A: two
+deactivate A
+A-)B: later`;
+    expect(messageLineIndices(rich)).toEqual([4, 6, 8]);
+  });
+});
+
+describe('sequence arrow, activation, and autonumber', () => {
+  const src = `sequenceDiagram
+autonumber 10 5
+participant A
+A->>B: sync
+A-->>B: dashed sync
+A->B: open
+A-->B: dashed open
+A-)B: async
+A--)B: dashed async
+A-xB: lost
+A--XB: dashed lost
+A->>+B: call
+B-->>-A: reply
+activate B
+A->>B: still
+deactivate B
+deactivate A`;
+
+  const model = parseSequenceDiagram(src);
+  const msgs = model.items.filter(i => i.kind === 'message');
+
+  it('reads each arrow type and keeps dashed separate', () => {
+    expect(msgs.map(m => m.kind === 'message' ? { arrow: m.arrow, dashed: m.dashed, text: m.text } : null)).toEqual([
+      { arrow: 'sync', dashed: false, text: 'sync' },
+      { arrow: 'sync', dashed: true, text: 'dashed sync' },
+      { arrow: 'open', dashed: false, text: 'open' },
+      { arrow: 'open', dashed: true, text: 'dashed open' },
+      { arrow: 'async', dashed: false, text: 'async' },
+      { arrow: 'async', dashed: true, text: 'dashed async' },
+      { arrow: 'lost', dashed: false, text: 'lost' },
+      { arrow: 'lost', dashed: true, text: 'dashed lost' },
+      { arrow: 'sync', dashed: false, text: 'call' },
+      { arrow: 'sync', dashed: true, text: 'reply' },
+      { arrow: 'sync', dashed: false, text: 'still' },
+    ]);
+  });
+
+  it('reads + and - on the message', () => {
+    const call = msgs.find(m => m.kind === 'message' && m.text === 'call');
+    const reply = msgs.find(m => m.kind === 'message' && m.text === 'reply');
+    expect(call).toMatchObject({ activate: true, from: 'A', to: 'B' });
+    expect(call).not.toHaveProperty('deactivate');
+    expect(reply).toMatchObject({ deactivate: true, from: 'B', to: 'A' });
+    expect(reply).not.toHaveProperty('activate');
+  });
+
+  it('reads activate and deactivate lines', () => {
+    expect(model.items.filter(i => i.kind === 'activate')).toEqual([{ kind: 'activate', id: 'B' }]);
+    expect(model.items.filter(i => i.kind === 'deactivate')).toEqual([
+      { kind: 'deactivate', id: 'B' },
+      { kind: 'deactivate', id: 'A' },
+    ]);
+  });
+
+  it('reads autonumber start and step', () => {
+    expect(parseSequenceDiagram('sequenceDiagram\nautonumber\nA->>B: a').autonumber).toEqual({ start: 1, step: 1 });
+    expect(parseSequenceDiagram('sequenceDiagram\nautonumber 10\nA->>B: a').autonumber).toEqual({ start: 10, step: 1 });
+    expect(model.autonumber).toEqual({ start: 10, step: 5 });
+    expect(parseSequenceDiagram('sequenceDiagram\nautonumber off\nA->>B: a').autonumber).toBeNull();
+  });
+
+  it('stacks activations, ignores a stray deactivate, and leaves an unclosed bar on the last row', () => {
+    const stacked = parseSequenceDiagram(`sequenceDiagram
+A->>+B: one
+A->>+B: two
+B-->>-A: three
+B-->>-A: four`);
+    expect(activationSpans(stacked.items)).toEqual([
+      { id: 'B', from: 1, to: 2, depth: 1, open: false },
+      { id: 'B', from: 0, to: 3, depth: 0, open: false },
+    ]);
+
+    const stray = parseSequenceDiagram(`sequenceDiagram
+deactivate A
+A->>B: hi`);
+    expect(activationSpans(stray.items)).toEqual([]);
+
+    const unclosed = parseSequenceDiagram(`sequenceDiagram
+A->>+B: hi
+B->>A: later`);
+    expect(activationSpans(unclosed.items)).toEqual([
+      { id: 'B', from: 0, to: 1, depth: 0, open: true },
+    ]);
+
+    const explicit = parseSequenceDiagram(`sequenceDiagram
+activate B
+A->>B: hi
+deactivate B`);
+    expect(activationSpans(explicit.items)).toEqual([
+      { id: 'B', from: 0, to: 2, depth: 0, open: false },
+    ]);
   });
 });

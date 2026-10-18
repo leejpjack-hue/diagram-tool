@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDiagramStore } from '../../store/diagramStore';
-import { parseSequenceSource } from './sequenceParser';
-import type { SequenceItem } from './sequenceParser';
+import { activationSpans, parseSequenceSource } from './sequenceParser';
+import type { SequenceArrow, SequenceItem } from './sequenceParser';
 import { renameParticipant, editMessageText, toggleMessageDashed } from './sequenceEdit';
 
 // Presentation-style sequence diagram renderer (SVG). Participants are
@@ -26,6 +26,72 @@ const CHAR_W = 7.2; // rough width of a label character at 12px
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
+const ACTIVATE_ROW = 16;
+const BAR_W = 8;
+
+function formatSeqNo(n: number): string {
+  if (Number.isInteger(n)) return String(n);
+  const rounded = Math.round(n * 100) / 100;
+  return String(rounded);
+}
+
+function ArrowTip({
+  kind,
+  x,
+  y,
+  dir,
+  color,
+}: {
+  kind: SequenceArrow;
+  x: number;
+  y: number;
+  dir: 1 | -1;
+  color: string;
+}) {
+  if (kind === 'async') {
+    const back = x - dir * 9;
+    return (
+      <path
+        d={`M ${back} ${y - 5} L ${x} ${y} L ${back} ${y + 5}`}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    );
+  }
+  if (kind === 'lost') {
+    return (
+      <g>
+        <line x1={x - 5} y1={y - 5} x2={x + 5} y2={y + 5} stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+        <line x1={x + 5} y1={y - 5} x2={x - 5} y2={y + 5} stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+      </g>
+    );
+  }
+  return null;
+}
+
+function SeqBadge({ n, x, y, color }: { n: string; x: number; y: number; color: string }) {
+  const wide = n.length > 2;
+  return (
+    <g data-testid="seq-number" pointerEvents="none">
+      <circle cx={x} cy={y} r={wide ? 11 : 8} fill="#fff" stroke={color} strokeWidth={1.25} />
+      <text
+        x={x}
+        y={y}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={wide ? 8 : 9}
+        fontWeight={700}
+        fill={color}
+        fontFamily="Inter, sans-serif"
+      >
+        {n}
+      </text>
+    </g>
+  );
+}
 
 interface FrameBox {
   startY: number;
@@ -54,7 +120,7 @@ export function SequenceCanvas() {
     setLastGood(parsed.model);
   }
   const model = parsed.error ? lastGood : parsed.model;
-  const { participants, items, title } = model;
+  const { participants, items, title, autonumber } = model;
 
   useEffect(() => {
     setError(parsed.error);
@@ -96,9 +162,11 @@ export function SequenceCanvas() {
     const rows: { item: SequenceItem; y: number; msgIndex?: number }[] = [];
     const frames: FrameBox[] = [];
     const stack: FrameBox[] = [];
+    const itemY: number[] = [];
     let msgCounter = 0;
 
-    items.forEach(item => {
+    items.forEach((item, index) => {
+      itemY[index] = y;
       if (item.kind === 'frameStart') {
         const box: FrameBox = { startY: y, endY: y, label: item.label, frameType: item.frameType, elses: [] };
         stack.push(box);
@@ -115,6 +183,8 @@ export function SequenceCanvas() {
       } else if (item.kind === 'note') {
         rows.push({ item, y });
         y += NOTE_H + 14;
+      } else if (item.kind === 'activate' || item.kind === 'deactivate') {
+        y += ACTIVATE_ROW;
       } else {
         rows.push({ item, y, msgIndex: msgCounter++ });
         y += item.kind === 'message' && item.from === item.to ? ROW_H + 14 : ROW_H;
@@ -126,7 +196,15 @@ export function SequenceCanvas() {
     const bodyEnd = y + 16;
     const width = MARGIN_X * 2 + 180 + Math.max(0, participants.length - 1) * spacing;
     const height = bodyEnd + HEADER_GAP + HEADER_H + 30;
-    return { xFor, rows, frames, width, height, bodyEnd, spacing };
+    const lastY = itemY.length > 0 ? itemY[itemY.length - 1] : y;
+    const bars = activationSpans(items).flatMap(span => {
+      const x = xFor.get(span.id);
+      const y1 = itemY[span.from];
+      if (x === undefined || y1 === undefined) return [];
+      const y2 = span.open ? lastY : (itemY[span.to] ?? lastY);
+      return [{ id: span.id, x, y1, y2: Math.max(y2, y1), depth: span.depth }];
+    });
+    return { xFor, rows, frames, width, height, bodyEnd, spacing, bars };
   }, [participants, items]);
 
   const colorFor = (id: string) =>
@@ -308,6 +386,22 @@ A-->>U: 200 OK`}
           );
         })}
 
+        {/* Activation bars sit on the lifeline, under the arrows. */}
+        {layout.bars.map((bar, i) => (
+          <rect
+            key={`act-${i}`}
+            data-testid="seq-activation"
+            x={bar.x - BAR_W / 2 + bar.depth * 7}
+            y={bar.y1 - 4}
+            width={BAR_W}
+            height={Math.max(12, bar.y2 - bar.y1 + 8)}
+            rx={1}
+            fill={colorFor(bar.id)}
+            fillOpacity={0.9}
+            pointerEvents="none"
+          />
+        ))}
+
         {/* Messages and notes */}
         {layout.rows.map(({ item, y, msgIndex }, i) => {
           if (item.kind === 'note') {
@@ -331,19 +425,30 @@ A-->>U: 200 OK`}
 
           if (item.kind !== 'message' || msgIndex === undefined) return null;
           const c = colorFor(item.from);
-          const marker = `url(#seq-arrow-${c.slice(1)})`;
+          const arrow: SequenceArrow = item.arrow ?? 'sync';
+          const marker = arrow === 'sync' ? `url(#seq-arrow-${c.slice(1)})` : undefined;
           const x1 = layout.xFor.get(item.from)!;
           const x2 = layout.xFor.get(item.to)!;
           const isEditingThis = editing?.kind === 'message' && editing.index === msgIndex;
+          const seqLabel = autonumber
+            ? formatSeqNo(autonumber.start + msgIndex * autonumber.step)
+            : null;
+          const arrowAttr = arrow === 'sync' ? {} : { 'data-arrow': arrow };
 
           if (item.from === item.to) {
-            // Self message: small loop to the right of the lifeline
+            // Self message: small loop to the right of the lifeline.
+            // Sync keeps the historical path and filled marker.
             const loopW = 46;
+            const shaftEnd = arrow === 'sync' ? x1 + 6 : arrow === 'open' ? x1 : x1 + 10;
+            const tipX = arrow === 'open' ? x1 : x1 + 2;
             return (
-              <g key={i}>
-                <path d={`M ${x1} ${y} H ${x1 + loopW} V ${y + 24} H ${x1 + 6}`}
+              <g key={i} {...arrowAttr}>
+                <path d={`M ${x1} ${y} H ${x1 + loopW} V ${y + 24} H ${shaftEnd}`}
                   fill="none" stroke={c} strokeWidth={1.8}
                   strokeDasharray={item.dashed ? '6 4' : undefined} markerEnd={marker} />
+                {arrow !== 'sync' && (
+                  <ArrowTip kind={arrow} x={tipX} y={y + 24} dir={-1} color={c} />
+                )}
                 <path d={`M ${x1} ${y} H ${x1 + loopW} V ${y + 24} H ${x1 + 6}`}
                   fill="none" stroke="transparent" strokeWidth={12} style={{ cursor: 'pointer' }}
                   onDoubleClick={() => toggleDashed(msgIndex)}>
@@ -361,16 +466,21 @@ A-->>U: 200 OK`}
                     <title>Click to edit</title>
                   </text>
                 )}
+                {seqLabel && <SeqBadge n={seqLabel} x={x1 + 18} y={y - 12} color={c} />}
               </g>
             );
           }
 
-          const dir = x2 > x1 ? 1 : -1;
+          const dir: 1 | -1 = x2 > x1 ? 1 : -1;
           const midX = (x1 + x2) / 2;
+          const xEnd = arrow === 'sync' ? x2 - dir * 4 : arrow === 'open' ? x2 : x2 - dir * 8;
           return (
-            <g key={i}>
-              <line x1={x1} y1={y} x2={x2 - dir * 4} y2={y} stroke={c} strokeWidth={1.8}
+            <g key={i} {...arrowAttr}>
+              <line x1={x1} y1={y} x2={xEnd} y2={y} stroke={c} strokeWidth={1.8}
                 strokeDasharray={item.dashed ? '6 4' : undefined} markerEnd={marker} />
+              {arrow !== 'sync' && (
+                <ArrowTip kind={arrow} x={x2} y={y} dir={dir} color={c} />
+              )}
               {/* Wide invisible hit-line: easier double-click target */}
               <line x1={x1} y1={y} x2={x2} y2={y} stroke="transparent" strokeWidth={14}
                 style={{ cursor: 'pointer' }} onDoubleClick={() => toggleDashed(msgIndex)}>
@@ -389,6 +499,7 @@ A-->>U: 200 OK`}
                   <title>Click to edit</title>
                 </text>
               )}
+              {seqLabel && <SeqBadge n={seqLabel} x={x1 + dir * 14} y={y - 14} color={c} />}
             </g>
           );
         })}

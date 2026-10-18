@@ -263,7 +263,13 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
     commitHistory(set, get, { showStepNumbers: next });
   },
   
-  setParsedDiagram: (diagram) => set({ parsedDiagram: diagram, diagramMode: diagram?.mode || 'architecture' }),
+  setParsedDiagram: (diagram) => set(state => ({
+    parsedDiagram: diagram,
+    // Clearing the architecture/flow graph must not relabel a Sequence board.
+    // Gantt still falls through to architecture, which is what the status showed before.
+    diagramMode: diagram?.mode
+      || (diagram === null && state.diagramMode === 'sequence' ? 'sequence' : 'architecture'),
+  })),
   setSelectedNode: (nodeId) => set({ selectedNodeId: nodeId }),
   setDiagramMode: (mode) => {
     if (get().diagramMode === mode) return;
