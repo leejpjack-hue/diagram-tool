@@ -80,8 +80,8 @@ export interface Board {
   deletedAt?: string;
   templateSourceId?: string;
   /**
-   * DT-STYLE-01. Optional Flow icon style. Omitted means Clean.
-   * Unknown values are dropped on load.
+   * DT-STYLE-01 / DT-ARCH-03. Optional icon style for Flow and Architecture.
+   * Omitted means Clean. Unknown values are dropped on load.
    */
   iconStyle?: IconStyleId;
   /**

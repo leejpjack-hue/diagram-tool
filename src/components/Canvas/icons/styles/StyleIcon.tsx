@@ -2,10 +2,10 @@
 // https://github.com/lucide-icons/lucide — copied in so the canvas never
 // fetches an icon CDN. Static only: no animation.
 
-import type { StyleIconName } from '../../iconStyles';
+import type { ArchIconName, StyleIconName } from '../../iconStyles';
 
 interface StyleIconProps {
-  name: StyleIconName;
+  name: StyleIconName | ArchIconName;
   size?: number;
   /** Desired on-screen stroke width in CSS pixels (outline styles). */
   strokeWidth?: number;
@@ -66,7 +66,7 @@ function IconPaths({
   filled,
   mark,
 }: {
-  name: StyleIconName;
+  name: StyleIconName | ArchIconName;
   stroke: string;
   sw: number;
   fill: string;
@@ -137,6 +137,34 @@ function IconPaths({
       return <polygon {...common} points="6 3 20 12 6 21 6 3" />;
     case 'square':
       return <rect {...common} x="3" y="3" width="18" height="18" rx="2" />;
+    case 'server':
+      return (
+        <>
+          <rect {...common} x="2" y="2" width="20" height="8" rx="2" />
+          <rect {...common} x="2" y="14" width="20" height="8" rx="2" />
+          <line {...common} fill="none" x1="6" x2="6.01" y1="6" y2="6" />
+          <line {...common} fill="none" x1="6" x2="6.01" y1="18" y2="18" />
+        </>
+      );
+    case 'layers':
+      return (
+        <>
+          <path {...common} d="m12.83 2.18 8.58 3.91a1 1 0 0 1 0 1.83l-8.58 3.9a2 2 0 0 1-1.66 0l-8.58-3.9a1 1 0 0 1 0-1.83l8.58-3.91a2 2 0 0 1 1.66 0z" />
+          <path {...common} fill="none" d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />
+          <path {...common} fill="none" d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" />
+        </>
+      );
+    case 'cloud':
+      return <path {...common} d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />;
+    case 'layout-grid':
+      return (
+        <>
+          <rect {...common} x="3" y="3" width="7" height="7" rx="1" />
+          <rect {...common} x="14" y="3" width="7" height="7" rx="1" />
+          <rect {...common} x="14" y="14" width="7" height="7" rx="1" />
+          <rect {...common} x="3" y="14" width="7" height="7" rx="1" />
+        </>
+      );
     default:
       return null;
   }

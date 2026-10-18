@@ -32,18 +32,22 @@ Every file has a `version` string. Current writers emit `"3.0"`. Readers must st
 
 `source.text` is the diagram authoring source (native DSL, or Mermaid for sequence diagrams and Mermaid flowcharts). `dslText` is kept as an alias so older importers keep working.
 
-### Flow icon style
+### Icon style
 
-`board.iconStyle` is optional and additive. `version` stays **3.0**. No database migration.
+`board.iconStyle` is optional and additive. It applies to **Flow and Architecture** boards. `version` stays **3.0**. No database migration. There is no new field.
 
 | Value | Meaning |
 | --- | --- |
-| `clean` | Default. Today's Flow look. Writers may omit the field. |
-| `line` | Line icons |
-| `bold` | Bold filled |
-| `blueprint` | Blueprint |
+| `clean` | Default. Today's look. Writers omit the field. |
+| `line` | White cards with a thin coloured line icon |
+| `bold` | Filled cards, white icon and text, thicker edges |
+| `blueprint` | Navy grid background, outline square nodes, mono text, dashed edges |
 
 Missing or unknown values load as `clean`. Older readers ignore the field. A diagram that omits `iconStyle` still loads as `clean`.
+
+On an Architecture board the same value paints services, databases, queues, cloud parts, groups, and the edges together. Sequence, Gantt, and C4 boards do not show the style picker.
+
+An explicit node `color:` in the DSL wins over the style colour. An explicit edge `color:` wins over the style edge colour. The style still chooses the fill, the icon, the type, and the edge weight. A node with no `color:` uses the style colour for that kind.
 
 ### Step numbers
 

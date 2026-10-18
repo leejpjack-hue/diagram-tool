@@ -1,6 +1,9 @@
 import { memo } from 'react';
 import { NodeResizer } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
+import { useDiagramStore } from '../../store/diagramStore';
+import { ICON_STYLES, resolveArchFace, type IconStyleId } from './iconStyles';
+import { StyleIcon } from './icons/styles/StyleIcon';
 
 /**
  * Sub-system grouping container — a dashed rectangle drawn behind a set of
@@ -29,7 +32,15 @@ export type GroupContainerData = {
   onResize?: (groupId: string, x: number, y: number, w: number, h: number) => void;
 };
 
-export const GroupContainerNode = memo(({ data, selected, positionAbsoluteX, positionAbsoluteY }: NodeProps) => {
+export const GroupContainerNode = memo((props: NodeProps) => {
+  const iconStyle = useDiagramStore(s => s.iconStyle);
+  if (iconStyle === 'clean') return <CleanGroupContainer {...props} />;
+  return <StyledGroupContainer {...props} iconStyle={iconStyle} />;
+});
+
+GroupContainerNode.displayName = 'GroupContainerNode';
+
+const CleanGroupContainer = memo(({ data, selected, positionAbsoluteX, positionAbsoluteY }: NodeProps) => {
   const d = data as unknown as GroupContainerData;
   const color = d.color ?? '#64748B';
   // Tint the fill very lightly so the area reads as a region without
@@ -63,6 +74,9 @@ export const GroupContainerNode = memo(({ data, selected, positionAbsoluteX, pos
         }}
       />
     <div
+      data-arch-kind="group"
+      data-arch-style="clean"
+      data-arch-treatment="chip"
       style={{
         width,
         height,
@@ -103,7 +117,97 @@ export const GroupContainerNode = memo(({ data, selected, positionAbsoluteX, pos
   );
 });
 
-GroupContainerNode.displayName = 'GroupContainerNode';
+CleanGroupContainer.displayName = 'CleanGroupContainer';
+
+const StyledGroupContainer = memo(({ data, selected, positionAbsoluteX, positionAbsoluteY, iconStyle }: NodeProps & { iconStyle: Exclude<IconStyleId, 'clean'> }) => {
+  const d = data as unknown as GroupContainerData;
+  const face = resolveArchFace(iconStyle, 'group', d.color);
+  const tokens = ICON_STYLES[iconStyle];
+  const width = Number.isFinite(d.width) ? d.width : 320;
+  const height = Number.isFinite(d.height) ? d.height : 200;
+  const x = Number.isFinite(positionAbsoluteX) ? positionAbsoluteX : 0;
+  const y = Number.isFinite(positionAbsoluteY) ? positionAbsoluteY : 0;
+  const borderWidth = iconStyle === 'bold' ? tokens.edge.width : face.borderWidth;
+  const borderStyle = iconStyle === 'blueprint' ? 'dashed' : 'solid';
+  const fill = iconStyle === 'blueprint'
+    ? 'transparent'
+    : iconStyle === 'bold'
+      ? `color-mix(in srgb, ${face.color} 22%, white)`
+      : `color-mix(in srgb, ${face.color} 8%, white)`;
+  const badgeBg = iconStyle === 'bold' ? face.color : iconStyle === 'blueprint' ? face.canvas : '#ffffff';
+  const badgeColor = iconStyle === 'bold' ? '#ffffff' : face.labelColor;
+  const ring = selected
+    ? { outline: `${tokens.selection.width}px solid ${tokens.selection.color}`, outlineOffset: tokens.selection.offset }
+    : {};
+
+  return (
+    <>
+      <NodeResizer
+        isVisible={!!selected}
+        minWidth={140}
+        minHeight={100}
+        lineStyle={{ borderColor: face.color }}
+        handleStyle={{ width: 8, height: 8, borderRadius: 2, background: badgeBg, border: `1.5px solid ${face.color}` }}
+        onResizeEnd={(_e, params) => {
+          if (d.groupId && d.onResize) {
+            d.onResize(d.groupId, x, y, params.width, params.height);
+          }
+        }}
+      />
+      <div
+        data-arch-kind="group"
+        data-arch-style={iconStyle}
+        data-arch-treatment={face.treatment}
+        style={{
+          width,
+          height,
+          border: `${borderWidth}px ${borderStyle} ${face.borderColor}`,
+          borderRadius: face.radius,
+          background: fill,
+          position: 'relative',
+          pointerEvents: 'all',
+          cursor: 'grab',
+          ...ring,
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            top: -11,
+            left: 18,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            background: badgeBg,
+            border: `1.2px solid ${iconStyle === 'bold' ? face.color : face.borderColor}`,
+            padding: '3px 10px',
+            fontSize: 10,
+            fontWeight: face.fontWeight,
+            color: badgeColor,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            lineHeight: '16px',
+            borderRadius: iconStyle === 'blueprint' ? 2 : 8,
+            fontFamily: face.fontFamily,
+          }}
+        >
+          <StyleIcon
+            name={face.icon}
+            size={12}
+            strokeWidth={face.iconStroke}
+            filled={face.iconFilled}
+            color={face.iconColor}
+            kind="group"
+            decorative
+          />
+          {d.label}
+        </div>
+      </div>
+    </>
+  );
+});
+
+StyledGroupContainer.displayName = 'StyledGroupContainer';
 
 // Convert a #RRGGBB or named color to rgba(...) at the given alpha. Falls
 // back to a low-opacity neutral if parsing fails.

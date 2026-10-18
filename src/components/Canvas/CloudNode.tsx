@@ -5,6 +5,9 @@ import { ProviderIcon, KindIcon } from './icons';
 import { hasKindIcon } from './icons/registry';
 import { cardStyle, chipStyle, badgeStyle, isCode, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
 import { ArchitectureHandles, type ArchitectureHandleSlots } from './ArchitectureHandles';
+import { useDiagramStore } from '../../store/diagramStore';
+import { ArchitectureStyleCard } from './ArchitectureStyleCard';
+import type { IconStyleId } from './iconStyles';
 
 // Provider visual identity — colored badges with stylized geometric glyphs.
 // Glyphs themselves now live as standalone .svg files in ./icons/providers/.
@@ -31,7 +34,19 @@ function kindLabel(kind?: string): string {
   return kind.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-export const CloudNode = memo(({ data, selected }: NodeProps) => {
+function connectionSlots(data: unknown): ArchitectureHandleSlots | undefined {
+  return (data as { connectionHandles?: ArchitectureHandleSlots }).connectionHandles;
+}
+
+export const CloudNode = memo((props: NodeProps) => {
+  const iconStyle = useDiagramStore(s => s.iconStyle);
+  if (iconStyle === 'clean') return <CleanCloudNode {...props} />;
+  return <StyledCloudNode {...props} iconStyle={iconStyle} />;
+});
+
+CloudNode.displayName = 'CloudNode';
+
+const CleanCloudNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as CloudNodeData;
   const provider = nodeData.provider || 'aws';
   const meta = PROVIDER_META[provider] ?? PROVIDER_META.aws;
@@ -41,7 +56,7 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
   const customKind = hasKindIcon(kindKey);
   // A `color:` in the DSL overrides the provider accent.
   const accent = nodeData.color || meta.pill;
-  const connectionHandles = (data as { connectionHandles?: ArchitectureHandleSlots }).connectionHandles;
+  const connectionHandles = connectionSlots(data);
 
   return (
     <div
@@ -50,6 +65,9 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
         ${selected ? 'scale-105' : 'hover:scale-102'}
         min-w-[180px]
       `}
+      data-arch-kind="cloud"
+      data-arch-style="clean"
+      data-arch-treatment="chip"
       style={cardStyle(accent, !!selected)}
     >
       <ArchitectureHandles accent={accent} slots={connectionHandles} />
@@ -107,4 +125,29 @@ export const CloudNode = memo(({ data, selected }: NodeProps) => {
   );
 });
 
-CloudNode.displayName = 'CloudNode';
+CleanCloudNode.displayName = 'CleanCloudNode';
+
+const StyledCloudNode = memo(({ data, selected, iconStyle }: NodeProps & { iconStyle: Exclude<IconStyleId, 'clean'> }) => {
+  const nodeData = data as unknown as CloudNodeData;
+  const provider = nodeData.provider || 'aws';
+  const meta = PROVIDER_META[provider] ?? PROVIDER_META.aws;
+  const bits = [
+    nodeData.provider ? meta.label : undefined,
+    nodeData.kind ? kindLabel(nodeData.kind) : undefined,
+    nodeData.tech,
+    nodeData.region,
+  ].filter(Boolean);
+  return (
+    <ArchitectureStyleCard
+      iconStyle={iconStyle}
+      kind="cloud"
+      color={nodeData.color}
+      selected={selected}
+      label={nodeData.label}
+      meta={bits.length ? bits.join(' · ') : undefined}
+      slots={connectionSlots(data)}
+    />
+  );
+});
+
+StyledCloudNode.displayName = 'StyledCloudNode';

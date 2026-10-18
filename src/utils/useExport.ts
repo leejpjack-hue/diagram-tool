@@ -8,7 +8,11 @@ import { ICON_STYLES } from '../components/Canvas/iconStyles';
 
 export const useExport = () => {
   const { parsedDiagram, diagramMode, iconStyle } = useDiagramStore();
-  const exportBackground = diagramMode === 'flow' ? ICON_STYLES[iconStyle].canvas : null;
+  // Clean architecture keeps today's export fill. Other architecture styles,
+  // and every Flow style, paint the style canvas (Blueprint is the navy grid).
+  const exportBackground = diagramMode === 'flow' || (diagramMode === 'architecture' && iconStyle !== 'clean')
+    ? ICON_STYLES[iconStyle].canvas
+    : null;
 
   const getFileName = (format: string) => {
     const title = parsedDiagram?.title || 'diagram';
@@ -144,7 +148,7 @@ export const useExport = () => {
       title,
       mode,
       dslText,
-      ...(mode === 'flow' && liveStyle !== 'clean' ? { iconStyle: liveStyle } : {}),
+      ...((mode === 'flow' || mode === 'architecture') && liveStyle !== 'clean' ? { iconStyle: liveStyle } : {}),
       ...(showStepNumbersForStorage(showStepNumbers) ? { showStepNumbers: true } : {}),
     }), null, 2);
     const blob = new Blob([json], { type: 'application/json' });
