@@ -118,6 +118,10 @@ What wins when several keys are present:
 
 Dragging a bar that has `after:` writes an explicit `start:` into the source. That start wins over `after:` for the date, and the dependency remains. Resizing a bar writes `duration:` (and drops `end:` when the length is now a duration). A cycle names the tasks in the parse error and leaves the last good chart on screen. An unknown `after:` name warns with the line number and still draws the rest of the plan.
 
+### Type tasks
+
+Type tasks writes ordinary `diagram: gantt` text into `source.text` / `dslText`: `task`, `group`, `duration:`, `after:`, `assignee:`, `progress:`, `start:`, `milestone:`, and `custom: role=ai|human|tool`. A `# @type-tasks` comment block holds the typed lines so the box can refill. The comment is commentary, not a board field. `custom: role=` uses the existing custom-field key so a bar can take the Flow role-chip colour. A hand-written Gantt plan has no marker, so opening Type tasks leaves the box empty and does not change the source. `version` stays **3.0**. No database migration.
+
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 
 ### Sequence arrows, activation, and autonumber

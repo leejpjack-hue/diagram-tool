@@ -35,9 +35,9 @@ describe('diagramStore setDiagramMode (DT-SAVE-01 blank-page fix)', () => {
     expect(useDiagramStore.getState().diagramMode).toBe('sequence');
   });
 
-  it('still resets a cleared Gantt graph to architecture', () => {
+  it('keeps Gantt mode when the architecture graph is cleared', () => {
     useDiagramStore.getState().setDiagramMode('gantt');
     useDiagramStore.getState().setParsedDiagram(null);
-    expect(useDiagramStore.getState().diagramMode).toBe('architecture');
+    expect(useDiagramStore.getState().diagramMode).toBe('gantt');
   });
 });

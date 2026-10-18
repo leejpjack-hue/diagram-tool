@@ -416,6 +416,8 @@ node Check { type: decision
 
 `diagram: gantt` activates the Gantt tab. Plans, milestones, and rollups are documented in the Gantt panel; this manual currently focuses on architecture and flow.
 
+**Type tasks.** On a Gantt board, Type tasks turns one line per task into that DSL. `Collect data — 3d — Human: Jack` is a 3-day bar assigned to Jack. `5d`, `2w`, and `3 days` set the length (`duration:`). `after Collect data` or `after Collect data and Review` waits until those tasks finish and draws a finish-to-start arrow (`after:`). `milestone` is a diamond. `Human: Jack`, `AI agent`, `AI:`, and `Tool:` set the assignee and store `custom: role=human`, `role=ai`, or `role=tool`, and the bar uses the same colours as the Flow role chips. `Phase: Build` or `## Build` starts a group. `50% done` sets progress. `starts 2026-11-02` sets the start date. Separators are `—`, `-`, or a comma. The Understood-as list under the box shows how each line was read and flags a missing length or an unknown `after` name. Build chart replaces the source with ordinary Gantt DSL, and undo restores the previous source. Opening Type tasks on a board it built fills the box from that source. A hand-written plan leaves the box empty, so its DSL stays as it is. Nothing is sent over the network. This is not a new board field, and `version` stays 3.0.
+
 ---
 
 ## Edges and labels
