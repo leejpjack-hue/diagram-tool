@@ -23,8 +23,14 @@ service Orders {}
 edge Gateway -> Orders { label: "reads" step: 1 }
 `;
 
-async function waitForToastsToClear(page: Page) {
-  await expect(page.getByTestId('toast-item')).toHaveCount(0, { timeout: 8000 });
+async function dismissBoardCreatedToast(page: Page) {
+  const created = page.getByTestId('toast-item').filter({ hasText: 'Board created' });
+  await expect(created).toBeVisible();
+  // Close this toast directly. A pointer left on the stack pauses an action
+  // toast's timer, and a sibling toast must not keep the wait open.
+  const close = created.getByRole('button', { name: '×' });
+  await close.click({ timeout: 2000 }).catch(() => undefined);
+  await expect(created).toHaveCount(0);
 }
 
 async function openArchitectureTemplate(page: Page) {
@@ -34,8 +40,7 @@ async function openArchitectureTemplate(page: Page) {
   const createDialog = page.getByRole('dialog', { name: 'Create a board' });
   await createDialog.getByRole('button', { name: 'Templates', exact: true }).click();
   await createDialog.getByTestId('template-card-network-topology').click();
-  await expect(page.getByTestId('toast-item').filter({ hasText: 'Board created' })).toBeVisible();
-  await waitForToastsToClear(page);
+  await dismissBoardCreatedToast(page);
   await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible();
   await expect(page.locator('.react-flow__node-service').first()).toBeVisible();
   await expect(page.getByTestId('icon-style-picker')).toBeVisible();
@@ -132,7 +137,7 @@ test.describe('Architecture icon styles', () => {
       });
     });
 
-    await page.goto('http://127.0.0.1:4173/app/?share=tok_arch_03');
+    await page.goto('/app/?share=tok_arch_03');
     const banner = page.getByTestId('shared-readonly-banner');
     await expect(banner).toBeVisible();
     await expect(page.getByTestId('icon-style-picker')).toHaveCount(0);
