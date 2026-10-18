@@ -141,6 +141,12 @@ A bar runs from the activating row to the deactivating row. Stacked activations 
 
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 
+### Type messages
+
+Type messages writes ordinary Mermaid `sequenceDiagram` text into `source.text` / `dslText`: `participant`, `->>`, `-->>`, `-)`, `alt` / `else` / `end`, `loop`, `opt`, `par` / `and`, and `Note over`. A `%% @type-messages` comment block holds the typed lines so the box can refill. A leading `Human:` / `AI:` / `Tool:` / `Data:` on the first mention is stored as `%% role <id> human|ai|tool|data`. Those comments are commentary, not a board field. A hand-written sequence diagram has no marker, so opening Type messages leaves the box empty and does not change the source. `version` stays **3.0**. No database migration.
+
+A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
+
 ### Type parts
 
 Type parts writes ordinary architecture DSL into `source.text` / `dslText`: `service`, `database`, `queue`, `edge`, and `group`, plus a `# @type-parts` comment that holds the typed lines so the box can refill. Those keywords already exist. The comment is commentary, not a board field. A hand-written architecture board has no marker, so opening Type parts leaves the box empty and does not change the source. `version` stays **3.0**. No database migration.
