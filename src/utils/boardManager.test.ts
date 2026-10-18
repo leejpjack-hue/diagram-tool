@@ -381,6 +381,28 @@ describe('durable workspace reload and quota recovery', () => {
     expect((await restarted.get(board.id))?.dslText).toContain('# change 23');
   });
 
+  it('reloads a staged source write that the debounced save has not committed', async () => {
+    const workspace = createMemoryWorkspace();
+    const first = workspace.open();
+    const board = await first.create({ title: 'Short Horizontal', mode: 'flow', dslText: 'node Beta {\n  at: 480, 180\n}' });
+    first.stageBoardWrite(board.id, {
+      dslText: 'node Beta {\n  at: 80, 340\n}',
+      mode: 'flow',
+      title: 'Short Horizontal',
+    });
+
+    const restarted = workspace.open();
+    expect((await restarted.get(board.id))?.dslText).toContain('at: 80, 340');
+    expect((await restarted.list()).find(item => item.id === board.id)?.dslText).toContain('at: 80, 340');
+
+    await restarted.update(board.id, { dslText: 'node Beta {\n  at: 480, 180\n}', mode: 'flow' });
+    expect((await restarted.get(board.id))?.dslText).toContain('at: 80, 340');
+
+    await restarted.update(board.id, { dslText: 'node Beta {\n  at: 80, 340\n}', mode: 'flow' });
+    expect((await restarted.get(board.id))?.dslText).toContain('at: 80, 340');
+    expect(localStorage.getItem('diagram-tool-pending-board-writes')).toBeNull();
+  });
+
   it('maps quota failures to a recovery message', () => {
     expect(toWorkspaceError(new DOMException('The quota has been exceeded.', 'QuotaExceededError')).message).toMatch(/out of storage/);
     expect(toWorkspaceError(new Error('IndexedDB quota exceeded'))).toMatchObject({ message: expect.stringMatching(/out of storage/) });

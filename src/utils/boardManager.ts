@@ -190,6 +190,7 @@ const DB_NAME = WORKSPACE_DB_NAME;
 const DB_VERSION = WORKSPACE_DB_VERSION;
 const LEGACY_STORAGE_KEY = 'diagram-tool-boards';
 const MIGRATION_KEY = 'diagram-tool-indexeddb-migrated-v2';
+const PENDING_BOARD_KEY = 'diagram-tool-pending-board-writes';
 const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const DEFAULT_PREFERENCES: DashboardPreferences = {
   id: 'dashboard',
@@ -200,6 +201,56 @@ const DEFAULT_PREFERENCES: DashboardPreferences = {
 };
 
 type StoreName = typeof WORKSPACE_STORES[number];
+
+interface PendingBoardWrite {
+  dslText: string;
+  mode: BoardMode;
+  title?: string;
+  savedAt: string;
+}
+
+function readPendingBoardWrites(): Record<string, PendingBoardWrite> {
+  try {
+    const raw = localStorage.getItem(PENDING_BOARD_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object') return {};
+    return parsed as Record<string, PendingBoardWrite>;
+  } catch {
+    return {};
+  }
+}
+
+function writePendingBoardWrites(pending: Record<string, PendingBoardWrite>) {
+  try {
+    if (Object.keys(pending).length === 0) localStorage.removeItem(PENDING_BOARD_KEY);
+    else localStorage.setItem(PENDING_BOARD_KEY, JSON.stringify(pending));
+  } catch {
+    // The debounced IndexedDB save is still the durable path when storage is full.
+  }
+}
+
+function clearPendingBoardWrite(id: string, dslText: string) {
+  const pending = readPendingBoardWrites();
+  if (pending[id]?.dslText !== dslText) return;
+  delete pending[id];
+  writePendingBoardWrites(pending);
+}
+
+function overlayPendingBoardWrite(board: Board): Board {
+  const staged = readPendingBoardWrites()[board.id];
+  if (!staged || staged.dslText === board.dslText) {
+    if (staged) clearPendingBoardWrite(board.id, staged.dslText);
+    return board;
+  }
+  return {
+    ...board,
+    dslText: staged.dslText,
+    mode: staged.mode || board.mode,
+    title: staged.title || board.title,
+    updatedAt: staged.savedAt > board.updatedAt ? staged.savedAt : board.updatedAt,
+  };
+}
 
 export function toWorkspaceError(error: unknown): Error {
   const name = error instanceof DOMException ? error.name : '';
@@ -448,9 +499,26 @@ export class BoardManager {
       updatedAt: incomingClock && incomingClock > board.updatedAt ? incomingClock : new Date().toISOString(),
     });
     await this.repository.put('boards', await storeBoard(updated));
+    if (typeof patch.dslText === 'string') clearPendingBoardWrite(id, patch.dslText);
     if (activity) await this.addActivity(updated, activity);
     this.emit();
     return updated;
+  }
+
+  /**
+   * Remember a board edit synchronously. The debounced IndexedDB write can
+   * still be pending when the page reloads; readers overlay this mirror so
+   * the latest source, including dragged flow pins, is what comes back.
+   */
+  stageBoardWrite(id: string, patch: { dslText: string; mode: BoardMode; title?: string }) {
+    const pending = readPendingBoardWrites();
+    pending[id] = {
+      dslText: patch.dslText,
+      mode: patch.mode,
+      ...(patch.title ? { title: patch.title } : {}),
+      savedAt: new Date().toISOString(),
+    };
+    writePendingBoardWrites(pending);
   }
 
   subscribe(listener: () => void): () => void {
@@ -508,13 +576,14 @@ export class BoardManager {
   async list(query: BoardQuery = {}): Promise<Board[]> {
     await this.initialize();
     const stored = await this.repository.getAll<StoredBoard>('boards');
-    return filterAndSortBoards(await Promise.all(stored.map(hydrateBoard)), query);
+    const boards = await Promise.all(stored.map(async item => overlayPendingBoardWrite(await hydrateBoard(item))));
+    return filterAndSortBoards(boards, query);
   }
 
   async get(id: string): Promise<Board | undefined> {
     await this.initialize();
     const stored = await this.repository.get<StoredBoard>('boards', id);
-    return stored ? hydrateBoard(stored) : undefined;
+    return stored ? overlayPendingBoardWrite(await hydrateBoard(stored)) : undefined;
   }
 
   async create(

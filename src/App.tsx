@@ -942,8 +942,12 @@ function App() {
   // so the dashboard always holds the latest version — like Miro.
   useEffect(() => {
     if (view !== 'editor' || !currentBoardId || isReadOnlyShared) return;
+    const patch = boardPatchFromSource(dslText, activeTab);
+    // IndexedDB save is debounced below. Stage the same patch synchronously
+    // so a reload during that delay still opens the latest source.
+    boardManager.stageBoardWrite(currentBoardId, patch);
     const t = setTimeout(() => {
-      void boardManager.update(currentBoardId, boardPatchFromSource(dslText, activeTab))
+      void boardManager.update(currentBoardId, patch)
         .then(() => boardManager.createVersion(currentBoardId, 'Automatic save', true))
         .then(() => setWorkspaceError(''))
         .catch(error => setWorkspaceError(toWorkspaceError(error).message));
