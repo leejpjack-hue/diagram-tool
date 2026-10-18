@@ -114,6 +114,19 @@ describe('plainArchitectureToDSL', () => {
     const parsed = built('- User -> Chat app\n1. Chat app -> Agent');
     expect(parsed.nodes.map(item => item.name)).toEqual(['User', 'Chat app', 'Agent']);
     expect(parsed.edges).toHaveLength(2);
+    expect(parsed.edges.find(edge => edge.from === 'user')?.step).toBeUndefined();
+    expect(parsed.edges.find(edge => edge.to === 'agent')?.step).toBe(1);
+  });
+
+  it('turns a numbered arrow into step and a label', () => {
+    const parsed = built('2. A -> B: question\n3. B -> C: answer\n3. B -> D: aside');
+    expect(parsed.edges.map(edge => ({ from: edge.from, to: edge.to, label: edge.label, step: edge.step }))).toEqual([
+      { from: 'a', to: 'b', label: 'question', step: 2 },
+      { from: 'b', to: 'c', label: 'answer', step: 3 },
+      { from: 'b', to: 'd', label: 'aside', step: 3 },
+    ]);
+    expect(plainArchitectureToDSL('2. A -> B: question')).toContain('step: 2');
+    expect(plainArchitectureToDSL('A -> B: question')).not.toContain('step:');
   });
 
   it('merges duplicate names into one part', () => {

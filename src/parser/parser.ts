@@ -126,17 +126,25 @@ export class Parser {
     this.upsertArchitectureEdge(fromName, toName, this.readOptionalArchitectureEdgeSettings());
   }
 
+  private parseStepNumber(value: string | number): number | undefined {
+    const step = typeof value === 'number' ? value : Number(String(value).trim());
+    if (!Number.isInteger(step) || step < 1) return undefined;
+    return step;
+  }
+
   private readOptionalArchitectureEdgeSettings(): {
     label?: string;
     color?: string;
     sourceSide?: ConnectionSide;
     targetSide?: ConnectionSide;
+    step?: number;
   } {
     const settings: {
       label?: string;
       color?: string;
       sourceSide?: ConnectionSide;
       targetSide?: ConnectionSide;
+      step?: number;
     } = {};
     if (this.peek().type !== TokenType.LBRACE) return settings;
 
@@ -157,6 +165,9 @@ export class Parser {
           settings.sourceSide = this.parseConnectionSide(v.value);
         } else if (key === 'to' || key === 'target' || key === 'targetside' || key === 'targetport') {
           settings.targetSide = this.parseConnectionSide(v.value);
+        } else if (key === 'step') {
+          const step = this.parseStepNumber(v.value);
+          if (step !== undefined) settings.step = step;
         }
       } else {
         this.advance();
@@ -174,6 +185,7 @@ export class Parser {
       color?: string;
       sourceSide?: ConnectionSide;
       targetSide?: ConnectionSide;
+      step?: number;
     } = {},
   ): void {
     const fromId = fromName.toLowerCase().replace(/[^a-z0-9]/g, '_');
@@ -184,6 +196,7 @@ export class Parser {
       if (settings.color !== undefined) existing.color = settings.color;
       if (settings.sourceSide !== undefined) existing.sourceSide = settings.sourceSide;
       if (settings.targetSide !== undefined) existing.targetSide = settings.targetSide;
+      if (settings.step !== undefined) existing.step = settings.step;
       return;
     }
     this.edges.push({
@@ -194,6 +207,7 @@ export class Parser {
       color: settings.color,
       sourceSide: settings.sourceSide,
       targetSide: settings.targetSide,
+      ...(settings.step !== undefined ? { step: settings.step } : {}),
     });
   }
 

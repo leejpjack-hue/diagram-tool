@@ -180,6 +180,8 @@ export interface Edge {
   color?: string;
   sourceSide?: ConnectionSide;
   targetSide?: ConnectionSide;
+  /** DT-ARCH-02. Optional request-path number. Omitted when unset. May repeat. */
+  step?: number;
 }
 
 export type ConnectionSide = 'top' | 'right' | 'bottom' | 'left';

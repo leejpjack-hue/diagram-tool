@@ -30,7 +30,7 @@ export interface BoardView {
   mode: LocalMcpMode;
   source: string;
   nodes: Array<{ id: string; name?: string; type?: string }>;
-  edges: Array<{ from: string; to: string; label?: string }>;
+  edges: Array<{ from: string; to: string; label?: string; step?: number }>;
 }
 
 export type CreatedBoard = BoardView;
@@ -171,7 +171,12 @@ function toBoardView(filename: string, parsed: ParsedBoardFile): BoardView {
     mode: parsed.mode,
     source: parsed.source,
     nodes: graph.nodes.map(node => ({ id: node.id, name: node.name, type: node.type })),
-    edges: graph.edges.map(edge => ({ from: edge.from, to: edge.to, label: edge.label })),
+    edges: graph.edges.map(edge => ({
+      from: edge.from,
+      to: edge.to,
+      label: edge.label,
+      ...(edge.step !== undefined ? { step: edge.step } : {}),
+    })),
   };
 }
 

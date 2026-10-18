@@ -307,7 +307,12 @@ server.registerTool(
           text: JSON.stringify({
             ...summarizeDiagram(parsed),
             nodesByName: parsed.nodes.map(n => ({ id: n.id, type: n.type, name: n.name })),
-            edges: parsed.edges.map(e => ({ from: e.from, to: e.to, label: e.label })),
+            edges: parsed.edges.map(e => ({
+              from: e.from,
+              to: e.to,
+              label: e.label,
+              ...(e.step !== undefined ? { step: e.step } : {}),
+            })),
           }, null, 2),
         }],
       };

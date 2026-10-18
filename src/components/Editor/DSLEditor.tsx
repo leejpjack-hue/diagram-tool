@@ -13,6 +13,7 @@ import { TypePartsPreview } from './TypePartsPreview';
 import { TypeMessagesPreview } from './TypeMessagesPreview';
 import { TypeTasksPreview } from './TypeTasksPreview';
 import { flowStepList, type FlowStep } from '../../parser/flowToPlainSteps';
+import { architectureWalkSequence } from '../../parser/architectureWalk';
 import { plainStepsFromBoardSource, applyLoadedPlainSteps, sourceMatchesRoleLanes } from '../../parser/boardToPlainSteps';
 import { insertRolePrefix, type RolePrefixRole } from '../../parser/insertRolePrefix';
 import { nextShowStepsAfterBuild, statsFromPlainStepsDsl, buildFromStepsSuccessMessage } from './buildFromStepsPanel';
@@ -396,6 +397,11 @@ Go live — milestone after Review`;
     }
   }, [diagramMode, parsedDiagram]);
 
+  const archCanWalk = useMemo(() => {
+    if (diagramMode !== 'architecture' || !parsedDiagram) return false;
+    return architectureWalkSequence(parsedDiagram).length > 0;
+  }, [diagramMode, parsedDiagram]);
+
 
   const copy = async (kind: 'mermaid' | 'dsl' | 'steps') => {
     if (kind === 'steps') {
@@ -441,7 +447,7 @@ Go live — milestone after Review`;
           </div>
         )}
         {diagramMode === 'architecture' && (
-          <div className="mt-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
               data-testid="toggle-type-parts"
@@ -450,6 +456,16 @@ Go live — milestone after Review`;
             >
               {showParts ? 'Hide Type parts' : 'Type parts'}
             </button>
+            {archCanWalk && (
+              <button
+                type="button"
+                data-testid="walk-through"
+                onClick={enterWalkThrough}
+                className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400"
+              >
+                Walk through
+              </button>
+            )}
           </div>
         )}
         {diagramMode === 'sequence' && (

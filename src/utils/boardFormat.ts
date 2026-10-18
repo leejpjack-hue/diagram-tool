@@ -53,6 +53,8 @@ export interface PortableEdge {
   from: string;
   to: string;
   label?: string;
+  /** DT-ARCH-02. Omitted when the architecture edge has no step. */
+  step?: number;
 }
 
 export interface PortableLayout {
@@ -203,6 +205,7 @@ export function projectBoardGraph(mode: BoardMode, dslText: string): {
       from: edge.from,
       to: edge.to,
       label: edge.label,
+      ...(edge.step !== undefined ? { step: edge.step } : {}),
     }));
     return { nodes, edges, layout: { pins: layout } };
   } catch {

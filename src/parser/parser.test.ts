@@ -335,6 +335,55 @@ service FirstService {
       expect(() => parseDiagram(dsl)).toThrow(/Unexpected end of input \(expected RBRACE\)/);
     });
 
+    it('parses optional step and omits it when unset', () => {
+      const dsl = `
+diagram: architecture
+service ChatApp {}
+service Agent {}
+service Model {}
+edge "Chat app" -> Agent { label: "question" step: 2 }
+edge Agent -> Model { label: "prompt" }
+ChatApp -> Agent { step: 0 }
+`;
+      const result = parseDiagram(dsl);
+      const question = result.edges.find(edge => edge.label === 'question');
+      const prompt = result.edges.find(edge => edge.label === 'prompt');
+      expect(question?.step).toBe(2);
+      expect(question?.from).toBe('chat_app');
+      expect(prompt?.step).toBeUndefined();
+      expect(result.edges.find(edge => edge.from === 'chatapp')?.step).toBeUndefined();
+    });
+
+    it('keeps repeated steps in declaration order', () => {
+      const dsl = `
+diagram: architecture
+service A {}
+service B {}
+service C {}
+service D {}
+edge B -> C { step: 3 label: "right" }
+edge A -> B { step: 1 label: "first" }
+edge A -> D { step: 3 label: "left" }
+edge D -> C { label: "plain" }
+`;
+      const result = parseDiagram(dsl);
+      const numbered = result.edges.filter(edge => edge.step !== undefined);
+      expect(numbered.map(edge => edge.step)).toEqual([3, 1, 3]);
+      expect(numbered.map(edge => edge.label)).toEqual(['right', 'first', 'left']);
+      expect(result.edges.find(edge => edge.label === 'plain')?.step).toBeUndefined();
+    });
+
+    it('ignores step on a flow connection', () => {
+      const dsl = `
+diagram: flow
+A -> B { step: 2 label: "go" }
+`;
+      const result = parseDiagram(dsl);
+      expect(result.mode).toBe('flow');
+      expect(result.edges[0].label).toBe('go');
+      expect(result.edges[0].step).toBeUndefined();
+    });
+
     it('handles multiple labelled edges in one diagram', () => {
       const dsl = `
 service Client {}
