@@ -24,6 +24,12 @@ interface WalkThroughOverlayProps {
   onPrev: () => void;
   onNext: () => void;
   onExit: () => void;
+  /**
+   * DT-SEQ-03: `panel` sits in a React Flow panel (Flow and Architecture).
+   * `anchor` is the same controls, positioned by the parent, for a canvas
+   * that is not React Flow. The buttons, caption, and keys stay one component.
+   */
+  placement?: 'panel' | 'anchor';
 }
 
 /**
@@ -32,7 +38,7 @@ interface WalkThroughOverlayProps {
  * arrow keys are handled here while walk-through is active (same input-guard
  * pattern as the canvas F2 handler). Purely view state — nothing is edited.
  */
-export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, paths, choices, onChoose, pathText, captionText, onPrev, onNext, onExit }: WalkThroughOverlayProps) {
+export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, paths, choices, onChoose, pathText, captionText, onPrev, onNext, onExit, placement = 'panel' }: WalkThroughOverlayProps) {
   // DT-AI-22 — Copy path: writes the session path text to the clipboard and
   // briefly flips the label to "Copied". Failures are swallowed (silent), and
   // any pending reset timer is cleared on unmount.
@@ -96,8 +102,7 @@ export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, 
     return () => window.removeEventListener('keydown', onKey);
   }, [onNext, onPrev, onExit]);
 
-  return (
-    <Panel position="top-center" className="!m-3">
+  const card = (
       <div
         data-testid="walk-through-overlay"
         className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur"
@@ -184,6 +189,19 @@ export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, 
         </button>
         <span className="text-[10px] text-slate-400">←/→ keys · Esc to exit</span>
       </div>
+  );
+
+  if (placement === 'anchor') {
+    return (
+      <div className="pointer-events-auto absolute left-1/2 top-3 z-30 -translate-x-1/2">
+        {card}
+      </div>
+    );
+  }
+
+  return (
+    <Panel position="top-center" className="!m-3">
+      {card}
     </Panel>
   );
 }

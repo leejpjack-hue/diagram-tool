@@ -767,9 +767,9 @@ describe('Shared read-only banner Walk through (DT-AI-23)', () => {
       dslText: ARCH_DSL,
     },
     {
-      label: 'Sequence board',
+      label: 'Sequence board with no messages',
       mode: 'sequence' as BoardMode,
-      dslText: 'sequenceDiagram\nAlice->>Bob: hi',
+      dslText: 'sequenceDiagram\nparticipant Alice\nparticipant Bob',
     },
     {
       label: 'Gantt board',
@@ -792,6 +792,33 @@ describe('Shared read-only banner Walk through (DT-AI-23)', () => {
     expect(within(banner).getByTestId('shared-save-local-copy')).toBeInTheDocument();
     expect(within(banner).queryByTestId('shared-walk-through')).toBeNull();
     expect(screen.queryByTestId('toast-item')).toBeNull();
+  });
+
+  it('shows Walk through on a shared sequence board with a message and keeps read-only on Exit', async () => {
+    setSupabaseClientForTests(
+      mockSharedClient({
+        title: 'Shared sequence',
+        mode: 'sequence',
+        dslText: 'sequenceDiagram\nAlice->>Bob: hi',
+      }),
+    );
+    window.history.replaceState({}, '', '/app/?share=tok_seq_03');
+
+    render(<App />);
+
+    const banner = await screen.findByTestId('shared-readonly-banner');
+    const walkBtn = within(banner).getByTestId('shared-walk-through');
+    expect(walkBtn).toHaveAccessibleName('Walk through');
+    fireEvent.click(walkBtn);
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('1 · Alice → Bob: hi');
+    expect(document.querySelector('[data-walk-current="true"]')).not.toBeNull();
+    expect(useDiagramStore.getState().isReadOnlyShared).toBe(true);
+
+    fireEvent.click(screen.getByTestId('walk-through-exit'));
+    expect(screen.queryByTestId('walk-through-overlay')).toBeNull();
+    expect(useDiagramStore.getState().walkThroughStep).toBeNull();
+    expect(useDiagramStore.getState().isReadOnlyShared).toBe(true);
+    expect(screen.getByTestId('shared-readonly-banner')).toBeInTheDocument();
   });
 });
 

@@ -50,6 +50,15 @@ describe('Type messages panel', () => {
     }
   });
 
+  it('shows Walk through only when the sequence has a message', () => {
+    const empty = renderSequence('sequenceDiagram\nparticipant A\nparticipant B\nNote over A: hi');
+    expect(screen.queryByTestId('walk-through')).toBeNull();
+    empty.unmount();
+
+    renderSequence();
+    expect(screen.getByTestId('walk-through')).toBeInTheDocument();
+  });
+
   it('opens a hand-written board onto an empty box and does not change the source', () => {
     renderSequence();
     fireEvent.click(screen.getByTestId('toggle-type-messages'));
