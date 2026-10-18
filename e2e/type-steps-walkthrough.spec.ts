@@ -19,9 +19,16 @@ test('Build success toast Walk through starts and exits the walkthrough', async 
   const toast = page.getByTestId('toast-item').filter({ hasText: 'Built 3 steps' });
   await expect(toast).toHaveCount(1);
   await expect(toast).toContainText('Built 3 steps onto the board');
-  await expect(toast.getByTestId('toast-action')).toHaveAccessibleName('Walk through');
+  const walkThrough = toast.getByTestId('toast-action');
+  await expect(walkThrough).toHaveAccessibleName('Walk through');
 
-  await toast.getByTestId('toast-action').click();
+  // Create new also shows "Board created" in a second top-right stack. That
+  // toast can cover this action until it auto-dismisses. Focus pauses this
+  // toast's own timer so the wait cannot dismiss Walk through out from under us.
+  await walkThrough.focus();
+  await expect(page.getByTestId('toast-item').filter({ hasText: 'Board created' })).toHaveCount(0);
+
+  await walkThrough.click();
   await expect(page.getByTestId('toast-item')).toHaveCount(0);
   await expect(page.getByTestId('walk-through-overlay')).toBeVisible();
   await expect(page.getByTestId('walk-through-caption')).toContainText('Step 1 of 3');
