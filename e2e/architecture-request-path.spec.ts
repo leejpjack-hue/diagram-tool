@@ -70,6 +70,57 @@ async function expectHop(page: Page, index: number) {
   await expect(page.getByTestId(`rf__node-${hop.dim}`)).toHaveCSS('opacity', '0.15');
 }
 
+async function walkAllHops(page: Page) {
+  await page.getByTestId('walk-through').click();
+  await expectHop(page, 0);
+  for (let index = 1; index < HOPS.length; index++) {
+    await page.getByTestId('walk-through-next').click();
+    await expectHop(page, index);
+  }
+}
+
+/**
+ * The localStorage pending-writes mirror is cleared once IndexedDB commits
+ * (#102). Wait on the saved board itself so a fast commit cannot race the wait.
+ */
+async function waitForSavedNumberedBoard(page: Page) {
+  await page.waitForFunction(async () => {
+    try {
+      return await new Promise<boolean>(resolve => {
+        const request = indexedDB.open('diagram-tool-workspace');
+        request.onerror = () => resolve(false);
+        request.onsuccess = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains('boards')) {
+            db.close();
+            resolve(false);
+            return;
+          }
+          const getAll = db.transaction('boards', 'readonly').objectStore('boards').getAll();
+          getAll.onerror = () => {
+            db.close();
+            resolve(false);
+          };
+          getAll.onsuccess = () => {
+            const boards = getAll.result as Array<{ title?: string; dslText?: string }>;
+            db.close();
+            resolve(boards.some(board => {
+              const dsl = board.dslText ?? '';
+              return (board.title === 'Request path walk' || dsl.includes('title: Request path walk'))
+                && dsl.includes('step: 1')
+                && dsl.includes('step: 2')
+                && dsl.includes('step: 3')
+                && dsl.includes('step: 4');
+            }));
+          };
+        };
+      });
+    } catch {
+      return false;
+    }
+  }, undefined, { timeout: 15_000 });
+}
+
 test('numbered architecture path shows badges, walks each hop, survives reload, and hides Walk through without steps', async ({ page }) => {
   await openBlankArchitecture(page);
   await setEditorDsl(page, NUMBERED);
@@ -77,27 +128,17 @@ test('numbered architecture path shows badges, walks each hop, survives reload, 
   await expectBadges(page);
   await expect(page.getByTestId('walk-through')).toBeVisible();
 
-  await page.getByTestId('walk-through').click();
-  await expectHop(page, 0);
-  for (let index = 1; index < HOPS.length; index++) {
-    await page.getByTestId('walk-through-next').click();
-    await expectHop(page, index);
-  }
+  await walkAllHops(page);
   await expect(page.getByTestId('walk-through-copy-path')).toBeEnabled();
 
-  await page.waitForFunction(() => {
-    const raw = localStorage.getItem('diagram-tool-pending-board-writes') ?? '';
-    return raw.includes('Request path walk') && raw.includes('step: 4');
-  });
+  await waitForSavedNumberedBoard(page);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
   await page.getByRole('heading', { name: 'Request path walk' }).first().click();
   await waitForEditor(page);
   await expectBadges(page);
-  await page.getByTestId('walk-through').click();
-  await expectHop(page, 0);
-  await page.getByTestId('walk-through-next').click();
-  await expectHop(page, 1);
+  await expect(page.getByTestId('walk-through')).toBeVisible();
+  await walkAllHops(page);
 
   await setEditorDsl(page, PLAIN);
   await expect(page.getByTestId('rf__node-user')).toBeVisible();
