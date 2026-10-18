@@ -51,10 +51,12 @@ test('Type messages builds an alt sequence, flags a bad line, and refills after 
   await expect(canvas.getByText('Actor', { exact: true })).toHaveCount(0);
   await expect(canvas.getByText('ALT', { exact: true })).toBeVisible();
   await expect(canvas.getByText('no flights', { exact: true })).toBeVisible();
-  await expect(canvas.getByText('try other dates', { exact: true })).toBeVisible();
-
-  const reply = canvas.locator('g').filter({ hasText: '3 options' }).first();
-  await expect(reply.locator('line').first()).toHaveAttribute('stroke-dasharray', '6 4');
+  // Message labels sit in an SVG <text> that also carries a <title> tooltip,
+  // so the element's full string is longer than the label. Lifelines are
+  // dashed 5 5; a dashed reply is the only 6 4 stroke.
+  await expect(canvas.locator('text').filter({ hasText: 'try other dates' })).toBeVisible();
+  await expect(canvas.locator('text').filter({ hasText: '3 options' })).toBeVisible();
+  await expect(canvas.locator('line[stroke-dasharray="6 4"]')).toHaveCount(1);
 
   await page.waitForFunction(() => (localStorage.getItem('diagram-tool-pending-board-writes') ?? '').includes('@type-messages'));
   await page.reload();
