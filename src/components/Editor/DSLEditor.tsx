@@ -4,8 +4,10 @@ import { useDiagramStore } from '../../store/diagramStore';
 import { installDiagramDslTestHook } from '../../utils/devTestHook';
 import { applyBoardSource, toDslSource, toMermaidSource } from '../../utils/sourceText';
 import { plainStepsToDSL } from '../../parser/plainSteps';
+import { plainArchitectureToDSL, plainPartsFromBoardSource, typePartsSuccessMessage } from '../../parser/plainArchitecture';
 import { stepLineRange } from '../../parser/typeStepsPreview';
 import { TypeStepsPreview } from './TypeStepsPreview';
+import { TypePartsPreview } from './TypePartsPreview';
 import { flowStepList, type FlowStep } from '../../parser/flowToPlainSteps';
 import { plainStepsFromBoardSource, applyLoadedPlainSteps, sourceMatchesRoleLanes } from '../../parser/boardToPlainSteps';
 import { insertRolePrefix, type RolePrefixRole } from '../../parser/insertRolePrefix';
@@ -32,6 +34,11 @@ export function DSLEditor() {
   // DT-AI-27: off until the user ticks it. The board remembers it by the
   // lane blocks in the DSL, so Load steps restores the tick. No new field.
   const [lanesByRole, setLanesByRole] = useState(false);
+  // DT-ARCH-01: "Type parts" is the architecture twin of Type steps.
+  const [showParts, setShowParts] = useState(false);
+  const [partsText, setPartsText] = useState('');
+  const [partsHandwritten, setPartsHandwritten] = useState(false);
+  const partsInputRef = useRef<HTMLTextAreaElement | null>(null);
   const toast = useToast();
   // DT-AI-08: textarea ref so role-prefix buttons can read the caret/selection.
   const stepsInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -132,6 +139,71 @@ else Flag for review`;
       toast.error(err instanceof Error ? err.message : 'Could not read those steps. Type one step per line.');
     }
   }, [stepsText, lanesByRole, toast, applySource, diagramMode, enterWalkThrough]);
+
+  // Undo/redo replaces dslText without going through Monaco. Re-parse so the
+  // canvas follows the restored source. Flow keeps its own applySource path.
+  useEffect(() => {
+    if (diagramMode !== 'architecture') return;
+    const result = applyBoardSource(dslText, 'architecture');
+    if (result.ok) {
+      setError(null);
+      setSourceWarning(result.warnings.length > 0 ? result.warnings.join('\n') : null);
+      if (result.kind === 'diagram') setParsedDiagram(result.parsed);
+    } else {
+      setError(result.error);
+      setSourceWarning(null);
+    }
+  }, [dslText, diagramMode, setParsedDiagram, setError, setSourceWarning]);
+
+  const PARTS_PLACEHOLDER = `User -> Chat app: asks
+Chat app -> Agent: question
+Agent -> Vector DB: search
+inside Cloud: Chat app, Agent`;
+
+  const toggleParts = useCallback(() => {
+    setShowParts(open => {
+      const next = !open;
+      if (!next) return next;
+      const loaded = plainPartsFromBoardSource(useDiagramStore.getState().dslText);
+      if (loaded == null) {
+        setPartsText('');
+        setPartsHandwritten(true);
+      } else {
+        setPartsText(loaded);
+        setPartsHandwritten(false);
+      }
+      return next;
+    });
+  }, []);
+
+  const buildFromParts = useCallback(() => {
+    const input = partsText.trim();
+    if (!input) {
+      toast.error('Type one part per line first. Example: "User -> Chat app: asks", "Agent -> Vector DB: search".');
+      return;
+    }
+    try {
+      const stats = { parts: 0, connections: 0 };
+      const dsl = plainArchitectureToDSL(input, {
+        title: useDiagramStore.getState().dslText.match(/^\s*title\s*:\s*(.+)\s*$/im)?.[1]?.trim(),
+        stats,
+      });
+      setShowParts(true);
+      setPartsHandwritten(false);
+      applySource(dsl);
+      toast.success(typePartsSuccessMessage(stats.parts, stats.connections));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not read those parts. Type one connection per line.');
+    }
+  }, [partsText, toast, applySource]);
+
+  const focusPartsLine = useCallback((lineIndex: number) => {
+    const input = partsInputRef.current;
+    if (!input) return;
+    const range = stepLineRange(partsText, lineIndex);
+    input.focus();
+    input.setSelectionRange(range.start, range.end);
+  }, [partsText]);
 
   // DT-AI-07: fill Type steps from the live board (same serializer as Copy; no clipboard).
   const loadSteps = useCallback(() => {
@@ -246,6 +318,18 @@ else Flag for review`;
               className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400"
             >
               {showSteps ? 'Hide Type steps' : 'Type steps'}
+            </button>
+          </div>
+        )}
+        {diagramMode === 'architecture' && (
+          <div className="mt-2">
+            <button
+              type="button"
+              data-testid="toggle-type-parts"
+              onClick={toggleParts}
+              className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400"
+            >
+              {showParts ? 'Hide Type parts' : 'Type parts'}
             </button>
           </div>
         )}
@@ -387,6 +471,46 @@ else Flag for review`;
               className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400"
             >
               Copy AI prompt
+            </button>
+            <span className="text-[11px] text-slate-500">Parsed locally — nothing leaves this device.</span>
+          </div>
+        </div>
+      )}
+
+      {diagramMode === 'architecture' && showParts && (
+        <div
+          data-testid="type-parts-box"
+          className="mx-3 mb-2 rounded-md border border-indigo-100 bg-indigo-50/60 p-3"
+        >
+          <label className="mb-1 block text-[11px] font-semibold text-indigo-700">
+            Type parts — one connection per line. A -&gt; B or A -&gt; B: label. Kinds from (db), (queue), (AI), (tool), (user), or a name ending in DB, Queue, Agent, Tool, or User. Groups: inside Cloud: A, B
+          </label>
+          <textarea
+            ref={partsInputRef}
+            data-testid="type-parts-input"
+            value={partsText}
+            onChange={e => {
+              setPartsText(e.target.value);
+              if (e.target.value.trim()) setPartsHandwritten(false);
+            }}
+            placeholder={PARTS_PLACEHOLDER}
+            rows={4}
+            className="w-full rounded border border-indigo-200 bg-white p-2 font-mono text-xs text-slate-800 focus:border-indigo-400 focus:outline-none"
+          />
+          {partsHandwritten && !partsText.trim() && (
+            <p data-testid="type-parts-handwritten-hint" className="mt-1 text-[11px] text-slate-500">
+              This board was not built with Type parts. The box starts empty so the current DSL stays as it is.
+            </p>
+          )}
+          <TypePartsPreview text={partsText} onFocusLine={focusPartsLine} />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="build-parts"
+              onClick={buildFromParts}
+              className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+            >
+              Build board
             </button>
             <span className="text-[11px] text-slate-500">Parsed locally — nothing leaves this device.</span>
           </div>
