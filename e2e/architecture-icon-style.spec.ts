@@ -103,6 +103,13 @@ test.describe('Architecture icon styles', () => {
     expect(svg.toLowerCase()).toMatch(/0b1f3a|rgb\(11,\s*31,\s*58\)/);
   });
 
+  // The Vite dev server has no Supabase client, so a share lookup never fires
+  // and page.route cannot see it. Pin this test to the preview server (4173),
+  // which Playwright's webServer already starts, matching the other share specs.
+  // PW_BASE_URL can retarget it (for example at live) without hard-coding the path.
+  test.describe('preview share', () => {
+    test.use({ baseURL: process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173' });
+
   test('shared architecture view renders Blueprint, step badges, and the walk highlight', async ({ page }) => {
     await page.route('**/rest/v1/rpc/get_diagram_by_share_token*', async route => {
       await route.fulfill({
@@ -138,6 +145,7 @@ test.describe('Architecture icon styles', () => {
     });
 
     await page.goto('/app/?share=tok_arch_03');
+    expect(new URL(page.url()).origin).toBe(new URL(process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173').origin);
     const banner = page.getByTestId('shared-readonly-banner');
     await expect(banner).toBeVisible();
     await expect(page.getByTestId('icon-style-picker')).toHaveCount(0);
@@ -152,5 +160,6 @@ test.describe('Architecture icon styles', () => {
     await banner.getByTestId('shared-walk-through').click();
     await expect(page.getByTestId('walk-through-caption')).toContainText('Gateway');
     await expect(page.getByTestId('rf__node-gateway')).toHaveCSS('box-shadow', /253,\s*230,\s*138/);
+  });
   });
 });
