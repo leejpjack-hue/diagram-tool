@@ -232,6 +232,7 @@ function writePendingBoardWrites(pending: Record<string, PendingBoardWrite>) {
 
 function clearPendingBoardWrite(id: string, dslText: string) {
   const pending = readPendingBoardWrites();
+  // An older in-flight save must not drop a newer staged patch.
   if (pending[id]?.dslText !== dslText) return;
   delete pending[id];
   writePendingBoardWrites(pending);
@@ -511,14 +512,18 @@ export class BoardManager {
    * the latest source, including dragged flow pins, is what comes back.
    */
   stageBoardWrite(id: string, patch: { dslText: string; mode: BoardMode; title?: string }) {
-    const pending = readPendingBoardWrites();
-    pending[id] = {
-      dslText: patch.dslText,
-      mode: patch.mode,
-      ...(patch.title ? { title: patch.title } : {}),
-      savedAt: new Date().toISOString(),
-    };
-    writePendingBoardWrites(pending);
+    try {
+      const pending = readPendingBoardWrites();
+      pending[id] = {
+        dslText: patch.dslText,
+        mode: patch.mode,
+        ...(patch.title ? { title: patch.title } : {}),
+        savedAt: new Date().toISOString(),
+      };
+      writePendingBoardWrites(pending);
+    } catch {
+      // Quota, private mode, or a disabled localStorage. IndexedDB autosave still runs.
+    }
   }
 
   subscribe(listener: () => void): () => void {
