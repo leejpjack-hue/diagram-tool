@@ -157,6 +157,18 @@ Type parts writes ordinary architecture DSL into `source.text` / `dslText`: `ser
 
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 
+### Numbered request path
+
+An architecture edge may carry an optional positive integer `step`. It is written on the edge settings block and on the portable `edges[]` item only when it is set:
+
+```
+edge "Chat app" -> Agent { label: "question" step: 2 }
+```
+
+Type parts accepts the same number as a shorthand on an arrow line: `2. Chat app -> Agent: question`. The same number may appear on more than one edge (those hops are parallel). Edges without `step` are unchanged: the field is absent from the DSL block and from JSON. `version` stays **3.0**. No database migration.
+
+A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
+
 `nodes` and `edges` are a portable projection of that source plus layout pins. Re-opening the file prefers `source.text` / `dslText` and restores typed boards (architecture, flow, sequence, Gantt) so layout stays within ±2px of the export.
 
 ### Complete backup (`kind: "workspace"`)

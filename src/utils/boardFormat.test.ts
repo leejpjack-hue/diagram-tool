@@ -498,6 +498,31 @@ lane "AI agent" {
     }
   });
 
+  it('writes architecture edge step only when it is set and stays on 3.0', () => {
+    expect(BOARD_FORMAT_VERSION).toBe('3.0');
+    const source = (schema.$defs as { source?: { properties?: { text?: { description?: string } } }; edge?: { properties?: { step?: { type?: string } } } });
+    expect(source.edge?.properties?.step?.type).toBe('integer');
+
+    const numbered = `diagram: architecture
+title: Request path
+service User {}
+service App {}
+edge User -> App { label: "asks" step: 1 }
+edge App -> User { label: "back" }
+`;
+    const doc = buildBoardDocument(board({ title: 'Request path', dslText: numbered }));
+    expect(doc.version).toBe('3.0');
+    expect(doc.board.edges.map(edge => edge.step)).toEqual([1, undefined]);
+    const json = JSON.parse(JSON.stringify(doc)) as { board: { edges: Array<Record<string, unknown>> } };
+    expect(json.board.edges[0].step).toBe(1);
+    expect(json.board.edges[1]).not.toHaveProperty('step');
+
+    const plain = buildBoardDocument(board());
+    expect(plain.board.edges.every(edge => edge.step === undefined)).toBe(true);
+    expect(JSON.stringify(plain.board.edges)).not.toContain('"step"');
+    expect(validatePortableDocument(doc).ok).toBe(true);
+  });
+
   it('PNG/SVG/PDF export stays free and unwatermarked', () => {
     expect(EXPORT_WATERMARK).toBeNull();
     expect(EXPORT_REQUIRES_ACCOUNT).toBe(false);

@@ -27,6 +27,7 @@ import { generateGanttDSL } from './components/Gantt/ganttGenerator';
 import { retainTypeTasksBlock } from './parser/plainGantt';
 import { seedTypeStepsForTemplate } from './parser/boardToPlainSteps';
 import { flowStepList } from './parser/flowToPlainSteps';
+import { architectureWalkSequence } from './parser/architectureWalk';
 import { applyBoardSource, extractBoardTitle } from './utils/sourceText';
 import { exportGanttChart } from './components/Gantt/exportUtils';
 import type { DelayImpactResult } from './components/Gantt/delayImpactUtils';
@@ -1100,12 +1101,18 @@ function App() {
 
   // DT-AI-23: same walkability gate as DSLEditor / DiagramCanvas.
   const canWalkShared = useMemo(() => {
-    if (!isReadOnlyShared || diagramMode !== 'flow' || !parsedDiagram) return false;
-    try {
-      return flowStepList(parsedDiagram).length > 0;
-    } catch {
-      return false;
+    if (!isReadOnlyShared || !parsedDiagram) return false;
+    if (diagramMode === 'flow') {
+      try {
+        return flowStepList(parsedDiagram).length > 0;
+      } catch {
+        return false;
+      }
     }
+    if (diagramMode === 'architecture') {
+      return architectureWalkSequence(parsedDiagram).length > 0;
+    }
+    return false;
   }, [isReadOnlyShared, diagramMode, parsedDiagram]);
 
   const handleSaveSharedAsLocalCopy = async () => {

@@ -34,7 +34,9 @@ import { applyBoardSource, renameNodeInSource } from '../../utils/sourceText';
 import { isMermaidFlow } from '../../parser/mermaidFlow';
 import { parseDiagram } from '../../parser/parser';
 import { flowStepList, flowStepNumbers, type FlowStep } from '../../parser/flowToPlainSteps';
+import { architectureHopCaption, architectureWalkSequence } from '../../parser/architectureWalk';
 import { WalkThroughOverlay } from './WalkThroughOverlay';
+import { ArchitectureStepEdge } from './ArchitectureStepEdge';
 import { NO_STEP_NUMBERS, StepNumberContext } from './stepNumberContext';
 import { withStepNumber } from './stepNumberSlot';
 import { LoopEdge } from './LoopEdge';
@@ -59,7 +61,7 @@ const architectureNodeTypes = {
   annotation: AnnotationNode,
 };
 
-const flowEdgeTypes = { loop: LoopEdge };
+const flowEdgeTypes = { loop: LoopEdge, archStep: ArchitectureStepEdge };
 
 const flowNodeTypes = {
   flow: withStepNumber(ProcessNode),
@@ -615,6 +617,11 @@ function DiagramCanvasInternal() {
       const flowAttach = diagramMode === 'flow' && sourceSide && targetSide
         ? `flow-source-side-${sourceSide} flow-target-side-${targetSide}`
         : undefined;
+      const archRoute = rfEdgeType === 'smoothstep' ? 'smoothstep'
+        : rfEdgeType === 'step' ? 'step'
+        : rfEdgeType === 'straight' ? 'straight'
+        : 'bezier';
+      const showArchStep = diagramMode === 'architecture' && edge.step !== undefined;
       return {
         id: edge.id,
         source: edge.from,
@@ -624,7 +631,8 @@ function DiagramCanvasInternal() {
         className: flowAttach,
         label: edge.label,
         animated: false,
-        type: rfEdgeType,
+        type: showArchStep ? 'archStep' : rfEdgeType,
+        data: showArchStep ? { step: edge.step, route: archRoute } : undefined,
         ...(rfEdgeType === 'smoothstep' ? { pathOptions: { borderRadius: 14 } } : {}),
         style: {
           stroke,
@@ -915,13 +923,40 @@ function DiagramCanvasInternal() {
     return lines.join('\n');
   }, [walkActive, parsedDiagram, walkSessionPath, walkSteps]);
 
+  // DT-ARCH-02 — numbered edges, one hop at a time. Flow walkSteps stay empty
+  // here, so the Flow computations above are unchanged.
+  const archHops = useMemo(() => {
+    if (diagramMode !== 'architecture' || !parsedDiagram) return [];
+    return architectureWalkSequence(parsedDiagram);
+  }, [diagramMode, parsedDiagram]);
+  const archWalkActive = diagramMode === 'architecture' && walkThroughStep !== null && archHops.length > 0;
+  const archIndex = archWalkActive ? Math.min(walkThroughStep ?? 0, archHops.length - 1) : 0;
+  const currentArchHop = archWalkActive ? archHops[archIndex] : null;
+  const archNameOf = (id: string) => parsedDiagram?.nodes.find(node => node.id === id)?.name ?? id;
+  const archCaption = currentArchHop ? architectureHopCaption(currentArchHop, archNameOf) : '';
+  const archCopyPathText = useMemo((): string | undefined => {
+    if (!archWalkActive || !parsedDiagram) return undefined;
+    const kept: number[] = [];
+    let prev = -1;
+    for (const idx of [0, ...walkThroughStack, archIndex]) {
+      if (idx === prev || idx < 0 || idx >= archHops.length) continue;
+      kept.push(idx);
+      prev = idx;
+    }
+    if (kept.length === 0) return undefined;
+    const nameOf = (id: string) => parsedDiagram.nodes.find(node => node.id === id)?.name ?? id;
+    return kept.map(idx => architectureHopCaption(archHops[idx], nameOf)).join('\n');
+  }, [archWalkActive, parsedDiagram, walkThroughStack, archIndex, archHops]);
+
   // Guard: board emptied or mode switched while active → leave walk-through;
   // board shrank → clamp to the last step instead of showing a blank caption.
+  // Architecture uses numbered hops; every other mode keeps the Flow list.
   useEffect(() => {
     if (walkThroughStep === null) return;
-    if (walkSteps.length === 0) exitWalkThrough();
-    else if (walkThroughStep >= walkSteps.length) setWalkThroughStep(walkSteps.length - 1);
-  }, [walkThroughStep, walkSteps, exitWalkThrough, setWalkThroughStep]);
+    const total = diagramMode === 'architecture' ? archHops.length : walkSteps.length;
+    if (total === 0) exitWalkThrough();
+    else if (walkThroughStep >= total) setWalkThroughStep(total - 1);
+  }, [walkThroughStep, walkSteps, archHops, diagramMode, exitWalkThrough, setWalkThroughStep]);
 
   // Keep the current step in view (pan/fit) on large boards.
   useEffect(() => {
@@ -929,10 +964,34 @@ function DiagramCanvasInternal() {
     fitView({ nodes: [{ id: walkCurrentId }], padding: 0.8, maxZoom: 1, duration: 300 });
   }, [walkCurrentId, fitView]);
 
+  useEffect(() => {
+    if (!currentArchHop) return;
+    fitView({
+      nodes: [{ id: currentArchHop.from }, { id: currentArchHop.to }],
+      padding: 0.8,
+      maxZoom: 1,
+      duration: 300,
+    });
+  }, [currentArchHop, fitView]);
+
   // View-only dimming (DT-AI-21): three opacity tiers while walk-through is
   // on — current = 1, session-path trail = mid readable, everything else =
   // heavy dim. Never written back to state.
   const displayNodes = useMemo((): Node[] => {
+    if (archWalkActive && currentArchHop) {
+      const hot = new Set([currentArchHop.from, currentArchHop.to]);
+      return nodes.map(n => {
+        const isCurrent = hot.has(n.id);
+        return {
+          ...n,
+          style: {
+            ...n.style,
+            opacity: isCurrent ? 1 : 0.15,
+            ...(isCurrent ? { boxShadow: `0 0 0 3px ${flowTokens.walk.highlight}`, borderRadius: 10 } : {}),
+          },
+        };
+      });
+    }
     if (!walkActive) return nodes;
     return nodes.map(n => {
       const isCurrent = n.id === walkCurrentId;
@@ -947,13 +1006,31 @@ function DiagramCanvasInternal() {
         },
       };
     });
-  }, [nodes, walkActive, walkCurrentId, walkTrailNodeIds, flowTokens]);
+  }, [nodes, walkActive, walkCurrentId, walkTrailNodeIds, flowTokens, archWalkActive, currentArchHop]);
 
   // View-only dimming: everything except the current step fades. Edges on the
   // path the human took are emphasized — the arrived-by edge of the current
   // step is active (indigo, matching the choose buttons), earlier hops keep a
   // softer trail. Never written back to state.
   const displayEdges = useMemo((): ReactFlowEdge[] => {
+    if (archWalkActive && currentArchHop) {
+      return edges.map(e => {
+        if (e.id === currentArchHop.edgeId) {
+          return {
+            ...e,
+            className: 'walk-through-edge-active',
+            style: { ...e.style, strokeWidth: 3, stroke: flowTokens.walk.highlight },
+            zIndex: 5,
+          };
+        }
+        return {
+          ...e,
+          style: { ...e.style, opacity: 0.12 },
+          labelStyle: { ...e.labelStyle, opacity: 0.12 },
+          labelBgStyle: { ...e.labelBgStyle, opacity: 0.12 },
+        };
+      });
+    }
     if (!walkActive) return edges;
     return edges.map(e => {
       if (e.id === walkActiveEdgeId) {
@@ -979,7 +1056,7 @@ function DiagramCanvasInternal() {
         labelBgStyle: { ...e.labelBgStyle, opacity: 0.12 },
       };
     });
-  }, [edges, walkActive, walkActiveEdgeId, walkTrailEdgeIds, flowTokens]);
+  }, [edges, walkActive, walkActiveEdgeId, walkTrailEdgeIds, flowTokens, archWalkActive, currentArchHop]);
 
 
   const persistCanvasPositions = useCallback((
@@ -1480,6 +1557,18 @@ function DiagramCanvasInternal() {
             onExit={exitWalkThrough}
           />
         )}
+        {archWalkActive && currentArchHop && (
+          <WalkThroughOverlay
+            step={archIndex + 1}
+            total={archHops.length}
+            label={archCaption}
+            captionText={archCaption}
+            pathText={archCopyPathText}
+            onPrev={popWalkThroughStep}
+            onNext={() => pushWalkThroughStep(Math.min(archHops.length - 1, archIndex + 1))}
+            onExit={exitWalkThrough}
+          />
+        )}
         <Panel position="bottom-left" className="!m-4 !ml-16">
           <div className="bg-white/95 backdrop-blur-md rounded-lg shadow-md border border-slate-200 p-2">
             <ZoomControls />
@@ -1545,6 +1634,13 @@ function DiagramCanvasInternal() {
           {Array.from(walkTrailNodeIds).map(id => (
             <g key={id} data-testid="walk-through-node-trail" data-node-id={id} />
           ))}
+        </svg>
+      )}
+      {archWalkActive && currentArchHop && (
+        <svg aria-hidden className="pointer-events-none absolute left-0 top-0 h-0 w-0 overflow-hidden">
+          <g data-testid="walk-through-edge-active" data-edge-id={currentArchHop.edgeId} />
+          <g data-testid="walk-through-node-current" data-node-id={currentArchHop.from} />
+          <g data-testid="walk-through-node-current" data-node-id={currentArchHop.to} />
         </svg>
       )}
 

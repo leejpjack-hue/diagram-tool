@@ -10,8 +10,10 @@ import { stripListMarker } from './plainSteps';
 // Line forms:
 //   A -> B
 //   A -> B: label          (also `A > B` and `A → B`)
+//   2. A -> B: label       (DT-ARCH-02 numbered hop; the number is step:)
 //   inside Cloud: A, B, C
-// Leading list markers (`-`, `*`, `1.`) are stripped, same as DT-AI-10.
+// Leading list markers (`-`, `*`) are stripped, same as DT-AI-10.
+// A leading `N.` / `N)` on an arrow line is a request-path step, not a marker.
 //
 // Kind comes from the name:
 //   (db) / (database), or a name ending in DB / Database / Store → database
@@ -63,6 +65,19 @@ interface ArchEdge {
   from: string;
   to: string;
   label?: string;
+  step?: number;
+}
+
+/** `2. A -> B` / `2) A -> B` on an arrow line. Other list markers stay markers. */
+function numberedArrowStep(line: string): { step: number; rest: string } | null {
+  const match = /^(\d+)[.)]\s*(.+)$/.exec(line);
+  if (!match) return null;
+  if (!/(?:->|→|>)/.test(match[2])) return null;
+  const step = Number(match[1]);
+  if (!Number.isInteger(step) || step < 1) return null;
+  const rest = match[2].trim();
+  if (!rest) return null;
+  return { step, rest };
 }
 
 interface ArchGroup {
@@ -242,7 +257,9 @@ export function plainArchitectureToDSL(
   for (let lineIndex = 0; lineIndex < rawLines.length; lineIndex++) {
     const trimmed = rawLines[lineIndex].trim();
     if (!trimmed) continue;
-    const unmarked = stripListMarker(trimmed).trim();
+    const numbered = numberedArrowStep(trimmed);
+    const unmarked = (numbered ? numbered.rest : stripListMarker(trimmed)).trim();
+    const step = numbered?.step;
     if (!unmarked) continue;
 
     const inside = INSIDE.exec(unmarked);
@@ -307,10 +324,11 @@ export function plainArchitectureToDSL(
       const existing = edges.find(edge => edge.from === from.id && edge.to === to.id);
       if (existing) {
         if (label) existing.label = label;
+        if (step !== undefined) existing.step = step;
       } else {
-        edges.push({ from: from.id, to: to.id, label });
+        edges.push({ from: from.id, to: to.id, label, ...(step !== undefined ? { step } : {}) });
       }
-      const summary = `${formatEnd(from)} → ${formatEnd(to)}${label ? ` · "${label}"` : ''}`;
+      const summary = `${step !== undefined ? `${step} · ` : ''}${formatEnd(from)} → ${formatEnd(to)}${label ? ` · "${label}"` : ''}`;
       understood?.push({ lineIndex, summary });
       continue;
     }
@@ -354,8 +372,11 @@ export function plainArchitectureToDSL(
     const from = parts.find(part => part.id === edge.from);
     const to = parts.find(part => part.id === edge.to);
     if (!from || !to) continue;
-    if (edge.label) {
-      out.push(`edge ${dslName(from.name)} -> ${dslName(to.name)} {`, `  label: ${quote(edge.label)}`, '}', '');
+    const props: string[] = [];
+    if (edge.label) props.push(`  label: ${quote(edge.label)}`);
+    if (edge.step !== undefined) props.push(`  step: ${edge.step}`);
+    if (props.length > 0) {
+      out.push(`edge ${dslName(from.name)} -> ${dslName(to.name)} {`, ...props, '}', '');
     } else {
       out.push(`edge ${dslName(from.name)} -> ${dslName(to.name)}`, '');
     }

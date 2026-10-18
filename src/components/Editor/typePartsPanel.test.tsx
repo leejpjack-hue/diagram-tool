@@ -61,6 +61,20 @@ describe('Type parts panel', () => {
     expect(screen.queryByTestId('type-parts-handwritten-hint')).toBeNull();
   });
 
+  it('shows Walk through only when a connection is numbered', () => {
+    const plain = renderArchitecture();
+    expect(screen.queryByTestId('walk-through')).toBeNull();
+    plain.unmount();
+
+    renderArchitecture(`diagram: architecture
+title: Path
+service A {}
+service B {}
+edge A -> B { label: "question" step: 2 }
+`);
+    expect(screen.getByTestId('walk-through')).toBeInTheDocument();
+  });
+
   it('replaces the source on Build and undo restores it', () => {
     renderArchitecture();
     fireEvent.click(screen.getByTestId('toggle-type-parts'));
