@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { WalkThroughOverlay } from '../Canvas/WalkThroughOverlay';
 import { useDiagramStore } from '../../store/diagramStore';
 import { activationSpans, parseSequenceSource } from './sequenceParser';
 import type { SequenceArrow, SequenceItem } from './sequenceParser';
 import { renameParticipant, editMessageText, toggleMessageDashed } from './sequenceEdit';
+import { SEQUENCE_WALK_DIM, sequenceCanWalk, sequenceWalkSessionText, sequenceWalkSteps } from './sequenceWalk';
 
 // Presentation-style sequence diagram renderer (SVG). Participants are
 // colour-coded cards repeated top and bottom (slide-deck style), with
@@ -108,7 +110,14 @@ type Editing =
 
 export function SequenceCanvas() {
   const { dslText, setDslText, setError } = useDiagramStore();
+  const walkThroughStep = useDiagramStore(s => s.walkThroughStep);
+  const walkThroughStack = useDiagramStore(s => s.walkThroughStack);
+  const pushWalkThroughStep = useDiagramStore(s => s.pushWalkThroughStep);
+  const popWalkThroughStep = useDiagramStore(s => s.popWalkThroughStep);
+  const exitWalkThrough = useDiagramStore(s => s.exitWalkThrough);
+  const setWalkThroughStep = useDiagramStore(s => s.setWalkThroughStep);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const currentRowRef = useRef<SVGGElement | null>(null);
 
   const [zoom, setZoom] = useState(1);
   const [editing, setEditing] = useState<Editing>(null);
@@ -159,7 +168,7 @@ export function SequenceCanvas() {
     // carry their document-order index so canvas edits can address the exact
     // line in the Mermaid text.
     let y = HEADER_H + HEADER_GAP + 20;
-    const rows: { item: SequenceItem; y: number; msgIndex?: number }[] = [];
+    const rows: { item: SequenceItem; y: number; msgIndex?: number; itemIndex: number }[] = [];
     const frames: FrameBox[] = [];
     const stack: FrameBox[] = [];
     const itemY: number[] = [];
@@ -181,12 +190,12 @@ export function SequenceCanvas() {
         if (box) box.endY = y;
         y += FRAME_PAD - 10;
       } else if (item.kind === 'note') {
-        rows.push({ item, y });
+        rows.push({ item, y, itemIndex: index });
         y += NOTE_H + 14;
       } else if (item.kind === 'activate' || item.kind === 'deactivate') {
         y += ACTIVATE_ROW;
       } else {
-        rows.push({ item, y, msgIndex: msgCounter++ });
+        rows.push({ item, y, msgIndex: msgCounter++, itemIndex: index });
         y += item.kind === 'message' && item.from === item.to ? ROW_H + 14 : ROW_H;
       }
     });
@@ -202,10 +211,47 @@ export function SequenceCanvas() {
       const y1 = itemY[span.from];
       if (x === undefined || y1 === undefined) return [];
       const y2 = span.open ? lastY : (itemY[span.to] ?? lastY);
-      return [{ id: span.id, x, y1, y2: Math.max(y2, y1), depth: span.depth }];
+      return [{ id: span.id, x, y1, y2: Math.max(y2, y1), depth: span.depth, from: span.from, to: span.to }];
     });
     return { xFor, rows, frames, width, height, bodyEnd, spacing, bars };
   }, [participants, items]);
+
+  // DT-SEQ-03 — one message or note at a time. View state only; the Mermaid
+  // source is unchanged and there is no board field.
+  const walkSteps = useMemo(() => sequenceWalkSteps(model), [model]);
+  const walkActive = walkThroughStep !== null && sequenceCanWalk(model) && walkSteps.length > 0;
+  const walkIndex = walkActive ? Math.min(walkThroughStep ?? 0, walkSteps.length - 1) : 0;
+  const currentWalk = walkActive ? walkSteps[walkIndex] : null;
+  const hotParticipants = useMemo(() => new Set(currentWalk?.participantIds ?? []), [currentWalk]);
+  const walkPathText = walkActive
+    ? sequenceWalkSessionText(walkSteps, [0, ...walkThroughStack, walkIndex])
+    : undefined;
+
+  useEffect(() => {
+    if (walkThroughStep === null) return;
+    if (!sequenceCanWalk(model) || walkSteps.length === 0) exitWalkThrough();
+    else if (walkThroughStep >= walkSteps.length) setWalkThroughStep(walkSteps.length - 1);
+  }, [walkThroughStep, model, walkSteps.length, exitWalkThrough, setWalkThroughStep]);
+
+  useEffect(() => {
+    if (!walkActive) return;
+    const row = currentRowRef.current;
+    const scroller = scrollRef.current;
+    if (!row || !scroller || typeof scroller.scrollTo !== 'function') return;
+    const rowRect = row.getBoundingClientRect();
+    const box = scroller.getBoundingClientRect();
+    if (box.height === 0 && box.width === 0) return;
+    const pad = 24;
+    let top = scroller.scrollTop;
+    let left = scroller.scrollLeft;
+    if (rowRect.top < box.top + pad) top -= box.top + pad - rowRect.top;
+    else if (rowRect.bottom > box.bottom - pad) top += rowRect.bottom - (box.bottom - pad);
+    if (rowRect.left < box.left + pad) left -= box.left + pad - rowRect.left;
+    else if (rowRect.right > box.right - pad) left += rowRect.right - (box.right - pad);
+    if (top !== scroller.scrollTop || left !== scroller.scrollLeft) {
+      scroller.scrollTo({ top, left });
+    }
+  }, [walkActive, walkIndex, zoom, layout.height, layout.width]);
 
   const colorFor = (id: string) =>
     PALETTE[participants.findIndex(p => p.id === id) % PALETTE.length];
@@ -292,9 +338,13 @@ A-->>U: 200 OK`}
       const c = colorFor(p.id);
       const w = Math.max(120, p.name.length * 8.5 + 36);
       const isEditingThis = editable && editing?.kind === 'participant' && editing.id === p.id;
+      const headerHot = hotParticipants.has(p.id);
       return (
         <g
           key={`${p.id}-${yPos}`}
+          data-seq-participant={p.id}
+          data-walk-header={walkActive ? (headerHot ? 'hot' : 'dim') : undefined}
+          opacity={walkActive ? (headerHot ? 1 : SEQUENCE_WALK_DIM) : undefined}
           style={{ cursor: editable ? 'pointer' : 'default' }}
           onClick={editable && !isEditingThis ? () => startParticipantEdit(p.id, p.name) : undefined}
         >
@@ -337,6 +387,7 @@ A-->>U: 200 OK`}
           ))}
         </defs>
 
+        <g opacity={walkActive ? SEQUENCE_WALK_DIM : undefined}>
         {title && (
           <text x={layout.width / 2} y={26} textAnchor="middle" fontSize={16} fontWeight={700}
             fill="#0f172a" fontFamily="Inter, sans-serif">{title}</text>
@@ -385,25 +436,37 @@ A-->>U: 200 OK`}
             </g>
           );
         })}
+        </g>
 
         {/* Activation bars sit on the lifeline, under the arrows. */}
-        {layout.bars.map((bar, i) => (
-          <rect
-            key={`act-${i}`}
-            data-testid="seq-activation"
-            x={bar.x - BAR_W / 2 + bar.depth * 7}
-            y={bar.y1 - 4}
-            width={BAR_W}
-            height={Math.max(12, bar.y2 - bar.y1 + 8)}
-            rx={1}
-            fill={colorFor(bar.id)}
-            fillOpacity={0.9}
-            pointerEvents="none"
-          />
-        ))}
+        {layout.bars.map((bar, i) => {
+          const barHot = Boolean(currentWalk && currentWalk.itemIndex >= bar.from && currentWalk.itemIndex <= bar.to);
+          return (
+            <g
+              key={`act-${i}`}
+              data-walk-bar={walkActive ? (barHot ? 'hot' : 'dim') : undefined}
+              opacity={walkActive ? (barHot ? 1 : SEQUENCE_WALK_DIM) : undefined}
+            >
+              <rect
+                data-testid="seq-activation"
+                x={bar.x - BAR_W / 2 + bar.depth * 7}
+                y={bar.y1 - 4}
+                width={BAR_W}
+                height={Math.max(12, bar.y2 - bar.y1 + 8)}
+                rx={1}
+                fill={colorFor(bar.id)}
+                fillOpacity={0.9}
+                pointerEvents="none"
+              />
+            </g>
+          );
+        })}
 
         {/* Messages and notes */}
-        {layout.rows.map(({ item, y, msgIndex }, i) => {
+        {layout.rows.map(({ item, y, msgIndex, itemIndex }, i) => {
+          const walkStep = walkSteps.find(step => step.itemIndex === itemIndex);
+          const rowCurrent = Boolean(walkActive && walkStep && walkStep.index === walkIndex);
+          const rowOpacity = walkActive ? (rowCurrent ? 1 : SEQUENCE_WALK_DIM) : undefined;
           if (item.kind === 'note') {
             const xs = item.targets.map(t => layout.xFor.get(t)!).filter(x => x !== undefined);
             const cx = xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -412,7 +475,13 @@ A-->>U: 200 OK`}
             if (item.position === 'left') x = xs[0] - w - 14;
             if (item.position === 'right') x = xs[0] + 14;
             return (
-              <g key={i}>
+              <g
+                key={i}
+                ref={rowCurrent ? currentRowRef : undefined}
+                data-walk-index={walkStep?.index}
+                data-walk-current={rowCurrent ? 'true' : undefined}
+                opacity={rowOpacity}
+              >
                 <rect x={x} y={y} width={w} height={NOTE_H - 6} rx={6}
                   fill="#fef9c3" stroke="#eab308" strokeOpacity={0.5} />
                 <text x={x + w / 2} y={y + (NOTE_H - 6) / 2 + 1} textAnchor="middle" dominantBaseline="central"
@@ -442,7 +511,14 @@ A-->>U: 200 OK`}
             const shaftEnd = arrow === 'sync' ? x1 + 6 : arrow === 'open' ? x1 : x1 + 10;
             const tipX = arrow === 'open' ? x1 : x1 + 2;
             return (
-              <g key={i} {...arrowAttr}>
+              <g
+                key={i}
+                {...arrowAttr}
+                ref={rowCurrent ? currentRowRef : undefined}
+                data-walk-index={walkStep?.index}
+                data-walk-current={rowCurrent ? 'true' : undefined}
+                opacity={rowOpacity}
+              >
                 <path d={`M ${x1} ${y} H ${x1 + loopW} V ${y + 24} H ${shaftEnd}`}
                   fill="none" stroke={c} strokeWidth={1.8}
                   strokeDasharray={item.dashed ? '6 4' : undefined} markerEnd={marker} />
@@ -475,7 +551,14 @@ A-->>U: 200 OK`}
           const midX = (x1 + x2) / 2;
           const xEnd = arrow === 'sync' ? x2 - dir * 4 : arrow === 'open' ? x2 : x2 - dir * 8;
           return (
-            <g key={i} {...arrowAttr}>
+            <g
+              key={i}
+              {...arrowAttr}
+              ref={rowCurrent ? currentRowRef : undefined}
+              data-walk-index={walkStep?.index}
+              data-walk-current={rowCurrent ? 'true' : undefined}
+              opacity={rowOpacity}
+            >
               <line x1={x1} y1={y} x2={xEnd} y2={y} stroke={c} strokeWidth={1.8}
                 strokeDasharray={item.dashed ? '6 4' : undefined} markerEnd={marker} />
               {arrow !== 'sync' && (
@@ -509,6 +592,26 @@ A-->>U: 200 OK`}
         {renderHeaderRow(layout.bodyEnd + HEADER_GAP, false)}
         </svg>
       </div>
+
+      {walkActive && currentWalk && (
+        <WalkThroughOverlay
+          placement="anchor"
+          step={walkIndex + 1}
+          total={walkSteps.length}
+          label={currentWalk.caption}
+          captionText={currentWalk.caption}
+          pathText={walkPathText}
+          onPrev={() => {
+            if (walkIndex <= 0) return;
+            popWalkThroughStep();
+          }}
+          onNext={() => {
+            if (walkIndex >= walkSteps.length - 1) return;
+            pushWalkThroughStep(walkIndex + 1);
+          }}
+          onExit={exitWalkThrough}
+        />
+      )}
 
       {/* Zoom panel — same treatment as the other canvases */}
       <div className="absolute bottom-4 left-4 z-10 bg-white/95 backdrop-blur-md rounded-lg shadow-md border border-slate-200 p-1.5 flex items-center gap-1">
