@@ -50,7 +50,8 @@ interface DiagramStore {
   sharedBoardTitle: string | null;
   setReadOnlyShared: (readOnly: boolean, title?: string | null) => void;
 
-  // DT-STYLE-01: Flow icon style. Clean is the default and today's rendering.
+  // DT-STYLE-01 / DT-ARCH-03: icon style for Flow and Architecture.
+  // Clean is the default and today's rendering.
   // Persisted on the board, not in the DSL. One undo step per change.
   iconStyle: IconStyleId;
   setIconStyle: (style: unknown, trackHistory?: boolean) => void;

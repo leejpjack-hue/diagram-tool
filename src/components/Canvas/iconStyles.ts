@@ -1,7 +1,7 @@
-// DT-STYLE-01 — four named Flow icon styles. One token table; Clean is today's
-// look (and the default when a board has no iconStyle, or an unknown value).
-// Line / Bold / Blueprint colours are consumed by the flow nodes, edges, and
-// legend. No runtime icon CDN.
+// DT-STYLE-01 / DT-ARCH-03 — four named icon styles. One token table; Clean is
+// today's look (and the default when a board has no iconStyle, or an unknown
+// value). Flow and Architecture boards share the table. Line / Bold / Blueprint
+// colours are consumed by the nodes, edges, and legend. No runtime icon CDN.
 
 export const ICON_STYLE_IDS = ['clean', 'line', 'bold', 'blueprint'] as const;
 export type IconStyleId = (typeof ICON_STYLE_IDS)[number];
@@ -32,6 +32,15 @@ export const STYLE_ICON_NAMES = [
 ] as const;
 export type StyleIconName = (typeof STYLE_ICON_NAMES)[number];
 
+/** Architecture parts. Separate from Flow kinds so Flow glyphs stay unchanged. */
+export const ARCH_STYLE_KINDS = ['service', 'database', 'queue', 'cloud', 'group'] as const;
+export type ArchStyleKind = (typeof ARCH_STYLE_KINDS)[number];
+
+export const ARCH_ICON_NAMES = ['server', 'layers', 'cloud', 'layout-grid', 'database'] as const;
+export type ArchIconName = (typeof ARCH_ICON_NAMES)[number];
+
+export type ArchTreatment = 'chip' | 'line' | 'filled' | 'outline';
+
 export const STYLE_KIND_LABEL: Record<StyleNodeKind, string> = {
   agent: 'AI agent',
   tool: 'Tool',
@@ -56,6 +65,13 @@ export interface TypeToken {
   color: string;
   icon: StyleIconName;
   /** Surface the type colour sits on when it is the foreground (clean chips / labels). */
+  surface: string;
+}
+
+export interface ArchTypeToken {
+  color: string;
+  icon: ArchIconName;
+  /** Surface the type colour sits on when it is the foreground. */
   surface: string;
 }
 
@@ -94,6 +110,8 @@ export interface StyleTokens {
     on: 'surface' | 'fill' | 'canvas' | 'white';
   };
   types: Record<StyleNodeKind, TypeToken>;
+  /** Service, database, queue, cloud, and group. Clean colours match today's defaults. */
+  arch: Record<ArchStyleKind, ArchTypeToken>;
   edge: {
     color: string;
     width: number;
@@ -195,7 +213,70 @@ const BOLD_TYPES = types(
   '#ffffff',
 );
 
+const ARCH_ICONS: Record<ArchStyleKind, ArchIconName> = {
+  service: 'server',
+  database: 'database',
+  queue: 'layers',
+  cloud: 'cloud',
+  group: 'layout-grid',
+};
+
+function archTypes(
+  colors: Record<ArchStyleKind, string>,
+  surface: string,
+): Record<ArchStyleKind, ArchTypeToken> {
+  const out = {} as Record<ArchStyleKind, ArchTypeToken>;
+  for (const kind of ARCH_STYLE_KINDS) {
+    out[kind] = { color: colors[kind], icon: ARCH_ICONS[kind], surface };
+  }
+  return out;
+}
+
+/** Today's architecture accents. The Clean renderer does not read these. */
+const CLEAN_ARCH = archTypes(
+  {
+    service: '#8b5cf6',
+    database: '#a855f7',
+    queue: '#10b981',
+    cloud: '#fb923c',
+    group: '#64748b',
+  },
+  '#ffffff',
+);
+
+const LINE_ARCH = archTypes(
+  {
+    service: '#6d28d9',
+    database: '#7e22ce',
+    queue: '#047857',
+    cloud: '#c2410c',
+    group: '#334155',
+  },
+  '#ffffff',
+);
+
+const BOLD_ARCH = archTypes(
+  {
+    service: '#5b21b6',
+    database: '#6b21a8',
+    queue: '#065f46',
+    cloud: '#9a3412',
+    group: '#1e293b',
+  },
+  '#ffffff',
+);
+
 const BLUEPRINT_CANVAS = '#0b1f3a';
+const BLUEPRINT_ARCH = archTypes(
+  {
+    service: '#c4b5fd',
+    database: '#d8b4fe',
+    queue: '#86efac',
+    cloud: '#fcd34d',
+    group: '#cbd5e1',
+  },
+  BLUEPRINT_CANVAS,
+);
 const BLUEPRINT_TYPES = types(
   {
     agent: '#c4b5fd',
@@ -230,6 +311,7 @@ export const ICON_STYLES: Record<IconStyleId, StyleTokens> = {
     icon: { show: false, size: 16, strokeWidth: 1.75, filled: false, color: 'type' },
     label: { color: 'type', font: TITLE_FONT, weight: 600, on: 'surface' },
     types: CLEAN_TYPES,
+    arch: CLEAN_ARCH,
     edge: {
       color: '#64748b',
       width: 1.8,
@@ -261,6 +343,7 @@ export const ICON_STYLES: Record<IconStyleId, StyleTokens> = {
     icon: { show: true, size: 16, strokeWidth: 1.75, filled: false, color: 'type' },
     label: { color: '#0f172a', font: TITLE_FONT, weight: 600, on: 'white' },
     types: LINE_TYPES,
+    arch: LINE_ARCH,
     edge: {
       color: '#64748b',
       width: 1.5,
@@ -292,6 +375,7 @@ export const ICON_STYLES: Record<IconStyleId, StyleTokens> = {
     icon: { show: true, size: 18, strokeWidth: 1.75, filled: true, color: 'white' },
     label: { color: '#ffffff', font: TITLE_FONT, weight: 600, on: 'fill' },
     types: BOLD_TYPES,
+    arch: BOLD_ARCH,
     edge: {
       color: '#334155',
       width: 2,
@@ -323,6 +407,7 @@ export const ICON_STYLES: Record<IconStyleId, StyleTokens> = {
     icon: { show: true, size: 16, strokeWidth: 1.75, filled: false, color: 'type' },
     label: { color: '#e0f2fe', font: MONO_FONT, weight: 500, on: 'canvas' },
     types: BLUEPRINT_TYPES,
+    arch: BLUEPRINT_ARCH,
     edge: {
       color: '#7dd3fc',
       width: 1,
@@ -464,6 +549,90 @@ export function resolveFace(styleId: IconStyleId, input: FlowFaceInput, shape: F
 export function faceBoxShadow(face: ResolvedFace): string | undefined {
   if (!face.doubleStroke) return undefined;
   return `inset 0 0 0 2px ${face.canvas}, inset 0 0 0 3.5px ${face.color}`;
+}
+
+/** Flow and Architecture show the style picker. Sequence, Gantt, and C4 do not. */
+export function boardShowsIconStyle(mode: string | null | undefined): boolean {
+  return mode === 'flow' || mode === 'architecture';
+}
+
+/** How an architecture part is drawn. Clean stays the existing chip card. */
+export function archTreatment(styleId: IconStyleId): ArchTreatment {
+  if (styleId === 'line') return 'line';
+  if (styleId === 'bold') return 'filled';
+  if (styleId === 'blueprint') return 'outline';
+  return 'chip';
+}
+
+export interface ArchFace {
+  styleId: IconStyleId;
+  kind: ArchStyleKind;
+  treatment: ArchTreatment;
+  /** Style colour, or the node's explicit DSL `color:` when one is set. */
+  color: string;
+  icon: ArchIconName;
+  fill: string;
+  borderColor: string;
+  borderWidth: number;
+  radius: number;
+  labelColor: string;
+  fontFamily: string;
+  fontWeight: number;
+  showIcon: boolean;
+  iconSize: number;
+  iconStroke: number;
+  iconFilled: boolean;
+  iconColor: string;
+  canvas: string;
+}
+
+/**
+ * Architecture face for one kind. An explicit DSL `color:` wins over the
+ * style colour (icon, border, and Bold fill). Clean label colour stays the
+ * title ink used today; the Clean node components do not paint from this face.
+ */
+export function resolveArchFace(styleId: IconStyleId, kind: ArchStyleKind, explicitColor?: string): ArchFace {
+  const tokens = ICON_STYLES[styleId];
+  const type = tokens.arch[kind];
+  const color = hexOr(explicitColor, type.color);
+  const fill = tokens.shape.fill === 'solid'
+    ? color
+    : tokens.shape.fill === 'canvas'
+      ? tokens.canvas
+      : '#ffffff';
+  const borderColor = tokens.shape.border === 'type' ? color : tokens.shape.border;
+  const labelColor = styleId === 'clean'
+    ? '#1e293b'
+    : tokens.label.color === 'type'
+      ? color
+      : tokens.label.color;
+  const iconColor = tokens.icon.color === 'white' ? '#ffffff' : color;
+  return {
+    styleId,
+    kind,
+    treatment: archTreatment(styleId),
+    color,
+    icon: type.icon,
+    fill,
+    borderColor,
+    borderWidth: tokens.shape.borderWidth,
+    radius: tokens.shape.radius,
+    labelColor,
+    fontFamily: tokens.label.font,
+    fontWeight: tokens.label.weight,
+    showIcon: tokens.icon.show,
+    iconSize: tokens.icon.size,
+    iconStroke: tokens.icon.strokeWidth,
+    iconFilled: tokens.icon.filled,
+    iconColor,
+    canvas: tokens.canvas,
+  };
+}
+
+/** Edge paint. An explicit DSL edge `color:` wins over the style edge colour. */
+export function resolveStyleEdge(styleId: IconStyleId, explicitColor?: string): StyleTokens['edge'] {
+  const edge = ICON_STYLES[styleId].edge;
+  return { ...edge, color: hexOr(explicitColor, edge.color) };
 }
 
 export interface ContrastPair {

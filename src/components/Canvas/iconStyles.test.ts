@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ARCH_STYLE_KINDS,
   ICON_STYLE_IDS,
   ICON_STYLES,
   STYLE_NODE_KINDS,
+  archTreatment,
+  boardShowsIconStyle,
   contrastRatio,
   iconStyleForStorage,
+  resolveArchFace,
   resolveFace,
   resolveIconStyle,
+  resolveStyleEdge,
   styleContrastPairs,
   styleKindOf,
 } from './iconStyles';
@@ -86,6 +91,103 @@ describe('ICON_STYLES', () => {
     expect(face.icon).toBe('wrench');
     expect(face.roleWord).toBe('tool');
     expect(face.showIcon).toBe(true);
+  });
+
+  it('resolves an architecture token for every kind and every style', () => {
+    expect(boardShowsIconStyle('architecture')).toBe(true);
+    expect(boardShowsIconStyle('flow')).toBe(true);
+    expect(boardShowsIconStyle('sequence')).toBe(false);
+    expect(boardShowsIconStyle('gantt')).toBe(false);
+    expect(boardShowsIconStyle('c4')).toBe(false);
+
+    const treatments = {
+      clean: 'chip',
+      line: 'line',
+      bold: 'filled',
+      blueprint: 'outline',
+    } as const;
+
+    for (const id of ICON_STYLE_IDS) {
+      expect(archTreatment(id)).toBe(treatments[id]);
+      const tokens = ICON_STYLES[id];
+      for (const kind of ARCH_STYLE_KINDS) {
+        const face = resolveArchFace(id, kind);
+        expect(face.kind).toBe(kind);
+        expect(face.styleId).toBe(id);
+        expect(face.treatment).toBe(treatments[id]);
+        expect(face.color).toBe(tokens.arch[kind].color);
+        expect(face.icon).toBe(tokens.arch[kind].icon);
+        expect(face.icon).toBeTruthy();
+        if (id === 'clean') {
+          expect(face.showIcon).toBe(false);
+          expect(face.labelColor).toBe('#1e293b');
+          expect(face.fill).toBe('#ffffff');
+        }
+        if (id === 'line') {
+          expect(face.showIcon).toBe(true);
+          expect(face.iconFilled).toBe(false);
+          expect(face.fill).toBe('#ffffff');
+          expect(face.borderColor).toBe('#cbd5e1');
+          expect(face.borderWidth).toBe(1);
+          expect(face.iconColor).toBe(face.color);
+          expect(face.labelColor).toBe('#0f172a');
+        }
+        if (id === 'bold') {
+          expect(face.fill).toBe(face.color);
+          expect(face.iconColor).toBe('#ffffff');
+          expect(face.labelColor).toBe('#ffffff');
+          expect(face.iconFilled).toBe(true);
+        }
+        if (id === 'blueprint') {
+          expect(face.fill).toBe('#0b1f3a');
+          expect(face.radius).toBe(2);
+          expect(face.fontFamily).toContain('JetBrains Mono');
+          expect(face.labelColor).toBe('#e0f2fe');
+          expect(tokens.edge.dash).toBe('6 4');
+          expect(tokens.grid).toEqual({ color: '#12305a', gap: 24, variant: 'lines' });
+        }
+      }
+    }
+    expect(ICON_STYLES.bold.edge.width).toBeGreaterThan(ICON_STYLES.line.edge.width);
+    expect(ICON_STYLES.bold.edge.width).toBeGreaterThan(ICON_STYLES.blueprint.edge.width);
+  });
+
+  it('lets an explicit architecture color win over the style colour', () => {
+    for (const id of ICON_STYLE_IDS) {
+      for (const kind of ARCH_STYLE_KINDS) {
+        const painted = resolveArchFace(id, kind, '#112233');
+        expect(painted.color).toBe('#112233');
+        expect(painted.color).not.toBe(ICON_STYLES[id].arch[kind].color);
+        if (id === 'bold') expect(painted.fill).toBe('#112233');
+        if (id === 'line') expect(painted.iconColor).toBe('#112233');
+        if (id === 'blueprint') expect(painted.borderColor).toBe('#112233');
+      }
+      expect(resolveStyleEdge(id, '#abcdef').color).toBe('#abcdef');
+      expect(resolveStyleEdge(id).color).toBe(ICON_STYLES[id].edge.color);
+    }
+  });
+
+  it('meets WCAG AA for architecture text in every style', () => {
+    const failures: string[] = [];
+    for (const id of ICON_STYLE_IDS) {
+      const tokens = ICON_STYLES[id];
+      for (const kind of ARCH_STYLE_KINDS) {
+        const face = resolveArchFace(id, kind);
+        const labelBg = id === 'bold' ? face.color : id === 'blueprint' ? tokens.canvas : '#ffffff';
+        const labelRatio = contrastRatio(face.labelColor, labelBg);
+        if (labelRatio < 4.5) failures.push(`${id} ${kind} label ${labelRatio.toFixed(2)}`);
+        if (id !== 'clean') {
+          const iconBg = id === 'bold' ? face.color : id === 'blueprint' ? tokens.canvas : '#ffffff';
+          const min = id === 'line' ? 3 : 4.5;
+          const iconRatio = contrastRatio(face.iconColor, iconBg);
+          if (iconRatio < min) failures.push(`${id} ${kind} icon ${iconRatio.toFixed(2)} < ${min}`);
+        }
+      }
+      const badge = tokens.stepBadge;
+      const badgeRatio = contrastRatio(badge.color, badge.background);
+      if (badgeRatio < 4.5) failures.push(`${id} step badge ${badgeRatio.toFixed(2)}`);
+    }
+    expect(failures).toEqual([]);
   });
 
   it('paints data and document nodes with the Data icon and colour in every style set (DT-AI-24)', () => {

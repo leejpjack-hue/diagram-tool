@@ -462,6 +462,7 @@ Go live — milestone after Review`;
             >
               {showParts ? 'Hide Type parts' : 'Type parts'}
             </button>
+            {!isReadOnlyShared && <IconStylePicker />}
             {archCanWalk && (
               <button
                 type="button"

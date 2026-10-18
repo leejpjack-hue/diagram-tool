@@ -282,6 +282,8 @@ describe('public portable board format', () => {
     expect(schemaBoard.required).not.toContain('showStepNumbers');
     expect(schemaBoard.properties.iconStyle.enum).toEqual(['clean', 'line', 'bold', 'blueprint']);
     expect(schemaBoard.properties.iconStyle.default).toBe('clean');
+    expect((schemaBoard.properties.iconStyle as { description?: string }).description).toMatch(/Architecture/);
+    expect((schemaBoard.properties.iconStyle as { description?: string }).description).toMatch(/color:/);
     expect(schemaBoard.properties.showStepNumbers.type).toBe('boolean');
     expect(schemaBoard.properties.showStepNumbers.default).toBe(false);
 
@@ -324,6 +326,13 @@ describe('public portable board format', () => {
     });
     expect(unknown.boards[0].iconStyle).toBeUndefined();
     expect(validatePortableDocument(buildBoardDocument(board({ mode: 'flow', dslText: FLOW_DSL, iconStyle: 'bold' }))).ok).toBe(true);
+
+    const archStyled = buildBoardDocument(board({ mode: 'architecture', dslText: ARCH_DSL, iconStyle: 'blueprint' }));
+    expect(archStyled.version).toBe('3.0');
+    expect(archStyled.board.iconStyle).toBe('blueprint');
+    expect(parsePortableImport(archStyled).boards[0].iconStyle).toBe('blueprint');
+    expect(buildBoardDocument(board({ mode: 'architecture', dslText: ARCH_DSL, iconStyle: 'clean' })).board).not.toHaveProperty('iconStyle');
+    expect(validatePortableDocument(archStyled).ok).toBe(true);
 
     const dataDsl = `diagram: flow
 title: Data steps

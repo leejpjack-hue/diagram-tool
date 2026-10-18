@@ -1,4 +1,6 @@
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, getSmoothStepPath, getStraightPath, type EdgeProps } from '@xyflow/react';
+import { useDiagramStore } from '../../store/diagramStore';
+import { ICON_STYLES } from './iconStyles';
 
 type ArchitectureRoute = 'bezier' | 'smoothstep' | 'step' | 'straight';
 
@@ -46,9 +48,17 @@ export function ArchitectureStepEdge({
         ? getSmoothStepPath({ ...pathArgs, borderRadius: 0 })
         : getBezierPath(pathArgs);
 
+  const iconStyle = useDiagramStore(s => s.iconStyle);
+  const styled = iconStyle !== 'clean';
+  const tokens = ICON_STYLES[iconStyle];
   const opacity = typeof style?.opacity === 'number' ? style.opacity : 1;
   const stroke = typeof style?.stroke === 'string' ? style.stroke : '#64748b';
   const labelText = typeof label === 'string' || typeof label === 'number' ? String(label) : '';
+  const badgeBackground = styled ? tokens.stepBadge.background : '#ffffff';
+  const badgeBorder = styled ? tokens.stepBadge.border : '#6366f1';
+  const badgeColor = styled ? tokens.stepBadge.color : '#4338ca';
+  const labelBackground = styled ? tokens.edge.labelBg : '#FDFDFD';
+  const labelColor = styled ? tokens.edge.labelColor : '#1E293B';
 
   return (
     <>
@@ -86,9 +96,9 @@ export function ArchitectureStepEdge({
               height: 16,
               padding: '0 4px',
               borderRadius: 999,
-              background: '#ffffff',
-              border: '1px solid #6366f1',
-              color: '#4338ca',
+              background: badgeBackground,
+              border: `1px solid ${badgeBorder}`,
+              color: badgeColor,
               fontSize: 10,
               fontWeight: 700,
               lineHeight: '14px',
@@ -100,13 +110,13 @@ export function ArchitectureStepEdge({
           {labelText ? (
             <span
               style={{
-                background: '#FDFDFD',
+                background: labelBackground,
                 border: `1px solid ${stroke}`,
                 borderRadius: 6,
                 padding: '2px 6px',
                 fontSize: 11,
                 fontWeight: 700,
-                color: '#1E293B',
+                color: labelColor,
                 fontFamily: "'JetBrains Mono', monospace",
                 lineHeight: '14px',
               }}

@@ -3,16 +3,31 @@ import type { NodeProps } from '@xyflow/react';
 import type { DatabaseNodeData } from './types';
 import { TITLE_FONT, MONO_FONT, accentDark } from './cardStyle';
 import { ArchitectureHandles, type ArchitectureHandleSlots } from './ArchitectureHandles';
+import { useDiagramStore } from '../../store/diagramStore';
+import { ArchitectureStyleCard } from './ArchitectureStyleCard';
+import type { IconStyleId } from './iconStyles';
 
 const DEFAULT_ACCENT = '#a855f7';
+
+function connectionSlots(data: unknown): ArchitectureHandleSlots | undefined {
+  return (data as { connectionHandles?: ArchitectureHandleSlots }).connectionHandles;
+}
 
 // Database node rendered as a 3-D cylinder (Diagram Kit reference): a tinted
 // body with a darker top ellipse and a rounded bottom, the accent colour
 // driving border + label. Title centred with a mono type sublabel.
-export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
+export const DatabaseNode = memo((props: NodeProps) => {
+  const iconStyle = useDiagramStore(s => s.iconStyle);
+  if (iconStyle === 'clean') return <CleanDatabaseNode {...props} />;
+  return <StyledDatabaseNode {...props} iconStyle={iconStyle} />;
+});
+
+DatabaseNode.displayName = 'DatabaseNode';
+
+const CleanDatabaseNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as DatabaseNodeData;
   const accent = nodeData.color || DEFAULT_ACCENT;
-  const connectionHandles = (data as { connectionHandles?: ArchitectureHandleSlots }).connectionHandles;
+  const connectionHandles = connectionSlots(data);
 
   const W = 150;
   const H = 86;
@@ -24,6 +39,9 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
   return (
     <div
       className={`relative transition-all duration-200 ${selected ? 'scale-105' : 'hover:scale-102'}`}
+      data-arch-kind="database"
+      data-arch-style="clean"
+      data-arch-treatment="chip"
       style={{
         width: W,
         height: H,
@@ -56,4 +74,22 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
   );
 });
 
-DatabaseNode.displayName = 'DatabaseNode';
+CleanDatabaseNode.displayName = 'CleanDatabaseNode';
+
+const StyledDatabaseNode = memo(({ data, selected, iconStyle }: NodeProps & { iconStyle: Exclude<IconStyleId, 'clean'> }) => {
+  const nodeData = data as unknown as DatabaseNodeData;
+  return (
+    <ArchitectureStyleCard
+      iconStyle={iconStyle}
+      kind="database"
+      color={nodeData.color}
+      selected={selected}
+      label={nodeData.label}
+      meta={nodeData.type}
+      minWidth={150}
+      slots={connectionSlots(data)}
+    />
+  );
+});
+
+StyledDatabaseNode.displayName = 'StyledDatabaseNode';

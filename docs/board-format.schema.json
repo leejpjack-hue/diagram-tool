@@ -167,7 +167,7 @@
           "type": "string",
           "enum": ["clean", "line", "bold", "blueprint"],
           "default": "clean",
-          "description": "Optional Flow icon style. Omitted or unknown values load as clean. Format version stays 3.0."
+          "description": "Optional icon style for Flow and Architecture boards. Omitted or unknown values load as clean. An explicit node color: in the DSL wins over the style colour. Sequence, Gantt, and C4 do not show the picker. Format version stays 3.0."
         },
         "showStepNumbers": {
           "type": "boolean",

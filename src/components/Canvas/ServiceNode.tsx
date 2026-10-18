@@ -5,6 +5,9 @@ import { NodeIcon } from './icons';
 import { hasNodeIcon } from './icons/registry';
 import { cardStyle, chipStyle, badgeStyle, isCode, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
 import { ArchitectureHandles, type ArchitectureHandleSlots } from './ArchitectureHandles';
+import { useDiagramStore } from '../../store/diagramStore';
+import { ArchitectureStyleCard } from './ArchitectureStyleCard';
+import type { IconStyleId } from './iconStyles';
 
 function partMark(icon?: string): 'AI' | 'tool' | 'user' | undefined {
   if (icon === 'AI') return 'AI';
@@ -13,7 +16,19 @@ function partMark(icon?: string): 'AI' | 'tool' | 'user' | undefined {
   return undefined;
 }
 
-export const ServiceNode = memo(({ data, selected }: NodeProps) => {
+function connectionSlots(data: unknown): ArchitectureHandleSlots | undefined {
+  return (data as { connectionHandles?: ArchitectureHandleSlots }).connectionHandles;
+}
+
+export const ServiceNode = memo((props: NodeProps) => {
+  const iconStyle = useDiagramStore(s => s.iconStyle);
+  if (iconStyle === 'clean') return <CleanServiceNode {...props} />;
+  return <StyledServiceNode {...props} iconStyle={iconStyle} />;
+});
+
+ServiceNode.displayName = 'ServiceNode';
+
+const CleanServiceNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as ServiceNodeData;
   const isAPI = nodeData.type === 'api';
   const iconKey = isAPI ? 'api' : 'service';
@@ -22,7 +37,7 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
   // Presentation-style accent: a `color:` in the DSL overrides the default
   // api/service palette; `icon:` swaps the SVG glyph for an emoji.
   const accent = nodeData.color || (isAPI ? '#3b82f6' : '#8b5cf6');
-  const connectionHandles = (data as { connectionHandles?: ArchitectureHandleSlots }).connectionHandles;
+  const connectionHandles = connectionSlots(data);
 
   return (
     <div
@@ -31,6 +46,9 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
         ${selected ? 'scale-105' : 'hover:scale-102'}
         min-w-[180px]
       `}
+      data-arch-kind="service"
+      data-arch-style="clean"
+      data-arch-treatment="chip"
       data-part-mark={mark}
       style={cardStyle(accent, !!selected)}
     >
@@ -86,4 +104,24 @@ export const ServiceNode = memo(({ data, selected }: NodeProps) => {
   );
 });
 
-ServiceNode.displayName = 'ServiceNode';
+CleanServiceNode.displayName = 'CleanServiceNode';
+
+const StyledServiceNode = memo(({ data, selected, iconStyle }: NodeProps & { iconStyle: Exclude<IconStyleId, 'clean'> }) => {
+  const nodeData = data as unknown as ServiceNodeData;
+  const mark = partMark(nodeData.icon);
+  const meta = [nodeData.type, mark && !nodeData.type ? mark : undefined, nodeData.tech].filter(Boolean).join(' · ');
+  return (
+    <ArchitectureStyleCard
+      iconStyle={iconStyle}
+      kind="service"
+      color={nodeData.color}
+      selected={selected}
+      label={nodeData.label}
+      meta={meta || undefined}
+      mark={mark}
+      slots={connectionSlots(data)}
+    />
+  );
+});
+
+StyledServiceNode.displayName = 'StyledServiceNode';

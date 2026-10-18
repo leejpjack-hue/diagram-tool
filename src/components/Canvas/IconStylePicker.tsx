@@ -4,6 +4,7 @@ import { useDiagramStore } from '../../store/diagramStore';
 import {
   ICON_STYLE_IDS,
   ICON_STYLES,
+  boardShowsIconStyle,
   type IconStyleId,
   type StyleNodeKind,
 } from './iconStyles';
@@ -12,13 +13,14 @@ import { StyleIcon } from './icons/styles/StyleIcon';
 const PREVIEW: StyleNodeKind[] = ['agent', 'tool', 'human'];
 
 /**
- * Flow-only Style menu. Hidden by the parent on other board types, and hidden
- * here while a share link is read-only.
+ * Style menu for Flow and Architecture. Hidden on Sequence, Gantt, and C4,
+ * and hidden while a share link is read-only.
  */
 export function IconStylePicker() {
   const iconStyle = useDiagramStore(s => s.iconStyle);
   const setIconStyle = useDiagramStore(s => s.setIconStyle);
   const readOnly = useDiagramStore(s => s.isReadOnlyShared);
+  const diagramMode = useDiagramStore(s => s.diagramMode);
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -65,7 +67,7 @@ export function IconStylePicker() {
     };
   }, [open, iconStyle]);
 
-  if (readOnly) return null;
+  if (readOnly || !boardShowsIconStyle(diagramMode)) return null;
 
   const onOptionKey = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {

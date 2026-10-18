@@ -5,13 +5,28 @@ import { NodeIcon } from './icons';
 import { hasNodeIcon } from './icons/registry';
 import { cardStyle, chipStyle, badgeStyle, isCode, TITLE_COLOR, MUTED_COLOR, TITLE_FONT, MONO_FONT } from './cardStyle';
 import { ArchitectureHandles, type ArchitectureHandleSlots } from './ArchitectureHandles';
+import { useDiagramStore } from '../../store/diagramStore';
+import { ArchitectureStyleCard } from './ArchitectureStyleCard';
+import type { IconStyleId } from './iconStyles';
 
 const DEFAULT_ACCENT = '#10b981';
 
-export const QueueNode = memo(({ data, selected }: NodeProps) => {
+function connectionSlots(data: unknown): ArchitectureHandleSlots | undefined {
+  return (data as { connectionHandles?: ArchitectureHandleSlots }).connectionHandles;
+}
+
+export const QueueNode = memo((props: NodeProps) => {
+  const iconStyle = useDiagramStore(s => s.iconStyle);
+  if (iconStyle === 'clean') return <CleanQueueNode {...props} />;
+  return <StyledQueueNode {...props} iconStyle={iconStyle} />;
+});
+
+QueueNode.displayName = 'QueueNode';
+
+const CleanQueueNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as QueueNodeData;
   const accent = nodeData.color || DEFAULT_ACCENT;
-  const connectionHandles = (data as { connectionHandles?: ArchitectureHandleSlots }).connectionHandles;
+  const connectionHandles = connectionSlots(data);
 
   return (
     <div
@@ -20,6 +35,9 @@ export const QueueNode = memo(({ data, selected }: NodeProps) => {
         ${selected ? 'scale-105' : 'hover:scale-102'}
         min-w-[160px]
       `}
+      data-arch-kind="queue"
+      data-arch-style="clean"
+      data-arch-treatment="chip"
       style={cardStyle(accent, !!selected)}
     >
       <ArchitectureHandles accent={accent} slots={connectionHandles} />
@@ -65,4 +83,23 @@ export const QueueNode = memo(({ data, selected }: NodeProps) => {
   );
 });
 
-QueueNode.displayName = 'QueueNode';
+CleanQueueNode.displayName = 'CleanQueueNode';
+
+const StyledQueueNode = memo(({ data, selected, iconStyle }: NodeProps & { iconStyle: Exclude<IconStyleId, 'clean'> }) => {
+  const nodeData = data as unknown as QueueNodeData;
+  const meta = [nodeData.type, nodeData.topic].filter(Boolean).join(' · ');
+  return (
+    <ArchitectureStyleCard
+      iconStyle={iconStyle}
+      kind="queue"
+      color={nodeData.color}
+      selected={selected}
+      label={nodeData.label}
+      meta={meta || undefined}
+      minWidth={160}
+      slots={connectionSlots(data)}
+    />
+  );
+});
+
+StyledQueueNode.displayName = 'StyledQueueNode';
