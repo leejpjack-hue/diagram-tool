@@ -49,7 +49,22 @@ test('Type parts builds the example board, flags a garbage line, and refills aft
   await expect(page.locator('.react-flow__node-groupcontainer', { hasText: 'Cloud' })).toBeVisible();
   await expect(page.locator('.react-flow').getByText('search', { exact: true })).toBeVisible();
 
-  await page.waitForFunction(() => (localStorage.getItem('diagram-tool-pending-board-writes') ?? '').includes('@type-parts'));
+  // The localStorage pending-write mirror is cleared as soon as IndexedDB
+  // accepts the board, so a wait on that key misses a save that already landed.
+  await expect.poll(async () => page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('diagram-tool-workspace');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const boards = await new Promise<Array<{ title?: string; dslText?: string }>>((resolve, reject) => {
+      const request = db.transaction('boards', 'readonly').objectStore('boards').getAll();
+      request.onsuccess = () => resolve(request.result as Array<{ title?: string; dslText?: string }>);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    return boards.find(board => board.title === 'Untitled Architecture')?.dslText ?? '';
+  }), { timeout: 8000 }).toContain('@type-parts');
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
   await page.getByRole('heading', { name: 'Untitled Architecture' }).click();
