@@ -8,9 +8,9 @@ import type { BoardMode } from './boardManager';
 import type { ParsedDiagram } from '../store/types';
 
 export type ApplySourceResult =
-  | { ok: true; kind: 'diagram'; parsed: ParsedDiagram }
-  | { ok: true; kind: 'sequence' }
-  | { ok: true; kind: 'gantt'; project: GanttProject }
+  | { ok: true; kind: 'diagram'; parsed: ParsedDiagram; warnings: string[] }
+  | { ok: true; kind: 'sequence'; warnings: string[] }
+  | { ok: true; kind: 'gantt'; project: GanttProject; warnings: string[] }
   | { ok: false; error: string };
 
 const isGanttSource = (text: string) => /^\s*diagram:\s*gantt\b/im.test(text);
@@ -73,7 +73,7 @@ export function applyBoardSource(text: string, mode: BoardMode | 'c4'): ApplySou
     if (result.error || !result.project) {
       return { ok: false, error: result.error ?? 'Parse error' };
     }
-    return { ok: true, kind: 'gantt', project: result.project };
+    return { ok: true, kind: 'gantt', project: result.project, warnings: result.warnings };
   }
 
   if (mode === 'sequence' || isMermaidSequence(text)) {
@@ -82,12 +82,12 @@ export function applyBoardSource(text: string, mode: BoardMode | 'c4'): ApplySou
     }
     const result = parseSequenceSource(text);
     if (result.error) return { ok: false, error: result.error };
-    return { ok: true, kind: 'sequence' };
+    return { ok: true, kind: 'sequence', warnings: [] };
   }
 
   try {
     const parsed = parseDiagram(text);
-    return { ok: true, kind: 'diagram', parsed };
+    return { ok: true, kind: 'diagram', parsed, warnings: [] };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Parse error' };
   }

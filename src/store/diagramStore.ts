@@ -19,6 +19,8 @@ interface DiagramStore {
   diagramMode: DiagramMode;
   isLoading: boolean;
   error: string | null;
+  /** Non-blocking Gantt source notice, such as an unknown after: name. */
+  sourceWarning: string | null;
   zoomLevel: number;
   
   // Clipboard state
@@ -34,6 +36,7 @@ interface DiagramStore {
   setSelectedNode: (nodeId: string | null) => void;
   setDiagramMode: (mode: DiagramMode) => void;
   setError: (error: string | null) => void;
+  setSourceWarning: (warning: string | null) => void;
   setLoading: (loading: boolean) => void;
   setZoomLevel: (zoom: number) => void;
   
@@ -219,6 +222,7 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   diagramMode: 'architecture',
   isLoading: false,
   error: null,
+  sourceWarning: null,
   zoomLevel: 100,
   clipboard: [],
   typeStepsSeed: null,
@@ -266,6 +270,7 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
     set({ diagramMode: mode });
   },
   setError: (error) => set({ error }),
+  setSourceWarning: (sourceWarning) => set({ sourceWarning }),
   setLoading: (loading) => set({ isLoading: loading }),
   setZoomLevel: (zoom) => set({ zoomLevel: zoom }),
   

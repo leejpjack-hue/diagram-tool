@@ -1,4 +1,4 @@
-import type { GanttTask, Dependency } from './types';
+import type { GanttTask, Dependency, GanttSourceSchedule } from './types';
 
 /**
  * Generate Gantt DSL from tasks and dependencies
@@ -59,9 +59,21 @@ export function generateGanttDSL(
   
   // Helper function to write a task
   const writeTask = (task: GanttTask, indent: string = ''): void => {
+    const schedule = task.sourceSchedule;
+    const explicitStart = schedule ? schedule.explicitStart : true;
+    const explicitEnd = schedule ? schedule.explicitEnd : true;
+    const writeDuration = Boolean(schedule && schedule.durationDays != null && !explicitEnd);
+    const anchoredByAfter = Boolean(schedule?.after?.length && !explicitStart);
+
     lines.push(`${indent}task ${task.name} {`);
-    lines.push(`${indent}  start: ${formatDate(new Date(task.startDate))}`);
-    lines.push(`${indent}  end: ${formatDate(new Date(task.endDate))}`);
+    if (explicitStart) {
+      lines.push(`${indent}  start: ${formatDate(new Date(task.startDate))}`);
+    }
+    if (writeDuration && schedule) {
+      lines.push(`${indent}  duration: ${formatDuration(schedule)}`);
+    } else if (explicitEnd || !anchoredByAfter) {
+      lines.push(`${indent}  end: ${formatDate(new Date(task.endDate))}`);
+    }
     
     if (task.assignee) {
       lines.push(`${indent}  assignee: ${task.assignee}`);
@@ -70,9 +82,13 @@ export function generateGanttDSL(
     if (task.progress !== undefined && task.progress !== 0) {
       lines.push(`${indent}  progress: ${task.progress}`);
     }
+
+    if (schedule?.after && schedule.after.length > 0) {
+      lines.push(`${indent}  after: ${schedule.after.join(', ')}`);
+    }
     
-    // Add dependencies
-    const taskDeps = getTaskDependencies(task.id);
+    // Add dependencies that are not already expressed by after:
+    const taskDeps = getTaskDependencies(task.id).filter(dep => !coveredByAfter(task, dep, tasks));
     if (taskDeps.length > 0) {
       const depStrings = taskDeps
         .map(dep => formatDependency(dep, tasks))
@@ -143,4 +159,77 @@ export function generateGanttDSL(
   });
   
   return lines.join('\n');
+}
+
+function formatDuration(schedule: GanttSourceSchedule): string {
+  if (schedule.durationUnit === 'w' && schedule.durationDays != null && schedule.durationDays % 7 === 0) {
+    return `${schedule.durationDays / 7}w`;
+  }
+  return `${schedule.durationDays ?? 1}d`;
+}
+
+function coveredByAfter(task: GanttTask, dep: Dependency, tasks: GanttTask[]): boolean {
+  if (!task.sourceSchedule?.after?.length) return false;
+  if (dep.type !== 'FS' || dep.lag !== 0) return false;
+  const predecessor = tasks.find(item => item.id === dep.predecessorId);
+  if (!predecessor) return false;
+  return task.sourceSchedule.after.some(name => scheduleNamesMatch(name, predecessor.name));
+}
+
+function scheduleNamesMatch(written: string, taskName: string): boolean {
+  return stripScheduleName(written) === stripScheduleName(taskName);
+}
+
+function stripScheduleName(name: string): string {
+  const trimmed = name.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2)
+    || (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length >= 2)
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+function spanDays(end: Date, start: Date): number {
+  return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000));
+}
+
+/**
+ * Canvas edits write back through the task model. A move of a task that
+ * has `after:` records an explicit start (that start wins). A resize
+ * records `duration:` and drops an explicit end.
+ */
+export function reconcileBarEdit(task: GanttTask, updates: Partial<GanttTask>): Partial<GanttTask> {
+  if (updates.sourceSchedule) return updates;
+  const nextStart = updates.startDate ?? task.startDate;
+  const nextEnd = updates.endDate ?? task.endDate;
+  const startChanged = updates.startDate != null && updates.startDate.getTime() !== new Date(task.startDate).getTime();
+  const endChanged = updates.endDate != null && updates.endDate.getTime() !== new Date(task.endDate).getTime();
+  if (!startChanged && !endChanged) return updates;
+
+  const prev: GanttSourceSchedule = task.sourceSchedule
+    ? { ...task.sourceSchedule, after: task.sourceSchedule.after ? [...task.sourceSchedule.after] : undefined }
+    : { explicitStart: true, explicitEnd: true };
+  const next: GanttSourceSchedule = { ...prev };
+
+  if (startChanged && endChanged) {
+    next.explicitStart = true;
+    return { ...updates, sourceSchedule: next };
+  }
+
+  if (endChanged && !startChanged) {
+    next.durationDays = spanDays(nextEnd, nextStart);
+    next.durationUnit = 'd';
+    next.explicitEnd = false;
+    return { ...updates, sourceSchedule: next };
+  }
+
+  next.explicitStart = true;
+  if (next.durationDays != null || !next.explicitEnd) {
+    next.durationDays = spanDays(nextEnd, nextStart);
+    next.durationUnit = 'd';
+    next.explicitEnd = false;
+  }
+  return { ...updates, sourceSchedule: next };
 }

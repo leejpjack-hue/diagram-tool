@@ -394,6 +394,7 @@ function App() {
     clipboard,
     setClipboard,
     setError,
+    setSourceWarning,
     queueTypeStepsSeed,
     isReadOnlyShared,
     sharedBoardTitle,
@@ -459,16 +460,21 @@ function App() {
   
   // Parse Gantt DSL when it changes. Invalid source keeps the last good plan.
   useEffect(() => {
-    if (activeTab !== 'gantt') return;
+    if (activeTab !== 'gantt') {
+      if (useDiagramStore.getState().sourceWarning) setSourceWarning(null);
+      return;
+    }
     const result = applyBoardSource(dslText, 'gantt');
     if (!result.ok || result.kind !== 'gantt') {
       setError(result.ok ? null : result.error);
+      if (!result.ok) setSourceWarning(null);
       return;
     }
     setError(null);
+    setSourceWarning(result.warnings.length > 0 ? result.warnings.join('\n') : null);
     isUpdatingFromDSL.current = true;
     setProject(result.project.tasks, result.project.dependencies ?? []);
-  }, [dslText, activeTab, setProject, setError]);
+  }, [dslText, activeTab, setProject, setError, setSourceWarning]);
   
   // Sync DSL when tasks or dependencies change from UI
   // This ensures DSL is always the single source of truth
