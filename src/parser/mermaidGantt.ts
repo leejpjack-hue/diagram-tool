@@ -26,13 +26,25 @@ function quoteName(name: string): string {
   return /[\s{}"]/.test(name) ? `"${name.replace(/"/g, "'")}"` : name;
 }
 
+interface MermaidTask {
+  section?: string;
+  name: string;
+  id?: string;
+  start?: string;
+  end?: string;
+  duration?: string;
+  after?: string;
+  milestone: boolean;
+}
+
 export function mermaidGanttToDSL(text: string): string {
   let title = '';
   let section: string | undefined;
   let lastEnd: string | undefined;
   let autoId = 1;
+  const idToName = new Map<string, string>();
   const resolved = new Map<string, { start: string; end: string }>();
-  const tasks: Array<{ section?: string; name: string; start: string; end: string; milestone: boolean }> = [];
+  const tasks: MermaidTask[] = [];
 
   let started = false;
   for (const raw of text.replace(/^\uFEFF/, '').split('\n')) {
@@ -62,8 +74,10 @@ export function mermaidGanttToDSL(text: string): string {
     let start: string | undefined;
     let end: string | undefined;
     let after: string | undefined;
+    let durationText: string | undefined;
     let durationDays: number | undefined;
     let milestone = false;
+    let explicitStart = false;
 
     for (const part of taskMatch[2].split(',').map(item => item.trim()).filter(Boolean)) {
       if (TAGS.has(part.toLowerCase())) {
@@ -75,33 +89,57 @@ export function mermaidGanttToDSL(text: string): string {
         after = afterMatch[1];
         continue;
       }
-      const duration = part.match(/^(\d+)(?:d|ms)?$/i);
-      if (duration && /d$/i.test(part)) {
-        durationDays = Number(duration[1]);
+      const duration = part.match(/^(\d+)\s*([dw])$/i);
+      if (duration) {
+        const amount = Number(duration[1]);
+        const unit = duration[2].toLowerCase() as 'd' | 'w';
+        durationText = `${amount}${unit}`;
+        durationDays = unit === 'w' ? amount * 7 : amount;
         continue;
       }
       if (/^\d{4}-\d{2}-\d{2}$/.test(part)) {
-        if (!start) start = part;
-        else end = part;
+        if (!start) {
+          start = part;
+          explicitStart = true;
+        } else end = part;
         continue;
       }
       if (/^[A-Za-z][\w-]*$/.test(part) && !id) id = part;
     }
 
+    // Dates are computed only so a later task with no start still lines up.
+    // The DSL keeps `after:` / `duration:` instead of those baked dates.
+    let scheduledStart = start;
     if (after) {
       const pred = resolved.get(after);
-      if (pred) start = pred.end;
+      if (pred && !explicitStart) scheduledStart = addDays(pred.end, milestone ? 0 : 1);
     }
-    if (!start) start = lastEnd ?? '2026-01-01';
-    if (!end) {
-      if (durationDays != null) end = addDays(start, Math.max(durationDays - 1, 0));
-      else end = start;
+    if (!scheduledStart) scheduledStart = lastEnd ?? '2026-01-01';
+    let scheduledEnd = end;
+    if (!scheduledEnd) {
+      if (durationDays != null) scheduledEnd = addDays(scheduledStart, milestone ? 0 : durationDays);
+      else scheduledEnd = scheduledStart;
+    }
+    if (milestone && after && !explicitStart && !end) {
+      scheduledStart = scheduledEnd;
     }
 
     const key = id ?? `t${autoId++}`;
-    resolved.set(key, { start, end });
-    lastEnd = end;
-    tasks.push({ section, name, start, end, milestone });
+    resolved.set(key, { start: scheduledStart, end: scheduledEnd });
+    if (id) idToName.set(id, name);
+    idToName.set(name, name);
+    lastEnd = scheduledEnd;
+    const keepEnd = !durationText && !(milestone && after && !end);
+    tasks.push({
+      section,
+      name,
+      id,
+      start: explicitStart ? start : (after ? undefined : scheduledStart),
+      end: keepEnd ? (end ?? scheduledEnd) : undefined,
+      duration: durationText,
+      after,
+      milestone,
+    });
   }
 
   if (tasks.length === 0) {
@@ -128,8 +166,13 @@ export function mermaidGanttToDSL(text: string): string {
     }
     const indent = task.section ? '  ' : '';
     lines.push(`${indent}task ${quoteName(task.name)} {`);
-    lines.push(`${indent}  start: ${task.start}`);
-    lines.push(`${indent}  end: ${task.end}`);
+    if (task.start) lines.push(`${indent}  start: ${task.start}`);
+    if (task.duration) lines.push(`${indent}  duration: ${task.duration}`);
+    else if (task.end) lines.push(`${indent}  end: ${task.end}`);
+    if (task.after) {
+      const predecessor = idToName.get(task.after) ?? task.after;
+      lines.push(`${indent}  after: ${predecessor}`);
+    }
     if (task.milestone) lines.push(`${indent}  milestone: true`);
     lines.push(`${indent}}`);
   }

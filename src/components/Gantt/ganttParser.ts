@@ -1,4 +1,5 @@
-import type { GanttTask, GanttProject, Dependency, DependencyType } from './types';
+import type { GanttTask, GanttProject, Dependency, DependencyType, GanttSourceSchedule } from './types';
+import { resolveLinkedSchedule } from './autoSchedule';
 
 /**
  * Parse Gantt DSL into structured data
@@ -15,16 +16,30 @@ import type { GanttTask, GanttProject, Dependency, DependencyType } from './type
  *     end: 2026-02-26
  *     assignee: Jack
  *     progress: 50
+ *     duration: 5d
+ *     after: OtherTask, Research
  *     depends: OtherTask:FS+2d
  *     color: #3b82f6
  *     milestone: true
  *   }
  * }
  * ```
+ *
+ * `duration:` is calendar days (`d`) or weeks (`w` = 7 days).
+ * `after:` starts the day after the latest predecessor ends and adds an FS link.
+ * An explicit `start:` beats `after:`. An explicit `end:` beats `duration:`.
  */
+export interface GanttParseDetails {
+  project: GanttProject | null;
+  error: string | null;
+  warnings: string[];
+}
+
 export function parseGanttDSL(dsl: string): GanttProject | null {
-  const lines = dsl.split('\n').map(l => l.trim()).filter(l => l);
-  
+  return parseGanttDSLDetailed(dsl).project;
+}
+
+export function parseGanttDSLDetailed(dsl: string): GanttParseDetails {
   let title = 'Untitled Project';
   let projectStart = new Date();
   const tasks: GanttTask[] = [];
@@ -33,6 +48,8 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
   
   let currentTask: Partial<GanttTask> | null = null;
   let taskIdCounter = 1;
+  const warnings: string[] = [];
+  const afterRefs: { name: string; line: number }[] = [];
   
   // Get current group ID (top of stack)
   const getCurrentGroupId = (): string | undefined => {
@@ -54,14 +71,19 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
     };
   };
   
-  for (const line of lines) {
-    // Project metadata
+  const rawLines = dsl.split('\n');
+  for (let lineIndex = 0; lineIndex < rawLines.length; lineIndex++) {
+    const line = rawLines[lineIndex].trim();
+    const lineNumber = lineIndex + 1;
+    if (!line) continue;
+
+    // Project metadata. A task's own start: is handled with the task.
     if (line.startsWith('title:')) {
       title = line.replace('title:', '').trim();
       continue;
     }
     
-    if (line.startsWith('start:')) {
+    if (line.startsWith('start:') && !currentTask) {
       const dateStr = line.replace('start:', '').trim();
       const parsed = parseDate(dateStr);
       if (parsed) projectStart = parsed;
@@ -118,6 +140,7 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
         dependencies: [],
         progress: 0,
         parentId: getCurrentGroupId(),
+        sourceSchedule: { explicitStart: false, explicitEnd: false },
       };
       continue;
     }
@@ -126,10 +149,34 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
     if (currentTask) {
       if (line.startsWith('start:')) {
         const dateStr = line.replace('start:', '').trim();
-        currentTask.startDate = parseDate(dateStr);
+        const parsed = parseDate(dateStr);
+        if (parsed) {
+          currentTask.startDate = parsed;
+          markSchedule(currentTask, { explicitStart: true });
+        }
       } else if (line.startsWith('end:')) {
         const dateStr = line.replace('end:', '').trim();
-        currentTask.endDate = parseDate(dateStr);
+        const parsed = parseDate(dateStr);
+        if (parsed) {
+          currentTask.endDate = parsed;
+          markSchedule(currentTask, { explicitEnd: true });
+        }
+      } else if (line.startsWith('duration:')) {
+        const parsed = parseDuration(line.replace(/^duration:\s*/i, '').trim());
+        if (parsed) {
+          markSchedule(currentTask, { durationDays: parsed.days, durationUnit: parsed.unit });
+        }
+      } else if (line.startsWith('after:')) {
+        const names = line.replace(/^after:\s*/i, '').split(',').map(part => part.trim()).filter(Boolean);
+        if (names.length === 0) {
+          warnings.push(`after: at line ${lineNumber} needs a task name.`);
+        }
+        names.forEach(depName => {
+          afterRefs.push({ name: depName, line: lineNumber });
+          addTaskDependency(currentTask!, depName, 'FS', 0);
+        });
+        const existing = currentTask.sourceSchedule?.after ?? [];
+        markSchedule(currentTask, { after: [...existing, ...names] });
       } else if (line.startsWith('assignee:')) {
         currentTask.assignee = line.replace('assignee:', '').trim();
       } else if (line.startsWith('progress:')) {
@@ -139,29 +186,9 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
         
         // Support comma-separated dependencies: "TaskA, TaskB, TaskC"
         const depNames = depStr.split(',').map(d => d.trim()).filter(d => d);
-        
-        // Ensure arrays exist
-        if (!currentTask.dependencies) {
-          currentTask.dependencies = [];
-        }
-        if (!currentTask.dependencyDetails) {
-          currentTask.dependencyDetails = [];
-        }
-        
-        // Process each dependency
         depNames.forEach(depName => {
           const parsed = parseDependencyString(depName);
-          
-          // ADD to dependencies array (don't overwrite!)
-          currentTask!.dependencies!.push(parsed.name); // Store name temporarily, resolve later
-          
-          // ADD to dependencyDetails array (don't overwrite!)
-          currentTask!.dependencyDetails!.push({
-            predecessorId: parsed.name, // Will be resolved to ID later
-            successorId: currentTask!.id || '',
-            type: parsed.type,
-            lag: parsed.lag,
-          });
+          addTaskDependency(currentTask!, parsed.name, parsed.type, parsed.lag);
         });
       } else if (line.startsWith('color:')) {
         currentTask.color = line.replace('color:', '').trim();
@@ -205,17 +232,35 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
   
   // Resolve dependency names to IDs
   const taskNameToId = new Map(tasks.map(t => [t.name, t.id]));
+  const resolveTaskId = (name: string): string | undefined => {
+    const exact = taskNameToId.get(name);
+    if (exact) return exact;
+    const stripped = stripTaskName(name);
+    for (const [key, id] of taskNameToId) {
+      if (stripTaskName(key) === stripped) return id;
+    }
+    return undefined;
+  };
+
+  const unknownAfter = new Set<string>();
+  afterRefs.forEach(ref => {
+    if (resolveTaskId(ref.name)) return;
+    const key = `${ref.line}:${ref.name}`;
+    if (unknownAfter.has(key)) return;
+    unknownAfter.add(key);
+    warnings.push(`Unknown task "${stripTaskName(ref.name)}" in after: at line ${ref.line}.`);
+  });
   
   tasks.forEach(task => {
     // Resolve simple dependencies (backward compatibility)
     task.dependencies = task.dependencies
-      .map(dep => taskNameToId.get(dep) || dep)
+      .map(dep => resolveTaskId(dep) || dep)
       .filter(dep => tasks.some(t => t.id === dep));
     
     // Resolve dependency details
     if (task.dependencyDetails) {
       task.dependencyDetails.forEach(dep => {
-        dep.predecessorId = taskNameToId.get(dep.predecessorId) || dep.predecessorId;
+        dep.predecessorId = resolveTaskId(dep.predecessorId) || dep.predecessorId;
         dep.successorId = task.id;
       });
     }
@@ -235,16 +280,32 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
       task.dependencyDetails.forEach(dep => {
         // Only add if predecessor exists
         if (tasks.some(t => t.id === dep.predecessorId)) {
-          dependencies.push(dep);
+          const duplicate = dependencies.some(existing =>
+            existing.predecessorId === dep.predecessorId
+            && existing.successorId === dep.successorId
+            && existing.type === dep.type
+            && existing.lag === dep.lag,
+          );
+          if (!duplicate) dependencies.push(dep);
         }
       });
     }
   });
+
+  const scheduled = resolveLinkedSchedule(tasks, dependencies, projectStart);
+  if (scheduled.cycleNames) {
+    return {
+      project: null,
+      error: `Circular dependency: ${scheduled.cycleNames.join(' → ')}`,
+      warnings: [],
+    };
+  }
+  const scheduledTasks = scheduled.tasks;
   
   // Calculate group progress (rollup from children)
-  tasks.filter(t => t.isGroup).forEach(group => {
+  scheduledTasks.filter(t => t.isGroup).forEach(group => {
     if (group.children && group.children.length > 0) {
-      const childTasks = tasks.filter(t => group.children!.includes(t.id));
+      const childTasks = scheduledTasks.filter(t => group.children!.includes(t.id));
       const totalProgress = childTasks.reduce((sum, t) => sum + t.progress, 0);
       group.progress = Math.round(totalProgress / childTasks.length);
       
@@ -256,8 +317,56 @@ export function parseGanttDSL(dsl: string): GanttProject | null {
     }
   });
   
-  console.log('[Parser] Parsed tasks:', tasks.map(t => ({ name: t.name, milestone: t.milestone, start: t.startDate, end: t.endDate })));
-  return { title, startDate: projectStart, tasks, milestones: [], dependencies };
+  console.log('[Parser] Parsed tasks:', scheduledTasks.map(t => ({ name: t.name, milestone: t.milestone, start: t.startDate, end: t.endDate })));
+  return {
+    project: { title, startDate: projectStart, tasks: scheduledTasks, milestones: [], dependencies },
+    error: null,
+    warnings,
+  };
+}
+
+function markSchedule(task: Partial<GanttTask>, patch: Partial<GanttSourceSchedule>) {
+  task.sourceSchedule = {
+    explicitStart: false,
+    explicitEnd: false,
+    ...task.sourceSchedule,
+    ...patch,
+  };
+}
+
+function addTaskDependency(task: Partial<GanttTask>, name: string, type: DependencyType, lag: number) {
+  if (!task.dependencies) task.dependencies = [];
+  if (!task.dependencyDetails) task.dependencyDetails = [];
+  const duplicate = task.dependencyDetails.some(dep =>
+    dep.predecessorId === name && dep.type === type && dep.lag === lag,
+  );
+  if (duplicate) return;
+  task.dependencies.push(name);
+  task.dependencyDetails.push({
+    predecessorId: name,
+    successorId: task.id || '',
+    type,
+    lag,
+  });
+}
+
+function stripTaskName(name: string): string {
+  const trimmed = name.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2)
+    || (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length >= 2)
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+function parseDuration(value: string): { days: number; unit: 'd' | 'w' } | undefined {
+  const match = value.match(/^(\d+)\s*([dw])$/i);
+  if (!match) return undefined;
+  const amount = parseInt(match[1], 10);
+  const unit = match[2].toLowerCase() as 'd' | 'w';
+  return { days: unit === 'w' ? amount * 7 : amount, unit };
 }
 
 function finalizeTask(partial: Partial<GanttTask>, idNum: number, projectStart: Date, parentId?: string): GanttTask {
@@ -284,6 +393,7 @@ function finalizeTask(partial: Partial<GanttTask>, idNum: number, projectStart: 
     tags: partial.tags,
     customFields: partial.customFields,
     timeTracking: partial.timeTracking,
+    sourceSchedule: partial.sourceSchedule,
   };
 }
 
@@ -320,13 +430,20 @@ export function findGanttSourceError(text: string): string | null {
   const dateError = findGanttDateError(text);
   if (dateError) return dateError;
 
+  const durationError = findGanttDurationError(text);
+  if (durationError) return durationError;
+
   return null;
 }
 
-export function parseGanttSource(text: string): { project: GanttProject | null; error: string | null } {
+export function parseGanttSource(text: string): { project: GanttProject | null; error: string | null; warnings: string[] } {
   const error = findGanttSourceError(text);
-  if (error) return { project: null, error };
-  return { project: parseGanttDSL(text), error: null };
+  if (error) return { project: null, error, warnings: [] };
+  const parsed = parseGanttDSLDetailed(text);
+  if (parsed.error || !parsed.project) {
+    return { project: null, error: parsed.error ?? 'Parse error', warnings: [] };
+  }
+  return { project: parsed.project, error: null, warnings: parsed.warnings };
 }
 
 function findGanttBraceError(text: string): string | null {
@@ -354,6 +471,18 @@ function findGanttDateError(text: string): string | null {
     if (!value) continue;
     if (!parseDate(value)) {
       return `Invalid ${match[1].toLowerCase()} date at line ${i + 1}. Use YYYY-MM-DD or +Nd.`;
+    }
+  }
+  return null;
+}
+
+function findGanttDurationError(text: string): string | null {
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].trim().match(/^duration:\s*(.*)$/i);
+    if (!match) continue;
+    if (!parseDuration(match[1].trim())) {
+      return `Invalid duration at line ${i + 1}. Use Nd or Nw, for example 5d or 2w.`;
     }
   }
   return null;

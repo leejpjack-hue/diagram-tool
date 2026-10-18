@@ -21,7 +21,7 @@ function asBoardMode(mode: string): BoardMode {
 }
 
 export function DSLEditor() {
-  const { dslText, setDslText, setParsedDiagram, setError, setLoading, diagramMode, error, parsedDiagram, isReadOnlyShared } = useDiagramStore();
+  const { dslText, setDslText, setParsedDiagram, setError, setSourceWarning, setLoading, diagramMode, error, sourceWarning, parsedDiagram, isReadOnlyShared } = useDiagramStore();
   const enterWalkThrough = useDiagramStore(s => s.enterWalkThrough);
   const showStepNumbers = useDiagramStore(s => s.showStepNumbers);
   const setShowStepNumbers = useDiagramStore(s => s.setShowStepNumbers);
@@ -70,12 +70,14 @@ else Flag for review`;
     const result = applyBoardSource(value, mode);
     if (result.ok) {
       setError(null);
+      setSourceWarning(result.warnings.length > 0 ? result.warnings.join('\n') : null);
       if (result.kind === 'diagram') setParsedDiagram(result.parsed);
     } else {
       setError(result.error);
+      setSourceWarning(null);
     }
     setLoading(false);
-  }, [diagramMode, setDslText, setParsedDiagram, setError, setLoading]);
+  }, [diagramMode, setDslText, setParsedDiagram, setError, setSourceWarning, setLoading]);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (value === undefined) return;
@@ -398,6 +400,15 @@ else Flag for review`;
           className="mx-3 mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700"
         >
           {error}
+        </div>
+      )}
+      {sourceWarning && (
+        <div
+          data-testid="dsl-parse-warning"
+          role="status"
+          className="mx-3 mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
+        >
+          {sourceWarning}
         </div>
       )}
 

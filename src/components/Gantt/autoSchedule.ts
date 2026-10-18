@@ -308,6 +308,111 @@ function addDays(date: Date, days: number): Date {
 }
 
 /**
+ * Place tasks that use `duration:` / `after:`.
+ * Explicit `start:` / `end:` tasks are left on their authored dates so
+ * existing boards stay put. `after:` starts the day after the latest
+ * predecessor ends; a milestone sits on that end day.
+ * Cycles are reported and not scheduled.
+ */
+export function resolveLinkedSchedule(
+  tasks: GanttTask[],
+  dependencies: Dependency[],
+  projectStart: Date,
+): { tasks: GanttTask[]; cycleNames: string[] | null } {
+  const nameOf = new Map(tasks.map(task => [task.id, task.name]));
+  const cycles = detectCircularDependencies(tasks, dependencies);
+  if (cycles.length > 0) {
+    return {
+      tasks,
+      cycleNames: cycles[0].map(id => nameOf.get(id) ?? id),
+    };
+  }
+
+  const predecessors = new Map<string, Dependency[]>();
+  tasks.forEach(task => predecessors.set(task.id, []));
+  dependencies.forEach(dep => {
+    const list = predecessors.get(dep.successorId);
+    if (list) list.push(dep);
+  });
+
+  const sorted = topologicalSort(tasks, dependencies);
+  const taskMap = new Map(tasks.map(task => [task.id, {
+    ...task,
+    startDate: new Date(task.startDate),
+    endDate: new Date(task.endDate),
+  }]));
+
+  sorted.forEach(taskId => {
+    const task = taskMap.get(taskId);
+    if (!task || task.isGroup) return;
+    const hint = task.sourceSchedule;
+    if (!hint) return;
+
+    const preds = (predecessors.get(taskId) ?? [])
+      .map(dep => taskMap.get(dep.predecessorId))
+      .filter((pred): pred is GanttTask => Boolean(pred));
+    const afterNames = (hint.after ?? []).map(stripScheduleName);
+    const afterPreds = afterNames.length === 0
+      ? []
+      : preds.filter(pred => afterNames.some(name => scheduleNamesMatch(name, pred.name)));
+
+    let start = new Date(task.startDate);
+    if (!hint.explicitStart) {
+      if (afterPreds.length > 0) {
+        const latest = afterPreds.reduce((max, pred) => (
+          pred.endDate.getTime() > max.getTime() ? pred.endDate : max
+        ), afterPreds[0].endDate);
+        // A milestone sits on the predecessor's end day. Any other task
+        // starts the day after that end.
+        start = task.milestone ? new Date(latest) : addDays(latest, 1);
+      } else {
+        start = new Date(projectStart);
+      }
+    }
+
+    let end = new Date(task.endDate);
+    const milestoneOnPredecessor = Boolean(
+      task.milestone
+      && !hint.explicitStart
+      && !hint.explicitEnd
+      && afterPreds.length > 0,
+    );
+    if (milestoneOnPredecessor) {
+      end = new Date(start);
+    } else if (!hint.explicitEnd && hint.durationDays != null) {
+      end = addDays(start, hint.durationDays);
+    } else if (!hint.explicitEnd && task.milestone) {
+      end = new Date(start);
+    } else if (!hint.explicitEnd && !hint.explicitStart) {
+      end = addDays(start, 3);
+    }
+
+    task.startDate = start;
+    task.endDate = end;
+  });
+
+  return {
+    tasks: tasks.map(task => taskMap.get(task.id) ?? task),
+    cycleNames: null,
+  };
+}
+
+function stripScheduleName(name: string): string {
+  const trimmed = name.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2)
+    || (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length >= 2)
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+function scheduleNamesMatch(written: string, taskName: string): boolean {
+  return stripScheduleName(written) === stripScheduleName(taskName);
+}
+
+/**
  * Validate a new dependency before adding it
  */
 export function validateNewDependency(

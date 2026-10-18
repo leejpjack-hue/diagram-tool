@@ -98,6 +98,28 @@ Alpha -> Beta { from: right, to: left }
 
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 
+### Gantt duration and predecessors
+
+`duration:` and `after:` are task keys inside `source.text` / `dslText` for `diagram: gantt`. They are not a new board field. `version` stays **3.0**. No database migration. A board that only uses `start:` and `end:` still loads as it does today.
+
+| Key | Meaning |
+| --- | --- |
+| `duration: 5d` | The bar is 5 calendar days long. `d` is a day. |
+| `duration: 2w` | The bar is 2 weeks long. A week is 7 days. |
+| `after: Design` | Start the day after Design ends, and draw a finish-to-start dependency. |
+| `after: Design, Research` | Start the day after the later predecessor ends. Each name adds a finish-to-start dependency. |
+
+What wins when several keys are present:
+
+- An explicit `start:` beats `after:`.
+- An explicit `end:` beats `duration:`.
+- A task with no `start:` and no `after:` starts on the project `start:`.
+- `milestone: true` with `after:` sits on the day the predecessor ends.
+
+Dragging a bar that has `after:` writes an explicit `start:` into the source. That start wins over `after:` for the date, and the dependency remains. Resizing a bar writes `duration:` (and drops `end:` when the length is now a duration). A cycle names the tasks in the parse error and leaves the last good chart on screen. An unknown `after:` name warns with the line number and still draws the rest of the plan.
+
+A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
+
 `nodes` and `edges` are a portable projection of that source plus layout pins. Re-opening the file prefers `source.text` / `dslText` and restores typed boards (architecture, flow, sequence, Gantt) so layout stays within ±2px of the export.
 
 ### Complete backup (`kind: "workspace"`)

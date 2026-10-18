@@ -24,6 +24,10 @@ describe('mermaidGanttToDSL', () => {
     expect(dsl).toContain('title: Sprint Plan');
     expect(dsl).toContain('task Design');
     expect(dsl).toContain('task Implement');
+    expect(dsl).toContain('duration: 4d');
+    expect(dsl).toContain('duration: 5d');
+    expect(dsl).toContain('after: Design');
+    expect(dsl).not.toMatch(/task Implement \{[^}]*end:/);
     const parsed = parseGanttSource(dsl);
     expect(parsed.error).toBeNull();
     expect(parsed.project?.tasks.map(task => task.name)).toEqual(expect.arrayContaining(['Build', 'Design', 'Implement']));

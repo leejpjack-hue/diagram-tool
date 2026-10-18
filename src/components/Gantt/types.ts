@@ -13,6 +13,21 @@ export interface Dependency {
   lag: number; // days (can be negative for lead time)
 }
 
+/**
+ * How a task was written in the Gantt DSL. Not a board JSON field —
+ * the source text stays the saved form. Missing flags mean an older
+ * start/end task.
+ */
+export interface GanttSourceSchedule {
+  explicitStart: boolean;
+  explicitEnd: boolean;
+  /** Calendar days from `duration:`. A week is 7 days. */
+  durationDays?: number;
+  durationUnit?: 'd' | 'w';
+  /** Predecessor names as written in `after:`. */
+  after?: string[];
+}
+
 export interface GanttTask {
   id: string;
   name: string;
@@ -52,6 +67,9 @@ export interface GanttTask {
   leveled?: boolean; // Task was rescheduled by leveling
   originalStart?: Date; // Original start before leveling
   originalEnd?: Date; // Original end before leveling
+
+  /** DSL scheduling keys (`duration:` / `after:`). Omitted for start/end tasks. */
+  sourceSchedule?: GanttSourceSchedule;
 }
 
 // Sprint 12: Custom field definition

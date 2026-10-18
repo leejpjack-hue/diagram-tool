@@ -42,6 +42,13 @@ const diffDays = (a: Date, b: Date): number => {
   return Math.floor(ms / (1000 * 60 * 60 * 24));
 };
 
+const formatIsoDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export function GanttCanvas() {
   const { 
     tasks, 
@@ -366,7 +373,7 @@ export function GanttCanvas() {
       const path = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`;
       
       arrows.push(
-        <g key={`${dep.predecessorId}-${dep.successorId}-${dep.type}`}>
+        <g key={`${dep.predecessorId}-${dep.successorId}-${dep.type}`} data-testid="gantt-dependency-line">
           <path
             d={path}
             fill="none"
@@ -503,7 +510,13 @@ export function GanttCanvas() {
                 : task.color || COLORS[index % COLORS.length];
             
             return (
-              <g key={task.id} data-testid={`gantt-task-row-${task.id}`} data-task-name={task.name}>
+              <g
+                key={task.id}
+                data-testid={`gantt-task-row-${task.id}`}
+                data-task-name={task.name}
+                data-start={formatIsoDate(task.startDate)}
+                data-end={formatIsoDate(task.endDate)}
+              >
                 {/* Task name cell */}
                 <rect
                   x={0}
@@ -782,6 +795,8 @@ export function GanttCanvas() {
                 {!task.isGroup && isMilestone && (
                   <g
                     className="cursor-pointer"
+                    data-testid={`gantt-milestone-${task.id}`}
+                    data-task-name={task.name}
                     onClick={(e) => {
                       const isMultiSelect = e.ctrlKey || e.metaKey;
                       toggleTaskSelection(task.id, isMultiSelect);

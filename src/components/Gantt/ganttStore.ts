@@ -8,6 +8,7 @@ import {
 } from './autoSchedule';
 import { levelResources, needsLeveling } from './resourceLeveling';
 import { recomputeGroupRollups } from './wbsUtils';
+import { reconcileBarEdit } from './ganttGenerator';
 
 // Sprint 11: History for undo/redo
 interface HistoryState {
@@ -342,7 +343,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
   updateTask: (id, updates) => set((state) => {
     state.pushHistory();
     const next = state.tasks.map((t) =>
-      t.id === id ? { ...t, ...updates } : t
+      t.id === id ? { ...t, ...reconcileBarEdit(t, updates) } : t
     );
     return { tasks: recomputeGroupRollups(next) };
   }),
