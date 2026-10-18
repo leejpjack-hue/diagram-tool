@@ -5,9 +5,11 @@ import { installDiagramDslTestHook } from '../../utils/devTestHook';
 import { applyBoardSource, toDslSource, toMermaidSource } from '../../utils/sourceText';
 import { plainStepsToDSL } from '../../parser/plainSteps';
 import { plainArchitectureToDSL, plainPartsFromBoardSource, typePartsSuccessMessage } from '../../parser/plainArchitecture';
+import { plainSequenceToMermaid, plainMessagesFromBoardSource, typeMessagesSuccessMessage } from '../../parser/plainSequence';
 import { stepLineRange } from '../../parser/typeStepsPreview';
 import { TypeStepsPreview } from './TypeStepsPreview';
 import { TypePartsPreview } from './TypePartsPreview';
+import { TypeMessagesPreview } from './TypeMessagesPreview';
 import { flowStepList, type FlowStep } from '../../parser/flowToPlainSteps';
 import { plainStepsFromBoardSource, applyLoadedPlainSteps, sourceMatchesRoleLanes } from '../../parser/boardToPlainSteps';
 import { insertRolePrefix, type RolePrefixRole } from '../../parser/insertRolePrefix';
@@ -39,6 +41,11 @@ export function DSLEditor() {
   const [partsText, setPartsText] = useState('');
   const [partsHandwritten, setPartsHandwritten] = useState(false);
   const partsInputRef = useRef<HTMLTextAreaElement | null>(null);
+  // DT-SEQ-02: "Type messages" is the sequence twin of Type steps.
+  const [showMessages, setShowMessages] = useState(false);
+  const [messagesText, setMessagesText] = useState('');
+  const [messagesHandwritten, setMessagesHandwritten] = useState(false);
+  const messagesInputRef = useRef<HTMLTextAreaElement | null>(null);
   const toast = useToast();
   // DT-AI-08: textarea ref so role-prefix buttons can read the caret/selection.
   const stepsInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -205,6 +212,60 @@ inside Cloud: Chat app, Agent`;
     input.setSelectionRange(range.start, range.end);
   }, [partsText]);
 
+  const MESSAGES_PLACEHOLDER = `User asks Agent: plan my trip
+Agent calls Search tool: flights
+Search tool replies Agent: 3 options
+if no flights:
+Agent tells User: try other dates
+else:
+Agent tells User: book it
+end`;
+
+  const toggleMessages = useCallback(() => {
+    setShowMessages(open => {
+      const next = !open;
+      if (!next) return next;
+      const loaded = plainMessagesFromBoardSource(useDiagramStore.getState().dslText);
+      if (loaded == null) {
+        setMessagesText('');
+        setMessagesHandwritten(true);
+      } else {
+        setMessagesText(loaded);
+        setMessagesHandwritten(false);
+      }
+      return next;
+    });
+  }, []);
+
+  const buildFromMessages = useCallback(() => {
+    const input = messagesText.trim();
+    if (!input) {
+      toast.error('Type one message per line first. Example: "User asks Agent: plan my trip".');
+      return;
+    }
+    try {
+      const stats = { participants: 0, messages: 0 };
+      const mermaid = plainSequenceToMermaid(input, {
+        title: useDiagramStore.getState().dslText.match(/^\s*title\s*:?\s+(.+)\s*$/im)?.[1]?.trim(),
+        stats,
+      });
+      setShowMessages(true);
+      setMessagesHandwritten(false);
+      applySource(mermaid);
+      toast.success(typeMessagesSuccessMessage(stats.participants, stats.messages));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not read those messages. Type one message per line.');
+    }
+  }, [messagesText, toast, applySource]);
+
+  const focusMessagesLine = useCallback((lineIndex: number) => {
+    const input = messagesInputRef.current;
+    if (!input) return;
+    const range = stepLineRange(messagesText, lineIndex);
+    input.focus();
+    input.setSelectionRange(range.start, range.end);
+  }, [messagesText]);
+
   // DT-AI-07: fill Type steps from the live board (same serializer as Copy; no clipboard).
   const loadSteps = useCallback(() => {
     const previous = stepsText;
@@ -330,6 +391,18 @@ inside Cloud: Chat app, Agent`;
               className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400"
             >
               {showParts ? 'Hide Type parts' : 'Type parts'}
+            </button>
+          </div>
+        )}
+        {diagramMode === 'sequence' && (
+          <div className="mt-2">
+            <button
+              type="button"
+              data-testid="toggle-type-messages"
+              onClick={toggleMessages}
+              className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400"
+            >
+              {showMessages ? 'Hide Type messages' : 'Type messages'}
             </button>
           </div>
         )}
@@ -508,6 +581,46 @@ inside Cloud: Chat app, Agent`;
               type="button"
               data-testid="build-parts"
               onClick={buildFromParts}
+              className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+            >
+              Build board
+            </button>
+            <span className="text-[11px] text-slate-500">Parsed locally — nothing leaves this device.</span>
+          </div>
+        </div>
+      )}
+
+      {diagramMode === 'sequence' && showMessages && (
+        <div
+          data-testid="type-messages-box"
+          className="mx-3 mb-2 rounded-md border border-indigo-100 bg-indigo-50/60 p-3"
+        >
+          <label className="mb-1 block text-[11px] font-semibold text-indigo-700">
+            Type messages — one message per line. asks/calls/sends/tells/uses are solid; replies/returns/answers/responds are dashed; notifies/fires/emits are async. A -&gt; B: text and A =&gt; B: text. Frames: if, else, end, repeat, maybe, at the same time, and. note on User: text. Roles: Human:, AI:, Tool:, Data:.
+          </label>
+          <textarea
+            ref={messagesInputRef}
+            data-testid="type-messages-input"
+            value={messagesText}
+            onChange={e => {
+              setMessagesText(e.target.value);
+              if (e.target.value.trim()) setMessagesHandwritten(false);
+            }}
+            placeholder={MESSAGES_PLACEHOLDER}
+            rows={4}
+            className="w-full rounded border border-indigo-200 bg-white p-2 font-mono text-xs text-slate-800 focus:border-indigo-400 focus:outline-none"
+          />
+          {messagesHandwritten && !messagesText.trim() && (
+            <p data-testid="type-messages-handwritten-hint" className="mt-1 text-[11px] text-slate-500">
+              This board was not built with Type messages. The box starts empty so the current Mermaid stays as it is.
+            </p>
+          )}
+          <TypeMessagesPreview text={messagesText} onFocusLine={focusMessagesLine} />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="build-messages"
+              onClick={buildFromMessages}
               className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
             >
               Build board

@@ -15,14 +15,15 @@ Live: https://diagram-tool.teqcon.uk/
 5. [Architecture mode](#architecture-mode)
 6. [Sub-system grouping](#sub-system-grouping)
 7. [Flow mode](#flow-mode)
-8. [Gantt mode](#gantt-mode)
-9. [Edges and labels](#edges-and-labels)
-10. [C4 hierarchy & drill-down](#c4-hierarchy--drill-down)
-11. [Swimlanes](#swimlanes)
-12. [Templates and shortcuts](#templates-and-shortcuts)
-13. [Exporting](#exporting)
-14. [Custom icons](#custom-icons)
-15. [Troubleshooting](#troubleshooting)
+8. [Sequence mode](#sequence-mode)
+9. [Gantt mode](#gantt-mode)
+10. [Edges and labels](#edges-and-labels)
+11. [C4 hierarchy & drill-down](#c4-hierarchy--drill-down)
+12. [Swimlanes](#swimlanes)
+13. [Templates and shortcuts](#templates-and-shortcuts)
+14. [Exporting](#exporting)
+15. [Custom icons](#custom-icons)
+16. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -402,6 +403,12 @@ node Check { type: decision
   caption ambiguous.
 - Chips are static (no animation), so `prefers-reduced-motion` is satisfied
   trivially.
+
+---
+
+## Sequence mode
+
+**Type messages.** On a Sequence board, Type messages turns short lines into a Mermaid sequenceDiagram. `User asks Agent: plan my trip` is a solid arrow (`->>`). asks, calls, sends, tells, and uses are solid; replies, returns, answers, and responds are dashed (`-->>`); notifies, fires, and emits are async (`-)`). `A -> B: text` and `A => B: text` are solid calls as well. `if no flights:` … `else:` … `end` becomes an alt frame; `repeat every minute:` … `end` a loop; `maybe later:` … `end` an opt; `at the same time:` … `and:` … `end` a par. `note on User: bring a passport` becomes Note over User. A leading `Human:`, `AI:`, `Tool:`, or `Data:` on the first mention of a name stores `%% role Name human` (or ai, tool, data) so a later change can draw the role; Mermaid ignores the comment. The Understood-as list under the box shows how each line was read and flags a line that was not. Build board replaces the source with ordinary sequenceDiagram text, and undo restores the previous source. Opening Type messages on a board it built fills the box from that source. A hand-written sequence diagram leaves the box empty, so its Mermaid stays as it is. Nothing is sent over the network. This is not a new board field, and `version` stays 3.0.
 
 ---
 
