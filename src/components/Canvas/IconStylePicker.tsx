@@ -13,7 +13,7 @@ import { StyleIcon } from './icons/styles/StyleIcon';
 const PREVIEW: StyleNodeKind[] = ['agent', 'tool', 'human'];
 
 /**
- * Style menu for Flow and Architecture. Hidden on Sequence, Gantt, and C4,
+ * Style menu for Flow, Architecture, and Sequence. Hidden on Gantt and C4,
  * and hidden while a share link is read-only.
  */
 export function IconStylePicker() {

@@ -1,9 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ICON_STYLES } from '../Canvas/iconStyles';
+import { StyleIcon } from '../Canvas/icons/styles/StyleIcon';
 import { WalkThroughOverlay } from '../Canvas/WalkThroughOverlay';
 import { useDiagramStore } from '../../store/diagramStore';
 import { activationSpans, parseSequenceSource } from './sequenceParser';
 import type { SequenceArrow, SequenceItem } from './sequenceParser';
 import { renameParticipant, editMessageText, toggleMessageDashed } from './sequenceEdit';
+import {
+  SEQUENCE_PALETTE,
+  sequenceBadgePaint,
+  sequenceFramePaint,
+  sequenceHeaderPaint,
+  sequenceLifelinePaint,
+  sequenceMessagePaint,
+  sequenceNotePaint,
+  sequenceRoleColor,
+  sequenceTitlePaint,
+} from './sequenceStyle';
 import { SEQUENCE_WALK_DIM, sequenceCanWalk, sequenceWalkSessionText, sequenceWalkSteps } from './sequenceWalk';
 
 // Presentation-style sequence diagram renderer (SVG). Participants are
@@ -15,7 +28,7 @@ import { SEQUENCE_WALK_DIM, sequenceCanWalk, sequenceWalkSessionText, sequenceWa
 // and double-click a message line to toggle solid ↔ dashed. Every edit writes
 // back into the Mermaid text, which stays the source of truth.
 
-const PALETTE = ['#6366f1', '#0ea5e9', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#84cc16'];
+const PALETTE: readonly string[] = SEQUENCE_PALETTE;
 
 const MARGIN_X = 60;
 const HEADER_H = 56;
@@ -43,12 +56,14 @@ function ArrowTip({
   y,
   dir,
   color,
+  strokeWidth = 1.6,
 }: {
   kind: SequenceArrow;
   x: number;
   y: number;
   dir: 1 | -1;
   color: string;
+  strokeWidth?: number;
 }) {
   if (kind === 'async') {
     const back = x - dir * 9;
@@ -57,7 +72,7 @@ function ArrowTip({
         d={`M ${back} ${y - 5} L ${x} ${y} L ${back} ${y + 5}`}
         fill="none"
         stroke={color}
-        strokeWidth={1.6}
+        strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -66,19 +81,37 @@ function ArrowTip({
   if (kind === 'lost') {
     return (
       <g>
-        <line x1={x - 5} y1={y - 5} x2={x + 5} y2={y + 5} stroke={color} strokeWidth={1.6} strokeLinecap="round" />
-        <line x1={x + 5} y1={y - 5} x2={x - 5} y2={y + 5} stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+        <line x1={x - 5} y1={y - 5} x2={x + 5} y2={y + 5} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+        <line x1={x + 5} y1={y - 5} x2={x - 5} y2={y + 5} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
       </g>
     );
   }
   return null;
 }
 
-function SeqBadge({ n, x, y, color }: { n: string; x: number; y: number; color: string }) {
+function SeqBadge({
+  n,
+  x,
+  y,
+  color,
+  fill = '#fff',
+  textColor,
+  stroke,
+  fontFamily = 'Inter, sans-serif',
+}: {
+  n: string;
+  x: number;
+  y: number;
+  color: string;
+  fill?: string;
+  textColor?: string;
+  stroke?: string;
+  fontFamily?: string;
+}) {
   const wide = n.length > 2;
   return (
     <g data-testid="seq-number" pointerEvents="none">
-      <circle cx={x} cy={y} r={wide ? 11 : 8} fill="#fff" stroke={color} strokeWidth={1.25} />
+      <circle cx={x} cy={y} r={wide ? 11 : 8} fill={fill} stroke={stroke ?? color} strokeWidth={1.25} />
       <text
         x={x}
         y={y}
@@ -86,8 +119,8 @@ function SeqBadge({ n, x, y, color }: { n: string; x: number; y: number; color: 
         dominantBaseline="central"
         fontSize={wide ? 8 : 9}
         fontWeight={700}
-        fill={color}
-        fontFamily="Inter, sans-serif"
+        fill={textColor ?? color}
+        fontFamily={fontFamily}
       >
         {n}
       </text>
@@ -110,6 +143,7 @@ type Editing =
 
 export function SequenceCanvas() {
   const { dslText, setDslText, setError } = useDiagramStore();
+  const iconStyle = useDiagramStore(s => s.iconStyle);
   const walkThroughStep = useDiagramStore(s => s.walkThroughStep);
   const walkThroughStack = useDiagramStore(s => s.walkThroughStack);
   const pushWalkThroughStep = useDiagramStore(s => s.pushWalkThroughStep);
@@ -253,8 +287,20 @@ export function SequenceCanvas() {
     }
   }, [walkActive, walkIndex, zoom, layout.height, layout.width]);
 
-  const colorFor = (id: string) =>
-    PALETTE[participants.findIndex(p => p.id === id) % PALETTE.length];
+  const accentOf = (id: string) => {
+    const index = participants.findIndex(p => p.id === id);
+    const participant = index >= 0 ? participants[index] : undefined;
+    if (participant?.role) return sequenceRoleColor(participant.role, iconStyle);
+    const slot = index >= 0 ? index : 0;
+    return PALETTE[slot % PALETTE.length];
+  };
+  const messagePaint = sequenceMessagePaint(iconStyle);
+  const lifelinePaint = sequenceLifelinePaint(iconStyle);
+  const titlePaint = sequenceTitlePaint(iconStyle);
+  const framePaint = sequenceFramePaint(iconStyle);
+  const notePaint = sequenceNotePaint(iconStyle);
+  const styled = iconStyle !== 'clean';
+  const markerColors = [...new Set(participants.map(p => accentOf(p.id)))];
 
   const commitEdit = () => {
     if (!editing) {
@@ -287,9 +333,23 @@ export function SequenceCanvas() {
     if (next !== dslText) setDslText(next);
   };
 
+  const blueprintGrid = useMemo(() => {
+    if (iconStyle !== 'blueprint') return null;
+    const grid = ICON_STYLES.blueprint.grid;
+    if (!grid) return null;
+    const lines: ReactNode[] = [];
+    for (let x = 0; x <= layout.width; x += grid.gap) {
+      lines.push(<line key={`v-${x}`} x1={x} y1={0} x2={x} y2={layout.height} stroke={grid.color} strokeWidth={1} />);
+    }
+    for (let y = 0; y <= layout.height; y += grid.gap) {
+      lines.push(<line key={`h-${y}`} x1={0} y1={y} x2={layout.width} y2={y} stroke={grid.color} strokeWidth={1} />);
+    }
+    return lines;
+  }, [iconStyle, layout.width, layout.height]);
+
   if (participants.length === 0) {
     return (
-      <div className="sequence-canvas w-full h-full flex items-center justify-center bg-white">
+      <div className="sequence-canvas w-full h-full flex items-center justify-center bg-white" data-icon-style={iconStyle}>
         <div className="text-center text-slate-400 max-w-md px-6">
           <div className="text-4xl mb-4">🔁</div>
           <div className="text-lg mb-2">Describe a sequence in Mermaid format</div>
@@ -335,32 +395,90 @@ A-->>U: 200 OK`}
   const renderHeaderRow = (yPos: number, editable: boolean) =>
     participants.map(p => {
       const x = layout.xFor.get(p.id)!;
-      const c = colorFor(p.id);
-      const w = Math.max(120, p.name.length * 8.5 + 36);
+      const c = accentOf(p.id);
       const isEditingThis = editable && editing?.kind === 'participant' && editing.id === p.id;
       const headerHot = hotParticipants.has(p.id);
+      const legacy = iconStyle === 'clean' && !p.role;
+      const paint = legacy ? null : sequenceHeaderPaint(iconStyle, c, p.role);
+      const iconSize = paint?.showIcon ? paint.iconSize : 0;
+      const iconGap = iconSize ? 6 : 0;
+      const w = Math.max(120, p.name.length * 8.5 + 36 + iconSize + iconGap);
+      const textW = p.name.length * 8.5;
+      const blockW = iconSize + iconGap + textW;
+      const iconX = x - blockW / 2;
+      const textX = iconSize ? iconX + iconSize + iconGap + textW / 2 : x;
+      const iconY = yPos + ((HEADER_H - 12) - iconSize) / 2;
+      const card = {
+        x: x - w / 2,
+        y: yPos,
+        width: w,
+        height: HEADER_H - 12,
+      };
       return (
         <g
           key={`${p.id}-${yPos}`}
           data-seq-participant={p.id}
+          data-role={p.role}
           data-walk-header={walkActive ? (headerHot ? 'hot' : 'dim') : undefined}
           opacity={walkActive ? (headerHot ? 1 : SEQUENCE_WALK_DIM) : undefined}
           style={{ cursor: editable ? 'pointer' : 'default' }}
           onClick={editable && !isEditingThis ? () => startParticipantEdit(p.id, p.name) : undefined}
         >
-          <rect x={x - w / 2} y={yPos} width={w} height={HEADER_H - 12} rx={10}
-            fill={c} opacity={0.92} />
-          <rect x={x - w / 2} y={yPos} width={w} height={HEADER_H - 12} rx={10}
-            fill="none" stroke="#0f172a" strokeOpacity={0.08} />
+          {legacy ? (
+            <>
+              <rect x={card.x} y={card.y} width={card.width} height={card.height} rx={10}
+                fill={c} opacity={0.92} />
+              <rect x={card.x} y={card.y} width={card.width} height={card.height} rx={10}
+                fill="none" stroke="#0f172a" strokeOpacity={0.08} />
+            </>
+          ) : paint && (
+            <>
+              <rect
+                x={card.x}
+                y={card.y}
+                width={card.width}
+                height={card.height}
+                rx={paint.radius}
+                fill={paint.fill}
+                opacity={paint.fillOpacity}
+                stroke={iconStyle !== 'clean' && paint.borderWidth > 0 ? paint.border : undefined}
+                strokeWidth={iconStyle !== 'clean' && paint.borderWidth > 0 ? paint.borderWidth : undefined}
+              />
+              {iconStyle === 'clean' && (
+                <rect x={card.x} y={card.y} width={card.width} height={card.height} rx={paint.radius}
+                  fill="none" stroke="#0f172a" strokeOpacity={0.08} />
+              )}
+            </>
+          )}
           {isEditingThis ? (
-            <foreignObject x={x - w / 2 + 4} y={yPos + 6} width={w - 8} height={HEADER_H - 24}>
+            <foreignObject x={card.x + 4} y={yPos + 6} width={card.width - 8} height={HEADER_H - 24}>
               {editorInput('Rename participant')}
             </foreignObject>
-          ) : (
+          ) : legacy ? (
             <text x={x} y={yPos + (HEADER_H - 12) / 2 + 1} textAnchor="middle" dominantBaseline="central"
               fill="#fff" fontSize={13.5} fontWeight={600} fontFamily="Inter, sans-serif">
               {p.actor ? `👤 ${p.name}` : p.name}
             </text>
+          ) : paint && (
+            <>
+              {paint.showIcon && paint.icon && (
+                <g transform={`translate(${iconX}, ${iconY})`} pointerEvents="none">
+                  <StyleIcon
+                    name={paint.icon}
+                    size={paint.iconSize}
+                    strokeWidth={paint.iconStroke}
+                    filled={paint.iconFilled}
+                    color={paint.iconColor}
+                    markColor={paint.iconFilled ? paint.fill : undefined}
+                    decorative
+                  />
+                </g>
+              )}
+              <text x={textX} y={yPos + (HEADER_H - 12) / 2 + 1} textAnchor="middle" dominantBaseline="central"
+                fill={paint.label} fontSize={13.5} fontWeight={paint.fontWeight} fontFamily={paint.fontFamily}>
+                {p.name}
+              </text>
+            </>
           )}
           {editable && !isEditingThis && (
             <title>Click to rename</title>
@@ -370,7 +488,12 @@ A-->>U: 200 OK`}
     });
 
   return (
-    <div className="sequence-canvas relative w-full h-full bg-white" data-canvas-target="primary">
+    <div
+      className="sequence-canvas relative w-full h-full bg-white"
+      data-canvas-target="primary"
+      data-icon-style={iconStyle}
+      style={iconStyle === 'blueprint' ? { background: ICON_STYLES.blueprint.pane } : undefined}
+    >
       <div ref={scrollRef} className="w-full h-full overflow-auto">
         <svg
           width={layout.width * zoom}
@@ -379,7 +502,7 @@ A-->>U: 200 OK`}
           xmlns="http://www.w3.org/2000/svg"
         >
         <defs>
-          {PALETTE.map(c => (
+          {markerColors.map(c => (
             <marker key={c} id={`seq-arrow-${c.slice(1)}`} viewBox="0 0 10 10" refX="9" refY="5"
               markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M 0 1 L 9 5 L 0 9 Z" fill={c} />
@@ -387,18 +510,26 @@ A-->>U: 200 OK`}
           ))}
         </defs>
 
+        {iconStyle === 'blueprint' && (
+          <g data-seq-grid="blueprint" pointerEvents="none">
+            <rect x={0} y={0} width={layout.width} height={layout.height} fill={ICON_STYLES.blueprint.canvas} />
+            {blueprintGrid}
+          </g>
+        )}
+
         <g opacity={walkActive ? SEQUENCE_WALK_DIM : undefined}>
         {title && (
           <text x={layout.width / 2} y={26} textAnchor="middle" fontSize={16} fontWeight={700}
-            fill="#0f172a" fontFamily="Inter, sans-serif">{title}</text>
+            fill={titlePaint.color} fontFamily={titlePaint.fontFamily}>{title}</text>
         )}
 
-        {/* Lifelines */}
+        {/* Lifelines. A role tints the dash with that role colour. */}
         {participants.map(p => {
           const x = layout.xFor.get(p.id)!;
           return (
             <line key={p.id} x1={x} y1={HEADER_H + 32} x2={x} y2={layout.bodyEnd + HEADER_GAP - 6}
-              stroke={colorFor(p.id)} strokeOpacity={0.35} strokeWidth={1.5} strokeDasharray="5 5" />
+              stroke={accentOf(p.id)} strokeOpacity={lifelinePaint.opacity} strokeWidth={lifelinePaint.width}
+              strokeDasharray={lifelinePaint.dash} />
           );
         })}
 
@@ -407,28 +538,64 @@ A-->>U: 200 OK`}
           const xs = participants.map(p => layout.xFor.get(p.id)!);
           const left = Math.min(...xs) - 46;
           const right = Math.max(...xs) + 46;
+          const pillW = Math.max(58, f.frameType.length * 8 + 26);
+          if (!styled) {
+            return (
+              <g key={i}>
+                <rect x={left} y={f.startY} width={right - left} height={f.endY - f.startY}
+                  rx={8} fill="#6366f1" fillOpacity={0.03} stroke="#94a3b8" strokeDasharray="4 4" />
+                <rect x={left} y={f.startY} width={pillW} height={20} rx={6}
+                  fill="#475569" />
+                <text x={left + 10} y={f.startY + 10.5} dominantBaseline="central" fontSize={10.5}
+                  fontWeight={700} fill="#fff" fontFamily="Inter, sans-serif">
+                  {f.frameType.toUpperCase()}
+                </text>
+                {f.label && (
+                  <text x={left + pillW + 8} y={f.startY + 10.5}
+                    dominantBaseline="central" fontSize={11} fill="#475569" fontStyle="italic"
+                    fontFamily="Inter, sans-serif">
+                    {f.label}
+                  </text>
+                )}
+                {f.elses.map((e, j) => (
+                  <g key={j}>
+                    <line x1={left} y1={e.y} x2={right} y2={e.y} stroke="#94a3b8" strokeDasharray="4 4" />
+                    <text x={left + 10} y={e.y + 12} fontSize={10.5} fontStyle="italic" fill="#475569"
+                      fontFamily="Inter, sans-serif">
+                      [{e.label || 'else'}]
+                    </text>
+                  </g>
+                ))}
+              </g>
+            );
+          }
           return (
             <g key={i}>
               <rect x={left} y={f.startY} width={right - left} height={f.endY - f.startY}
-                rx={8} fill="#6366f1" fillOpacity={0.03} stroke="#94a3b8" strokeDasharray="4 4" />
-              <rect x={left} y={f.startY} width={Math.max(58, f.frameType.length * 8 + 26)} height={20} rx={6}
-                fill="#475569" />
+                rx={framePaint.radius} fill={framePaint.fill} fillOpacity={framePaint.fillOpacity}
+                stroke={framePaint.stroke} strokeWidth={framePaint.strokeWidth}
+                strokeDasharray={framePaint.dash} />
+              <rect x={left} y={f.startY} width={pillW} height={20} rx={framePaint.pillRadius}
+                fill={framePaint.pillFill}
+                stroke={framePaint.pillStrokeWidth > 0 ? framePaint.pillStroke : undefined}
+                strokeWidth={framePaint.pillStrokeWidth > 0 ? framePaint.pillStrokeWidth : undefined} />
               <text x={left + 10} y={f.startY + 10.5} dominantBaseline="central" fontSize={10.5}
-                fontWeight={700} fill="#fff" fontFamily="Inter, sans-serif">
+                fontWeight={700} fill={framePaint.pillLabel} fontFamily={framePaint.fontFamily}>
                 {f.frameType.toUpperCase()}
               </text>
               {f.label && (
-                <text x={left + Math.max(58, f.frameType.length * 8 + 26) + 8} y={f.startY + 10.5}
-                  dominantBaseline="central" fontSize={11} fill="#475569" fontStyle="italic"
-                  fontFamily="Inter, sans-serif">
+                <text x={left + pillW + 8} y={f.startY + 10.5}
+                  dominantBaseline="central" fontSize={11} fill={framePaint.label} fontStyle="italic"
+                  fontFamily={framePaint.fontFamily}>
                   {f.label}
                 </text>
               )}
               {f.elses.map((e, j) => (
                 <g key={j}>
-                  <line x1={left} y1={e.y} x2={right} y2={e.y} stroke="#94a3b8" strokeDasharray="4 4" />
-                  <text x={left + 10} y={e.y + 12} fontSize={10.5} fontStyle="italic" fill="#475569"
-                    fontFamily="Inter, sans-serif">
+                  <line x1={left} y1={e.y} x2={right} y2={e.y} stroke={framePaint.elseStroke}
+                    strokeDasharray={framePaint.elseDash} />
+                  <text x={left + 10} y={e.y + 12} fontSize={10.5} fontStyle="italic" fill={framePaint.label}
+                    fontFamily={framePaint.fontFamily}>
                     [{e.label || 'else'}]
                   </text>
                 </g>
@@ -454,7 +621,7 @@ A-->>U: 200 OK`}
                 width={BAR_W}
                 height={Math.max(12, bar.y2 - bar.y1 + 8)}
                 rx={1}
-                fill={colorFor(bar.id)}
+                fill={accentOf(bar.id)}
                 fillOpacity={0.9}
                 pointerEvents="none"
               />
@@ -482,10 +649,18 @@ A-->>U: 200 OK`}
                 data-walk-current={rowCurrent ? 'true' : undefined}
                 opacity={rowOpacity}
               >
-                <rect x={x} y={y} width={w} height={NOTE_H - 6} rx={6}
-                  fill="#fef9c3" stroke="#eab308" strokeOpacity={0.5} />
+                {styled ? (
+                  <rect x={x} y={y} width={w} height={NOTE_H - 6} rx={notePaint.radius}
+                    fill={notePaint.fill} stroke={notePaint.strokeWidth > 0 ? notePaint.stroke : undefined}
+                    strokeWidth={notePaint.strokeWidth > 0 ? notePaint.strokeWidth : undefined}
+                    strokeOpacity={notePaint.strokeOpacity} />
+                ) : (
+                  <rect x={x} y={y} width={w} height={NOTE_H - 6} rx={6}
+                    fill="#fef9c3" stroke="#eab308" strokeOpacity={0.5} />
+                )}
                 <text x={x + w / 2} y={y + (NOTE_H - 6) / 2 + 1} textAnchor="middle" dominantBaseline="central"
-                  fontSize={11} fill="#713f12" fontFamily="Inter, sans-serif">
+                  fontSize={11} fill={styled ? notePaint.label : '#713f12'}
+                  fontFamily={styled ? notePaint.fontFamily : 'Inter, sans-serif'}>
                   {item.text}
                 </text>
               </g>
@@ -493,9 +668,11 @@ A-->>U: 200 OK`}
           }
 
           if (item.kind !== 'message' || msgIndex === undefined) return null;
-          const c = colorFor(item.from);
+          const c = accentOf(item.from);
           const arrow: SequenceArrow = item.arrow ?? 'sync';
           const marker = arrow === 'sync' ? `url(#seq-arrow-${c.slice(1)})` : undefined;
+          const messageDash = item.dashed ? messagePaint.dashedDash : messagePaint.solidDash;
+          const badge = sequenceBadgePaint(iconStyle, c);
           const x1 = layout.xFor.get(item.from)!;
           const x2 = layout.xFor.get(item.to)!;
           const isEditingThis = editing?.kind === 'message' && editing.index === msgIndex;
@@ -520,10 +697,10 @@ A-->>U: 200 OK`}
                 opacity={rowOpacity}
               >
                 <path d={`M ${x1} ${y} H ${x1 + loopW} V ${y + 24} H ${shaftEnd}`}
-                  fill="none" stroke={c} strokeWidth={1.8}
-                  strokeDasharray={item.dashed ? '6 4' : undefined} markerEnd={marker} />
+                  fill="none" stroke={c} strokeWidth={messagePaint.width}
+                  strokeDasharray={messageDash} markerEnd={marker} />
                 {arrow !== 'sync' && (
-                  <ArrowTip kind={arrow} x={tipX} y={y + 24} dir={-1} color={c} />
+                  <ArrowTip kind={arrow} x={tipX} y={y + 24} dir={-1} color={c} strokeWidth={messagePaint.tipWidth} />
                 )}
                 <path d={`M ${x1} ${y} H ${x1 + loopW} V ${y + 24} H ${x1 + 6}`}
                   fill="none" stroke="transparent" strokeWidth={12} style={{ cursor: 'pointer' }}
@@ -535,14 +712,25 @@ A-->>U: 200 OK`}
                     {editorInput('Edit message')}
                   </foreignObject>
                 ) : (
-                  <text x={x1 + loopW + 8} y={y + 12} fontSize={12} fill="#334155"
-                    fontFamily="Inter, sans-serif" style={{ cursor: 'text' }}
+                  <text x={x1 + loopW + 8} y={y + 12} fontSize={12} fill={messagePaint.label}
+                    fontFamily={messagePaint.fontFamily} style={{ cursor: 'text' }}
                     onClick={() => startMessageEdit(msgIndex, item.text, x1 + loopW + 8, y)}>
                     {item.text}
                     <title>Click to edit</title>
                   </text>
                 )}
-                {seqLabel && <SeqBadge n={seqLabel} x={x1 + 18} y={y - 12} color={c} />}
+                {seqLabel && (
+                  <SeqBadge
+                    n={seqLabel}
+                    x={x1 + 18}
+                    y={y - 12}
+                    color={c}
+                    fill={styled ? badge.fill : undefined}
+                    textColor={styled ? badge.text : undefined}
+                    stroke={styled ? badge.stroke : undefined}
+                    fontFamily={styled ? badge.fontFamily : undefined}
+                  />
+                )}
               </g>
             );
           }
@@ -559,10 +747,10 @@ A-->>U: 200 OK`}
               data-walk-current={rowCurrent ? 'true' : undefined}
               opacity={rowOpacity}
             >
-              <line x1={x1} y1={y} x2={xEnd} y2={y} stroke={c} strokeWidth={1.8}
-                strokeDasharray={item.dashed ? '6 4' : undefined} markerEnd={marker} />
+              <line x1={x1} y1={y} x2={xEnd} y2={y} stroke={c} strokeWidth={messagePaint.width}
+                strokeDasharray={messageDash} markerEnd={marker} />
               {arrow !== 'sync' && (
-                <ArrowTip kind={arrow} x={x2} y={y} dir={dir} color={c} />
+                <ArrowTip kind={arrow} x={x2} y={y} dir={dir} color={c} strokeWidth={messagePaint.tipWidth} />
               )}
               {/* Wide invisible hit-line: easier double-click target */}
               <line x1={x1} y1={y} x2={x2} y2={y} stroke="transparent" strokeWidth={14}
@@ -575,14 +763,25 @@ A-->>U: 200 OK`}
                 </foreignObject>
               ) : (
                 <text x={midX} y={y - 8} textAnchor="middle" fontSize={12}
-                  fontWeight={500} fill="#334155" fontFamily="Inter, sans-serif"
+                  fontWeight={500} fill={messagePaint.label} fontFamily={messagePaint.fontFamily}
                   style={{ cursor: 'text' }}
                   onClick={() => startMessageEdit(msgIndex, item.text, midX, y)}>
                   {item.text}
                   <title>Click to edit</title>
                 </text>
               )}
-              {seqLabel && <SeqBadge n={seqLabel} x={x1 + dir * 14} y={y - 14} color={c} />}
+              {seqLabel && (
+                <SeqBadge
+                  n={seqLabel}
+                  x={x1 + dir * 14}
+                  y={y - 14}
+                  color={c}
+                  fill={styled ? badge.fill : undefined}
+                  textColor={styled ? badge.text : undefined}
+                  stroke={styled ? badge.stroke : undefined}
+                  fontFamily={styled ? badge.fontFamily : undefined}
+                />
+              )}
             </g>
           );
         })}

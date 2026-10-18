@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { activationSpans, messageLineIndices, parseSequenceDiagram, parseSequenceSource } from './sequenceParser';
+import { activationSpans, guessSequenceRole, messageLineIndices, parseSequenceDiagram, parseSequenceSource, resolveSequenceRole } from './sequenceParser';
 
 const SAMPLE = `sequenceDiagram
 title Checkout
@@ -190,5 +190,61 @@ deactivate B`);
     expect(activationSpans(explicit.items)).toEqual([
       { id: 'B', from: 0, to: 2, depth: 0, open: false },
     ]);
+  });
+});
+
+describe('sequence participant roles', () => {
+  it('resolves comment, then actor, then a name guess', () => {
+    const model = parseSequenceDiagram(`sequenceDiagram
+%% role A ai
+actor A as Vector DB
+participant B as Agent
+actor C as GPT
+participant D as Nora
+%% role E human
+%% role E data
+participant E as GPT
+participant F as Search tool
+participant G as My API
+participant H as Redis Cache
+`);
+    const role = (id: string) => model.participants.find(p => p.id === id)?.role;
+    expect(role('A')).toBe('ai');
+    expect(role('B')).toBe('ai');
+    expect(role('C')).toBe('human');
+    expect(role('D')).toBeUndefined();
+    expect(model.participants.find(p => p.id === 'D')).not.toHaveProperty('role');
+    expect(role('E')).toBe('data');
+    expect(role('F')).toBe('tool');
+    expect(role('G')).toBe('tool');
+    expect(role('H')).toBe('data');
+  });
+
+  it('gives an unknown name no role, and ignores an unknown comment word', () => {
+    const model = parseSequenceDiagram(`sequenceDiagram
+%% role N robot
+participant N as Nora
+participant P as Checkout
+N->>P: hi
+`);
+    expect(model.participants.find(p => p.id === 'N')?.role).toBeUndefined();
+    expect(model.participants.find(p => p.id === 'P')?.role).toBeUndefined();
+    expect(guessSequenceRole('Nora')).toBeUndefined();
+    expect(guessSequenceRole('Database')).toBeUndefined();
+    expect(resolveSequenceRole({ commentRole: 'check', actor: true, name: 'Agent' })).toBe('check');
+    expect(resolveSequenceRole({ actor: true, name: 'Vector DB' })).toBe('human');
+    expect(resolveSequenceRole({ name: 'LLM' })).toBe('ai');
+    expect(resolveSequenceRole({ name: 'GPT-4' })).toBe('ai');
+    expect(resolveSequenceRole({ name: 'the Store' })).toBe('data');
+  });
+
+  it('accepts a role comment in any case and does not treat it as a message', () => {
+    const text = `sequenceDiagram
+%% ROLE A AI
+participant A
+A->>A: think`;
+    const model = parseSequenceDiagram(text);
+    expect(model.participants[0].role).toBe('ai');
+    expect(messageLineIndices(text)).toEqual([3]);
   });
 });

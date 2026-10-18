@@ -4,15 +4,15 @@ import { IconStylePicker } from './IconStylePicker';
 import { useDiagramStore } from '../../store/diagramStore';
 
 describe('IconStylePicker mode gate', () => {
-  it('shows on architecture and flow, and stays hidden on sequence, gantt, and c4', () => {
-    for (const diagramMode of ['architecture', 'flow'] as const) {
+  it('shows on architecture, flow, and sequence, and stays hidden on gantt and c4', () => {
+    for (const diagramMode of ['architecture', 'flow', 'sequence'] as const) {
       useDiagramStore.setState({ diagramMode, iconStyle: 'clean', isReadOnlyShared: false });
       const view = render(<IconStylePicker />);
       expect(screen.getByTestId('icon-style-picker')).toBeInTheDocument();
       view.unmount();
     }
 
-    for (const diagramMode of ['sequence', 'gantt', 'c4'] as const) {
+    for (const diagramMode of ['gantt', 'c4'] as const) {
       useDiagramStore.setState({ diagramMode, iconStyle: 'bold', isReadOnlyShared: false });
       const view = render(<IconStylePicker />);
       expect(screen.queryByTestId('icon-style-picker')).toBeNull();

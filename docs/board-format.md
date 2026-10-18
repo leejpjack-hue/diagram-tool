@@ -34,7 +34,7 @@ Every file has a `version` string. Current writers emit `"3.0"`. Readers must st
 
 ### Icon style
 
-`board.iconStyle` is optional and additive. It applies to **Flow and Architecture** boards. `version` stays **3.0**. No database migration. There is no new field.
+`board.iconStyle` is optional and additive. It applies to **Flow, Architecture, and Sequence** boards. `version` stays **3.0**. No database migration. There is no new field. Roles on a sequence are not a field: they live in the Mermaid source.
 
 | Value | Meaning |
 | --- | --- |
@@ -45,7 +45,7 @@ Every file has a `version` string. Current writers emit `"3.0"`. Readers must st
 
 Missing or unknown values load as `clean`. Older readers ignore the field. A diagram that omits `iconStyle` still loads as `clean`.
 
-On an Architecture board the same value paints services, databases, queues, cloud parts, groups, and the edges together. Sequence, Gantt, and C4 boards do not show the style picker.
+On an Architecture board the same value paints services, databases, queues, cloud parts, groups, and the edges together. On a Sequence board the same value paints header cards, messages, frames, and notes. Clean with no participant roles is today's sequence look. Gantt and C4 boards do not show the style picker.
 
 An explicit node `color:` in the DSL wins over the style colour. An explicit edge `color:` wins over the style edge colour. The style still chooses the fill, the icon, the type, and the edge weight. A node with no `color:` uses the style colour for that kind.
 
@@ -179,6 +179,24 @@ A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `s
 ### Type messages
 
 Type messages writes ordinary Mermaid `sequenceDiagram` text into `source.text` / `dslText`: `participant`, `->>`, `-->>`, `-)`, `alt` / `else` / `end`, `loop`, `opt`, `par` / `and`, and `Note over`. A `%% @type-messages` comment block holds the typed lines so the box can refill. A leading `Human:` / `AI:` / `Tool:` / `Data:` on the first mention is stored as `%% role <id> human|ai|tool|data`. Those comments are commentary, not a board field. A hand-written sequence diagram has no marker, so opening Type messages leaves the box empty and does not change the source. `version` stays **3.0**. No database migration.
+
+### Participant roles
+
+A sequence participant's role is read from the Mermaid source. It is not a new board field. `version` stays **3.0**. No database migration.
+
+| Source, first match wins | Role |
+| --- | --- |
+| `%% role <id> ai` | AI agent |
+| `%% role <id> human` | Human |
+| `%% role <id> tool` | Tool |
+| `%% role <id> data` | Data |
+| `%% role <id> check` | Check |
+| `actor <id>` | Human |
+| Name has the word Agent, Model, LLM, or GPT | AI agent |
+| Name has the word DB, Store, or Cache | Data |
+| Name has the word Tool or API | Tool |
+
+Anything else has no role, and the card keeps today's palette colour. Header and footer cards show the role icon and the Flow role colour (the same colours as the role chips, and the style's colour when the board is Line, Bold, or Blueprint). Lifelines are lightly tinted with that colour. `board.iconStyle` paints the sequence: Clean, Line, Bold, or Blueprint. Writers omit `iconStyle` when it is Clean.
 
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 

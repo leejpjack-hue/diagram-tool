@@ -485,6 +485,7 @@ Go live — milestone after Review`;
             >
               {showMessages ? 'Hide Type messages' : 'Type messages'}
             </button>
+            {!isReadOnlyShared && <IconStylePicker />}
             {seqCanWalk && (
               <button
                 type="button"
