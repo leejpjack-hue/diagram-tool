@@ -4,13 +4,14 @@ import { useGanttStore } from '../components/Gantt/ganttStore';
 import type { DiagramNode } from '../store/types';
 import { buildBoardDocument, EXPORT_WATERMARK, showStepNumbersForStorage } from './boardFormat';
 import type { BoardMode } from './boardManager';
-import { ICON_STYLES } from '../components/Canvas/iconStyles';
+import { ICON_STYLES, iconStyleForStorage } from '../components/Canvas/iconStyles';
 
 export const useExport = () => {
   const { parsedDiagram, diagramMode, iconStyle } = useDiagramStore();
   // Clean architecture keeps today's export fill. Other architecture styles,
   // and every Flow style, paint the style canvas (Blueprint is the navy grid).
-  const exportBackground = diagramMode === 'flow' || (diagramMode === 'architecture' && iconStyle !== 'clean')
+  const exportBackground = diagramMode === 'flow'
+    || ((diagramMode === 'architecture' || diagramMode === 'sequence') && iconStyle !== 'clean')
     ? ICON_STYLES[iconStyle].canvas
     : null;
 
@@ -148,7 +149,9 @@ export const useExport = () => {
       title,
       mode,
       dslText,
-      ...((mode === 'flow' || mode === 'architecture') && liveStyle !== 'clean' ? { iconStyle: liveStyle } : {}),
+      ...((mode === 'flow' || mode === 'architecture' || mode === 'sequence') && iconStyleForStorage(liveStyle)
+        ? { iconStyle: iconStyleForStorage(liveStyle) }
+        : {}),
       ...(showStepNumbersForStorage(showStepNumbers) ? { showStepNumbers: true } : {}),
     }), null, 2);
     const blob = new Blob([json], { type: 'application/json' });

@@ -1,7 +1,8 @@
-// DT-STYLE-01 / DT-ARCH-03 — four named icon styles. One token table; Clean is
-// today's look (and the default when a board has no iconStyle, or an unknown
-// value). Flow and Architecture boards share the table. Line / Bold / Blueprint
-// colours are consumed by the nodes, edges, and legend. No runtime icon CDN.
+// DT-STYLE-01 / DT-ARCH-03 / DT-SEQ-04 — four named icon styles. One token
+// table; Clean is today's look (and the default when a board has no iconStyle,
+// or an unknown value). Flow, Architecture, and Sequence share the table.
+// Line / Bold / Blueprint colours are consumed by the nodes, edges, and legend.
+// No runtime icon CDN.
 
 export const ICON_STYLE_IDS = ['clean', 'line', 'bold', 'blueprint'] as const;
 export type IconStyleId = (typeof ICON_STYLE_IDS)[number];
@@ -551,9 +552,9 @@ export function faceBoxShadow(face: ResolvedFace): string | undefined {
   return `inset 0 0 0 2px ${face.canvas}, inset 0 0 0 3.5px ${face.color}`;
 }
 
-/** Flow and Architecture show the style picker. Sequence, Gantt, and C4 do not. */
+/** Flow, Architecture, and Sequence show the style picker. Gantt and C4 do not. */
 export function boardShowsIconStyle(mode: string | null | undefined): boolean {
-  return mode === 'flow' || mode === 'architecture';
+  return mode === 'flow' || mode === 'architecture' || mode === 'sequence';
 }
 
 /** How an architecture part is drawn. Clean stays the existing chip card. */

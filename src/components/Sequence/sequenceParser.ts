@@ -26,10 +26,19 @@
 
 export type SequenceArrow = 'sync' | 'async' | 'lost' | 'open';
 
+/** Role words written by `%% role <id> <role>`. `ai` is the Flow "model" role. */
+export const SEQUENCE_ROLES = ['ai', 'human', 'tool', 'data', 'check'] as const;
+export type SequenceRole = (typeof SEQUENCE_ROLES)[number];
+
 export interface SequenceParticipant {
   id: string;
   name: string;
   actor: boolean; // declared with `actor` instead of `participant`
+  /**
+   * Resolved display role. Absent when nothing matched, so the card keeps
+   * today's palette. Not a board field — it is derived from the Mermaid text.
+   */
+  role?: SequenceRole;
 }
 
 export type SequenceItem =
@@ -103,6 +112,45 @@ export function messageLineIndices(text: string): number[] {
 
 function cleanId(raw: string): string {
   return raw.trim().replace(/^"|"$/g, '');
+}
+
+const ROLE_COMMENT_RE = /^%%\s*role\s+(?:"([^"]+)"|(\S+))\s+(ai|human|tool|data|check)\s*$/i;
+const AI_NAME_RE = /\b(?:agent|model|llm|gpt)\b/i;
+const DATA_NAME_RE = /\b(?:db|store|cache)\b/i;
+const TOOL_NAME_RE = /\b(?:tool|api)\b/i;
+
+function readRoleComment(line: string): { id: string; role: SequenceRole } | null {
+  const match = line.match(ROLE_COMMENT_RE);
+  if (!match) return null;
+  const id = cleanId(match[1] ?? match[2] ?? '');
+  if (!id) return null;
+  return { id, role: match[3].toLowerCase() as SequenceRole };
+}
+
+/**
+ * Name guess, after a role comment and `actor` have already lost.
+ * Agent / Model / LLM / GPT → AI, then DB / Store / Cache → Data,
+ * then Tool / API → Tool. An unknown name returns nothing.
+ */
+export function guessSequenceRole(name: string): SequenceRole | undefined {
+  if (AI_NAME_RE.test(name)) return 'ai';
+  if (DATA_NAME_RE.test(name)) return 'data';
+  if (TOOL_NAME_RE.test(name)) return 'tool';
+  return undefined;
+}
+
+/**
+ * Resolution order: `%% role` comment, then `actor` (Human), then the name
+ * guess. Anything else is unroled.
+ */
+export function resolveSequenceRole(input: {
+  commentRole?: SequenceRole | null;
+  actor?: boolean;
+  name: string;
+}): SequenceRole | undefined {
+  if (input.commentRole) return input.commentRole;
+  if (input.actor) return 'human';
+  return guessSequenceRole(input.name);
 }
 
 function arrowFromToken(token: string): SequenceArrow {
@@ -208,6 +256,7 @@ export function parseSequenceDiagram(text: string): SequenceDiagramModel {
   let autonumber: SequenceAutonumber | null = null;
 
   const seen = new Map<string, SequenceParticipant>();
+  const roleComments = new Map<string, SequenceRole>();
   const ensure = (rawId: string, name?: string, actor = false): SequenceParticipant => {
     const id = cleanId(rawId);
     let p = seen.get(id);
@@ -224,7 +273,14 @@ export function parseSequenceDiagram(text: string): SequenceDiagramModel {
   const lines = text.split('\n');
   for (const rawLine of lines) {
     const line = rawLine.trim();
-    if (!line || line.startsWith('%%') || line.startsWith('#')) continue;
+    if (!line || line.startsWith('#')) continue;
+    const roleComment = readRoleComment(line);
+    if (roleComment) {
+      // A later comment for the same id wins, so a correction sticks.
+      roleComments.set(roleComment.id, roleComment.role);
+      continue;
+    }
+    if (line.startsWith('%%')) continue;
     if (/^sequenceDiagram\b/i.test(line)) continue;
     if (/^autonumber\b/i.test(line)) {
       const next = readAutonumber(line);
@@ -301,6 +357,15 @@ export function parseSequenceDiagram(text: string): SequenceDiagramModel {
       continue;
     }
     // Unrecognised lines are skipped so partial typing never hard-fails.
+  }
+
+  for (const participant of participants) {
+    const role = resolveSequenceRole({
+      commentRole: roleComments.get(participant.id),
+      actor: participant.actor,
+      name: participant.name,
+    });
+    if (role) participant.role = role;
   }
 
   return { title, participants, items, autonumber };

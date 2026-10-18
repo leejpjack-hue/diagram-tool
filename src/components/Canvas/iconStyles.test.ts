@@ -96,7 +96,7 @@ describe('ICON_STYLES', () => {
   it('resolves an architecture token for every kind and every style', () => {
     expect(boardShowsIconStyle('architecture')).toBe(true);
     expect(boardShowsIconStyle('flow')).toBe(true);
-    expect(boardShowsIconStyle('sequence')).toBe(false);
+    expect(boardShowsIconStyle('sequence')).toBe(true);
     expect(boardShowsIconStyle('gantt')).toBe(false);
     expect(boardShowsIconStyle('c4')).toBe(false);
 
