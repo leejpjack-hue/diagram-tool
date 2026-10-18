@@ -31,8 +31,9 @@ async function openArchitectureTemplate(page: Page) {
   await page.goto('/app/');
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
   await page.getByRole('button', { name: 'Create new' }).click();
-  await page.getByRole('button', { name: 'Templates', exact: true }).click();
-  await page.getByTestId('template-card-c4-context-insurance').click();
+  const createDialog = page.getByRole('dialog', { name: 'Create a board' });
+  await createDialog.getByRole('button', { name: 'Templates', exact: true }).click();
+  await createDialog.getByTestId('template-card-c4-context-insurance').click();
   await expect(page.getByTestId('toast-item').filter({ hasText: 'Board created' })).toBeVisible();
   await waitForToastsToClear(page);
   await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible();
