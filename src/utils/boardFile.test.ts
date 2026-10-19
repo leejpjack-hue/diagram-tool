@@ -207,9 +207,9 @@ describe('open board file into the workspace', () => {
     const beforeOther = snapshot(other);
 
     const attempts: Array<[string, string, string]> = [
-      ['schema.mmd', 'erDiagram\n  CUSTOMER ||--o{ ORDER : places\n', OPEN_BOARD_FILE_ERRORS.unsupported],
-      ['model.mermaid', 'classDiagram\n  class Animal\n', OPEN_BOARD_FILE_ERRORS.unsupported],
-      ['map.mmd', 'mindmap\n  root((ideas))\n', OPEN_BOARD_FILE_ERRORS.unsupported],
+      ['schema.mmd', 'erDiagram\n  CUSTOMER ||--o{ ORDER : places\n', "Mermaid erDiagram isn't supported yet."],
+      ['model.mermaid', 'classDiagram\n  class Animal\n', "Mermaid classDiagram isn't supported yet."],
+      ['map.mmd', 'mindmap\n  root((ideas))\n', "Mermaid mindmap isn't supported yet."],
       ['backup.json', JSON.stringify({ version: '3.0', kind: 'workspace', boards: [boardDoc().board] }), OPEN_BOARD_FILE_ERRORS.workspace],
     ];
 

@@ -5,6 +5,7 @@ import {
   parsePortableImport,
   type ImportReport,
 } from './boardFormat';
+import { unsupportedMermaidOpenError } from './boardFile';
 import { detectRawDiagramImport } from './sourceText';
 import { importDrawio, looksLikeDrawio } from './drawioImport';
 import { assertImportSize, sanitizeImportPlainText } from './importSanitizer';
@@ -946,6 +947,9 @@ export class BoardManager {
       });
       return { boards: [board], spaces: 0, templates: 0, versions: 0, skipped: [] };
     }
+
+    const unsupported = unsupportedMermaidOpenError(text);
+    if (unsupported) throw new Error(unsupported);
 
     if (looksLikeDrawio(file.name, text)) {
       const drawio = await importDrawio(file.name, text);

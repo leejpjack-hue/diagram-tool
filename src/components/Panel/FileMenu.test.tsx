@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FileMenu } from './FileMenu';
 import { CURSOR_MCP_FOLDER_SENTENCE, CURSOR_MCP_PRIVACY_SENTENCE, cursorMcpJsonSnippet } from '../../utils/cursorMcpSnippet';
-import { OPEN_BOARD_FILE_ERRORS } from '../../utils/boardFile';
 import { OPEN_FILE_ACCEPT, boardFileHandles } from '../../utils/fileSystemAccess';
 import { buildBoardDocument } from '../../utils/boardFormat';
 import {
@@ -161,7 +160,7 @@ describe('FileMenu', () => {
     });
 
     await waitFor(() => {
-      expect(notify).toHaveBeenCalledWith('error', OPEN_BOARD_FILE_ERRORS.unsupported);
+      expect(notify).toHaveBeenCalledWith('error', "Mermaid erDiagram isn't supported yet.");
     });
     expect(onOpenWorkspaceBoard).not.toHaveBeenCalled();
   });

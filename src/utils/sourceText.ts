@@ -1,4 +1,5 @@
 import { isMermaidFlow, isMermaidSequence, mermaidFlowToDSL } from '../parser/mermaidFlow';
+import { isMermaidGantt, mermaidGanttToDSL } from '../parser/mermaidGantt';
 import { parseDiagram } from '../parser/parser';
 import { parseGanttSource } from '../components/Gantt/ganttParser';
 import { parseSequenceSource } from '../components/Sequence/sequenceParser';
@@ -52,6 +53,14 @@ export function detectRawDiagramImport(filename: string, text: string): { mode: 
   }
   if (isMermaidFlow(trimmed)) {
     return { mode: 'flow', title: extractSourceTitle(trimmed, base), dslText: text };
+  }
+  if (isMermaidGantt(trimmed)) {
+    const dslText = mermaidGanttToDSL(trimmed);
+    const parsed = parseGanttSource(dslText);
+    if (parsed.error || !parsed.project) {
+      throw new Error(parsed.error ?? "That file couldn't be opened.");
+    }
+    return { mode: 'gantt', title: extractSourceTitle(dslText, base), dslText };
   }
 
   const mermaidName = /\.(mmd|mermaid)$/i.test(filename);

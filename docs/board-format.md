@@ -145,7 +145,7 @@ When `workdays` is on:
 
 A week is still 7 days. With `workdays: on` those 7 days are working days.
 
-Mermaid import maps `excludes weekends` to `workdays: on`, `excludes 2026-12-25` to `holidays:`, and `weekend friday` to `weekend: fri-sat`.
+Mermaid import maps `excludes weekends` to `workdays: on`, `excludes 2026-12-25` to `holidays:`, and `weekend friday` to `weekend: fri-sat`. File → Open and Dashboard Import accept a Mermaid `gantt` file and store native `diagram: gantt` through the existing importer; the live Gantt editor stays native DSL.
 
 Writers omit each key when it is at its default.
 
