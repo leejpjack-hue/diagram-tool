@@ -32,8 +32,11 @@ export function firstSignificantLine(text: string): string {
   return '';
 }
 
-export function isUnsupportedOpenedDiagram(text: string): boolean {
-  return UNSUPPORTED_MERMAID.test(firstSignificantLine(text));
+/** Recognizable Mermaid that this app does not import. Names the kind. */
+export function unsupportedMermaidOpenError(text: string): string | null {
+  const kind = firstSignificantLine(text).match(UNSUPPORTED_MERMAID)?.[1];
+  if (!kind) return null;
+  return `Mermaid ${kind} isn't supported yet.`;
 }
 
 function looksLikeJson(text: string): boolean {
@@ -98,9 +101,8 @@ export async function interpretOpenedFile(
     };
   }
 
-  if (isUnsupportedOpenedDiagram(raw)) {
-    throw new Error(OPEN_BOARD_FILE_ERRORS.unsupported);
-  }
+  const unsupported = unsupportedMermaidOpenError(raw);
+  if (unsupported) throw new Error(unsupported);
 
   if (isMermaidSequence(raw)) {
     requireReadable(raw, 'sequence');

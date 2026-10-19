@@ -296,6 +296,41 @@ U->>A: GET /orders
     expect(report.boards[0].dslText).toContain('U->>A: GET /orders');
   });
 
+  it('imports a mermaid gantt file as a native gantt board', async () => {
+    const file = new File([`gantt
+title Sprint Plan
+dateFormat YYYY-MM-DD
+Design :a1, 2026-08-01, 4d
+Implement :after a1, 5d
+`], 'sprint.mmd', { type: 'text/plain' });
+    const report = await manager.importFromFile(file);
+    expect(report.boards[0]).toMatchObject({ mode: 'gantt', title: 'Sprint Plan' });
+    expect(report.boards[0].dslText).toMatch(/diagram:\s*gantt/);
+    expect(report.boards[0].dslText).toContain('after: Design');
+    expect(buildBoardDocument(report.boards[0]).version).toBe('3.0');
+  });
+
+  it('names an unsupported mermaid kind and does not create a board', async () => {
+    const existing = await manager.create({ title: 'Keep Me', mode: 'flow', dslText: 'diagram: flow\nstart A' });
+    await expect(manager.importFromFile(new File(
+      ['erDiagram\n  CUSTOMER ||--o{ ORDER : places\n'],
+      'schema.mmd',
+      { type: 'text/plain' },
+    ))).rejects.toThrow("Mermaid erDiagram isn't supported yet.");
+    const boards = await manager.list();
+    expect(boards).toHaveLength(1);
+    expect(boards[0]).toMatchObject({ id: existing.id, title: 'Keep Me' });
+  });
+
+  it('rejects an empty mermaid gantt without creating a board', async () => {
+    const existing = await manager.create({ title: 'Keep Me', mode: 'flow', dslText: 'diagram: flow\nstart A' });
+    await expect(manager.importFromFile(new File(['gantt\ntitle Empty plan\n'], 'empty.mmd', { type: 'text/plain' })))
+      .rejects.toThrow(/couldn't be opened/i);
+    const boards = await manager.list();
+    expect(boards).toHaveLength(1);
+    expect(boards[0].id).toBe(existing.id);
+  });
+
   it('imports a raw flowchart mermaid file', async () => {
     const file = new File(['flowchart TD\nA[Start] --> B[Done]\n'], 'flow.mmd', { type: 'text/plain' });
     const report = await manager.importFromFile(file);

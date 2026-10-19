@@ -60,6 +60,32 @@ describe('detectRawDiagramImport', () => {
   it('does not treat JSON as mermaid', () => {
     expect(detectRawDiagramImport('board.json', '{"version":"3.0"}')).toBeNull();
   });
+
+  it('imports a mermaid gantt file as native diagram: gantt', () => {
+    const imported = detectRawDiagramImport('sprint.mmd', `gantt
+title Sprint Plan
+dateFormat YYYY-MM-DD
+Design :a1, 2026-08-01, 4d
+Implement :after a1, 5d
+`);
+    expect(imported).toMatchObject({ mode: 'gantt', title: 'Sprint Plan' });
+    expect(imported?.dslText).toMatch(/diagram:\s*gantt/);
+    expect(imported?.dslText).toContain('duration: 4d');
+    expect(imported?.dslText).toContain('duration: 5d');
+    expect(imported?.dslText).toContain('after: Design');
+    expect(imported?.dslText).not.toMatch(/^gantt\b/m);
+  });
+
+  it('imports a mermaid gantt .txt the same way', () => {
+    const imported = detectRawDiagramImport('plan.txt', '%% note\n\ngantt\ntitle Roadmap\nDesign :a1, 2026-08-01, 2d\n');
+    expect(imported?.mode).toBe('gantt');
+    expect(imported?.title).toBe('Roadmap');
+    expect(imported?.dslText).toContain('task Design');
+  });
+
+  it('rejects an empty mermaid gantt instead of returning a board', () => {
+    expect(() => detectRawDiagramImport('empty.mmd', 'gantt\ntitle Empty plan\n')).toThrow(/couldn't be opened/i);
+  });
 });
 
 describe('applyBoardSource last-good contract', () => {
