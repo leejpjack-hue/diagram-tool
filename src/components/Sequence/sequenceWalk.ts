@@ -82,7 +82,7 @@ function snapshotFrames(stack: OpenFrame[]): SequenceWalkFrame[] {
  * DT-SEQ-03 — messages and notes in document order.
  * Frames are not steps; they annotate the caption of whatever they enclose.
  * An `else` / `and` replaces the open frame's section label for later steps.
- * Activate lines are not steps. A board with no messages and no notes returns [].
+ * Activate, create, and destroy lines are not steps. A board with no messages and no notes returns [].
  */
 export function sequenceWalkSteps(model: SequenceDiagramModel | null | undefined): SequenceWalkStep[] {
   if (!model) return [];
@@ -101,6 +101,9 @@ export function sequenceWalkSteps(model: SequenceDiagramModel | null | undefined
     }
     if (item.kind === 'frameEnd') {
       stack.pop();
+      return;
+    }
+    if (item.kind === 'create' || item.kind === 'destroy' || item.kind === 'activate' || item.kind === 'deactivate') {
       return;
     }
     if (item.kind === 'message') {

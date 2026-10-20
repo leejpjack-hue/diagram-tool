@@ -176,6 +176,29 @@ A bar runs from the activating row to the deactivating row. Stacked activations 
 
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 
+### Sequence box groups, create, and destroy
+
+Sequence boards keep these Mermaid keywords inside `source.text` / `dslText`. They are not a new board field. `version` stays **3.0**. No database migration. A diagram that does not use them draws the same headers and lifelines it does today.
+
+| Source | Meaning |
+| --- | --- |
+| `box Optional label` … `end` | Groups the `participant` and `actor` lines written inside it. The canvas draws a light band behind those header cards and shows the label. |
+| `create participant ID` | Introduces ID on that row. The header and lifeline start there. |
+| `create participant ID as Name` | Same, with a display name. |
+| `create actor ID` | Introduces an actor on that row. |
+| `create actor ID as Name` | Same, with a display name. |
+| `destroy ID` | Draws an X on that lifeline and stops the line on that row. |
+
+A `box` inside another `box` is ignored. Participants declared there stay in the outer group. The inner `end` closes only the ignored box, so it does not end a frame and does not close the outer group. `rect` overlays are not read.
+
+`end` closes the innermost open box or frame. A box `end` does not end a `loop`, `alt`, `opt`, `par`, `critical`, or `break`. A frame `end` still does.
+
+`create` moves the header and lifeline only when that line is the first mention of the id. An earlier `participant`, `actor`, or message keeps the lifeline starting at the top. A `destroy` for an unknown id is ignored. Messages after `destroy` still parse; the lifeline does not continue below the X.
+
+Walk through skips `create` and `destroy` rows. They are not steps.
+
+A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
+
 ### Type messages
 
 Type messages writes ordinary Mermaid `sequenceDiagram` text into `source.text` / `dslText`: `participant`, `->>`, `-->>`, `-)`, `alt` / `else` / `end`, `loop`, `opt`, `par` / `and`, and `Note over`. A `%% @type-messages` comment block holds the typed lines so the box can refill. A leading `Human:` / `AI:` / `Tool:` / `Data:` on the first mention is stored as `%% role <id> human|ai|tool|data`. Those comments are commentary, not a board field. A hand-written sequence diagram has no marker, so opening Type messages leaves the box empty and does not change the source. `version` stays **3.0**. No database migration.

@@ -21,7 +21,12 @@
 //   loop Every minute ... end
 //   alt Success ... else Failure ... end
 //   opt Optional ... end
+//   box Clients             (participant group, closed by end)
+//   create participant W as Worker
+//   create actor C as Customer
+//   destroy W
 //
+// A box `end` is not a frame end. Nested boxes are ignored. `rect` is not read.
 // These keywords stay in the source text. They are not a board JSON field.
 
 export type SequenceArrow = 'sync' | 'async' | 'lost' | 'open';
@@ -39,6 +44,16 @@ export interface SequenceParticipant {
    * today's palette. Not a board field — it is derived from the Mermaid text.
    */
   role?: SequenceRole;
+  /** Set when this participant is declared inside a `box` group. */
+  boxId?: string;
+  /**
+   * Item index of the `create` line that first introduced this participant.
+   * Absent when a declaration or an earlier message already created them,
+   * so the lifeline still starts at the top.
+   */
+  createdAt?: number;
+  /** Item index of `destroy`. The lifeline stops on that row. */
+  destroyedAt?: number;
 }
 
 export type SequenceItem =
@@ -60,7 +75,16 @@ export type SequenceItem =
   | { kind: 'frameElse'; label: string }
   | { kind: 'frameEnd' }
   | { kind: 'activate'; id: string }
-  | { kind: 'deactivate'; id: string };
+  | { kind: 'deactivate'; id: string }
+  | { kind: 'create'; id: string }
+  | { kind: 'destroy'; id: string };
+
+/** One `box` … `end` group. Nested boxes are not recorded. */
+export interface SequenceBox {
+  id: string;
+  label: string;
+  participantIds: string[];
+}
 
 export interface SequenceAutonumber {
   start: number;
@@ -73,6 +97,8 @@ export interface SequenceDiagramModel {
   items: SequenceItem[];
   /** null when the source has no autonumber directive. */
   autonumber: SequenceAutonumber | null;
+  /** Empty when the source has no box group. Not a board JSON field. */
+  boxes: SequenceBox[];
 }
 
 /** One activation bar, from item index `from` through item index `to`. */
@@ -91,7 +117,7 @@ export const MESSAGE_RE = /^([\w "]+?)\s*(-{1,2})(>>|>|\)|[xX])\s*([+-]?)\s*([\w
 // Lines the parser consumes before it ever tests MESSAGE_RE. Kept in sync
 // with parseSequenceDiagram so edit utilities can locate the nth message
 // line in the raw text reliably.
-const NON_MESSAGE_PREFIX = /^(sequenceDiagram|autonumber|activate|deactivate|title|participant|actor|note|loop|alt|opt|par|critical|break|else|and|end)\b/i;
+const NON_MESSAGE_PREFIX = /^(sequenceDiagram|autonumber|activate|deactivate|title|participant|actor|note|loop|alt|opt|par|critical|break|else|and|end|box|create|destroy)\b/i;
 
 /**
  * Indices (into text.split('\n')) of the lines that parse as messages, in
@@ -249,9 +275,15 @@ export function parseSequenceSource(text: string): { model: SequenceDiagramModel
   return { model: parseSequenceDiagram(text), error: null };
 }
 
+type OpenBlock =
+  | { kind: 'frame' }
+  | { kind: 'box'; id: string; ignored: boolean };
+
 export function parseSequenceDiagram(text: string): SequenceDiagramModel {
   const participants: SequenceParticipant[] = [];
   const items: SequenceItem[] = [];
+  const boxes: SequenceBox[] = [];
+  const openBlocks: OpenBlock[] = [];
   let title = '';
   let autonumber: SequenceAutonumber | null = null;
 
@@ -268,6 +300,23 @@ export function parseSequenceDiagram(text: string): SequenceDiagramModel {
       p.name = name;
     }
     return p;
+  };
+
+  const activeBox = (): SequenceBox | undefined => {
+    for (let i = openBlocks.length - 1; i >= 0; i--) {
+      const block = openBlocks[i];
+      if (block.kind === 'box' && !block.ignored) {
+        return boxes.find(box => box.id === block.id);
+      }
+    }
+    return undefined;
+  };
+
+  const assignBox = (participant: SequenceParticipant) => {
+    const box = activeBox();
+    if (!box || participant.boxId) return;
+    participant.boxId = box.id;
+    box.participantIds.push(participant.id);
   };
 
   const lines = text.split('\n');
@@ -308,9 +357,52 @@ export function parseSequenceDiagram(text: string): SequenceDiagramModel {
       continue;
     }
 
+    if (/^box\b/i.test(line)) {
+      const nested = openBlocks.some(block => block.kind === 'box' && !block.ignored);
+      if (nested) {
+        // A box inside a box is out of scope. Keep a stack entry so its `end`
+        // does not close the outer group or emit a frame end.
+        openBlocks.push({ kind: 'box', id: '', ignored: true });
+      } else {
+        const id = `box-${boxes.length + 1}`;
+        const label = line.replace(/^box\b/i, '').trim();
+        boxes.push({ id, label, participantIds: [] });
+        openBlocks.push({ kind: 'box', id, ignored: false });
+      }
+      continue;
+    }
+
+    const createMatch = line.match(/^create\s+(participant|actor)\s+(.+?)(?:\s+as\s+(.+))?$/i);
+    if (createMatch) {
+      const actor = createMatch[1].toLowerCase() === 'actor';
+      const id = cleanId(createMatch[2]);
+      if (id) {
+        const existed = seen.has(id);
+        const participant = ensure(id, createMatch[3]?.trim(), actor);
+        if (actor) participant.actor = true;
+        if (!existed) participant.createdAt = items.length;
+        assignBox(participant);
+        items.push({ kind: 'create', id: participant.id });
+      }
+      continue;
+    }
+    if (/^create\b/i.test(line)) continue;
+
+    if (/^destroy\b/i.test(line)) {
+      const destroyMatch = line.match(/^destroy\s+(.+)$/i);
+      const id = destroyMatch ? cleanId(destroyMatch[1]) : '';
+      const participant = id ? seen.get(id) : undefined;
+      if (participant && participant.destroyedAt === undefined) {
+        participant.destroyedAt = items.length;
+        items.push({ kind: 'destroy', id: participant.id });
+      }
+      continue;
+    }
+
     const partMatch = line.match(/^(participant|actor)\s+(.+?)(?:\s+as\s+(.+))?$/i);
     if (partMatch) {
-      ensure(partMatch[2], partMatch[3]?.trim(), partMatch[1].toLowerCase() === 'actor');
+      const participant = ensure(partMatch[2], partMatch[3]?.trim(), partMatch[1].toLowerCase() === 'actor');
+      assignBox(participant);
       continue;
     }
 
@@ -326,6 +418,7 @@ export function parseSequenceDiagram(text: string): SequenceDiagramModel {
 
     const frameMatch = line.match(/^(loop|alt|opt|par|critical|break)\b\s*(.*)$/i);
     if (frameMatch) {
+      openBlocks.push({ kind: 'frame' });
       items.push({ kind: 'frameStart', frameType: frameMatch[1].toLowerCase(), label: frameMatch[2].trim() });
       continue;
     }
@@ -335,7 +428,8 @@ export function parseSequenceDiagram(text: string): SequenceDiagramModel {
       continue;
     }
     if (/^end\b/i.test(line)) {
-      items.push({ kind: 'frameEnd' });
+      const top = openBlocks.pop();
+      if (!top || top.kind === 'frame') items.push({ kind: 'frameEnd' });
       continue;
     }
 
@@ -368,5 +462,5 @@ export function parseSequenceDiagram(text: string): SequenceDiagramModel {
     if (role) participant.role = role;
   }
 
-  return { title, participants, items, autonumber };
+  return { title, participants, items, autonumber, boxes };
 }

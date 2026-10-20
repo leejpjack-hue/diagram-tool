@@ -248,3 +248,135 @@ A->>A: think`;
     expect(messageLineIndices(text)).toEqual([3]);
   });
 });
+
+describe('sequence box groups, create, and destroy', () => {
+  it('groups two participants under a box label and does not emit frameEnd for the box', () => {
+    const model = parseSequenceDiagram(`sequenceDiagram
+box Clients
+participant U as User
+participant B as Browser
+end
+U->>B: click`);
+    expect(model.boxes).toEqual([
+      { id: 'box-1', label: 'Clients', participantIds: ['U', 'B'] },
+    ]);
+    expect(model.participants.map(participant => participant.boxId)).toEqual(['box-1', 'box-1']);
+    expect(model.items.filter(item => item.kind === 'frameEnd')).toEqual([]);
+    expect(model.items.filter(item => item.kind === 'message')).toHaveLength(1);
+  });
+
+  it('keeps a frame end when the frame is inside or after a box', () => {
+    const after = parseSequenceDiagram(`sequenceDiagram
+box Clients
+participant U as User
+participant B as Browser
+end
+loop Nightly
+  U->>B: ping
+end`);
+    expect(after.items.filter(item => item.kind === 'frameStart')).toEqual([
+      { kind: 'frameStart', frameType: 'loop', label: 'Nightly' },
+    ]);
+    expect(after.items.filter(item => item.kind === 'frameEnd')).toEqual([{ kind: 'frameEnd' }]);
+
+    const inside = parseSequenceDiagram(`sequenceDiagram
+box Clients
+participant U as User
+loop Nightly
+  U->>U: ping
+end
+end`);
+    expect(inside.items.map(item => item.kind)).toEqual(['frameStart', 'message', 'frameEnd']);
+    expect(inside.boxes[0].participantIds).toEqual(['U']);
+    expect(inside.items.filter(item => item.kind === 'frameEnd')).toHaveLength(1);
+  });
+
+  it('ignores a nested box without closing the outer group or a surrounding frame', () => {
+    const model = parseSequenceDiagram(`sequenceDiagram
+box Outer
+participant A
+loop Inner
+  box Nested
+  participant B
+  end
+  A->>B: ping
+end
+participant C
+end`);
+    expect(model.boxes).toEqual([
+      { id: 'box-1', label: 'Outer', participantIds: ['A', 'B', 'C'] },
+    ]);
+    expect(model.participants.map(participant => participant.boxId)).toEqual(['box-1', 'box-1', 'box-1']);
+    expect(model.items.map(item => item.kind)).toEqual(['frameStart', 'message', 'frameEnd']);
+  });
+
+  it('reads create participant and create actor, including an alias', () => {
+    const model = parseSequenceDiagram(`sequenceDiagram
+create participant W as Worker
+create actor C as Customer
+create participant P
+create actor A`);
+    expect(model.participants.map(participant => ({
+      id: participant.id,
+      name: participant.name,
+      actor: participant.actor,
+      createdAt: participant.createdAt,
+    }))).toEqual([
+      { id: 'W', name: 'Worker', actor: false, createdAt: 0 },
+      { id: 'C', name: 'Customer', actor: true, createdAt: 1 },
+      { id: 'P', name: 'P', actor: false, createdAt: 2 },
+      { id: 'A', name: 'A', actor: true, createdAt: 3 },
+    ]);
+    expect(model.items).toEqual([
+      { kind: 'create', id: 'W' },
+      { kind: 'create', id: 'C' },
+      { kind: 'create', id: 'P' },
+      { kind: 'create', id: 'A' },
+    ]);
+  });
+
+  it('does not move the start when the participant was already introduced', () => {
+    const model = parseSequenceDiagram(`sequenceDiagram
+participant U as User
+U->>W: early
+create participant W as Worker`);
+    const worker = model.participants.find(participant => participant.id === 'W');
+    expect(worker).toMatchObject({ name: 'Worker' });
+    expect(worker).not.toHaveProperty('createdAt');
+    expect(model.items.filter(item => item.kind === 'create')).toEqual([{ kind: 'create', id: 'W' }]);
+  });
+
+  it('records destroy and ignores a stray destroy', () => {
+    const model = parseSequenceDiagram(`sequenceDiagram
+participant A
+participant B
+A->>B: before
+destroy B
+A->>B: after
+destroy
+destroy Missing
+destroy B`);
+    expect(model.participants.map(participant => participant.id)).toEqual(['A', 'B']);
+    expect(model.participants.find(participant => participant.id === 'B')?.destroyedAt).toBe(1);
+    expect(model.items.filter(item => item.kind === 'destroy')).toEqual([{ kind: 'destroy', id: 'B' }]);
+    expect(model.items.filter(item => item.kind === 'message').map(item => (
+      item.kind === 'message' ? item.text : ''
+    ))).toEqual(['before', 'after']);
+  });
+
+  it('keeps messageLineIndices on pure messages and skips box, create, and destroy', () => {
+    const text = `sequenceDiagram
+box Clients
+participant U as User
+end
+create participant W as Worker
+U->>W: hi
+destroy W
+W->>U: after`;
+    expect(messageLineIndices(text)).toEqual([5, 7]);
+    const parsed = parseSequenceDiagram(text);
+    expect(parsed.items.filter(item => item.kind === 'message')).toHaveLength(2);
+    expect(parsed.items.some(item => item.kind === 'create' || item.kind === 'destroy')).toBe(true);
+    expect(messageLineIndices(SAMPLE)).toEqual([6, 7, 8, 12, 16, 18]);
+  });
+});

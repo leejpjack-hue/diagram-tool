@@ -20,11 +20,11 @@ export function renameParticipant(text: string, id: string, newName: string): st
   if (!name) return text;
 
   const lines = text.split('\n');
-  const declRe = new RegExp(`^(\\s*)(participant|actor)\\s+${escapeRegex(id)}(\\s+as\\s+.+)?\\s*$`, 'i');
+  const declRe = new RegExp(`^(\\s*)((?:create\\s+)?)(participant|actor)\\s+${escapeRegex(id)}(\\s+as\\s+.+)?\\s*$`, 'i');
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(declRe);
     if (m) {
-      lines[i] = `${m[1]}${m[2]} ${id} as ${name}`;
+      lines[i] = `${m[1]}${m[2]}${m[3]} ${id} as ${name}`;
       return lines.join('\n');
     }
   }

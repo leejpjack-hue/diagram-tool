@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ICON_STYLES } from '../Canvas/iconStyles';
+import { ICON_STYLES, type IconStyleId } from '../Canvas/iconStyles';
 import { StyleIcon } from '../Canvas/icons/styles/StyleIcon';
 import { WalkThroughOverlay } from '../Canvas/WalkThroughOverlay';
 import { useDiagramStore } from '../../store/diagramStore';
 import { activationSpans, parseSequenceSource } from './sequenceParser';
-import type { SequenceArrow, SequenceItem } from './sequenceParser';
+import type { SequenceArrow, SequenceItem, SequenceParticipant } from './sequenceParser';
 import { renameParticipant, editMessageText, toggleMessageDashed } from './sequenceEdit';
 import {
   SEQUENCE_PALETTE,
@@ -43,6 +43,21 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
 const ACTIVATE_ROW = 16;
 const BAR_W = 8;
+const BOX_BAND_EXTRA = 22;
+
+function sequenceHeaderCard(
+  participant: Pick<SequenceParticipant, 'name' | 'role'>,
+  centerX: number,
+  y: number,
+  iconStyle: IconStyleId,
+): { x: number; y: number; width: number; height: number } {
+  const legacy = iconStyle === 'clean' && !participant.role;
+  const paint = legacy ? null : sequenceHeaderPaint(iconStyle, '#000000', participant.role);
+  const iconSize = paint?.showIcon ? paint.iconSize : 0;
+  const iconGap = iconSize ? 6 : 0;
+  const width = Math.max(120, participant.name.length * 8.5 + 36 + iconSize + iconGap);
+  return { x: centerX - width / 2, y, width, height: HEADER_H - 12 };
+}
 
 function formatSeqNo(n: number): string {
   if (Number.isInteger(n)) return String(n);
@@ -183,6 +198,10 @@ export function SequenceCanvas() {
   }, []);
 
   const layout = useMemo(() => {
+    // Room for a box label above the header cards. Diagrams with no box keep
+    // today's header and lifeline coordinates.
+    const boxBandExtra = model.boxes.some(box => box.participantIds.length > 0) ? BOX_BAND_EXTRA : 0;
+    const topHeaderY = HEADER_H - 24 + boxBandExtra;
     // Column spacing: wide enough for the longest message between adjacent
     // lifelines, with a sane minimum.
     let spacing = MIN_SPACING;
@@ -201,7 +220,7 @@ export function SequenceCanvas() {
     // Vertical layout: walk items, assigning each a y position. Message rows
     // carry their document-order index so canvas edits can address the exact
     // line in the Mermaid text.
-    let y = HEADER_H + HEADER_GAP + 20;
+    let y = HEADER_H + HEADER_GAP + 20 + boxBandExtra;
     const rows: { item: SequenceItem; y: number; msgIndex?: number; itemIndex: number }[] = [];
     const frames: FrameBox[] = [];
     const stack: FrameBox[] = [];
@@ -228,9 +247,15 @@ export function SequenceCanvas() {
         y += NOTE_H + 14;
       } else if (item.kind === 'activate' || item.kind === 'deactivate') {
         y += ACTIVATE_ROW;
-      } else {
+      } else if (item.kind === 'create') {
+        rows.push({ item, y, itemIndex: index });
+        y += HEADER_H;
+      } else if (item.kind === 'destroy') {
+        rows.push({ item, y, itemIndex: index });
+        y += ROW_H;
+      } else if (item.kind === 'message') {
         rows.push({ item, y, msgIndex: msgCounter++, itemIndex: index });
-        y += item.kind === 'message' && item.from === item.to ? ROW_H + 14 : ROW_H;
+        y += item.from === item.to ? ROW_H + 14 : ROW_H;
       }
     });
     // Close any unclosed frames gracefully
@@ -247,8 +272,8 @@ export function SequenceCanvas() {
       const y2 = span.open ? lastY : (itemY[span.to] ?? lastY);
       return [{ id: span.id, x, y1, y2: Math.max(y2, y1), depth: span.depth, from: span.from, to: span.to }];
     });
-    return { xFor, rows, frames, width, height, bodyEnd, spacing, bars };
-  }, [participants, items]);
+    return { xFor, rows, frames, width, height, bodyEnd, spacing, bars, itemY, topHeaderY };
+  }, [participants, items, model.boxes]);
 
   // DT-SEQ-03 — one message or note at a time. View state only; the Mermaid
   // source is unchanged and there is no board field.
@@ -392,8 +417,11 @@ A-->>U: 200 OK`}
     />
   );
 
-  const renderHeaderRow = (yPos: number, editable: boolean) =>
-    participants.map(p => {
+  const renderHeaderRow = (
+    entries: { participant: SequenceParticipant; y: number }[],
+    editable: boolean,
+  ) =>
+    entries.map(({ participant: p, y: yPos }) => {
       const x = layout.xFor.get(p.id)!;
       const c = accentOf(p.id);
       const isEditingThis = editable && editing?.kind === 'participant' && editing.id === p.id;
@@ -402,18 +430,12 @@ A-->>U: 200 OK`}
       const paint = legacy ? null : sequenceHeaderPaint(iconStyle, c, p.role);
       const iconSize = paint?.showIcon ? paint.iconSize : 0;
       const iconGap = iconSize ? 6 : 0;
-      const w = Math.max(120, p.name.length * 8.5 + 36 + iconSize + iconGap);
+      const card = sequenceHeaderCard(p, x, yPos, iconStyle);
       const textW = p.name.length * 8.5;
       const blockW = iconSize + iconGap + textW;
       const iconX = x - blockW / 2;
       const textX = iconSize ? iconX + iconSize + iconGap + textW / 2 : x;
       const iconY = yPos + ((HEADER_H - 12) - iconSize) / 2;
-      const card = {
-        x: x - w / 2,
-        y: yPos,
-        width: w,
-        height: HEADER_H - 12,
-      };
       return (
         <g
           key={`${p.id}-${yPos}`}
@@ -487,6 +509,97 @@ A-->>U: 200 OK`}
       );
     });
 
+  const primaryHeaders = participants.map(participant => ({
+    participant,
+    y: participant.createdAt !== undefined && layout.itemY[participant.createdAt] !== undefined
+      ? layout.itemY[participant.createdAt]
+      : layout.topHeaderY,
+  }));
+  const footerHeaders = participants
+    .filter(participant => participant.destroyedAt === undefined)
+    .map(participant => ({ participant, y: layout.bodyEnd + HEADER_GAP }));
+
+  const lifelineSpan = (participant: SequenceParticipant) => {
+    const headerY = participant.createdAt !== undefined && layout.itemY[participant.createdAt] !== undefined
+      ? layout.itemY[participant.createdAt]
+      : layout.topHeaderY;
+    const y1 = headerY + HEADER_H;
+    const destroyedY = participant.destroyedAt !== undefined ? layout.itemY[participant.destroyedAt] : undefined;
+    const y2 = destroyedY !== undefined ? destroyedY : layout.bodyEnd + HEADER_GAP - 6;
+    return { y1, y2: Math.max(y2, y1) };
+  };
+
+  const renderBoxBands = (entries: { participant: SequenceParticipant; y: number }[]) => {
+    const bands: ReactNode[] = [];
+    for (const box of model.boxes) {
+      const members = entries.filter(entry => entry.participant.boxId === box.id);
+      const rowsAt = new Map<number, typeof members>();
+      for (const member of members) {
+        const list = rowsAt.get(member.y) ?? [];
+        list.push(member);
+        rowsAt.set(member.y, list);
+      }
+      for (const [bandY, group] of rowsAt) {
+        const ordered = [...group].sort((a, b) => (
+          participants.findIndex(participant => participant.id === a.participant.id)
+          - participants.findIndex(participant => participant.id === b.participant.id)
+        ));
+        let run: typeof ordered = [];
+        let previousIndex = -999;
+        const flush = () => {
+          if (run.length === 0) return;
+          const cards = run.flatMap(entry => {
+            const center = layout.xFor.get(entry.participant.id);
+            if (center === undefined) return [];
+            return [sequenceHeaderCard(entry.participant, center, entry.y, iconStyle)];
+          });
+          if (cards.length > 0) {
+            const left = Math.min(...cards.map(card => card.x)) - 14;
+            const right = Math.max(...cards.map(card => card.x + card.width)) + 14;
+            const top = Math.min(...cards.map(card => card.y)) - 20;
+            const bottom = Math.max(...cards.map(card => card.y + card.height)) + 8;
+            bands.push(
+              <g key={`${box.id}-${bandY}-${run[0].participant.id}`} data-testid="seq-box" data-box-id={box.id} pointerEvents="none">
+                <rect
+                  x={left}
+                  y={top}
+                  width={right - left}
+                  height={bottom - top}
+                  rx={12}
+                  fill="#eef2ff"
+                  stroke="#c7d2fe"
+                  strokeWidth={1}
+                />
+                {box.label ? (
+                  <text
+                    x={left + 12}
+                    y={top + 4}
+                    fontSize={11}
+                    fontWeight={700}
+                    fill="#4338ca"
+                    fontFamily="Inter, sans-serif"
+                    dominantBaseline="hanging"
+                  >
+                    {box.label}
+                  </text>
+                ) : null}
+              </g>,
+            );
+          }
+          run = [];
+        };
+        for (const entry of ordered) {
+          const index = participants.findIndex(participant => participant.id === entry.participant.id);
+          if (run.length > 0 && index !== previousIndex + 1) flush();
+          run.push(entry);
+          previousIndex = index;
+        }
+        flush();
+      }
+    }
+    return bands;
+  };
+
   return (
     <div
       className="sequence-canvas relative w-full h-full bg-white"
@@ -523,11 +636,15 @@ A-->>U: 200 OK`}
             fill={titlePaint.color} fontFamily={titlePaint.fontFamily}>{title}</text>
         )}
 
-        {/* Lifelines. A role tints the dash with that role colour. */}
+        {renderBoxBands(primaryHeaders)}
+
+        {/* Lifelines. A role tints the dash with that role colour.
+            Create starts the line at that row. Destroy stops it. */}
         {participants.map(p => {
           const x = layout.xFor.get(p.id)!;
+          const span = lifelineSpan(p);
           return (
-            <line key={p.id} x1={x} y1={HEADER_H + 32} x2={x} y2={layout.bodyEnd + HEADER_GAP - 6}
+            <line key={p.id} data-seq-lifeline={p.id} x1={x} y1={span.y1} x2={x} y2={span.y2}
               stroke={accentOf(p.id)} strokeOpacity={lifelinePaint.opacity} strokeWidth={lifelinePaint.width}
               strokeDasharray={lifelinePaint.dash} />
           );
@@ -667,6 +784,24 @@ A-->>U: 200 OK`}
             );
           }
 
+          if (item.kind === 'destroy') {
+            const x = layout.xFor.get(item.id);
+            if (x === undefined) return null;
+            const color = accentOf(item.id);
+            return (
+              <g
+                key={i}
+                data-testid="seq-destroy"
+                data-seq-destroy={item.id}
+                opacity={walkActive ? SEQUENCE_WALK_DIM : undefined}
+                pointerEvents="none"
+              >
+                <line x1={x - 6} y1={y - 6} x2={x + 6} y2={y + 6} stroke={color} strokeWidth={2.2} strokeLinecap="round" />
+                <line x1={x + 6} y1={y - 6} x2={x - 6} y2={y + 6} stroke={color} strokeWidth={2.2} strokeLinecap="round" />
+              </g>
+            );
+          }
+
           if (item.kind !== 'message' || msgIndex === undefined) return null;
           const c = accentOf(item.from);
           const arrow: SequenceArrow = item.arrow ?? 'sync';
@@ -786,9 +921,10 @@ A-->>U: 200 OK`}
           );
         })}
 
-        {/* Participant cards, top and bottom */}
-        {renderHeaderRow(HEADER_H - 24, true)}
-        {renderHeaderRow(layout.bodyEnd + HEADER_GAP, false)}
+        {/* Participant cards. Created participants start at the create row.
+            Destroyed participants have no footer card. */}
+        {renderHeaderRow(primaryHeaders, true)}
+        {renderHeaderRow(footerHeaders, false)}
         </svg>
       </div>
 
