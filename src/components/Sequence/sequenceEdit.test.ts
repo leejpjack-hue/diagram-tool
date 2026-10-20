@@ -35,6 +35,14 @@ describe('renameParticipant', () => {
     expect(parseSequenceDiagram(out).participants.find(p => p.id === 'Y')?.name).toBe('Gateway');
   });
 
+  it('renames a participant introduced with create', () => {
+    const src = 'sequenceDiagram\ncreate participant W as Worker\nW->>W: run';
+    const out = renameParticipant(src, 'W', 'Job');
+    expect(out).toContain('create participant W as Job');
+    expect(out.split('\n').some(line => line.trim() === 'participant W as Job')).toBe(false);
+    expect(parseSequenceDiagram(out).participants.find(participant => participant.id === 'W')?.name).toBe('Job');
+  });
+
   it('ignores empty names', () => {
     expect(renameParticipant(SAMPLE, 'U', '  ')).toBe(SAMPLE);
   });

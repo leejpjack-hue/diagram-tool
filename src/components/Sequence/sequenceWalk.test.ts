@@ -95,6 +95,22 @@ A->>B: after`);
     ]);
   });
 
+  it('skips create and destroy rows and still walks the messages around them', () => {
+    const steps = sequenceWalkFromSource(`sequenceDiagram
+participant U as User
+U->>U: before
+create participant W as Worker
+U->>W: start
+destroy W
+U->>U: after`);
+    expect(steps.map(step => step.caption)).toEqual([
+      '1 · User → User: before',
+      '2 · User → Worker: start',
+      '3 · User → User: after',
+    ]);
+    expect(steps.map(step => step.kind)).toEqual(['message', 'message', 'message']);
+  });
+
   it('returns no steps for an empty board and does not walk notes alone', () => {
     expect(sequenceWalkSteps(null)).toEqual([]);
     expect(sequenceWalkSteps(parseSequenceDiagram('sequenceDiagram\nparticipant A'))).toEqual([]);
