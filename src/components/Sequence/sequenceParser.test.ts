@@ -66,6 +66,16 @@ A -> B
     expect(result.error).toMatch(/Unrecognized sequence message/i);
   });
 
+  it('rejects Mermaid gantt so the last sequence diagram can stay', () => {
+    const result = parseSequenceSource(`gantt
+title Sprint Plan
+dateFormat YYYY-MM-DD
+Design :a1, 2026-08-01, 4d
+`);
+    expect(result.error).toMatch(/Mermaid gantt/);
+    expect(result.error).toMatch(/Gantt/);
+  });
+
   it('implicitly declares participants seen in messages', () => {
     const m = parseSequenceDiagram('sequenceDiagram\nX->>Y: hi');
     expect(m.participants.map(p => p.id)).toEqual(['X', 'Y']);

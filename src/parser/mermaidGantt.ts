@@ -1,5 +1,9 @@
-// Mermaid `gantt` → native `diagram: gantt` for File → Open.
-// The live Gantt editor stays native-DSL-only; this is import-only.
+// Mermaid `gantt` → native `diagram: gantt`.
+// File → Open and the Gantt source editor both reuse this converter.
+// Detection is the leading `gantt` keyword only (blank lines and %% comments skipped).
+
+export const MERMAID_GANTT_OPEN_ON_GANTT =
+  'This is a Mermaid gantt. Open it on the Gantt tab or import it as a Gantt board.';
 
 export function isMermaidGantt(text: string): boolean {
   for (const raw of text.split('\n')) {

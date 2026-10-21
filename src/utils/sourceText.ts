@@ -1,5 +1,5 @@
 import { isMermaidFlow, isMermaidSequence, mermaidFlowToDSL } from '../parser/mermaidFlow';
-import { isMermaidGantt, mermaidGanttToDSL } from '../parser/mermaidGantt';
+import { isMermaidGantt, MERMAID_GANTT_OPEN_ON_GANTT, mermaidGanttToDSL } from '../parser/mermaidGantt';
 import { parseDiagram } from '../parser/parser';
 import { parseGanttSource } from '../components/Gantt/ganttParser';
 import { parseSequenceSource } from '../components/Sequence/sequenceParser';
@@ -11,10 +11,49 @@ import type { ParsedDiagram } from '../store/types';
 export type ApplySourceResult =
   | { ok: true; kind: 'diagram'; parsed: ParsedDiagram; warnings: string[] }
   | { ok: true; kind: 'sequence'; warnings: string[] }
-  | { ok: true; kind: 'gantt'; project: GanttProject; warnings: string[] }
+  | { ok: true; kind: 'gantt'; project: GanttProject; warnings: string[]; dslText?: string }
   | { ok: false; error: string };
 
 const isGanttSource = (text: string) => /^\s*diagram:\s*gantt\b/im.test(text);
+
+export const CONVERTED_FROM_MERMAID_GANTT = 'Converted from Mermaid gantt';
+
+/**
+ * The paste path replaces Mermaid text with native DSL, then parses that DSL
+ * again. Remember the note so the second parse still surfaces it, and drop it
+ * as soon as the source is no longer that converted text.
+ */
+let pinnedMermaidConversion: { dsl: string; note: string } | null = null;
+
+function warningsForGanttSource(text: string, parsedWarnings: string[]): string[] {
+  const pinned = pinnedMermaidConversion;
+  if (pinned && pinned.dsl === text) {
+    return parsedWarnings.includes(pinned.note) ? parsedWarnings : [pinned.note, ...parsedWarnings];
+  }
+  pinnedMermaidConversion = null;
+  return parsedWarnings;
+}
+
+function applyConvertedMermaidGantt(text: string): ApplySourceResult {
+  let dslText: string;
+  try {
+    dslText = mermaidGanttToDSL(text);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Parse error' };
+  }
+  const result = parseGanttSource(dslText);
+  if (result.error || !result.project) {
+    return { ok: false, error: result.error ?? 'Parse error' };
+  }
+  pinnedMermaidConversion = { dsl: dslText, note: CONVERTED_FROM_MERMAID_GANTT };
+  return {
+    ok: true,
+    kind: 'gantt',
+    project: result.project,
+    warnings: warningsForGanttSource(dslText, result.warnings),
+    dslText,
+  };
+}
 
 export { isMermaidFlow, isMermaidSequence };
 
@@ -74,6 +113,15 @@ export function detectRawDiagramImport(filename: string, text: string): { mode: 
 }
 
 export function applyBoardSource(text: string, mode: BoardMode | 'c4'): ApplySourceResult {
+  // Leading `gantt` keyword only — a flow whose text merely contains the word
+  // "gantt" must keep going to the flow parser.
+  if (isMermaidGantt(text)) {
+    if (mode !== 'gantt') {
+      return { ok: false, error: MERMAID_GANTT_OPEN_ON_GANTT };
+    }
+    return applyConvertedMermaidGantt(text);
+  }
+
   if (mode === 'gantt' || isGanttSource(text)) {
     if (mode !== 'gantt' && isGanttSource(text)) {
       return { ok: false, error: 'This is a Gantt plan. Open it on the Gantt tab or import it as a Gantt board.' };
@@ -82,7 +130,7 @@ export function applyBoardSource(text: string, mode: BoardMode | 'c4'): ApplySou
     if (result.error || !result.project) {
       return { ok: false, error: result.error ?? 'Parse error' };
     }
-    return { ok: true, kind: 'gantt', project: result.project, warnings: result.warnings };
+    return { ok: true, kind: 'gantt', project: result.project, warnings: warningsForGanttSource(text, result.warnings) };
   }
 
   if (mode === 'sequence' || isMermaidSequence(text)) {

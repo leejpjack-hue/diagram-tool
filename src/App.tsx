@@ -29,7 +29,7 @@ import { seedTypeStepsForTemplate } from './parser/boardToPlainSteps';
 import { flowStepList } from './parser/flowToPlainSteps';
 import { architectureWalkSequence } from './parser/architectureWalk';
 import { sequenceSourceCanWalk } from './components/Sequence/sequenceWalk';
-import { applyBoardSource, extractBoardTitle } from './utils/sourceText';
+import { applyBoardSource, CONVERTED_FROM_MERMAID_GANTT, extractBoardTitle } from './utils/sourceText';
 import { exportGanttChart } from './components/Gantt/exportUtils';
 import type { DelayImpactResult } from './components/Gantt/delayImpactUtils';
 import { useExport } from './utils/useExport';
@@ -449,6 +449,9 @@ function App() {
   // This flag prevents the UI-to-DSL sync effect from writing old Gantt state
   // back over fresh editor text while a DSL parse is updating the Gantt store.
   const isUpdatingFromDSL = useRef(false);
+  // Expand section groups once per converted Mermaid paste, not on every
+  // later parse of that same native text (a collapse should stick).
+  const expandedMermaidConversion = useRef<string | null>(null);
   
   const { exportPNG, exportJPG, exportSVG, exportPDF, exportJSON, exportCSV } = useExport();
   const toast = useToast();
@@ -477,14 +480,25 @@ function App() {
     setSourceWarning(result.warnings.length > 0 ? result.warnings.join('\n') : null);
     isUpdatingFromDSL.current = true;
     setProject(result.project.tasks, result.project.dependencies ?? [], result.project.calendar);
+    if (result.dslText && result.dslText !== dslText) {
+      setDslText(result.dslText);
+    }
     // Type tasks charts open with their groups expanded so the bars are visible.
     // Task ids are reassigned on every parse, so a collapsed group would hide
-    // the chart that Build just wrote.
+    // the chart that Build just wrote. A Mermaid paste expands once so section
+    // tasks are on screen, then leaves later collapses alone.
     if (dslText.includes('# @type-tasks')) {
       const groupIds = result.project.tasks.filter(task => task.isGroup).map(task => task.id);
       useGanttStore.setState({ expandedGroups: new Set(groupIds) });
+    } else if (result.warnings.includes(CONVERTED_FROM_MERMAID_GANTT)) {
+      const key = result.dslText ?? dslText;
+      if (expandedMermaidConversion.current !== key) {
+        expandedMermaidConversion.current = key;
+        const groupIds = result.project.tasks.filter(task => task.isGroup).map(task => task.id);
+        useGanttStore.setState({ expandedGroups: new Set(groupIds) });
+      }
     }
-  }, [dslText, activeTab, setProject, setError, setSourceWarning]);
+  }, [dslText, activeTab, setProject, setDslText, setError, setSourceWarning]);
   
   // Sync DSL when tasks or dependencies change from UI
   // This ensures DSL is always the single source of truth

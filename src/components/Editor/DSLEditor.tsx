@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Editor from '@monaco-editor/react';
+import Editor, { type OnMount } from '@monaco-editor/react';
 import { useDiagramStore } from '../../store/diagramStore';
 import { installDiagramDslTestHook } from '../../utils/devTestHook';
 import { applyBoardSource, toDslSource, toMermaidSource } from '../../utils/sourceText';
@@ -56,6 +56,10 @@ export function DSLEditor() {
   const [tasksHandwritten, setTasksHandwritten] = useState(false);
   const tasksInputRef = useRef<HTMLTextAreaElement | null>(null);
   const toast = useToast();
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  // setValue/executeEdits fires onChange. Ignore that echo while we replace
+  // pasted Mermaid with the converted native DSL.
+  const applyingConversion = useRef(false);
   // DT-AI-08: textarea ref so role-prefix buttons can read the caret/selection.
   const stepsInputRef = useRef<HTMLTextAreaElement | null>(null);
   // DT-AI-09: one-shot seed from picking the AI workflow template.
@@ -86,11 +90,24 @@ If error then Retry
 else Flag for review`;
 
   const applySource = useCallback((value: string) => {
-    setDslText(value);
     const mode = asBoardMode(diagramMode);
 
     setLoading(true);
     const result = applyBoardSource(value, mode);
+    // A Gantt board stores the converted native DSL, not the pasted Mermaid.
+    const nextText = result.ok && result.kind === 'gantt' && result.dslText ? result.dslText : value;
+    setDslText(nextText);
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    if (nextText !== value && editor && model && editor.getValue() !== nextText) {
+      applyingConversion.current = true;
+      editor.executeEdits('mermaid-gantt', [{
+        range: model.getFullModelRange(),
+        text: nextText,
+        forceMoveMarkers: true,
+      }]);
+      applyingConversion.current = false;
+    }
     if (result.ok) {
       setError(null);
       setSourceWarning(result.warnings.length > 0 ? result.warnings.join('\n') : null);
@@ -104,6 +121,7 @@ else Flag for review`;
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (value === undefined) return;
+    if (applyingConversion.current) return;
     if (useDiagramStore.getState().isReadOnlyShared) return;
     // Ignore Monaco echoes after a canvas writeback updates `dslText`.
     if (value === useDiagramStore.getState().dslText) return;
@@ -800,6 +818,7 @@ Go live — milestone after Review`;
             width="100%"
             defaultLanguage="plaintext"
             value={dslText}
+            onMount={editor => { editorRef.current = editor; }}
             onChange={handleEditorChange}
             theme="vs-dark"
             loading={<div style={{ padding: '20px', color: '#666' }}>Loading editor...</div>}
