@@ -1,3 +1,5 @@
+import { isMermaidGantt, MERMAID_GANTT_OPEN_ON_GANTT } from '../../parser/mermaidGantt';
+
 // Mermaid-style sequence diagram parser.
 //
 // Accepts the common core of Mermaid's `sequenceDiagram` syntax:
@@ -259,6 +261,10 @@ export function findUnrecognizedSequenceLines(text: string): { line: number; tex
 }
 
 export function parseSequenceSource(text: string): { model: SequenceDiagramModel; error: string | null } {
+  // Mermaid gantt is not a sequence. Error so the canvas keeps the last good diagram.
+  if (isMermaidGantt(text)) {
+    return { model: parseSequenceDiagram(text), error: MERMAID_GANTT_OPEN_ON_GANTT };
+  }
   if (/^\s*diagram:\s*(architecture|flow|gantt)\b/im.test(text)) {
     return {
       model: parseSequenceDiagram(text),

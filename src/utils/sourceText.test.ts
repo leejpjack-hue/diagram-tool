@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { parseDiagram } from '../parser/parser';
+import { MERMAID_GANTT_OPEN_ON_GANTT } from '../parser/mermaidGantt';
 import {
   applyBoardSource,
+  CONVERTED_FROM_MERMAID_GANTT,
   detectRawDiagramImport,
   extractBoardTitle,
   renameNodeInSource,
@@ -138,15 +140,140 @@ task Design {
     if (!result.ok) expect(result.error).toMatch(/Expected \}/i);
   });
 
-  it('rejects Mermaid gantt so the native DSL stays the only format', () => {
+  it('rejects Mermaid gantt that the native parser cannot schedule', () => {
     const result = applyBoardSource(`gantt
-    title Mermaid Plan
-    dateFormat YYYY-MM-DD
-    section Build
-    Design :a1, 2026-08-01, 4d
+title Cycle
+dateFormat YYYY-MM-DD
+Design :a1, after a2, 2d
+Build :a2, after a1, 2d
 `, 'gantt');
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/diagram:\s*gantt/i);
+    if (!result.ok) expect(result.error).toMatch(/Circular dependency: Design → Build → Design/);
+  });
+});
+
+const MERMAID_GANTT = `gantt
+title Sprint Plan
+dateFormat YYYY-MM-DD
+section Build
+Design :a1, 2026-08-01, 4d
+Implement :a2, after a1, 5d
+Ship :milestone, m1, after a2, 0d
+`;
+
+describe('applyBoardSource Mermaid gantt routing', () => {
+  it('converts Mermaid gantt on a Gantt board via mermaidGanttToDSL', () => {
+    const result = applyBoardSource(MERMAID_GANTT, 'gantt');
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== 'gantt') return;
+    expect(result.dslText).toMatch(/^diagram:\s*gantt/m);
+    expect(result.dslText).toContain('title: Sprint Plan');
+    expect(result.dslText).toContain('duration: 4d');
+    expect(result.dslText).toContain('duration: 5d');
+    expect(result.dslText).toContain('after: Design');
+    expect(result.dslText).toContain('group Build');
+    expect(result.dslText).toContain('milestone: true');
+    expect(result.dslText).not.toMatch(/^gantt\b/m);
+    expect(result.warnings[0]).toBe(CONVERTED_FROM_MERMAID_GANTT);
+    expect(result.project.tasks.map(task => task.name)).toEqual(expect.arrayContaining(['Build', 'Design', 'Implement', 'Ship']));
+    expect(result.project.tasks.find(task => task.name === 'Ship')?.milestone).toBe(true);
+    expect(result.project.dependencies.length).toBeGreaterThan(0);
+
+    const again = applyBoardSource(result.dslText!, 'gantt');
+    expect(again.ok).toBe(true);
+    if (again.ok && again.kind === 'gantt') {
+      expect(again.warnings[0]).toBe(CONVERTED_FROM_MERMAID_GANTT);
+      expect(again.dslText).toBeUndefined();
+    }
+  });
+
+  it('does not attach the conversion note to a different native plan', () => {
+    const result = applyBoardSource(`diagram: gantt
+title: Other
+task Other {
+  start: 2026-09-01
+  end: 2026-09-03
+}`, 'gantt');
+    expect(result.ok).toBe(true);
+    if (result.ok && result.kind === 'gantt') {
+      expect(result.warnings).not.toContain(CONVERTED_FROM_MERMAID_GANTT);
+    }
+  });
+
+  it('redirects Mermaid gantt on Flow, Architecture, and Sequence boards', () => {
+    for (const mode of ['flow', 'architecture', 'sequence'] as const) {
+      const result = applyBoardSource(MERMAID_GANTT, mode);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toBe(MERMAID_GANTT_OPEN_ON_GANTT);
+    }
+  });
+
+  it('leaves an empty Mermaid gantt as a parser error', () => {
+    const result = applyBoardSource('gantt\ntitle Empty plan\n', 'gantt');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/couldn't be opened/i);
+  });
+
+  it('does not treat a flow that merely mentions gantt as Mermaid gantt', () => {
+    const result = applyBoardSource(`diagram: flow
+title: Gantt rollout
+direction: LR
+Intake -> Review
+Review -> Done`, 'flow');
+    expect(result.ok).toBe(true);
+    if (result.ok && result.kind === 'diagram') {
+      expect(result.parsed.nodes.map(node => node.name)).toEqual(expect.arrayContaining(['Intake', 'Review', 'Done']));
+    }
+  });
+
+  it('still parses native Gantt DSL without a conversion note', () => {
+    const result = applyBoardSource(`diagram: gantt
+title: Native
+task Design {
+  start: 2026-08-01
+  end: 2026-08-04
+}`, 'gantt');
+    expect(result.ok).toBe(true);
+    if (result.ok && result.kind === 'gantt') {
+      expect(result.dslText).toBeUndefined();
+      expect(result.warnings).not.toContain(CONVERTED_FROM_MERMAID_GANTT);
+      expect(result.project.tasks.map(task => task.name)).toEqual(['Design']);
+    }
+  });
+
+  it('still accepts a Mermaid sequence on a Sequence board', () => {
+    const result = applyBoardSource(SEQUENCE, 'sequence');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.kind).toBe('sequence');
+  });
+
+  it('still redirects a sequenceDiagram away from Flow', () => {
+    const result = applyBoardSource(SEQUENCE, 'flow');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/sequenceDiagram/);
+  });
+
+  it('still accepts a Mermaid flowchart on a Flow board', () => {
+    const result = applyBoardSource(FLOW_MERMAID, 'flow');
+    expect(result.ok).toBe(true);
+    if (result.ok && result.kind === 'diagram') {
+      expect(result.parsed.nodes.map(node => node.name)).toEqual(expect.arrayContaining(['Intake', 'Review', 'Done']));
+    }
+  });
+
+  it('still rejects a flowchart pasted onto a Gantt board', () => {
+    const result = applyBoardSource('flowchart TD\nA-->B\n', 'gantt');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/flowchart/i);
+  });
+
+  it('converts a leading gantt keyword after a mermaid comment', () => {
+    const result = applyBoardSource('%% note\n\ngantt\ntitle Roadmap\nDesign :a1, 2026-08-01, 2d\n', 'gantt');
+    expect(result.ok).toBe(true);
+    if (result.ok && result.kind === 'gantt') {
+      expect(result.dslText).toContain('task Design');
+      expect(result.warnings[0]).toBe(CONVERTED_FROM_MERMAID_GANTT);
+    }
   });
 });
 

@@ -443,6 +443,8 @@ export function findGanttSourceError(text: string): string | null {
   if (MERMAID_FLOW.test(text)) {
     return 'This source is a flowchart. Open it on the Flow tab.';
   }
+  // Raw Mermaid `gantt` is rejected here. applyBoardSource converts it first
+  // on a Gantt board; this guard stays for direct parses.
   if (MERMAID_GANTT.test(text) && !GANTT_HEADER.test(text)) {
     return 'Gantt source must start with `diagram: gantt` (native DSL, not Mermaid gantt).';
   }
