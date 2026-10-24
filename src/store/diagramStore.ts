@@ -277,6 +277,13 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   setSelectedNode: (nodeId) => set({ selectedNodeId: nodeId }),
   setDiagramMode: (mode) => {
     if (get().diagramMode === mode) return;
+    const { history, historyIndex } = get();
+    if (historyIndex >= 0 && history[historyIndex]) {
+      const nextHistory = history.slice();
+      nextHistory[historyIndex] = { ...nextHistory[historyIndex], diagramMode: mode };
+      set({ diagramMode: mode, history: nextHistory });
+      return;
+    }
     set({ diagramMode: mode });
   },
   setError: (error) => set({ error }),

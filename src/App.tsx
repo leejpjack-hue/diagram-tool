@@ -411,11 +411,11 @@ function App() {
   
   const { addTask, updateTask, setProject, tasks, dependencies } = useGanttStore();
   
-  // Initialize activeTab from saved diagram if available
-  const [activeTab, setActiveTab] = useState<'architecture' | 'flow' | 'sequence' | 'gantt'>(() => {
-    const saved = saveManager.getCurrentDiagram();
-    return (saved?.mode as 'architecture' | 'flow' | 'gantt') || 'architecture';
-  });
+  // Keep activeTab in lockstep with diagramMode (including editor paste auto-switch and undo/redo).
+  const activeTab: 'architecture' | 'flow' | 'sequence' | 'gantt' =
+    diagramMode === 'flow' || diagramMode === 'sequence' || diagramMode === 'gantt'
+      ? diagramMode
+      : 'architecture';
   const [activePanel, setActivePanel] = useState<PanelType>('none');
   // Miro-style home: the board dashboard is the landing view; opening or
   // creating a board switches to the editor. A third view, `presentation`,
@@ -534,11 +534,10 @@ function App() {
     // Note: dslText is intentionally excluded to prevent infinite loops
     // extractBoardTitle is stable and setDslText/setSaveStatus are stable setters
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, dependencies, activeTab]);
+  }, [tasks, dependencies]);
 
   const handleTabChange = (tab: 'architecture' | 'flow' | 'sequence' | 'gantt') => {
     setReadOnlyShared(false);
-    setActiveTab(tab);
     setDiagramMode(tab);
 
     const sampleDsl =
@@ -810,7 +809,6 @@ function App() {
           setShowStepNumbers(shared.portable.showStepNumbers === true, false);
           setDslText(shared.portable.dslText, false);
           setDiagramMode(shared.portable.mode);
-          setActiveTab(shared.portable.mode);
           if (shared.portable.mode !== 'gantt' && shared.portable.mode !== 'sequence') {
             try {
               setParsedDiagram(parseDiagram(shared.portable.dslText));
@@ -851,7 +849,6 @@ function App() {
     setShowStepNumbers(board.showStepNumbers === true, false);
     setDslText(board.dslText);
     setDiagramMode(board.mode);
-    setActiveTab(board.mode);
     // Gantt parses via its own effect; sequence parses inside SequenceCanvas;
     // architecture/flow need an explicit re-parse (Monaco won't fire onChange).
     if (board.mode !== 'gantt' && board.mode !== 'sequence') {
@@ -995,7 +992,6 @@ function App() {
     setShowStepNumbers(false, false);
     setDslText(diagram.dslText);
     setDiagramMode(diagram.mode);
-    setActiveTab(diagram.mode);
     // Monaco's onChange doesn't fire for programmatic value swaps, so re-parse
     // here or the canvas keeps the previous diagram. Saved diagrams are only
     // architecture/flow, both handled by the generic parser.
@@ -1015,7 +1011,6 @@ function App() {
     setShowStepNumbers(false, false);
     setDslText(ARCHITECTURE_DSL);
     setDiagramMode('architecture');
-    setActiveTab('architecture');
     try {
       setParsedDiagram(parseDiagram(ARCHITECTURE_DSL));
     } catch (err) {
@@ -1029,7 +1024,6 @@ function App() {
     setReadOnlyShared(false);
     setDslText(tpl.dsl);
     setDiagramMode(tpl.mode);
-    setActiveTab(tpl.mode);
     setSaveStatus('unsaved');
     // Gantt DSL is parsed by the gantt effect watching dslText; sequence
     // (Mermaid format) is parsed inside SequenceCanvas. The generic parser
@@ -1099,7 +1093,6 @@ function App() {
     const diagram = csvToDiagram(rows, filename);
     setParsedDiagram(diagram);
     setDiagramMode('architecture');
-    setActiveTab('architecture');
     const dsl = csvToDSL(rows, filename);
     setDslText(dsl);
     setActivePanel('none'); // Close panel after import

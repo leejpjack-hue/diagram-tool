@@ -1,3 +1,4 @@
+import { unsupportedMermaidOpenError } from '../../parser/mermaidFlow';
 import type { GanttTask, GanttProject, Dependency, DependencyType, GanttSourceSchedule } from './types';
 import { resolveLinkedSchedule } from './autoSchedule';
 import { formatWorkCalendarLines, isIsoDate, type WeekendPattern, type WorkCalendar } from './workCalendar';
@@ -434,6 +435,10 @@ const MERMAID_GANTT = /^\s*gantt\b/im;
  * the last good plan — callers keep the previous project when `error` is set.
  */
 export function findGanttSourceError(text: string): string | null {
+  const unsupported = unsupportedMermaidOpenError(text);
+  if (unsupported) {
+    return unsupported;
+  }
   if (MERMAID_SEQUENCE.test(text)) {
     return 'This source is a sequenceDiagram. Open it on the Sequence tab.';
   }

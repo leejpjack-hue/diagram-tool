@@ -218,10 +218,17 @@ export class Parser {
       const token = this.peek();
 
       if (token.type === TokenType.KEYWORD) {
-        if (this.mode === 'architecture' && this.looksLikeArchitectureArrow()) {
-          this.parseArchitectureArrowLine();
-          this.skipNewlines();
-          continue;
+        if (this.looksLikeArchitectureArrow()) {
+          if (this.mode === 'architecture') {
+            this.parseArchitectureArrowLine();
+            this.skipNewlines();
+            continue;
+          }
+          if (this.mode === 'flow') {
+            this.parseFlowConnection();
+            this.skipNewlines();
+            continue;
+          }
         }
         switch ((token.value as string).toLowerCase()) {
           case 'diagram':
@@ -1264,7 +1271,7 @@ export class Parser {
         break;
       }
       
-      if (token.type === TokenType.IDENTIFIER) {
+      if (token.type === TokenType.IDENTIFIER || token.type === TokenType.KEYWORD) {
         nodeNames.push(token.value as string);
         this.advance();
         
@@ -1342,7 +1349,7 @@ export class Parser {
   private parseFlowNodeMetadata(): void {
     this.advance(); // consume 'node'
     const nameToken = this.peek();
-    if (nameToken.type !== TokenType.IDENTIFIER) {
+    if (nameToken.type !== TokenType.IDENTIFIER && nameToken.type !== TokenType.KEYWORD) {
       return;
     }
     

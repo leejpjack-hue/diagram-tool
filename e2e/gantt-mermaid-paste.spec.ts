@@ -13,6 +13,24 @@ Implement :a2, after a1, 5d
 Ship :milestone, m1, after a2, 0d
 `;
 
+const SEQUENCE_MMD = `sequenceDiagram
+title Checkout Flow
+participant U as User
+participant A as API
+U->>A: GET /orders
+A-->>U: 200 OK
+`;
+
+const FLOW_MMD = `flowchart LR
+title: Checkout
+  Intake[Intake] --> Review[Review]
+  Review --> Done[Done]
+`;
+
+const UNSUPPORTED_MMD = `erDiagram
+  CUSTOMER ||--o{ ORDER : places
+`;
+
 async function waitForEditor(page: Page) {
   await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible();
   await page.waitForFunction(() => {
@@ -110,7 +128,67 @@ test.describe('Paste Mermaid gantt into the source editor', () => {
     await expect(page.getByTestId('board-mode-status')).toHaveText(/gantt mode/i);
   });
 
-  test('pasting Mermaid gantt on a Flow board leaves the diagram and asks for Gantt', async ({ page }) => {
+  test('pasting Mermaid gantt on a Flow board auto-switches to Gantt mode and renders task bars', async ({ page }) => {
+    await page.goto('/app/');
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await page.getByRole('button', { name: 'Create new' }).click();
+    await page.getByRole('button', { name: 'Blank Workflow Open a clean DSL canvas.' }).click();
+    await waitForEditor(page);
+    await dismissToastIfPresent(page, 'Board created');
+
+    const nodes = page.locator('.react-flow__node');
+    await expect(nodes.filter({ hasText: 'NextStep' })).toBeVisible();
+    await expect(nodes.filter({ hasText: 'Done' })).toBeVisible();
+    await expect(page.getByTestId('board-mode-status')).toHaveText(/flow mode/i);
+
+    await pasteIntoSourceEditor(page, GANTT_MMD);
+
+    await expect(page.getByTestId('dsl-parse-warning')).toContainText('Converted from Mermaid gantt');
+    await expect(page.getByTestId('dsl-parse-error')).toHaveCount(0);
+    await expect(page.getByTestId('board-mode-status')).toHaveText(/gantt mode/i);
+    await expect(page.getByRole('button', { name: 'Gantt', exact: true })).toHaveClass(/active/);
+    await expect.poll(async () => editorText(page)).toMatch(/diagram:\s*gantt/);
+    const after = await editorText(page);
+    expect(after).toContain('task Design');
+    expect(after).toContain('duration: 4d');
+    expect(after).toContain('after: Design');
+    expect(after).not.toMatch(/^gantt\b/m);
+
+    await page.getByRole('button', { name: 'Day', exact: true }).click();
+    await expect(bar(page, 'Design')).toBeVisible();
+    await expect(bar(page, 'Implement')).toBeVisible();
+    await expect(page.locator('[data-testid^="gantt-milestone-"][data-task-name="Ship"]')).toBeVisible();
+  });
+
+  test('pasting sequenceDiagram and flowchart on wrong boards auto-switches to the matching mode', async ({ page }) => {
+    await page.goto('/app/');
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await page.getByRole('button', { name: 'Create new' }).click();
+    await page.getByRole('button', { name: 'Blank Gantt Open a clean DSL canvas.' }).click();
+    await waitForEditor(page);
+    await dismissToastIfPresent(page, 'Board created');
+    await expect(page.getByTestId('board-mode-status')).toHaveText(/gantt mode/i);
+
+    await pasteIntoSourceEditor(page, SEQUENCE_MMD);
+
+    await expect(page.getByTestId('dsl-parse-error')).toHaveCount(0);
+    await expect(page.getByTestId('board-mode-status')).toHaveText(/sequence/i);
+    await expect(page.getByRole('button', { name: 'Sequence', exact: true })).toHaveClass(/active/);
+    await expect(page.locator('.sequence-canvas').getByText('User').first()).toBeVisible();
+    await expect(page.locator('.sequence-canvas').getByText('GET /orders').first()).toBeVisible();
+
+    await pasteIntoSourceEditor(page, FLOW_MMD);
+
+    await expect(page.getByTestId('dsl-parse-error')).toHaveCount(0);
+    await expect(page.getByTestId('board-mode-status')).toHaveText(/flow mode/i);
+    await expect(page.getByRole('button', { name: 'Flow', exact: true })).toHaveClass(/active/);
+    const nodes = page.locator('.react-flow__node');
+    await expect(nodes.filter({ hasText: 'Intake' })).toBeVisible();
+    await expect(nodes.filter({ hasText: 'Review' })).toBeVisible();
+    await expect(nodes.filter({ hasText: 'Done' })).toBeVisible();
+  });
+
+  test('pasting an unknown Mermaid type rejects naming the type and keeps the board unchanged', async ({ page }) => {
     await page.goto('/app/');
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.getByRole('button', { name: 'Create new' }).click();
@@ -123,23 +201,15 @@ test.describe('Paste Mermaid gantt into the source editor', () => {
     await expect(nodes.filter({ hasText: 'Done' })).toBeVisible();
     const nodeCount = await nodes.count();
     expect(nodeCount).toBeGreaterThan(0);
-    const before = await editorText(page);
-    expect(before).toMatch(/diagram:\s*flow/);
-    expect(before).toContain('NextStep');
 
-    await pasteIntoSourceEditor(page, GANTT_MMD);
+    await pasteIntoSourceEditor(page, UNSUPPORTED_MMD);
 
-    await expect(page.getByTestId('dsl-parse-error')).toContainText('This is a Mermaid gantt. Open it on the Gantt tab or import it as a Gantt board.');
+    await expect(page.getByTestId('dsl-parse-error')).toContainText("Mermaid erDiagram isn't supported yet.");
     await expect(page.getByTestId('dsl-parse-warning')).toHaveCount(0);
+    await expect(page.getByTestId('board-mode-status')).toHaveText(/flow mode/i);
+    await expect(page.getByRole('button', { name: 'Flow', exact: true })).toHaveClass(/active/);
     await expect(nodes).toHaveCount(nodeCount);
     await expect(nodes.filter({ hasText: 'NextStep' })).toBeVisible();
     await expect(nodes.filter({ hasText: 'Done' })).toBeVisible();
-    await expect(nodes.filter({ hasText: 'Design' })).toHaveCount(0);
-    await expect(page.locator('[data-testid^="gantt-task-bar"]')).toHaveCount(0);
-    await expect(page.getByTestId('board-mode-status')).toHaveText(/flow mode/i);
-    await expect.poll(async () => editorText(page)).toMatch(/^gantt\b/m);
-    const after = await editorText(page);
-    expect(after).not.toMatch(/diagram:\s*gantt/);
-    expect(after).not.toContain('NextStep');
   });
 });

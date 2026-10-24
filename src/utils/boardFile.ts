@@ -1,4 +1,9 @@
-import { isMermaidFlow, isMermaidSequence } from '../parser/mermaidFlow';
+import {
+  firstSignificantLine,
+  isMermaidFlow,
+  isMermaidSequence,
+  unsupportedMermaidOpenError,
+} from '../parser/mermaidFlow';
 import { isMermaidGantt, mermaidGanttToDSL } from '../parser/mermaidGantt';
 import {
   buildBoardDocument,
@@ -21,23 +26,7 @@ export const OPEN_BOARD_FILE_ERRORS = {
   unreadable: "That file couldn't be opened.",
 } as const;
 
-const UNSUPPORTED_MERMAID = /^(erDiagram|classDiagram|mindmap|stateDiagram(?:-v2)?|pie|gitGraph|journey|quadrantChart|timeline|C4Context|C4Container|C4Component)\b/i;
-
-export function firstSignificantLine(text: string): string {
-  for (const raw of text.split('\n')) {
-    const line = raw.trim().replace(/^\uFEFF/, '');
-    if (!line || line.startsWith('%%') || /^#{1,3}\s/.test(line)) continue;
-    return line;
-  }
-  return '';
-}
-
-/** Recognizable Mermaid that this app does not import. Names the kind. */
-export function unsupportedMermaidOpenError(text: string): string | null {
-  const kind = firstSignificantLine(text).match(UNSUPPORTED_MERMAID)?.[1];
-  if (!kind) return null;
-  return `Mermaid ${kind} isn't supported yet.`;
-}
+export { firstSignificantLine, unsupportedMermaidOpenError };
 
 function looksLikeJson(text: string): boolean {
   const trimmed = text.trim();
