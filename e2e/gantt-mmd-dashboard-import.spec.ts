@@ -18,6 +18,11 @@ const UNSUPPORTED_MMD = `erDiagram
   CUSTOMER ||--o{ ORDER : places
 `;
 
+const ARCH_BETA_MMD = `architecture-beta
+  group api(cloud)[API]
+  service db(database)[Database] in api
+`;
+
 function fixturePath(label: string): string {
   return join(tmpdir(), `diagram-tool-${label}-${Date.now()}-${Math.random().toString(16).slice(2)}.mmd`);
 }
@@ -95,5 +100,21 @@ test.describe('Dashboard import of Mermaid gantt .mmd', () => {
     await expect(page.getByText('No boards here yet')).toBeVisible();
     await toast.getByRole('button', { name: '×' }).click();
     await expect(toast).toHaveCount(0);
+
+    const archBetaPath = fixturePath('arch-beta-mmd');
+    writeFileSync(archBetaPath, ARCH_BETA_MMD);
+
+    const [archBetaChooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.getByTestId('dashboard-import').click(),
+    ]);
+    await archBetaChooser.setFiles(archBetaPath);
+
+    const archToast = page.getByTestId('toast-item').filter({ hasText: "Mermaid architecture-beta isn't supported yet." });
+    await expect(archToast).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.getByText('No boards here yet')).toBeVisible();
+    await archToast.getByRole('button', { name: '×' }).click();
+    await expect(archToast).toHaveCount(0);
   });
 });
