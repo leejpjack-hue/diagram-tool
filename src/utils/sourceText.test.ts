@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { parseDiagram } from '../parser/parser';
-import { MERMAID_GANTT_OPEN_ON_GANTT } from '../parser/mermaidGantt';
 import {
   applyBoardSource,
   CONVERTED_FROM_MERMAID_GANTT,
+  detectMermaidMode,
   detectRawDiagramImport,
   extractBoardTitle,
   renameNodeInSource,
@@ -200,18 +200,24 @@ task Other {
     }
   });
 
-  it('redirects Mermaid gantt on Flow, Architecture, and Sequence boards', () => {
+  it('auto-switches Mermaid gantt on Flow, Architecture, and Sequence boards to gantt mode', () => {
     for (const mode of ['flow', 'architecture', 'sequence'] as const) {
       const result = applyBoardSource(MERMAID_GANTT, mode);
-      expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.error).toBe(MERMAID_GANTT_OPEN_ON_GANTT);
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== 'gantt') continue;
+      expect(result.mode).toBe('gantt');
+      expect(result.dslText).toMatch(/^diagram:\s*gantt/m);
+      expect(result.warnings[0]).toBe(CONVERTED_FROM_MERMAID_GANTT);
+      expect(result.project.tasks.map(task => task.name)).toEqual(expect.arrayContaining(['Build', 'Design', 'Implement', 'Ship']));
     }
   });
 
-  it('leaves an empty Mermaid gantt as a parser error', () => {
-    const result = applyBoardSource('gantt\ntitle Empty plan\n', 'gantt');
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/couldn't be opened/i);
+  it('leaves an empty Mermaid gantt as a parser error across all modes', () => {
+    for (const mode of ['gantt', 'flow', 'architecture', 'sequence'] as const) {
+      const result = applyBoardSource('gantt\ntitle Empty plan\n', mode);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toMatch(/couldn't be opened/i);
+    }
   });
 
   it('does not treat a flow that merely mentions gantt as Mermaid gantt', () => {
@@ -222,6 +228,7 @@ Intake -> Review
 Review -> Done`, 'flow');
     expect(result.ok).toBe(true);
     if (result.ok && result.kind === 'diagram') {
+      expect(result.mode).toBe('flow');
       expect(result.parsed.nodes.map(node => node.name)).toEqual(expect.arrayContaining(['Intake', 'Review', 'Done']));
     }
   });
@@ -235,36 +242,76 @@ task Design {
 }`, 'gantt');
     expect(result.ok).toBe(true);
     if (result.ok && result.kind === 'gantt') {
+      expect(result.mode).toBe('gantt');
       expect(result.dslText).toBeUndefined();
       expect(result.warnings).not.toContain(CONVERTED_FROM_MERMAID_GANTT);
       expect(result.project.tasks.map(task => task.name)).toEqual(['Design']);
     }
   });
 
-  it('still accepts a Mermaid sequence on a Sequence board', () => {
-    const result = applyBoardSource(SEQUENCE, 'sequence');
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.kind).toBe('sequence');
-  });
-
-  it('still redirects a sequenceDiagram away from Flow', () => {
-    const result = applyBoardSource(SEQUENCE, 'flow');
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/sequenceDiagram/);
-  });
-
-  it('still accepts a Mermaid flowchart on a Flow board', () => {
-    const result = applyBoardSource(FLOW_MERMAID, 'flow');
-    expect(result.ok).toBe(true);
-    if (result.ok && result.kind === 'diagram') {
-      expect(result.parsed.nodes.map(node => node.name)).toEqual(expect.arrayContaining(['Intake', 'Review', 'Done']));
+  it('auto-switches a Mermaid sequenceDiagram to sequence mode from any board', () => {
+    for (const mode of ['sequence', 'flow', 'architecture', 'gantt'] as const) {
+      const result = applyBoardSource(SEQUENCE, mode);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.kind).toBe('sequence');
+        expect(result.mode).toBe('sequence');
+      }
     }
   });
 
-  it('still rejects a flowchart pasted onto a Gantt board', () => {
-    const result = applyBoardSource('flowchart TD\nA-->B\n', 'gantt');
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/flowchart/i);
+  it('auto-switches a Mermaid flowchart / graph to flow mode from any board', () => {
+    for (const mode of ['flow', 'architecture', 'sequence', 'gantt'] as const) {
+      const flowResult = applyBoardSource(FLOW_MERMAID, mode);
+      expect(flowResult.ok).toBe(true);
+      if (flowResult.ok && flowResult.kind === 'diagram') {
+        expect(flowResult.mode).toBe('flow');
+        expect(flowResult.parsed.mode).toBe('flow');
+        expect(flowResult.parsed.nodes.map(node => node.name)).toEqual(expect.arrayContaining(['Intake', 'Review', 'Done']));
+      }
+
+      const graphResult = applyBoardSource('graph TD\nA[Start] --> B[End]\n', mode);
+      expect(graphResult.ok).toBe(true);
+      if (graphResult.ok && graphResult.kind === 'diagram') {
+        expect(graphResult.mode).toBe('flow');
+        expect(graphResult.parsed.mode).toBe('flow');
+        expect(graphResult.parsed.nodes).toHaveLength(2);
+      }
+    }
+  });
+
+  it('detects Mermaid target modes via detectMermaidMode', () => {
+    expect(detectMermaidMode(FLOW_MERMAID)).toBe('flow');
+    expect(detectMermaidMode('graph TD\nA-->B')).toBe('flow');
+    expect(detectMermaidMode(SEQUENCE)).toBe('sequence');
+    expect(detectMermaidMode(MERMAID_GANTT)).toBe('gantt');
+    expect(detectMermaidMode(FLOW_DSL)).toBeNull();
+    expect(detectMermaidMode('erDiagram\n  A ||--o{ B : has')).toBeNull();
+  });
+
+  it('rejects unknown/unsupported Mermaid types with clear copy naming the type on every board', () => {
+    const unsupportedCases: Array<[string, string]> = [
+      ['erDiagram\n  CUSTOMER ||--o{ ORDER : places\n', "Mermaid erDiagram isn't supported yet."],
+      ['classDiagram\n  class Animal\n', "Mermaid classDiagram isn't supported yet."],
+      ['mindmap\n  root((ideas))\n', "Mermaid mindmap isn't supported yet."],
+      ['stateDiagram-v2\n  [*] --> Still\n', "Mermaid stateDiagram-v2 isn't supported yet."],
+      ['pie title Pets\n  "Dogs" : 386\n', "Mermaid pie isn't supported yet."],
+      ['gitGraph\n  commit\n', "Mermaid gitGraph isn't supported yet."],
+      ['journey\n  title Working day\n', "Mermaid journey isn't supported yet."],
+      ['quadrantChart\n  title Reach\n', "Mermaid quadrantChart isn't supported yet."],
+      ['timeline\n  title History\n', "Mermaid timeline isn't supported yet."],
+      ['unknownDiagram\n  A --> B\n', "Mermaid unknownDiagram isn't supported yet."],
+    ];
+
+    for (const [source, expectedError] of unsupportedCases) {
+      for (const mode of ['flow', 'architecture', 'sequence', 'gantt'] as const) {
+        const result = applyBoardSource(source, mode);
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.error).toBe(expectedError);
+        }
+      }
+    }
   });
 
   it('converts a leading gantt keyword after a mermaid comment', () => {

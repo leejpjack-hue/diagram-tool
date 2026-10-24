@@ -1,5 +1,11 @@
-import { isMermaidFlow, isMermaidSequence, mermaidFlowToDSL } from '../parser/mermaidFlow';
-import { isMermaidGantt, MERMAID_GANTT_OPEN_ON_GANTT, mermaidGanttToDSL } from '../parser/mermaidGantt';
+import {
+  firstSignificantLine,
+  isMermaidFlow,
+  isMermaidSequence,
+  mermaidFlowToDSL,
+  unsupportedMermaidOpenError,
+} from '../parser/mermaidFlow';
+import { isMermaidGantt, mermaidGanttToDSL } from '../parser/mermaidGantt';
 import { parseDiagram } from '../parser/parser';
 import { parseGanttSource } from '../components/Gantt/ganttParser';
 import { parseSequenceSource } from '../components/Sequence/sequenceParser';
@@ -9,9 +15,9 @@ import type { BoardMode } from './boardManager';
 import type { ParsedDiagram } from '../store/types';
 
 export type ApplySourceResult =
-  | { ok: true; kind: 'diagram'; parsed: ParsedDiagram; warnings: string[] }
-  | { ok: true; kind: 'sequence'; warnings: string[] }
-  | { ok: true; kind: 'gantt'; project: GanttProject; warnings: string[]; dslText?: string }
+  | { ok: true; kind: 'diagram'; mode: 'architecture' | 'flow'; parsed: ParsedDiagram; warnings: string[] }
+  | { ok: true; kind: 'sequence'; mode: 'sequence'; warnings: string[] }
+  | { ok: true; kind: 'gantt'; mode: 'gantt'; project: GanttProject; warnings: string[]; dslText?: string }
   | { ok: false; error: string };
 
 const isGanttSource = (text: string) => /^\s*diagram:\s*gantt\b/im.test(text);
@@ -49,13 +55,21 @@ function applyConvertedMermaidGantt(text: string): ApplySourceResult {
   return {
     ok: true,
     kind: 'gantt',
+    mode: 'gantt',
     project: result.project,
     warnings: warningsForGanttSource(dslText, result.warnings),
     dslText,
   };
 }
 
-export { isMermaidFlow, isMermaidSequence };
+export { firstSignificantLine, isMermaidFlow, isMermaidGantt, isMermaidSequence, unsupportedMermaidOpenError };
+
+export function detectMermaidMode(text: string): 'flow' | 'sequence' | 'gantt' | null {
+  if (isMermaidFlow(text)) return 'flow';
+  if (isMermaidSequence(text)) return 'sequence';
+  if (isMermaidGantt(text)) return 'gantt';
+  return null;
+}
 
 /** First `title:` / `title` line, or the first markdown heading on sequence sources. */
 export function extractBoardTitle(text: string, mode?: BoardMode): string | null {
@@ -113,13 +127,30 @@ export function detectRawDiagramImport(filename: string, text: string): { mode: 
 }
 
 export function applyBoardSource(text: string, mode: BoardMode | 'c4'): ApplySourceResult {
+  const unsupported = unsupportedMermaidOpenError(text);
+  if (unsupported) {
+    return { ok: false, error: unsupported };
+  }
+
   // Leading `gantt` keyword only — a flow whose text merely contains the word
   // "gantt" must keep going to the flow parser.
   if (isMermaidGantt(text)) {
-    if (mode !== 'gantt') {
-      return { ok: false, error: MERMAID_GANTT_OPEN_ON_GANTT };
-    }
     return applyConvertedMermaidGantt(text);
+  }
+
+  if (isMermaidSequence(text)) {
+    const result = parseSequenceSource(text);
+    if (result.error) return { ok: false, error: result.error };
+    return { ok: true, kind: 'sequence', mode: 'sequence', warnings: [] };
+  }
+
+  if (isMermaidFlow(text)) {
+    try {
+      const parsed = parseDiagram(text);
+      return { ok: true, kind: 'diagram', mode: 'flow', parsed, warnings: [] };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Parse error' };
+    }
   }
 
   if (mode === 'gantt' || isGanttSource(text)) {
@@ -130,21 +161,25 @@ export function applyBoardSource(text: string, mode: BoardMode | 'c4'): ApplySou
     if (result.error || !result.project) {
       return { ok: false, error: result.error ?? 'Parse error' };
     }
-    return { ok: true, kind: 'gantt', project: result.project, warnings: warningsForGanttSource(text, result.warnings) };
+    return {
+      ok: true,
+      kind: 'gantt',
+      mode: 'gantt',
+      project: result.project,
+      warnings: warningsForGanttSource(text, result.warnings),
+    };
   }
 
-  if (mode === 'sequence' || isMermaidSequence(text)) {
-    if (mode !== 'sequence' && isMermaidSequence(text)) {
-      return { ok: false, error: 'This is a sequenceDiagram. Open it on the Sequence tab or import it as a sequence board.' };
-    }
+  if (mode === 'sequence') {
     const result = parseSequenceSource(text);
     if (result.error) return { ok: false, error: result.error };
-    return { ok: true, kind: 'sequence', warnings: [] };
+    return { ok: true, kind: 'sequence', mode: 'sequence', warnings: [] };
   }
 
   try {
     const parsed = parseDiagram(text);
-    return { ok: true, kind: 'diagram', parsed, warnings: [] };
+    const resolvedMode: 'architecture' | 'flow' = parsed.mode === 'flow' ? 'flow' : 'architecture';
+    return { ok: true, kind: 'diagram', mode: resolvedMode, parsed, warnings: [] };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Parse error' };
   }

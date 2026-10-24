@@ -1,3 +1,4 @@
+import { isMermaidFlow, unsupportedMermaidOpenError } from '../../parser/mermaidFlow';
 import { isMermaidGantt, MERMAID_GANTT_OPEN_ON_GANTT } from '../../parser/mermaidGantt';
 
 // Mermaid-style sequence diagram parser.
@@ -261,9 +262,19 @@ export function findUnrecognizedSequenceLines(text: string): { line: number; tex
 }
 
 export function parseSequenceSource(text: string): { model: SequenceDiagramModel; error: string | null } {
+  const unsupported = unsupportedMermaidOpenError(text);
+  if (unsupported) {
+    return { model: parseSequenceDiagram(text), error: unsupported };
+  }
   // Mermaid gantt is not a sequence. Error so the canvas keeps the last good diagram.
   if (isMermaidGantt(text)) {
     return { model: parseSequenceDiagram(text), error: MERMAID_GANTT_OPEN_ON_GANTT };
+  }
+  if (isMermaidFlow(text)) {
+    return {
+      model: parseSequenceDiagram(text),
+      error: 'This is a Mermaid flowchart. Open it on the Flow tab or import it as a Flow board.',
+    };
   }
   if (/^\s*diagram:\s*(architecture|flow|gantt)\b/im.test(text)) {
     return {

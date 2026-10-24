@@ -29,7 +29,7 @@ function asBoardMode(mode: string): BoardMode {
 }
 
 export function DSLEditor() {
-  const { dslText, setDslText, setParsedDiagram, setError, setSourceWarning, setLoading, diagramMode, error, sourceWarning, parsedDiagram, isReadOnlyShared } = useDiagramStore();
+  const { dslText, setDslText, setParsedDiagram, setError, setSourceWarning, setLoading, diagramMode, setDiagramMode, error, sourceWarning, parsedDiagram, isReadOnlyShared } = useDiagramStore();
   const enterWalkThrough = useDiagramStore(s => s.enterWalkThrough);
   const showStepNumbers = useDiagramStore(s => s.showStepNumbers);
   const setShowStepNumbers = useDiagramStore(s => s.setShowStepNumbers);
@@ -90,7 +90,7 @@ If error then Retry
 else Flag for review`;
 
   const applySource = useCallback((value: string) => {
-    const mode = asBoardMode(diagramMode);
+    const mode = asBoardMode(useDiagramStore.getState().diagramMode || diagramMode);
 
     setLoading(true);
     const result = applyBoardSource(value, mode);
@@ -111,13 +111,19 @@ else Flag for review`;
     if (result.ok) {
       setError(null);
       setSourceWarning(result.warnings.length > 0 ? result.warnings.join('\n') : null);
-      if (result.kind === 'diagram') setParsedDiagram(result.parsed);
+      if (result.kind === 'diagram') {
+        setParsedDiagram(result.parsed);
+        setDiagramMode(result.mode);
+      } else {
+        setDiagramMode(result.mode);
+        setParsedDiagram(null);
+      }
     } else {
       setError(result.error);
       setSourceWarning(null);
     }
     setLoading(false);
-  }, [diagramMode, setDslText, setParsedDiagram, setError, setSourceWarning, setLoading]);
+  }, [diagramMode, setDiagramMode, setDslText, setParsedDiagram, setError, setSourceWarning, setLoading]);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (value === undefined) return;

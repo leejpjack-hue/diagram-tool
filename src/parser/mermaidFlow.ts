@@ -14,10 +14,28 @@
 //   subgraph Title ... end  → swimlane lane
 //   %% comments
 
+const UNSUPPORTED_MERMAID = /^(erDiagram|classDiagram|mindmap|stateDiagram(?:-v2)?|pie|gitGraph|journey|quadrantChart|timeline|sankey-beta|xychart-beta|block-beta|packet-beta|kanban|requirementDiagram|zenuml|C4Context|C4Container|C4Component|(?!sequenceDiagram\b)[A-Za-z][A-Za-z0-9]*Diagram|(?!flowchart\b)[A-Za-z][A-Za-z0-9]*Chart)\b/i;
+
+export function firstSignificantLine(text: string): string {
+  for (const raw of text.split('\n')) {
+    const line = raw.trim().replace(/^\uFEFF/, '');
+    if (!line || line.startsWith('%%') || line.startsWith('#')) continue;
+    return line;
+  }
+  return '';
+}
+
+/** Recognizable Mermaid that this app does not import or apply. Names the kind. */
+export function unsupportedMermaidOpenError(text: string): string | null {
+  const kind = firstSignificantLine(text).match(UNSUPPORTED_MERMAID)?.[1];
+  if (!kind) return null;
+  return `Mermaid ${kind} isn't supported yet.`;
+}
+
 export function isMermaidFlow(text: string): boolean {
   // First non-blank, non-comment line begins with flowchart/graph.
   for (const raw of text.split('\n')) {
-    const line = raw.trim();
+    const line = raw.trim().replace(/^\uFEFF/, '');
     if (!line || line.startsWith('%%')) continue;
     return /^(flowchart|graph)\b/i.test(line);
   }
@@ -26,7 +44,7 @@ export function isMermaidFlow(text: string): boolean {
 
 export function isMermaidSequence(text: string): boolean {
   for (const raw of text.split('\n')) {
-    const line = raw.trim();
+    const line = raw.trim().replace(/^\uFEFF/, '');
     if (!line || line.startsWith('%%') || line.startsWith('#')) continue;
     return /^sequenceDiagram\b/i.test(line);
   }
@@ -162,7 +180,7 @@ export function mermaidFlowToDSL(text: string): string {
     if (!line) continue;
 
     // Header: flowchart / graph + direction
-    const header = /^(?:flowchart|graph)\s+(TB|TD|BT|RL|LR)?/i.exec(line);
+    const header = /^(?:flowchart|graph)(?:\s+(TB|TD|BT|RL|LR))?\s*;?\s*$/i.exec(line);
     if (header) {
       const d = (header[1] || 'TB').toUpperCase();
       direction = d === 'LR' || d === 'RL' ? 'LR' : 'TB';
