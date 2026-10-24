@@ -129,6 +129,15 @@ describe('Type tasks panel', () => {
       expect.arrayContaining(['Intake', 'Done']),
     );
 
+    fireEvent.change(screen.getByTestId('monaco-stub'), {
+      target: { value: 'architecture-beta\n  group api(cloud)[API]\n  service db(database)[Database] in api\n' },
+    });
+    expect(useDiagramStore.getState().diagramMode).toBe('flow');
+    expect(useDiagramStore.getState().error).toBe("Mermaid architecture-beta isn't supported yet.");
+    expect(useDiagramStore.getState().parsedDiagram?.nodes.map(n => n.name)).toEqual(
+      expect.arrayContaining(['Intake', 'Done']),
+    );
+
     // 2. Paste sequenceDiagram on Flow board -> switches to sequence mode
     fireEvent.change(screen.getByTestId('monaco-stub'), {
       target: { value: 'sequenceDiagram\ntitle Auth\nAlice->>Bob: token\n' },

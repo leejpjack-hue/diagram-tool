@@ -31,6 +31,13 @@ const UNSUPPORTED_MMD = `erDiagram
   CUSTOMER ||--o{ ORDER : places
 `;
 
+const ARCH_BETA_MMD = `architecture-beta
+  group api(cloud)[API]
+  service db(database)[Database] in api
+  service server(server)[Server] in api
+  db:L -- R:server
+`;
+
 async function waitForEditor(page: Page) {
   await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible();
   await page.waitForFunction(() => {
@@ -205,6 +212,16 @@ test.describe('Paste Mermaid gantt into the source editor', () => {
     await pasteIntoSourceEditor(page, UNSUPPORTED_MMD);
 
     await expect(page.getByTestId('dsl-parse-error')).toContainText("Mermaid erDiagram isn't supported yet.");
+    await expect(page.getByTestId('dsl-parse-warning')).toHaveCount(0);
+    await expect(page.getByTestId('board-mode-status')).toHaveText(/flow mode/i);
+    await expect(page.getByRole('button', { name: 'Flow', exact: true })).toHaveClass(/active/);
+    await expect(nodes).toHaveCount(nodeCount);
+    await expect(nodes.filter({ hasText: 'NextStep' })).toBeVisible();
+    await expect(nodes.filter({ hasText: 'Done' })).toBeVisible();
+
+    await pasteIntoSourceEditor(page, ARCH_BETA_MMD);
+
+    await expect(page.getByTestId('dsl-parse-error')).toContainText("Mermaid architecture-beta isn't supported yet.");
     await expect(page.getByTestId('dsl-parse-warning')).toHaveCount(0);
     await expect(page.getByTestId('board-mode-status')).toHaveText(/flow mode/i);
     await expect(page.getByRole('button', { name: 'Flow', exact: true })).toHaveClass(/active/);

@@ -14,7 +14,7 @@
 //   subgraph Title ... end  → swimlane lane
 //   %% comments
 
-const UNSUPPORTED_MERMAID = /^(erDiagram|classDiagram|mindmap|stateDiagram(?:-v2)?|pie|gitGraph|journey|quadrantChart|timeline|sankey-beta|xychart-beta|block-beta|packet-beta|kanban|requirementDiagram|zenuml|C4Context|C4Container|C4Component|(?!sequenceDiagram\b)[A-Za-z][A-Za-z0-9]*Diagram|(?!flowchart\b)[A-Za-z][A-Za-z0-9]*Chart)\b/i;
+const UNSUPPORTED_MERMAID = /^(erDiagram|classDiagram|mindmap|stateDiagram(?:-v2)?|pie|gitGraph|journey|quadrantChart|timeline|sankey-beta|xychart-beta|block-beta|packet-beta|architecture-beta|kanban|requirementDiagram|zenuml|C4Context|C4Container|C4Component|(?!sequenceDiagram\b)[A-Za-z][A-Za-z0-9]*Diagram|(?!flowchart\b)[A-Za-z][A-Za-z0-9]*Chart)\b/i;
 
 export function firstSignificantLine(text: string): string {
   for (const raw of text.split('\n')) {

@@ -207,6 +207,7 @@ describe('open board file into the workspace', () => {
     const beforeOther = snapshot(other);
 
     const attempts: Array<[string, string, string]> = [
+      ['arch.mmd', 'architecture-beta\n  group api(cloud)[API]\n  service db(database)[Database] in api\n', "Mermaid architecture-beta isn't supported yet."],
       ['schema.mmd', 'erDiagram\n  CUSTOMER ||--o{ ORDER : places\n', "Mermaid erDiagram isn't supported yet."],
       ['model.mermaid', 'classDiagram\n  class Animal\n', "Mermaid classDiagram isn't supported yet."],
       ['map.mmd', 'mindmap\n  root((ideas))\n', "Mermaid mindmap isn't supported yet."],

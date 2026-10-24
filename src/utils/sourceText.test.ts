@@ -287,10 +287,13 @@ task Design {
     expect(detectMermaidMode(MERMAID_GANTT)).toBe('gantt');
     expect(detectMermaidMode(FLOW_DSL)).toBeNull();
     expect(detectMermaidMode('erDiagram\n  A ||--o{ B : has')).toBeNull();
+    expect(detectMermaidMode('architecture-beta\n  service api(server)[API]')).toBeNull();
   });
 
   it('rejects unknown/unsupported Mermaid types with clear copy naming the type on every board', () => {
     const unsupportedCases: Array<[string, string]> = [
+      ['architecture-beta\n  group api(cloud)[API]\n  service db(database)[Database] in api\n  db:L -- R:server\n', "Mermaid architecture-beta isn't supported yet."],
+      ['%% leading comment\n\n# heading\narchitecture-beta\n  service api(server)[API]\n', "Mermaid architecture-beta isn't supported yet."],
       ['erDiagram\n  CUSTOMER ||--o{ ORDER : places\n', "Mermaid erDiagram isn't supported yet."],
       ['classDiagram\n  class Animal\n', "Mermaid classDiagram isn't supported yet."],
       ['mindmap\n  root((ideas))\n', "Mermaid mindmap isn't supported yet."],

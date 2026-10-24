@@ -317,6 +317,11 @@ Implement :after a1, 5d
       'schema.mmd',
       { type: 'text/plain' },
     ))).rejects.toThrow("Mermaid erDiagram isn't supported yet.");
+    await expect(manager.importFromFile(new File(
+      ['architecture-beta\n  group api(cloud)[API]\n  service db(database)[Database] in api\n'],
+      'arch.mmd',
+      { type: 'text/plain' },
+    ))).rejects.toThrow("Mermaid architecture-beta isn't supported yet.");
     const boards = await manager.list();
     expect(boards).toHaveLength(1);
     expect(boards[0]).toMatchObject({ id: existing.id, title: 'Keep Me' });
