@@ -15,6 +15,7 @@ coverage/
 # Test results
 test-results/
 playwright-report/
+playwright-report-live/
 
 # Screenshots
 e2e/**/*-snapshots/

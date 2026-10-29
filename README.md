@@ -58,10 +58,17 @@ npm run dev
 Open the printed local URL. Pick **Architecture**, **Flow**, **Sequence**, or **Gantt**, type or paste source on the left, and watch the canvas on the right.
 
 ```bash
-npm test          # unit tests (Vitest)
-npm run build     # production bundle → dist/
-npm run preview   # serve dist/ locally
+npm test              # unit tests (Vitest)
+npm run test:e2e      # in-repo Playwright E2E (starts local dev + preview servers)
+npm run test:e2e:live # post-deploy live Playwright smoke vs https://diagram-tool.teqcon.uk
+npm run build         # production bundle → dist/
+npm run preview       # serve dist/ locally
 ```
+
+### E2E suites
+
+- **In-repo suite.** Run `npm run test:e2e` to execute `playwright.config.ts`. Playwright starts the local Vite dev server on port 5173 and the preview server on port 4173, then runs the full `e2e/` suite. Use this command as the primary pre-merge gate.
+- **Live companion.** Run `npm run test:e2e:live` to execute `playwright.live.config.ts` with no local `webServer`. Playwright runs `e2e/live-smoke.spec.ts` and `e2e/dashboard.spec.ts` against `https://diagram-tool.teqcon.uk` to catch blank shells or React error `#185` on `/app/` after a deploy. Set `LIVE_BASE_URL` to target a different host. The live companion does not replace `npm run test:e2e`.
 
 DSL reference: [USAGE.md](USAGE.md). Portable board JSON: [docs/board-format.md](docs/board-format.md).
 
