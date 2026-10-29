@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DSLEditor } from './DSLEditor';
 import { useDiagramStore } from '../../store/diagramStore';
 import { plainSequenceToMermaid } from '../../parser/plainSequence';
@@ -7,6 +7,12 @@ import { plainSequenceToMermaid } from '../../parser/plainSequence';
 vi.mock('@monaco-editor/react', () => ({
   default: () => <div data-testid="monaco-stub" />,
 }));
+
+const OPEN_KEY = 'diagram-tool-type-messages-preview-open';
+
+afterEach(() => {
+  localStorage.removeItem(OPEN_KEY);
+});
 
 const HANDWRITTEN = `sequenceDiagram
 title Hand written
@@ -95,5 +101,38 @@ describe('Type messages panel', () => {
       useDiagramStore.getState().undo();
     });
     expect(useDiagramStore.getState().dslText).toBe(HANDWRITTEN);
+  });
+
+  it('shows explicit empty state, live preview rows, warning focus, and inline error near Type messages', async () => {
+    renderSequence();
+    fireEvent.click(screen.getByTestId('toggle-type-messages'));
+
+    expect(screen.getByTestId('type-messages-preview-toggle')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('type-messages-preview-summary')).toHaveTextContent('0 lines, 0 warnings');
+    expect(screen.getByTestId('type-messages-preview-empty')).toHaveTextContent('No messages typed yet.');
+
+    // Clicking Build on empty input surfaces an inline error near Type messages and keeps the board unchanged.
+    fireEvent.click(screen.getByTestId('build-messages'));
+    expect(screen.getByTestId('type-messages-error')).toHaveTextContent('Type one message per line first.');
+    expect(useDiagramStore.getState().dslText).toBe(HANDWRITTEN);
+
+    // Typing clears the inline error and updates the live preview without changing the board.
+    fireEvent.change(screen.getByTestId('type-messages-input'), {
+      target: { value: 'User asks Agent: plan my trip\nnot a message' },
+    });
+    expect(screen.queryByTestId('type-messages-error')).toBeNull();
+    expect(useDiagramStore.getState().dslText).toBe(HANDWRITTEN);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('type-messages-preview-summary')).toHaveTextContent('2 lines, 1 warning');
+    });
+    expect(screen.queryByTestId('type-messages-preview-empty')).toBeNull();
+    const rows = screen.getAllByTestId('type-messages-preview-row');
+    expect(rows[0]).toHaveTextContent('User → Agent (call) "plan my trip"');
+    expect(rows[1]).toHaveTextContent("This line wasn't understood.");
+
+    fireEvent.click(rows[1]);
+    const input = screen.getByTestId('type-messages-input') as HTMLTextAreaElement;
+    expect(input.value.slice(input.selectionStart, input.selectionEnd)).toBe('not a message');
   });
 });

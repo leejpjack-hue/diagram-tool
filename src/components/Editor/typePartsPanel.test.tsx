@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DSLEditor } from './DSLEditor';
 import { useDiagramStore } from '../../store/diagramStore';
 import { plainArchitectureToDSL } from '../../parser/plainArchitecture';
@@ -7,6 +7,12 @@ import { plainArchitectureToDSL } from '../../parser/plainArchitecture';
 vi.mock('@monaco-editor/react', () => ({
   default: () => <div data-testid="monaco-stub" />,
 }));
+
+const OPEN_KEY = 'diagram-tool-type-parts-preview-open';
+
+afterEach(() => {
+  localStorage.removeItem(OPEN_KEY);
+});
 
 const HANDWRITTEN = `diagram: architecture
 title: Hand written
@@ -92,5 +98,38 @@ edge A -> B { label: "question" step: 2 }
     });
     expect(useDiagramStore.getState().dslText).toBe(HANDWRITTEN);
     expect(useDiagramStore.getState().parsedDiagram?.nodes.some(node => node.name === 'API')).toBe(true);
+  });
+
+  it('shows explicit empty state, live preview rows, warning focus, and inline error near Type parts', async () => {
+    renderArchitecture();
+    fireEvent.click(screen.getByTestId('toggle-type-parts'));
+
+    expect(screen.getByTestId('type-parts-preview-toggle')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('type-parts-preview-summary')).toHaveTextContent('0 lines, 0 warnings');
+    expect(screen.getByTestId('type-parts-preview-empty')).toHaveTextContent('No parts typed yet.');
+
+    // Clicking Build on empty input surfaces an inline error near Type parts and keeps the board unchanged.
+    fireEvent.click(screen.getByTestId('build-parts'));
+    expect(screen.getByTestId('type-parts-error')).toHaveTextContent('Type one part per line first.');
+    expect(useDiagramStore.getState().dslText).toBe(HANDWRITTEN);
+
+    // Typing clears the inline error and updates the live preview without changing the board.
+    fireEvent.change(screen.getByTestId('type-parts-input'), {
+      target: { value: 'User -> Chat app: asks\nnot a connection' },
+    });
+    expect(screen.queryByTestId('type-parts-error')).toBeNull();
+    expect(useDiagramStore.getState().dslText).toBe(HANDWRITTEN);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('type-parts-preview-summary')).toHaveTextContent('2 lines, 1 warning');
+    });
+    expect(screen.queryByTestId('type-parts-preview-empty')).toBeNull();
+    const rows = screen.getAllByTestId('type-parts-preview-row');
+    expect(rows[0]).toHaveTextContent('User (user) → Chat app · "asks"');
+    expect(rows[1]).toHaveTextContent("This line wasn't understood.");
+
+    fireEvent.click(rows[1]);
+    const input = screen.getByTestId('type-parts-input') as HTMLTextAreaElement;
+    expect(input.value.slice(input.selectionStart, input.selectionEnd)).toBe('not a connection');
   });
 });

@@ -365,6 +365,9 @@ export function plainSequenceToMermaid(
   }
 
   if (actors.length === 0) {
+    if (understood && understood.length > 0 && understood.every(line => !line.warning)) {
+      understood[0].warning = 'No messages found. Type one message per line, e.g. "User asks Agent: plan my trip".';
+    }
     throw new Error('No messages found. Type one message per line, e.g. "User asks Agent: plan my trip".');
   }
 

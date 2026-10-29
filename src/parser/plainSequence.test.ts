@@ -200,6 +200,7 @@ describe('plainSequenceToMermaid', () => {
     expect(() => plainSequenceToMermaid('   \n  ')).toThrow(/No messages found/);
     expect(() => plainSequenceToMermaid('if later:\nend')).toThrow(/No messages found/);
     expect(typeMessagesPreviewRows('hello there')[0].warning).toMatch(/wasn't understood/);
+    expect(typeMessagesPreviewRows('if later:\nend')[0].warning).toMatch(/No messages found/);
   });
 
   it('keeps a note and a reserved name as valid mermaid', () => {
