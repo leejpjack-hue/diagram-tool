@@ -5,6 +5,7 @@ import { parseDiagram } from './parser';
 import {
   plainArchitectureToDSL,
   plainPartsFromBoardSource,
+  typePartsPreviewRows,
   type PlainArchitectureLine,
 } from './plainArchitecture';
 
@@ -137,10 +138,21 @@ describe('plainArchitectureToDSL', () => {
     expect(parsed.edges.find(edge => edge.to === 'b')?.label).toBe('again');
   });
 
-  it('upgrades a plain service when a later line names a kind', () => {
+  it('upgrades a plain service when a later line names a kind, including in preview rows', () => {
     const parsed = built('Foo -> Bar\nFoo (db) -> Baz');
     expect(parsed.nodes.find(item => item.name === 'Foo')?.type).toBe('database');
     expect(parsed.nodes.filter(item => item.id === 'foo')).toHaveLength(1);
+    const rows = typePartsPreviewRows('Foo -> Bar\nFoo (db) -> Baz');
+    expect(rows.map(row => row.summary)).toEqual([
+      'Foo (database) → Bar',
+      'Foo (database) → Baz',
+    ]);
+  });
+
+  it('flags an inside group line whose members have no valid part names', () => {
+    const rows = typePartsPreviewRows('inside Cloud: (), ---');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].warning).toMatch(/wasn't understood/);
   });
 
   it('flags a line that was not understood and leaves it off the board', () => {

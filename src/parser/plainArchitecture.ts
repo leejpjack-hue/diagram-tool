@@ -231,7 +231,7 @@ export function plainArchitectureToDSL(
 
   const ensure = (raw: string): Part | null => {
     const classified = classify(raw);
-    if (!classified.name) return null;
+    if (!classified.name || !/[a-z0-9]/i.test(classified.name)) return null;
     const id = architectureNodeId(classified.name);
     if (!id) return null;
     const existing = byId.get(id);
@@ -253,6 +253,8 @@ export function plainArchitectureToDSL(
     return part;
   };
 
+  const deferred: Array<{ lineIndex: number; render: () => string; warning?: string }> = [];
+
   const rawLines = text.split('\n');
   for (let lineIndex = 0; lineIndex < rawLines.length; lineIndex++) {
     const trimmed = rawLines[lineIndex].trim();
@@ -267,14 +269,22 @@ export function plainArchitectureToDSL(
       const groupName = inside[1].trim();
       const members = inside[2].split(',').map(member => member.trim()).filter(Boolean);
       if (!groupName || members.length === 0) {
-        understood?.push({
+        deferred.push({
           lineIndex,
-          summary: unmarked,
+          render: () => unmarked,
           warning: "This line wasn't understood. Use inside Group: A, B.",
         });
         continue;
       }
       const memberParts = members.map(member => ensure(member)).filter((part): part is Part => Boolean(part));
+      if (memberParts.length === 0) {
+        deferred.push({
+          lineIndex,
+          render: () => unmarked,
+          warning: "This line wasn't understood. Use inside Group: A, B.",
+        });
+        continue;
+      }
       const key = groupName.toLowerCase();
       let group = groupByName.get(key);
       if (!group) {
@@ -285,9 +295,9 @@ export function plainArchitectureToDSL(
       for (const member of memberParts) {
         if (!group.members.includes(member.id)) group.members.push(member.id);
       }
-      understood?.push({
+      deferred.push({
         lineIndex,
-        summary: `inside ${groupName} · ${memberParts.map(formatEnd).join(', ')}`,
+        render: () => `inside ${groupName} · ${memberParts.map(formatEnd).join(', ')}`,
       });
       continue;
     }
@@ -304,9 +314,9 @@ export function plainArchitectureToDSL(
         if (rest) label = rest;
       }
       if (!fromRaw || !toRaw || /(?:->|→|>)/.test(fromRaw) || /(?:->|→|>)/.test(toRaw)) {
-        understood?.push({
+        deferred.push({
           lineIndex,
-          summary: unmarked,
+          render: () => unmarked,
           warning: "This line wasn't understood. Use A -> B or A -> B: label.",
         });
         continue;
@@ -314,9 +324,9 @@ export function plainArchitectureToDSL(
       const from = ensure(fromRaw);
       const to = ensure(toRaw);
       if (!from || !to) {
-        understood?.push({
+        deferred.push({
           lineIndex,
-          summary: unmarked,
+          render: () => unmarked,
           warning: "This line wasn't understood. Use A -> B or A -> B: label.",
         });
         continue;
@@ -328,16 +338,28 @@ export function plainArchitectureToDSL(
       } else {
         edges.push({ from: from.id, to: to.id, label, ...(step !== undefined ? { step } : {}) });
       }
-      const summary = `${step !== undefined ? `${step} · ` : ''}${formatEnd(from)} → ${formatEnd(to)}${label ? ` · "${label}"` : ''}`;
-      understood?.push({ lineIndex, summary });
+      deferred.push({
+        lineIndex,
+        render: () => `${step !== undefined ? `${step} · ` : ''}${formatEnd(from)} → ${formatEnd(to)}${label ? ` · "${label}"` : ''}`,
+      });
       continue;
     }
 
-    understood?.push({
+    deferred.push({
       lineIndex,
-      summary: unmarked,
+      render: () => unmarked,
       warning: "This line wasn't understood. Use A -> B or inside Group: A, B.",
     });
+  }
+
+  if (understood) {
+    for (const item of deferred) {
+      understood.push({
+        lineIndex: item.lineIndex,
+        summary: item.render(),
+        ...(item.warning ? { warning: item.warning } : {}),
+      });
+    }
   }
 
   if (opts.stats) {

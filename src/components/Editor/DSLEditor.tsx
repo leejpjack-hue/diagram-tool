@@ -44,11 +44,13 @@ export function DSLEditor() {
   const [showParts, setShowParts] = useState(false);
   const [partsText, setPartsText] = useState('');
   const [partsHandwritten, setPartsHandwritten] = useState(false);
+  const [partsError, setPartsError] = useState<string | null>(null);
   const partsInputRef = useRef<HTMLTextAreaElement | null>(null);
   // DT-SEQ-02: "Type messages" is the sequence twin of Type steps.
   const [showMessages, setShowMessages] = useState(false);
   const [messagesText, setMessagesText] = useState('');
   const [messagesHandwritten, setMessagesHandwritten] = useState(false);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
   const messagesInputRef = useRef<HTMLTextAreaElement | null>(null);
   // DT-GANTT-02: "Type tasks" is the Gantt twin of Type steps.
   const [showTasks, setShowTasks] = useState(false);
@@ -203,6 +205,7 @@ inside Cloud: Chat app, Agent`;
   const toggleParts = useCallback(() => {
     setShowParts(open => {
       const next = !open;
+      setPartsError(null);
       if (!next) return next;
       const loaded = plainPartsFromBoardSource(useDiagramStore.getState().dslText);
       if (loaded == null) {
@@ -219,7 +222,9 @@ inside Cloud: Chat app, Agent`;
   const buildFromParts = useCallback(() => {
     const input = partsText.trim();
     if (!input) {
-      toast.error('Type one part per line first. Example: "User -> Chat app: asks", "Agent -> Vector DB: search".');
+      const msg = 'Type one part per line first. Example: "User -> Chat app: asks", "Agent -> Vector DB: search".';
+      setPartsError(msg);
+      toast.error(msg);
       return;
     }
     try {
@@ -228,12 +233,15 @@ inside Cloud: Chat app, Agent`;
         title: useDiagramStore.getState().dslText.match(/^\s*title\s*:\s*(.+)\s*$/im)?.[1]?.trim(),
         stats,
       });
+      setPartsError(null);
       setShowParts(true);
       setPartsHandwritten(false);
       applySource(dsl);
       toast.success(typePartsSuccessMessage(stats.parts, stats.connections));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not read those parts. Type one connection per line.');
+      const msg = err instanceof Error ? err.message : 'Could not read those parts. Type one connection per line.';
+      setPartsError(msg);
+      toast.error(msg);
     }
   }, [partsText, toast, applySource]);
 
@@ -257,6 +265,7 @@ end`;
   const toggleMessages = useCallback(() => {
     setShowMessages(open => {
       const next = !open;
+      setMessagesError(null);
       if (!next) return next;
       const loaded = plainMessagesFromBoardSource(useDiagramStore.getState().dslText);
       if (loaded == null) {
@@ -273,7 +282,9 @@ end`;
   const buildFromMessages = useCallback(() => {
     const input = messagesText.trim();
     if (!input) {
-      toast.error('Type one message per line first. Example: "User asks Agent: plan my trip".');
+      const msg = 'Type one message per line first. Example: "User asks Agent: plan my trip".';
+      setMessagesError(msg);
+      toast.error(msg);
       return;
     }
     try {
@@ -282,12 +293,15 @@ end`;
         title: useDiagramStore.getState().dslText.match(/^\s*title\s*:?\s+(.+)\s*$/im)?.[1]?.trim(),
         stats,
       });
+      setMessagesError(null);
       setShowMessages(true);
       setMessagesHandwritten(false);
       applySource(mermaid);
       toast.success(typeMessagesSuccessMessage(stats.participants, stats.messages));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not read those messages. Type one message per line.');
+      const msg = err instanceof Error ? err.message : 'Could not read those messages. Type one message per line.';
+      setMessagesError(msg);
+      toast.error(msg);
     }
   }, [messagesText, toast, applySource]);
 
@@ -692,6 +706,7 @@ Go live — milestone after Review`;
             value={partsText}
             onChange={e => {
               setPartsText(e.target.value);
+              setPartsError(null);
               if (e.target.value.trim()) setPartsHandwritten(false);
             }}
             placeholder={PARTS_PLACEHOLDER}
@@ -701,6 +716,15 @@ Go live — milestone after Review`;
           {partsHandwritten && !partsText.trim() && (
             <p data-testid="type-parts-handwritten-hint" className="mt-1 text-[11px] text-slate-500">
               This board was not built with Type parts. The box starts empty so the current DSL stays as it is.
+            </p>
+          )}
+          {partsError && (
+            <p
+              data-testid="type-parts-error"
+              role="alert"
+              className="mt-1 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700"
+            >
+              {partsError}
             </p>
           )}
           <TypePartsPreview text={partsText} onFocusLine={focusPartsLine} />
@@ -772,6 +796,7 @@ Go live — milestone after Review`;
             value={messagesText}
             onChange={e => {
               setMessagesText(e.target.value);
+              setMessagesError(null);
               if (e.target.value.trim()) setMessagesHandwritten(false);
             }}
             placeholder={MESSAGES_PLACEHOLDER}
@@ -781,6 +806,15 @@ Go live — milestone after Review`;
           {messagesHandwritten && !messagesText.trim() && (
             <p data-testid="type-messages-handwritten-hint" className="mt-1 text-[11px] text-slate-500">
               This board was not built with Type messages. The box starts empty so the current Mermaid stays as it is.
+            </p>
+          )}
+          {messagesError && (
+            <p
+              data-testid="type-messages-error"
+              role="alert"
+              className="mt-1 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700"
+            >
+              {messagesError}
             </p>
           )}
           <TypeMessagesPreview text={messagesText} onFocusLine={focusMessagesLine} />
