@@ -38,6 +38,12 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Check the skills host and converter
+        run: |
+          npm run typecheck:worker
+          npm run prove:converter
+          npm run prove:skills
+
       - name: Run Playwright E2E tests
         run: npm run test:e2e
 

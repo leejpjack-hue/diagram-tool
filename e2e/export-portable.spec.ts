@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 import { copyFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -65,7 +66,7 @@ async function downloadFromExport(page: Page, format: 'JSON' | 'PNG' | 'SVG') {
 }
 
 test.describe('Portable export and import', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: testTimeout(60_000) });
 
   test('exports JSON of a known architecture board, then imports matching DSL and node count', async ({ page }) => {
     await createKnownArchitectureBoard(page);

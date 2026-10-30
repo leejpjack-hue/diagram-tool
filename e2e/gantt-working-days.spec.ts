@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const FRIDAY_ON = `diagram: gantt
@@ -53,7 +54,7 @@ async function openBlankGantt(page: Page) {
 }
 
 test.describe('Gantt working days', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: testTimeout(60_000) });
 
   test('5d from Friday ends Thursday, shades weekends, and ends Tuesday when off', async ({ page }) => {
     await openBlankGantt(page);

@@ -444,7 +444,6 @@ function App() {
   });
   const containerRef = useRef<HTMLDivElement>(null);
   const ganttCanvasRef = useRef<HTMLDivElement>(null);
-  const thumbnailCaptureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const thumbnailCaptureInFlightRef = useRef(false);
   // This flag prevents the UI-to-DSL sync effect from writing old Gantt state
   // back over fresh editor text while a DSL parse is updating the Gantt store.
@@ -456,14 +455,6 @@ function App() {
   const { exportPNG, exportJPG, exportSVG, exportPDF, exportJSON, exportCSV } = useExport();
   const toast = useToast();
 
-  useEffect(() => {
-    return () => {
-      if (thumbnailCaptureTimerRef.current) {
-        clearTimeout(thumbnailCaptureTimerRef.current);
-      }
-    };
-  }, []);
-  
   // Parse Gantt DSL when it changes. Invalid source keeps the last good plan.
   useEffect(() => {
     if (activeTab !== 'gantt') {
@@ -894,10 +885,6 @@ function App() {
   const backToDashboard = async () => {
     // Flush the latest text into the board before leaving the editor.
     if (currentBoardId) {
-      if (thumbnailCaptureTimerRef.current) {
-        clearTimeout(thumbnailCaptureTimerRef.current);
-        thumbnailCaptureTimerRef.current = null;
-      }
       const thumbnail = await captureDiagramThumbnail(activeTab);
       await boardManager.update(currentBoardId, {
         ...boardPatchFromSource(dslText, activeTab),
@@ -975,15 +962,11 @@ function App() {
         .then(() => boardManager.createVersion(currentBoardId, 'Automatic save', true))
         .then(() => setWorkspaceError(''))
         .catch(error => setWorkspaceError(toWorkspaceError(error).message));
-      if (thumbnailCaptureTimerRef.current) {
-        clearTimeout(thumbnailCaptureTimerRef.current);
-      }
-      thumbnailCaptureTimerRef.current = setTimeout(() => {
-        void captureAndStoreBoardThumbnail(currentBoardId, activeTab);
-      }, 1200);
     }, 800);
     return () => clearTimeout(t);
-  }, [dslText, activeTab, currentBoardId, view, isReadOnlyShared, captureAndStoreBoardThumbnail, iconStyle, showStepNumbers]);
+    // Thumbnail cloning copies computed styles for every canvas element and
+    // can block the editor. Capture on explicit save or leaving the board.
+  }, [dslText, activeTab, currentBoardId, view, isReadOnlyShared, iconStyle, showStepNumbers]);
 
   const handleLoadDiagram = (diagram: SavedDiagram) => {
     setReadOnlyShared(false);

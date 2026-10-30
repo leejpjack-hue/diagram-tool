@@ -41,3 +41,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Generated Workspace bootstrap
+worker/generated-skill-seed.ts
+.wrangler/

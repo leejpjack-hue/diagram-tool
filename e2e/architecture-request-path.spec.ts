@@ -1,6 +1,7 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: testTimeout(90_000) });
 
 const NUMBERED = `diagram: architecture
 title: Request path walk
@@ -179,7 +180,7 @@ test('shared read-only architecture board can walk a numbered path', async ({ pa
     });
   });
 
-  await page.goto('http://127.0.0.1:4173/app/?share=tok_arch_02');
+  await page.goto(new URL('/app/?share=tok_arch_02', process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173').toString());
   const banner = page.getByTestId('shared-readonly-banner');
   await expect(banner).toBeVisible();
   await expect(banner).toContainText('Request path walk');

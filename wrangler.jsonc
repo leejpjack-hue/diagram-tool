@@ -1,7 +1,11 @@
 {
   "name": "diagram-tool",
   "main": "worker/index.ts",
-  "compatibility_date": "2026-09-04",
+  "compatibility_date": "2026-10-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": { "bindings": [{ "name": "DIAGRAM_SKILLS", "class_name": "DiagramSkillsAgent" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DiagramSkillsAgent"] }],
+  "worker_loaders": [{ "binding": "LOADER" }],
   // Vite inlines VITE_* from `.env.production` during `npm run build`.
   // Do not put VITE_GA4_MEASUREMENT_ID in Worker runtime `vars` — that is too late.
   "build": {

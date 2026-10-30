@@ -1,9 +1,10 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: testTimeout(90_000) });
 
 const SEQUENCE_MMD = `sequenceDiagram
 title Sequence walk
@@ -121,7 +122,7 @@ test('shared read-only sequence board can walk through', async ({ page }) => {
     });
   });
 
-  await page.goto('http://127.0.0.1:4173/app/?share=tok_seq_03');
+  await page.goto(new URL('/app/?share=tok_seq_03', process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173').toString());
   const banner = page.getByTestId('shared-readonly-banner');
   await expect(banner).toBeVisible();
   await expect(banner).toContainText('Sequence walk');

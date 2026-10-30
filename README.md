@@ -14,6 +14,8 @@ This is a Vite + React + TypeScript app.
 
 `npm run build` ships `dist/` (landing `index.html`, workspace `app/index.html`, and everything in `public/`). The older mock under `landing/` is unused.
 
+For the Workspace-backed `type-to-flow` skill, its host API, operator file updates, and proof commands, see [Skills workspace](docs/skills-workspace.md).
+
 ### Analytics env (optional)
 
 The landing never blocks if these are missing — it uses safe no-op stubs.

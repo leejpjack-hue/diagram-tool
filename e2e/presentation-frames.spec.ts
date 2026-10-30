@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
@@ -32,7 +33,7 @@ async function titleSelectedFrame(page: Page, title: string) {
 }
 
 test.describe('Deck frames as first-class containers', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: testTimeout(60_000) });
 
   test('creates titled frames, presents them in order, and exports one frame smaller than all', async ({ page }) => {
     await openDeck(page);

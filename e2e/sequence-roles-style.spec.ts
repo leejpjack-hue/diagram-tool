@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -52,7 +53,7 @@ async function expectRoles(page: Page) {
 }
 
 test.describe('Sequence participant roles and icon styles', () => {
-  test.describe.configure({ timeout: 120_000 });
+  test.describe.configure({ timeout: testTimeout(120_000) });
 
   test('imports an mmd with a role comment, an actor, and a guessed data name, then keeps Blueprint across reload', async ({ page }) => {
     await page.goto('/app/');

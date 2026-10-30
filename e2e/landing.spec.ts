@@ -36,7 +36,7 @@ test.describe('P0 marketing landing', () => {
   });
 
   test('production preview bakes GA4 and serves the Open the app CTA', async ({ page, request }) => {
-    const preview = 'http://127.0.0.1:4173';
+    const preview = process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173';
     const html = await (await request.get(`${preview}/`)).text();
     expect(html).toContain('Open the app');
     expect(html).not.toContain('Join the waitlist');

@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -47,7 +48,7 @@ async function chooseStyle(page: Page, id: 'clean' | 'line' | 'bold' | 'blueprin
 }
 
 test.describe('Flow icon style switcher', () => {
-  test.describe.configure({ timeout: 120_000 });
+  test.describe.configure({ timeout: testTimeout(120_000) });
 
   test('switches all four sets, keeps the choice across reload, and exports Bold', async ({ page }) => {
     await openBlankWorkflow(page);

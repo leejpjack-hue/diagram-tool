@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -85,7 +86,7 @@ async function createArchitectureBoard(page: Page) {
 }
 
 test.describe('Bidirectional source sync', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: testTimeout(60_000) });
 
   test('edit DSL → node appears', async ({ page }) => {
     await createArchitectureBoard(page);

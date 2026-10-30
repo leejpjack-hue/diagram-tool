@@ -1,7 +1,8 @@
+import { testTimeout } from './testTimeout';
 import { expect, test } from '@playwright/test';
 
 // DT-AI-17 smoke: the Type steps panel shows a keyboard-reachable Copy AI prompt.
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: testTimeout(90_000) });
 
 test('Copy AI prompt button is visible and focusable in Type steps', async ({ page }) => {
   await page.goto('/app/');

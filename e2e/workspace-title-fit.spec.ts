@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 
 const FAR_NODE_DSL = `diagram: architecture
@@ -33,7 +34,7 @@ function isInside(box: { x: number; y: number; width: number; height: number }, 
 }
 
 test.describe('Workspace title, fit, and File menu', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: testTimeout(60_000) });
 
   test('applying AWS 3-Tier sets the Home title from source, not Untitled', async ({ page }) => {
     await page.goto('/app/');

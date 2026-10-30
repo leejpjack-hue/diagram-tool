@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -106,7 +107,7 @@ function bar(page: Page, name: string) {
 }
 
 test.describe('Paste Mermaid gantt into the source editor', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: testTimeout(60_000) });
   test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
 
   test('pasting Mermaid gantt on a Gantt board renders task bars', async ({ page }) => {

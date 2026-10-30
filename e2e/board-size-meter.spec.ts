@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 
 const SMALL_DSL = `diagram: architecture
@@ -60,7 +61,7 @@ async function applyBoardSizeFixture(page: Page, count: number) {
 }
 
 test.describe('Board-size meter', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: testTimeout(60_000) });
 
   test('a board with fewer than 50 objects says Smooth and shows the count', async ({ page }) => {
     await createArchitectureBoard(page);

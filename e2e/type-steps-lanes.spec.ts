@@ -1,7 +1,8 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // DT-AI-27: Lanes by role puts mixed Type steps into Human / AI agent / Tool lanes.
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: testTimeout(90_000) });
 
 const STEPS = [
   'Human: ask',

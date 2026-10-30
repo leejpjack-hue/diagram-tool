@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -70,7 +71,7 @@ async function createGanttBoard(page: Page) {
 }
 
 test.describe('Gantt duration and after', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: testTimeout(60_000) });
 
   test('places bars and dependency lines, then shifts the chain when Design grows', async ({ page }) => {
     await createGanttBoard(page);

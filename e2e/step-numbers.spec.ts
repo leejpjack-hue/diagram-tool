@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 
 const STEPS = [
@@ -17,7 +18,7 @@ async function openBlankWorkflow(page: Page) {
 }
 
 test.describe('Flow step numbers', () => {
-  test.describe.configure({ timeout: 120_000 });
+  test.describe.configure({ timeout: testTimeout(120_000) });
 
   test('toggles badges 1..4 in walk order, matches step 3, and keeps the toggle after reload', async ({ page }) => {
     await openBlankWorkflow(page);

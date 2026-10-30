@@ -99,6 +99,10 @@ export class Lexer {
     const quote = this.advance(); // consume opening quote
     let value = '';
     while (this.peek() && this.peek() !== quote) {
+      // Quoted DSL values may contain their delimiter or a literal backslash.
+      if (this.peek() === '\\' && (this.peekNext() === quote || this.peekNext() === '\\')) {
+        this.advance();
+      }
       value += this.advance();
     }
     this.advance(); // consume closing quote

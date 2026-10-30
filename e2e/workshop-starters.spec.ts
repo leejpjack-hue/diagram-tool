@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 
 const STARTERS = [
@@ -36,7 +37,7 @@ async function backToHome(page: Page) {
 }
 
 test.describe('Workshop ICP starters', () => {
-  test.describe.configure({ timeout: 90_000 });
+  test.describe.configure({ timeout: testTimeout(90_000) });
 
   test('all five workshop cards are visible and searchable', async ({ page }) => {
     await openHome(page);

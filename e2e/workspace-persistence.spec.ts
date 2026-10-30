@@ -90,7 +90,7 @@ async function warmOfflineShell(page: Page) {
   });
 }
 
-test.use({ baseURL: 'http://127.0.0.1:4173' });
+test.use({ baseURL: process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173' });
 
 test.describe('Durable local-first workspace', () => {
   test('keeps last 3 boards, a named checkpoint, and 20 autosaves offline after reload', async ({ page, context }) => {
