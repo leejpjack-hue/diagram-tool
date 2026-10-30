@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { testTimeout } from './e2e/testTimeout';
 
 export default defineConfig({
   testDir: './e2e',
@@ -8,12 +9,13 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report-live' }]],
-  timeout: 60_000,
+  timeout: testTimeout(60_000),
+  expect: { timeout: testTimeout(5_000) },
   use: {
     baseURL: process.env.LIVE_BASE_URL || 'https://diagram-tool.teqcon.uk',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: process.env.PW_NO_VIDEO === '1' ? 'off' : 'retain-on-failure',
   },
   projects: [
     {

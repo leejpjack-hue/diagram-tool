@@ -76,6 +76,7 @@ fixtures/type-to-flow/spike-output.json
 package-lock.json
 package.json
 playwright.config.ts
+playwright.live.config.ts
 playwright.preview.config.ts
 scripts/generate-skill-seed.mjs
 scripts/prove-converter.mjs
@@ -159,6 +160,12 @@ authenticated add-skill instructions and deployment routing requirements.
 - Default Flow switching regression after removing background thumbnail capture:
   **1 passed** (39.5 seconds).
 - Deterministic before-autosave reload regression: **1 passed** (59.0 seconds).
+- Existing live deployment smoke at `https://diagram-tool.teqcon.uk`: **3 passed**
+  (51.3 seconds), including dashboard desktop/mobile and `/app` reload without
+  React #185, using `PW_TIMEOUT_SCALE=5 PW_NO_VIDEO=1 npm run test:e2e:live`.
+  The default five-second cold-Monaco assertion initially timed out; it passed
+  with the expanded local budget. This is a baseline smoke, not deployment of
+  this branch's new feature.
 - Full Playwright regression and live smoke results are being recorded in a
   follow-up validation commit. Earlier broad runs exposed the thumbnail stall
   and a wall-clock autosave assertion, which are addressed above.
