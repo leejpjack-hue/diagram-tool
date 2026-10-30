@@ -1,20 +1,22 @@
 import { Workspace } from '@cloudflare/computer';
-import { WorkerJavaScriptBackend } from '@cloudflare/computer/backends/worker-javascript';
 import { Think, skills } from '@cloudflare/think';
 import { loadSkillCatalog } from 'agents/skills';
 import { STARTER_SKILLS } from './generated-skill-seed';
+// Free-plan deploy: no Dynamic Workers / worker_loaders. Run the checked-in converter
+// via static import instead of WorkerJavaScriptBackend + LOADER.
+import typeToFlow from '../skills/type-to-flow/scripts/type-to-flow.js';
 
 const ROOT = '/workspace/.agents/skills';
 const SEEDED = 'dt-skills-seeded-v1';
 const MAX_INPUT_BYTES = 64 * 1024;
 
-type Env = Cloudflare.Env & { LOADER: WorkerLoader };
+type Env = Cloudflare.Env;
 
-/** A real DT Durable Agent: the Workspace files remain authoritative after first boot. */
+/** Durable skills host: Workspace files stay authoritative for catalog/activation. */
 export class DiagramSkillsAgent extends Think<Env> {
+  // File storage only — no JS Worker Loader backend (paid Dynamic Workers).
   override workspace = new Workspace({
     storage: this.ctx.storage,
-    backends: [new WorkerJavaScriptBackend({ id: 'js', loader: this.env.LOADER, access: 'read' })],
   });
 
   override getSkills() {
@@ -79,19 +81,19 @@ export class DiagramSkillsAgent extends Think<Env> {
         const catalog = await loadSkillCatalog(await this.getSkills());
         const activated = catalog.activate('type-to-flow');
         if (!activated.ok) return Response.json({ error: 'type-to-flow skill is unavailable.' }, { status: 503 });
-        // Invoke the live Workspace script, not an imported copy or an LLM.
-        const handle = await this.workspace.runtime.exec('export { default } from "./scripts/type-to-flow.js";', {
-          backend: 'js', cwd: `${ROOT}/type-to-flow`, input: { text: input.text, ...(typeof input.title === 'string' ? { title: input.title } : {}) }, encoding: 'utf8', timeoutMs: 10000,
-        });
-        const execution = await handle.result();
-        // Completed execution records can contain the submitted prose. Drop
-        // them after reading the result instead of keeping the SDK's default
-        // retention window. Interrupted runs are still governed by the SDK.
-        await this.workspace.runtime.disposeExec(handle.id, { backend: 'js' });
-        if (execution.exitCode !== 0 || execution.status !== 'completed' || !execution.value) {
-          return Response.json({ error: 'The type-to-flow skill could not run.' }, { status: 500 });
+        // Static import (free plan). Editable Workspace scripts remain for catalog/activation;
+        // live JS Worker Loader execution requires paid Dynamic Workers.
+        try {
+          const value = await typeToFlow({
+            text: input.text,
+            ...(typeof input.title === 'string' ? { title: input.title } : {}),
+          });
+          return Response.json(value);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'The type-to-flow skill could not run.';
+          const status = /enter at least one|must be a string/i.test(message) ? 400 : 500;
+          return Response.json({ error: message }, { status });
         }
-        return Response.json(execution.value);
       }
       return new Response('Not found', { status: 404 });
     } catch (error) {
