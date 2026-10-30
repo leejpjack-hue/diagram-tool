@@ -11,6 +11,8 @@ without redeploy, and a pinned JavaScript execution backend. The production
 adapter uses DT's existing flow nodes, decision nodes, terminators, edges, and
 native DSL persistence. **Type steps → Run type-to-flow** builds the board and
 shows the returned Mermaid and decision warnings.
+Native source preserves the converter's node order, keeping the end after the
+intermediate steps in DT's stack layout.
 The editor scrolls vertically so the Mermaid remains reachable beneath a long
 workflow preview; Playwright verifies this with ordinary wheel scrolling.
 
@@ -143,12 +145,17 @@ authenticated add-skill instructions and deployment routing requirements.
 - Converter fixture parity and decision branch proof: `PROOF_OK=1`.
 - Actual Worker catalog, activation, execution, authenticated file and script
   edits without redeploy, and persistence after a process restart: `PROOF_OK=1`.
+- Real local DT Worker `/app/` smoke with no injected API response: `PROOF_OK=1`;
+  catalog, activation, Workspace conversion, ordered seven-node graph, Mermaid
+  visible after wheel scrolling, and saved-board reload all passed. No LLM.
 - New Playwright skill fixture suite against this checkout's production preview:
   **4 passed** (2.1 minutes), including wheel-scrolling the Mermaid into view,
   with no LLM.
 - Unit suite: 675 passed and one five-second timeout in the existing presentation
   canvas file; the affected file subsequently passed **8/8** with
   `--testTimeout=60000`. The new adapter tests passed in the full unit run.
+- The order-sensitive adapter round-trip and validation tests were rerun after
+  preserving node order: **2 passed** (6.5 seconds).
 - Default Flow switching regression after removing background thumbnail capture:
   **1 passed** (39.5 seconds).
 - Deterministic before-autosave reload regression: **1 passed** (59.0 seconds).

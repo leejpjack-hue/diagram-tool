@@ -13,8 +13,8 @@ describe('type-to-flow adapter', () => {
     const adapted = adaptTypeToFlow(fixture);
     const graph = parseDiagram(adapted.source);
     expect(graph.title).toBe(fixture.flow.title);
-    expect(graph.nodes.map(node => [node.id, kind(node), node.type === 'flow' && node.properties.label]).sort()).toEqual(
-      fixture.flow.nodes.map(node => [node.id, node.kind, node.label]).sort(),
+    expect(graph.nodes.map(node => [node.id, kind(node), node.type === 'flow' && node.properties.label])).toEqual(
+      fixture.flow.nodes.map(node => [node.id, node.kind, node.label]),
     );
     expect(graph.edges.map(({ from, to, label }) => ({ from, to, ...(label ? { label } : {}) }))).toEqual(fixture.flow.edges);
   });

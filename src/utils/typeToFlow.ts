@@ -45,18 +45,16 @@ export function adaptTypeToFlow(value: unknown): { source: string; graph: Parsed
   // survive a reload and subsequent canvas edits without changing IDs or edges.
   const quoted = (text: string) => `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
   const lines = ['diagram: flow', `title: ${quoted(flow.title)}`, 'direction: TB', ''];
+  // Declare nodes in workflow order before edges. Declaring the end first
+  // would place it directly below the start in DT's default stack layout.
   for (const node of flow.nodes) {
     if (node.kind === 'start' || node.kind === 'end') lines.push(`${node.kind} ${node.id}`);
-  }
-  lines.push('');
-  for (const edge of flow.edges) lines.push(`${edge.from} ->${edge.label ? `|${quoted(edge.label)}|` : ''} ${edge.to}`);
-  lines.push('');
-  for (const node of flow.nodes) {
     lines.push(`node ${node.id} {`, `  label: ${quoted(node.label)}`);
     if (node.kind === 'step') lines.push('  type: process');
     if (node.kind === 'decision') lines.push('  type: decision');
     lines.push('}', '');
   }
+  for (const edge of flow.edges) lines.push(`${edge.from} ->${edge.label ? `|${quoted(edge.label)}|` : ''} ${edge.to}`);
   const source = lines.join('\n');
   return { source, graph: parseDiagram(source), result };
 }
