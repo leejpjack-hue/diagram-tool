@@ -1,7 +1,8 @@
+import { testTimeout } from './testTimeout';
 import { expect, test } from '@playwright/test';
 
 // DT-AI-16 smoke: Type steps → Build → success toast Walk through → Esc.
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: testTimeout(90_000) });
 
 test('Build success toast Walk through starts and exits the walkthrough', async ({ page }) => {
   await page.goto('/app/');
@@ -136,7 +137,7 @@ service Web { }`;
     });
   });
 
-  await page.goto('http://127.0.0.1:4173/app/?share=tok_flow_23');
+  await page.goto(new URL('/app/?share=tok_flow_23', process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173').toString());
   const banner = page.getByTestId('shared-readonly-banner');
   await expect(banner).toBeVisible();
   await expect(banner).toContainText('Shared AI Workflow');
@@ -166,7 +167,7 @@ service Web { }`;
   await expect(banner).toBeVisible();
 
   // Non-walk shared board hides Walk through button with no toast spam.
-  await page.goto('http://127.0.0.1:4173/app/?share=tok_arch_23');
+  await page.goto(new URL('/app/?share=tok_arch_23', process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173').toString());
   await expect(banner).toBeVisible();
   await expect(banner).toContainText('Shared Arch');
   await expect(banner.getByTestId('shared-save-local-copy')).toBeVisible();

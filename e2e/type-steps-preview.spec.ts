@@ -1,8 +1,9 @@
+import { testTimeout } from './testTimeout';
 import { expect, test } from '@playwright/test';
 
 // DT-AI-28: the Understood as list warns on a mistyped role, shows a parsed
 // role and note, and leaves Build working. The board stays put until Build.
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: testTimeout(90_000) });
 
 const STEPS = ['Humna: ask', 'Model: draft — reuse tickets'].join('\n');
 

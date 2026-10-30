@@ -1,9 +1,10 @@
+import { testTimeout } from './testTimeout';
 import { expect, test } from '@playwright/test';
 
 // DT-AI-25: "go back to" links an earlier step. Four typed lines stay four
 // nodes, the decision points back at "draft reply", and Walk through can
 // choose that loop target.
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: testTimeout(90_000) });
 
 const STEPS = [
   'Model: draft reply',

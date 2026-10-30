@@ -1,8 +1,9 @@
+import { testTimeout } from './testTimeout';
 import { expect, test } from '@playwright/test';
 
 // DT-AI-24: Data: steps become data shapes. No role chip. Copy as steps
 // round-trips the Data: prefix.
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: testTimeout(90_000) });
 
 const STEPS = [
   'Ask the customer',

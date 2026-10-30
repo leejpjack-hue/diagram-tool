@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,7 +38,7 @@ async function expectFidelity(page: Page) {
 }
 
 test.describe('Sequence Mermaid fidelity', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: testTimeout(60_000) });
 
   test('imports autonumber, activation, async and lost arrows, and keeps them after reload', async ({ page }) => {
     await page.goto('/app/');

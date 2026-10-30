@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -47,7 +48,7 @@ function bar(page: Page, name: string): Locator {
 }
 
 test.describe('Dashboard import of Mermaid gantt .mmd', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: testTimeout(60_000) });
 
   test('imports a gantt .mmd from the dashboard and opens Gantt mode with bars and a dependency', async ({ page }) => {
     await page.goto('/app/');

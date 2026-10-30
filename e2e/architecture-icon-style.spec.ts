@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
@@ -55,7 +56,7 @@ async function chooseStyle(page: Page, id: keyof typeof TREATMENT) {
 }
 
 test.describe('Architecture icon styles', () => {
-  test.describe.configure({ timeout: 120_000 });
+  test.describe.configure({ timeout: testTimeout(120_000) });
 
   test('picks each style on an architecture template, keeps it, and exports Blueprint', async ({ page }) => {
     await openArchitectureTemplate(page);

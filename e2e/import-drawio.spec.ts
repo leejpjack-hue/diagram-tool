@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,7 +16,7 @@ async function waitForEditor(page: Page) {
 }
 
 test.describe('draw.io dashboard import', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: testTimeout(60_000) });
 
   test('imports a 2-box draw.io file as an editable flow board', async ({ page }) => {
     await page.goto('/app/');

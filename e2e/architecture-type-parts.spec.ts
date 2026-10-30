@@ -1,7 +1,8 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 
 // DT-ARCH-01: Type parts turns plain lines into an architecture board.
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: testTimeout(90_000) });
 
 const LINES = [
   'User -> Chat app: asks',

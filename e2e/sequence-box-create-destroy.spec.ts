@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -78,7 +79,7 @@ function decodeDownload(saved: string): string {
 }
 
 test.describe('Sequence box groups, create, and destroy', () => {
-  test.describe.configure({ timeout: 120_000 });
+  test.describe.configure({ timeout: testTimeout(120_000) });
 
   test('imports a labelled box, create, and destroy, and keeps them after reload', async ({ page }) => {
     await page.goto('/app/');
@@ -133,7 +134,7 @@ test.describe('Sequence box groups, create, and destroy', () => {
 });
 
 test.describe('Shared sequence box, create, and destroy', () => {
-  test.describe.configure({ timeout: 120_000 });
+  test.describe.configure({ timeout: testTimeout(120_000) });
   test.use({ baseURL: process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173' });
 
   test('shared read-only view shows the box band, create header, and destroy marker', async ({ page }) => {

@@ -1,0 +1,4 @@
+{
+  "title": "type-to-flow self-describe",
+  "text": "Receive plain-text workflow from user\nParse steps into ordered lines\nIf a line is a decision?\nBranch yes to next step and no toward end\nEmit typed flow JSON\nRender Mermaid flowchart\nDone"
+}

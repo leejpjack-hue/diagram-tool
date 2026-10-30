@@ -1,8 +1,9 @@
+import { testTimeout } from './testTimeout';
 import { expect, test } from '@playwright/test';
 
 // DT-AI-26: "at the same time" draws a parallel gateway fork and join.
 // Two tool branches both land on the join before the next step.
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: testTimeout(90_000) });
 
 const STEPS = [
   'Model: plan',

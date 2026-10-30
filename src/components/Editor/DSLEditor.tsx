@@ -23,6 +23,7 @@ import { useToast } from '../../utils/useToast';
 import { ToastContainer } from '../Toast/ToastContainer';
 import type { BoardMode } from '../../utils/boardManager';
 import { IconStylePicker } from '../Canvas/IconStylePicker';
+import { adaptTypeToFlow } from '../../utils/typeToFlow';
 
 function asBoardMode(mode: string): BoardMode {
   return mode === 'flow' || mode === 'sequence' || mode === 'gantt' ? mode : 'architecture';
@@ -37,6 +38,8 @@ export function DSLEditor() {
   // DT-AI-01: thin "Type steps" box for plain sentences (Flow boards only).
   const [showSteps, setShowSteps] = useState(false);
   const [stepsText, setStepsText] = useState('');
+  const [skillBusy, setSkillBusy] = useState(false);
+  const [skillResult, setSkillResult] = useState<{ source: string; mermaid: string; warnings: string[] } | null>(null);
   // DT-AI-27: off until the user ticks it. The board remembers it by the
   // lane blocks in the DSL, so Load steps restores the tick. No new field.
   const [lanesByRole, setLanesByRole] = useState(false);
@@ -181,6 +184,52 @@ else Flag for review`;
       toast.error(err instanceof Error ? err.message : 'Could not read those steps. Type one step per line.');
     }
   }, [stepsText, lanesByRole, toast, applySource, diagramMode, enterWalkThrough]);
+
+  // This explicitly sends the workflow to the DT skills host. The existing
+  // Build board action remains local; a failed/stale run never changes a board.
+  const runTypeToFlow = useCallback(async () => {
+    const text = stepsText.trim();
+    if (!text) {
+      toast.error('Type one workflow step per line first.');
+      return;
+    }
+    const before = useDiagramStore.getState();
+    const sourceAtStart = before.dslText;
+    const title = before.parsedDiagram?.title || 'Untitled workflow';
+    setSkillBusy(true);
+    try {
+      const response = await fetch('/api/skills/type-to-flow/run', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text, title }),
+      });
+      let data: unknown;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error('The skills host is unavailable.');
+      }
+      if (!response.ok) {
+        const message = data && typeof data === 'object' && 'error' in data && typeof data.error === 'string' ? data.error : 'The skill could not run.';
+        throw new Error(message);
+      }
+      const current = useDiagramStore.getState();
+      if (current.dslText !== sourceAtStart || current.diagramMode !== 'flow' || current.isReadOnlyShared || stepsInputRef.current?.value.trim() !== text) {
+        throw new Error('The board or steps changed while the skill was running. Run it again.');
+      }
+      const { source, graph, result } = adaptTypeToFlow(data);
+      setDslText(source);
+      setParsedDiagram(graph);
+      setError(null);
+      setSourceWarning(null);
+      setSkillResult({ source, mermaid: result.mermaid, warnings: result.warnings });
+      toast.success(`Built ${graph.nodes.length} workflow nodes with type-to-flow.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'The skill could not run.');
+    } finally {
+      setSkillBusy(false);
+    }
+  }, [stepsText, toast, setDslText, setParsedDiagram, setError, setSourceWarning]);
 
   // Undo/redo replaces dslText without going through Monaco. Re-parse so the
   // canvas follows the restored source. Flow keeps its own applySource path.
@@ -474,7 +523,7 @@ Go live — milestone after Review`;
   };
 
   return (
-    <div className="editor-panel" style={{ height: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="editor-panel" style={{ height: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden' }}>
       <div className="editor-header">
         <div className="editor-title">Editor</div>
         <div className="editor-subtitle">Describe your diagram in plain text</div>
@@ -643,6 +692,18 @@ Go live — milestone after Review`;
             rows={4}
             className="w-full rounded border border-indigo-200 bg-white p-2 font-mono text-xs text-slate-800 focus:border-indigo-400 focus:outline-none"
           />
+          <div className="mt-2">
+            <button
+              type="button"
+              data-testid="run-type-to-flow"
+              disabled={skillBusy || isReadOnlyShared}
+              onClick={() => void runTypeToFlow()}
+              className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400 disabled:opacity-50"
+            >
+              {skillBusy ? 'Running type-to-flow…' : 'Run type-to-flow'}
+            </button>
+            <p className="mt-1 text-[11px] text-slate-500">Run type-to-flow sends these steps to the DiagramTool skills host.</p>
+          </div>
           {/* DT-AI-28: live reading of the same converter Build uses. Read-only. */}
           <TypeStepsPreview text={stepsText} onFocusLine={focusStepsLine} />
           {/* DT-AI-08: role prefix inserts (#37) — plain buttons, tab-reachable, no shortcuts. */}
@@ -687,8 +748,17 @@ Go live — milestone after Review`;
             >
               Copy AI prompt
             </button>
-            <span className="text-[11px] text-slate-500">Parsed locally — nothing leaves this device.</span>
+            <span className="text-[11px] text-slate-500">Build board runs locally.</span>
           </div>
+          {skillResult && skillResult.source === dslText && (
+            <div className="mt-2" data-testid="skill-mermaid-pane">
+              {skillResult.warnings.map((warning, index) => <p key={index} className="text-[11px] text-amber-800">{warning}</p>)}
+              <details open>
+                <summary className="cursor-pointer text-[11px] font-semibold text-slate-700">Mermaid</summary>
+                <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-[11px] text-slate-700">{skillResult.mermaid}</pre>
+              </details>
+            </div>
+          )}
         </div>
       )}
 

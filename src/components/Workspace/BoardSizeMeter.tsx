@@ -52,7 +52,7 @@ export function BoardSizeMeter({ snapshot }: { snapshot: BoardSizeSnapshot }) {
       data-testid="board-size-meter"
       data-state={snapshot.state}
       data-object-count={snapshot.objectCount}
-      title="Local board size. Nothing is sent anywhere."
+      title="Board size is calculated on this device."
       className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold tracking-normal normal-case ${CHIP_TONE[snapshot.state]}`}
     >
       {snapshot.statusLine}

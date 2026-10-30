@@ -1,0 +1,76 @@
+{
+  "flow": {
+    "title": "type-to-flow self-describe",
+    "nodes": [
+      {
+        "id": "n1",
+        "kind": "start",
+        "label": "Receive plain-text workflow from user"
+      },
+      {
+        "id": "n2",
+        "kind": "step",
+        "label": "Parse steps into ordered lines"
+      },
+      {
+        "id": "n3",
+        "kind": "decision",
+        "label": "If a line is a decision?"
+      },
+      {
+        "id": "n4",
+        "kind": "step",
+        "label": "Branch yes to next step and no toward end"
+      },
+      {
+        "id": "n5",
+        "kind": "step",
+        "label": "Emit typed flow JSON"
+      },
+      {
+        "id": "n6",
+        "kind": "step",
+        "label": "Render Mermaid flowchart"
+      },
+      {
+        "id": "n7",
+        "kind": "end",
+        "label": "Done"
+      }
+    ],
+    "edges": [
+      {
+        "from": "n1",
+        "to": "n2"
+      },
+      {
+        "from": "n2",
+        "to": "n3"
+      },
+      {
+        "from": "n3",
+        "to": "n4",
+        "label": "yes"
+      },
+      {
+        "from": "n3",
+        "to": "n7",
+        "label": "no"
+      },
+      {
+        "from": "n4",
+        "to": "n5"
+      },
+      {
+        "from": "n5",
+        "to": "n6"
+      },
+      {
+        "from": "n6",
+        "to": "n7"
+      }
+    ]
+  },
+  "mermaid": "flowchart TD\n  n1([Receive plain-text workflow from user])\n  n2[Parse steps into ordered lines]\n  n3{If a line is a decision?}\n  n4[Branch yes to next step and no toward end]\n  n5[Emit typed flow JSON]\n  n6[Render Mermaid flowchart]\n  n7([Done])\n  n1 --> n2\n  n2 --> n3\n  n3 -->|yes| n4\n  n3 -->|no| n7\n  n4 --> n5\n  n5 --> n6\n  n6 --> n7",
+  "warnings": []
+}

@@ -1,7 +1,8 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 
 // DT-SEQ-02: Type messages turns plain lines into a sequence diagram.
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: testTimeout(90_000) });
 
 const LINES = [
   'User asks Agent: plan my trip',

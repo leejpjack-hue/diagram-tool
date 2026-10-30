@@ -1,9 +1,10 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // DT-GANTT-02: Type tasks turns one line per task into a Gantt chart.
 // The five example lines are a group, three task bars, and one milestone.
 // The group summary is the fourth bar.
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: testTimeout(90_000) });
 
 const LINES = [
   'Phase: Build',

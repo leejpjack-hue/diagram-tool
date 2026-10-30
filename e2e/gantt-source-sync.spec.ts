@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 
 const GANTT_DSL = `diagram: gantt
@@ -82,7 +83,7 @@ async function createGanttBoard(page: Page) {
 }
 
 test.describe('Gantt bidirectional source sync', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: testTimeout(60_000) });
 
   test('drag a task on the canvas → source dates change', async ({ page }) => {
     await createGanttBoard(page);

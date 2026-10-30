@@ -1,9 +1,10 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: testTimeout(90_000) });
 
 const HORIZONTAL = `diagram: flow
 title: Short Horizontal

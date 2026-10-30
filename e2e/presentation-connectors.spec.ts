@@ -1,3 +1,4 @@
+import { testTimeout } from './testTimeout';
 import { expect, test, type Page } from '@playwright/test';
 
 const ARCH_DSL = `diagram: architecture
@@ -32,7 +33,7 @@ async function drawShape(page: Page, x1: number, y1: number, x2: number, y2: num
 }
 
 test.describe('Deck connector attachments', () => {
-  test.describe.configure({ timeout: 60_000 });
+  test.describe.configure({ timeout: testTimeout(60_000) });
 
   test('snaps a connector to two shapes, reflows on drag, and keeps bindings after reload', async ({ page }) => {
     await openDeck(page);
