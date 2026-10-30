@@ -76,23 +76,21 @@ try {
   await putFile('proof-added/SKILL.md', '---\nname: proof-added\ndescription: Test dynamic workspace discovery.\n---\n\nUpdated body.\n');
   assert.match((await request('/api/skills/proof-added/activate', { method: 'POST' })).content, /Updated body/);
 
-  // Prove that execution reads the editable Workspace script, rather than
-  // continuing to call the bundled seed or a separately imported converter.
-  const converter = await readFile(join(root, 'skills/type-to-flow/scripts/type-to-flow.js'), 'utf8');
-  await putFile('type-to-flow/scripts/type-to-flow.js', converter.replace("const warnings = [];", "const warnings = ['Workspace edit is active.'];"));
-  const edited = await request('/api/skills/type-to-flow/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
-  assert.deepEqual(edited.flow, expected.flow);
-  assert.ok(edited.warnings.includes('Workspace edit is active.'));
+  // Free-plan path: run uses the statically imported converter (no Dynamic
+  // Workers / LOADER). Script file edits still persist for catalog/activation.
+  await putFile('type-to-flow/scripts/type-to-flow.js', '// edited converter retained in durable Workspace\n');
   assert.equal((await fetch(`${origin}/api/skills/missing/activate`, { method: 'POST' })).status, 404);
   assert.equal((await fetch(`${origin}/api/skills/type-to-flow/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: '' }) })).status, 400);
+  const afterEdit = await request('/api/skills/type-to-flow/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
+  assert.deepEqual(afterEdit.flow, expected.flow);
 
-  // A cold process with the same durable storage must keep operator edits.
+  // A cold process with the same durable storage must keep operator SKILL edits.
   await stopServer();
   await startServer();
   assert.match((await request('/api/skills/proof-added/activate', { method: 'POST' })).content, /Updated body/);
   const restored = await request('/api/skills/type-to-flow/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
-  assert.deepEqual(restored, edited);
-  console.log(`PROOF_OK=1 Workspace catalog, activation, exec (${result.flow.nodes.length} nodes / ${result.flow.edges.length} edges), authenticated add/edit and script execution without redeploy, durable edits survive restart`);
+  assert.deepEqual(restored.flow, expected.flow);
+  console.log(`PROOF_OK=1 Workspace catalog, activation, static type-to-flow exec (${result.flow.nodes.length} nodes / ${result.flow.edges.length} edges), authenticated add/edit, durable SKILL edits survive restart (no Dynamic Workers)`);
 } catch (error) {
   console.error(output.slice(-6000));
   throw error;

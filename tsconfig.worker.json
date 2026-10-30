@@ -1,13 +1,21 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "types": ["@cloudflare/workers-types"],
+    "types": [
+      "@cloudflare/workers-types"
+    ],
     "skipLibCheck": true,
     "strict": true,
-    "noEmit": true
+    "noEmit": true,
+    "allowJs": true
   },
-  "include": ["worker/**/*.ts"]
+  "include": [
+    "worker/**/*.ts",
+    "skills/type-to-flow/scripts/type-to-flow.js"
+  ]
 }

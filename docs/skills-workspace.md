@@ -4,7 +4,7 @@ The production Worker (`worker/index.ts`) routes the skills API to the `DiagramS
 
 The skill and its deterministic converter descend from the `02-cf-skills` spike (`PROOF.md`, `type-to-flow-skill/`, and `sample/input.json`); the spike Worker was not promoted. DT pins Agents 0.32.0, Think 0.23.0 and Computer 0.8.0 because these APIs are experimental. See Cloudflare's [skills-as-files release](https://developers.cloudflare.com/changelog/post/2026-10-29-agent-skills-from-files/) for the Workspace and next-turn discovery contract.
 
-`GET /api/skills` lists the Workspace catalog; `POST /api/skills/<name>/activate` loads the skill body and resource list through the SDK's catalog activation. `POST /api/skills/type-to-flow/run` activates that skill and executes `scripts/type-to-flow.js` from its Workspace location using the JavaScript backend. It takes `{ "text": "one step per line", "title": "optional" }`; it returns `{ flow, mermaid, warnings }`. No model or API key is needed for this converter. Decision branches are inferred; review the warnings. In a Flow board, open **Type steps**, enter the workflow, and choose **Run type-to-flow**. This sends the steps to the DT host; do not include secrets. Completed execution records are discarded after the result is read; interrupted runs follow the SDK's retention behavior. The existing **Build board** button remains local. The graph is saved as the board's ordinary native DSL, and the returned Mermaid is shown in the Type steps panel for the result.
+`GET /api/skills` lists the Workspace catalog; `POST /api/skills/<name>/activate` loads the skill body and resource list through the SDK's catalog activation. `POST /api/skills/type-to-flow/run` activates that skill and runs the statically imported `skills/type-to-flow/scripts/type-to-flow.js` converter (free-plan deploy; no Dynamic Workers / `worker_loaders`). It takes `{ "text": "one step per line", "title": "optional" }`; it returns `{ flow, mermaid, warnings }`. No model or API key is needed for this converter. Decision branches are inferred; review the warnings. In a Flow board, open **Type steps**, enter the workflow, and choose **Run type-to-flow**. This sends the steps to the DT host; do not include secrets. Completed execution records are discarded after the result is read; interrupted runs follow the SDK's retention behavior. The existing **Build board** button remains local. The graph is saved as the board's ordinary native DSL, and the returned Mermaid is shown in the Type steps panel for the result.
 
 ## Add or edit a skill without a Worker redeploy
 
@@ -31,13 +31,13 @@ npm ci
 npm run prove:converter
 npm run build
 npm test -- --project=unit --maxWorkers=1
-npm run prove:skills  # isolated local Worker: catalog, activation, live file/script edits, restart persistence
+npm run prove:skills  # isolated local Worker: catalog, activation, static converter, durable SKILL edits
 npm run test:e2e      # includes fixture-injected browser test, no LLM
 ```
 
 To open the real host locally, run `npm run dev:worker` and visit the `/app/` URL printed by Wrangler. It serves the built app and the skills API together. A Vite-only development server has no skills API.
 
-The e2e fixture injects the spike's expected skill response at the HTTP boundary; `prove:skills` separately exercises the real durable Workspace and JavaScript backend. `npm run test:e2e:preview` runs the skill fixture cases and `/app` smoke against an already-running build; set `PW_BASE_URL` to that build's origin. If port 4173 belongs to another checkout, run the full suite with `PW_PREVIEW_PORT=4183 PW_BASE_URL=http://127.0.0.1:4183 npm run test:e2e -- --workers=1`.
+The e2e fixture injects the spike's expected skill response at the HTTP boundary; `prove:skills` separately exercises the real durable Workspace and the statically imported converter. `npm run test:e2e:preview` runs the skill fixture cases and `/app` smoke against an already-running build; set `PW_BASE_URL` to that build's origin. If port 4173 belongs to another checkout, run the full suite with `PW_PREVIEW_PORT=4183 PW_BASE_URL=http://127.0.0.1:4183 npm run test:e2e -- --workers=1`.
 
 On a slow local host, set `PW_TIMEOUT_SCALE=3` to give the same browser assertions and test workflows more time. The default scale is 1, including CI. `PW_NO_EXTERNAL_FONTS=1` blocks optional external font hosts, and `PW_NO_VIDEO=1` reduces capture overhead.
 
