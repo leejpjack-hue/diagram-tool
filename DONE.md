@@ -11,6 +11,8 @@ without redeploy, and a pinned JavaScript execution backend. The production
 adapter uses DT's existing flow nodes, decision nodes, terminators, edges, and
 native DSL persistence. **Type steps → Run type-to-flow** builds the board and
 shows the returned Mermaid and decision warnings.
+The editor scrolls vertically so the Mermaid remains reachable beneath a long
+workflow preview; Playwright verifies this with ordinary wheel scrolling.
 
 Regression support removes automatic DOM thumbnail cloning during editing;
 thumbnails are still captured on explicit save and returning to Boards. Profiling
@@ -83,6 +85,7 @@ src/App.tsx
 src/components/Editor/DSLEditor.tsx
 src/components/Workspace/BoardSizeMeter.tsx
 src/parser/lexer.ts
+src/styles/professional.css
 src/utils/typeToFlow.test.ts
 src/utils/typeToFlow.ts
 tsconfig.node.json
@@ -141,7 +144,8 @@ authenticated add-skill instructions and deployment routing requirements.
 - Actual Worker catalog, activation, execution, authenticated file and script
   edits without redeploy, and persistence after a process restart: `PROOF_OK=1`.
 - New Playwright skill fixture suite against this checkout's production preview:
-  **4 passed** (50.5 seconds), no LLM.
+  **4 passed** (2.1 minutes), including wheel-scrolling the Mermaid into view,
+  with no LLM.
 - Unit suite: 675 passed and one five-second timeout in the existing presentation
   canvas file; the affected file subsequently passed **8/8** with
   `--testTimeout=60000`. The new adapter tests passed in the full unit run.

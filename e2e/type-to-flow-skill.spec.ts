@@ -40,6 +40,10 @@ test('workflow skill response produces the spike graph and shows Mermaid', async
   await expect(page.locator('.react-flow__edge')).toHaveCount(7);
   await expect(page.locator('.react-flow__node-decision')).toContainText('If a line is a decision?');
   await expect(page.getByTestId('skill-mermaid-pane')).toContainText(output.mermaid);
+  // A long preview must leave the Mermaid reachable by normal wheel scrolling.
+  await page.locator('.editor-panel').hover({ position: { x: 5, y: 150 } });
+  await page.mouse.wheel(0, 2000);
+  await expect(page.getByTestId('skill-mermaid-pane')).toBeInViewport({ ratio: 0.9 });
   expect(calls).toBe(1);
 
   // Reopening the saved board proves that the graph survives the normal DSL
