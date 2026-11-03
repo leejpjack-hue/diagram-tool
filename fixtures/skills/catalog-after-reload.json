@@ -1,0 +1,14 @@
+{
+  "skills": [
+    {
+      "name": "type-to-flow",
+      "description": "Convert a plain-text workflow into a typed flow and Mermaid flowchart for DiagramTool. Use for process steps, workflow outlines, and flowcharts from prose.",
+      "location": "/workspace/.agents/skills/type-to-flow"
+    },
+    {
+      "name": "review-notes",
+      "description": "Summarise a board in plain language.",
+      "location": "/workspace/.agents/skills/review-notes"
+    }
+  ]
+}
