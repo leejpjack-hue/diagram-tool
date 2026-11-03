@@ -24,6 +24,8 @@ import { ToastContainer } from '../Toast/ToastContainer';
 import type { BoardMode } from '../../utils/boardManager';
 import { IconStylePicker } from '../Canvas/IconStylePicker';
 import { adaptTypeToFlow } from '../../utils/typeToFlow';
+import { activateSkill, runTypeToFlow, type SkillCatalogEntry } from '../../utils/skillsHost';
+import { SkillCatalog } from './SkillCatalog';
 
 function asBoardMode(mode: string): BoardMode {
   return mode === 'flow' || mode === 'sequence' || mode === 'gantt' ? mode : 'architecture';
@@ -40,6 +42,8 @@ export function DSLEditor() {
   const [stepsText, setStepsText] = useState('');
   const [skillBusy, setSkillBusy] = useState(false);
   const [skillResult, setSkillResult] = useState<{ source: string; mermaid: string; warnings: string[] } | null>(null);
+  // One in-flight host skill at a time. Writes happen only after a run validates.
+  const skillLock = useRef(false);
   // DT-AI-27: off until the user ticks it. The board remembers it by the
   // lane blocks in the DSL, so Load steps restores the tick. No new field.
   const [lanesByRole, setLanesByRole] = useState(false);
@@ -185,51 +189,79 @@ else Flag for review`;
     }
   }, [stepsText, lanesByRole, toast, applySource, diagramMode, enterWalkThrough]);
 
+  // Map a type-to-flow result onto the board only after it validates and the
+  // board still matches the snapshot taken before the run. Failures throw
+  // before any store write.
+  const applyTypeToFlowRun = useCallback(async (text: string) => {
+    const before = useDiagramStore.getState();
+    const sourceAtStart = before.dslText;
+    const title = before.parsedDiagram?.title || 'Untitled workflow';
+    const data = await runTypeToFlow({ text, title });
+    const adapted = adaptTypeToFlow(data);
+    const current = useDiagramStore.getState();
+    const typedNow = stepsInputRef.current?.value.trim() ?? text;
+    if (current.dslText !== sourceAtStart || current.diagramMode !== 'flow' || current.isReadOnlyShared || typedNow !== text) {
+      throw new Error('The board or steps changed while the skill was running. Run it again.');
+    }
+    setDslText(adapted.source);
+    setParsedDiagram(adapted.graph);
+    setError(null);
+    setSourceWarning(null);
+    setSkillResult({ source: adapted.source, mermaid: adapted.result.mermaid, warnings: adapted.result.warnings });
+    return adapted.graph.nodes.length;
+  }, [setDslText, setParsedDiagram, setError, setSourceWarning]);
+
   // This explicitly sends the workflow to the DT skills host. The existing
   // Build board action remains local; a failed/stale run never changes a board.
-  const runTypeToFlow = useCallback(async () => {
+  const runTypeToFlowSkill = useCallback(async () => {
     const text = stepsText.trim();
     if (!text) {
       toast.error('Type one workflow step per line first.');
       return;
     }
-    const before = useDiagramStore.getState();
-    const sourceAtStart = before.dslText;
-    const title = before.parsedDiagram?.title || 'Untitled workflow';
+    if (skillLock.current) return;
+    skillLock.current = true;
     setSkillBusy(true);
     try {
-      const response = await fetch('/api/skills/type-to-flow/run', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text, title }),
-      });
-      let data: unknown;
-      try {
-        data = await response.json();
-      } catch {
-        throw new Error('The skills host is unavailable.');
-      }
-      if (!response.ok) {
-        const message = data && typeof data === 'object' && 'error' in data && typeof data.error === 'string' ? data.error : 'The skill could not run.';
-        throw new Error(message);
-      }
-      const current = useDiagramStore.getState();
-      if (current.dslText !== sourceAtStart || current.diagramMode !== 'flow' || current.isReadOnlyShared || stepsInputRef.current?.value.trim() !== text) {
-        throw new Error('The board or steps changed while the skill was running. Run it again.');
-      }
-      const { source, graph, result } = adaptTypeToFlow(data);
-      setDslText(source);
-      setParsedDiagram(graph);
-      setError(null);
-      setSourceWarning(null);
-      setSkillResult({ source, mermaid: result.mermaid, warnings: result.warnings });
-      toast.success(`Built ${graph.nodes.length} workflow nodes with type-to-flow.`);
+      const count = await applyTypeToFlowRun(text);
+      toast.success(`Built ${count} workflow nodes with type-to-flow.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'The skill could not run.');
     } finally {
+      skillLock.current = false;
       setSkillBusy(false);
     }
-  }, [stepsText, toast, setDslText, setParsedDiagram, setError, setSourceWarning]);
+  }, [stepsText, toast, applyTypeToFlowRun]);
+
+  // Catalog Activate calls the host activate path first. type-to-flow then maps.
+  // Any failure leaves the store untouched (applyTypeToFlowRun writes last).
+  const activateFromCatalog = useCallback(async (skill: SkillCatalogEntry) => {
+    if (skillLock.current) throw new Error('A skill is already activating.');
+    skillLock.current = true;
+    setSkillBusy(true);
+    try {
+      await activateSkill(skill.name);
+      if (skill.name !== 'type-to-flow') return;
+      const state = useDiagramStore.getState();
+      if (state.diagramMode !== 'flow') {
+        throw new Error('type-to-flow maps onto a Flow board. Open a workflow board and type steps first. The board was not changed.');
+      }
+      if (state.isReadOnlyShared) {
+        throw new Error('This shared board is read-only. The board was not changed.');
+      }
+      const text = (stepsInputRef.current?.value ?? stepsText).trim();
+      if (!text) {
+        setShowSteps(true);
+        throw new Error('Type one workflow step per line in Type steps, then activate type-to-flow again. The board was not changed.');
+      }
+      setShowSteps(true);
+      const count = await applyTypeToFlowRun(text);
+      toast.success(`Built ${count} workflow nodes with type-to-flow.`);
+    } finally {
+      skillLock.current = false;
+      setSkillBusy(false);
+    }
+  }, [stepsText, toast, applyTypeToFlowRun]);
 
   // Undo/redo replaces dslText without going through Monaco. Re-parse so the
   // canvas follows the restored source. Flow keeps its own applySource path.
@@ -675,6 +707,8 @@ Go live — milestone after Review`;
         )}
       </div>
 
+      <SkillCatalog disabled={skillBusy} onActivate={activateFromCatalog} />
+
       {diagramMode === 'flow' && showSteps && (
         <div
           data-testid="type-steps-box"
@@ -697,7 +731,7 @@ Go live — milestone after Review`;
               type="button"
               data-testid="run-type-to-flow"
               disabled={skillBusy || isReadOnlyShared}
-              onClick={() => void runTypeToFlow()}
+              onClick={() => void runTypeToFlowSkill()}
               className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400 disabled:opacity-50"
             >
               {skillBusy ? 'Running type-to-flow…' : 'Run type-to-flow'}
