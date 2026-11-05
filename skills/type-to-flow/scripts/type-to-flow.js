@@ -23,6 +23,7 @@ export default async function typeToFlow(input = {}) {
   const nodes = entries.map((node, index) => ({ id: `n${index + 1}`, ...node }));
   const edges = [];
   const warnings = [];
+  const ambiguities = [];
   for (let i = 0; i < nodes.length - 1; i++) {
     const node = nodes[i];
     const next = nodes[i + 1];
@@ -31,6 +32,13 @@ export default async function typeToFlow(input = {}) {
       edges.push({ from: node.id, to: next.id, label: 'yes' });
       edges.push({ from: node.id, to: end.id, label: 'no' });
       warnings.push(`Review inferred yes/no paths for decision ${node.id}${end.id === next.id ? ' (both lead to the same step)' : ''}.`);
+      // One named sentence per spike rule: questions and if/when/whether lines
+      // are decisions, and yes/no targets are assumed rather than stated.
+      const same = end.id === next.id ? ', and both assumed paths lead to the same step' : '';
+      ambiguities.push({
+        id: node.id,
+        sentence: `${node.id} (${node.label}) is ambiguous under the spike rule: a question or a line starting with if, when, or whether is a decision, yes is assumed to continue to ${next.label}, and no is assumed to go to ${end.label}${same}, which the text did not state.`,
+      });
     } else if (node.kind !== 'end') {
       edges.push({ from: node.id, to: next.id });
     }
@@ -47,5 +55,5 @@ export default async function typeToFlow(input = {}) {
   for (const edge of edges) {
     mermaid.push(`  ${edge.from} -->${edge.label ? `|${quote(edge.label)}|` : ''} ${edge.to}`);
   }
-  return { flow: { title, nodes, edges }, mermaid: mermaid.join('\n'), warnings };
+  return { flow: { title, nodes, edges }, mermaid: mermaid.join('\n'), warnings, ambiguities };
 }

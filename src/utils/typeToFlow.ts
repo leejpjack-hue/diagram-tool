@@ -7,10 +7,18 @@ export interface SkillFlow {
   nodes: { id: string; kind: SkillNodeKind; label: string }[];
   edges: { from: string; to: string; label?: string }[];
 }
+/** One named sentence for a decision whose yes/no edges were assumed. */
+export interface FlowAmbiguity {
+  id: string;
+  sentence: string;
+}
+
 export interface TypeToFlowResult {
   flow: SkillFlow;
   mermaid: string;
   warnings: string[];
+  /** Present when the skill marked inferred decision branches. Empty or omitted means nothing to confirm. */
+  ambiguities?: FlowAmbiguity[];
 }
 
 /** Validate untrusted skill results before changing the local board. */
@@ -39,6 +47,20 @@ export function adaptTypeToFlow(value: unknown): { source: string; graph: Parsed
       throw new Error('Each decision needs at least two labeled outgoing edges.');
     }
   }
+  if ('ambiguities' in (value as object) && (value as { ambiguities?: unknown }).ambiguities !== undefined) {
+    const ambiguities = (value as { ambiguities?: unknown }).ambiguities;
+    if (!Array.isArray(ambiguities)) throw new Error('The skill returned an invalid ambiguity list.');
+    const seen = new Set<string>();
+    for (const item of ambiguities) {
+      if (!item || typeof item !== 'object') throw new Error('The skill returned an invalid ambiguity list.');
+      const { id, sentence } = item as { id?: unknown; sentence?: unknown };
+      const decision = typeof id === 'string' ? flow.nodes.find(node => node.id === id) : undefined;
+      if (!decision || decision.kind !== 'decision' || seen.has(decision.id) || typeof sentence !== 'string' || !sentence.trim() || /[\r\n]/.test(sentence)) {
+        throw new Error('The skill returned an invalid ambiguity list.');
+      }
+      seen.add(decision.id);
+    }
+  }
   if (/[\r\n]/.test(flow.title)) throw new Error('The skill returned an invalid title.');
 
   // Native DSL is the board's durable source of truth. Escape quotes so labels
@@ -57,4 +79,29 @@ export function adaptTypeToFlow(value: unknown): { source: string; graph: Parsed
   for (const edge of flow.edges) lines.push(`${edge.from} ->${edge.label ? `|${quoted(edge.label)}|` : ''} ${edge.to}`);
   const source = lines.join('\n');
   return { source, graph: parseDiagram(source), result };
+}
+
+/** Point an inferred no-edge at another node. Does not write a board. */
+export function retargetAmbiguousNoEdge(result: TypeToFlowResult, ambiguityId: string, toId: string): TypeToFlowResult {
+  const named = result.ambiguities?.some(item => item.id === ambiguityId);
+  const decision = result.flow.nodes.find(node => node.id === ambiguityId && node.kind === 'decision');
+  const target = result.flow.nodes.find(node => node.id === toId);
+  if (!named || !decision || !target || toId === ambiguityId) {
+    throw new Error('Choose another step for this decision.');
+  }
+  let previous = '';
+  let found = false;
+  const edges = result.flow.edges.map(edge => {
+    if (!found && edge.from === ambiguityId && edge.label?.trim().toLowerCase() === 'no') {
+      found = true;
+      previous = edge.to;
+      return { ...edge, to: toId };
+    }
+    return edge;
+  });
+  if (!found) throw new Error('Choose another step for this decision.');
+  const needle = `${ambiguityId} -->|"no"| ${previous}`;
+  const replacement = `${ambiguityId} -->|"no"| ${toId}`;
+  const mermaid = result.mermaid.includes(needle) ? result.mermaid.replace(needle, replacement) : result.mermaid;
+  return { ...result, flow: { ...result.flow, edges }, mermaid };
 }

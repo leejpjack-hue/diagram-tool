@@ -23,9 +23,16 @@ import { useToast } from '../../utils/useToast';
 import { ToastContainer } from '../Toast/ToastContainer';
 import type { BoardMode } from '../../utils/boardManager';
 import { IconStylePicker } from '../Canvas/IconStylePicker';
-import { adaptTypeToFlow } from '../../utils/typeToFlow';
+import { adaptTypeToFlow, retargetAmbiguousNoEdge, type TypeToFlowResult } from '../../utils/typeToFlow';
 import { activateSkill, runTypeToFlow, type SkillCatalogEntry } from '../../utils/skillsHost';
-import { SkillCatalog } from './SkillCatalog';
+import { SkillCatalog, type SkillActivationResult } from './SkillCatalog';
+import { AmbiguityConfirm } from './AmbiguityConfirm';
+
+type PendingAmbiguity = {
+  text: string;
+  sourceAtStart: string;
+  result: TypeToFlowResult;
+};
 
 function asBoardMode(mode: string): BoardMode {
   return mode === 'flow' || mode === 'sequence' || mode === 'gantt' ? mode : 'architecture';
@@ -42,6 +49,8 @@ export function DSLEditor() {
   const [stepsText, setStepsText] = useState('');
   const [skillBusy, setSkillBusy] = useState(false);
   const [skillResult, setSkillResult] = useState<{ source: string; mermaid: string; warnings: string[] } | null>(null);
+  // Held off the board until confirm or an edited no-branch is confirmed.
+  const [pendingAmbiguity, setPendingAmbiguity] = useState<PendingAmbiguity | null>(null);
   // One in-flight host skill at a time. Writes happen only after a run validates.
   const skillLock = useRef(false);
   // DT-AI-27: off until the user ticks it. The board remembers it by the
@@ -189,27 +198,79 @@ else Flag for review`;
     }
   }, [stepsText, lanesByRole, toast, applySource, diagramMode, enterWalkThrough]);
 
-  // Map a type-to-flow result onto the board only after it validates and the
-  // board still matches the snapshot taken before the run. Failures throw
-  // before any store write.
-  const applyTypeToFlowRun = useCallback(async (text: string) => {
-    const before = useDiagramStore.getState();
-    const sourceAtStart = before.dslText;
-    const title = before.parsedDiagram?.title || 'Untitled workflow';
-    const data = await runTypeToFlow({ text, title });
-    const adapted = adaptTypeToFlow(data);
-    const current = useDiagramStore.getState();
-    const typedNow = stepsInputRef.current?.value.trim() ?? text;
-    if (current.dslText !== sourceAtStart || current.diagramMode !== 'flow' || current.isReadOnlyShared || typedNow !== text) {
-      throw new Error('The board or steps changed while the skill was running. Run it again.');
-    }
+  // Write a validated type-to-flow graph in one step. Callers adapt first so a
+  // bad result never reaches the store.
+  const commitTypeToFlow = useCallback((adapted: ReturnType<typeof adaptTypeToFlow>) => {
     setDslText(adapted.source);
     setParsedDiagram(adapted.graph);
     setError(null);
     setSourceWarning(null);
     setSkillResult({ source: adapted.source, mermaid: adapted.result.mermaid, warnings: adapted.result.warnings });
+    setPendingAmbiguity(null);
     return adapted.graph.nodes.length;
   }, [setDslText, setParsedDiagram, setError, setSourceWarning]);
+
+  const proposalStillMatches = useCallback((text: string, sourceAtStart: string) => {
+    const current = useDiagramStore.getState();
+    const typedNow = stepsInputRef.current?.value.trim() ?? text;
+    return current.dslText === sourceAtStart && current.diagramMode === 'flow' && !current.isReadOnlyShared && typedNow === text;
+  }, []);
+
+  // Map a type-to-flow result onto the board only after it validates and the
+  // board still matches the snapshot taken before the run. A named ambiguity
+  // list is held here; confirm commits it, cancel drops it. Failures throw
+  // before any store write.
+  const applyTypeToFlowRun = useCallback(async (text: string): Promise<SkillActivationResult & { count?: number }> => {
+    const before = useDiagramStore.getState();
+    const sourceAtStart = before.dslText;
+    const title = before.parsedDiagram?.title || 'Untitled workflow';
+    const data = await runTypeToFlow({ text, title });
+    const adapted = adaptTypeToFlow(data);
+    if (!proposalStillMatches(text, sourceAtStart)) {
+      throw new Error('The board or steps changed while the skill was running. Run it again.');
+    }
+    if ((adapted.result.ambiguities?.length ?? 0) > 0) {
+      setShowSteps(true);
+      setPendingAmbiguity({ text, sourceAtStart, result: adapted.result });
+      return { committed: false };
+    }
+    const count = commitTypeToFlow(adapted);
+    return { committed: true, count };
+  }, [commitTypeToFlow, proposalStillMatches]);
+
+  const confirmAmbiguity = useCallback(() => {
+    const pending = pendingAmbiguity;
+    if (!pending) return;
+    let adapted: ReturnType<typeof adaptTypeToFlow>;
+    try {
+      adapted = adaptTypeToFlow(pending.result);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'The skill could not run.');
+      return;
+    }
+    if (!proposalStillMatches(pending.text, pending.sourceAtStart)) {
+      setPendingAmbiguity(null);
+      toast.error('The board or steps changed while the skill was running. Run it again.');
+      return;
+    }
+    const count = commitTypeToFlow(adapted);
+    toast.success(`Built ${count} workflow nodes with type-to-flow.`);
+  }, [pendingAmbiguity, proposalStillMatches, commitTypeToFlow, toast]);
+
+  const cancelAmbiguity = useCallback(() => {
+    setPendingAmbiguity(null);
+  }, []);
+
+  const editAmbiguityNoTarget = useCallback((ambiguityId: string, toId: string) => {
+    setPendingAmbiguity(pending => {
+      if (!pending) return pending;
+      try {
+        return { ...pending, result: retargetAmbiguousNoEdge(pending.result, ambiguityId, toId) };
+      } catch {
+        return pending;
+      }
+    });
+  }, []);
 
   // This explicitly sends the workflow to the DT skills host. The existing
   // Build board action remains local; a failed/stale run never changes a board.
@@ -223,8 +284,8 @@ else Flag for review`;
     skillLock.current = true;
     setSkillBusy(true);
     try {
-      const count = await applyTypeToFlowRun(text);
-      toast.success(`Built ${count} workflow nodes with type-to-flow.`);
+      const outcome = await applyTypeToFlowRun(text);
+      if (outcome.committed) toast.success(`Built ${outcome.count} workflow nodes with type-to-flow.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'The skill could not run.');
     } finally {
@@ -255,8 +316,9 @@ else Flag for review`;
         throw new Error('Type one workflow step per line in Type steps, then activate type-to-flow again. The board was not changed.');
       }
       setShowSteps(true);
-      const count = await applyTypeToFlowRun(text);
-      toast.success(`Built ${count} workflow nodes with type-to-flow.`);
+      const outcome = await applyTypeToFlowRun(text);
+      if (outcome.committed) toast.success(`Built ${outcome.count} workflow nodes with type-to-flow.`);
+      return outcome;
     } finally {
       skillLock.current = false;
       setSkillBusy(false);
@@ -739,6 +801,15 @@ Go live — milestone after Review`;
             <p className="mt-1 text-[11px] text-slate-500">Run type-to-flow sends these steps to the DiagramTool skills host.</p>
           </div>
           {/* DT-AI-28: live reading of the same converter Build uses. Read-only. */}
+          {pendingAmbiguity && (
+            <AmbiguityConfirm
+              result={pendingAmbiguity.result}
+              disabled={skillBusy}
+              onConfirm={confirmAmbiguity}
+              onCancel={cancelAmbiguity}
+              onEditNoTarget={editAmbiguityNoTarget}
+            />
+          )}
           <TypeStepsPreview text={stepsText} onFocusLine={focusStepsLine} />
           {/* DT-AI-08: role prefix inserts (#37) — plain buttons, tab-reachable, no shortcuts. */}
           <div className="mt-1 flex flex-wrap items-center gap-1">

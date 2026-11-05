@@ -1,0 +1,57 @@
+{
+  "flow": {
+    "title": "Ambiguous approval",
+    "nodes": [
+      {
+        "id": "n1",
+        "label": "Start review",
+        "kind": "start"
+      },
+      {
+        "id": "n2",
+        "label": "If approved?",
+        "kind": "decision"
+      },
+      {
+        "id": "n3",
+        "label": "Send the reply",
+        "kind": "step"
+      },
+      {
+        "id": "n4",
+        "label": "Done",
+        "kind": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "n1",
+        "to": "n2"
+      },
+      {
+        "from": "n2",
+        "to": "n3",
+        "label": "yes"
+      },
+      {
+        "from": "n2",
+        "to": "n4",
+        "label": "no"
+      },
+      {
+        "from": "n3",
+        "to": "n4"
+      }
+    ]
+  },
+  "mermaid": "flowchart TD\n  n1([\"Start review\"])\n  n2{\"If approved?\"}\n  n3[\"Send the reply\"]\n  n4([\"Done\"])\n  n1 --> n2\n  n2 -->|\"yes\"| n3\n  n2 -->|\"no\"| n4\n  n3 --> n4",
+  "warnings": [
+    "Review inferred yes/no paths for decision n2."
+  ],
+  "ambiguities": [
+    {
+      "id": "n2",
+      "sentence": "n2 (If approved?) is ambiguous under the spike rule: a question or a line starting with if, when, or whether is a decision, yes is assumed to continue to Send the reply, and no is assumed to go to Done, which the text did not state."
+    }
+  ]
+}

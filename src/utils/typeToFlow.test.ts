@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { adaptTypeToFlow } from './typeToFlow';
+import { adaptTypeToFlow, retargetAmbiguousNoEdge, type TypeToFlowResult } from './typeToFlow';
 import fixture from '../../fixtures/type-to-flow/spike-output.json';
+import ambiguous from '../../fixtures/type-to-flow/ambiguous-decision.json';
 import { parseDiagram } from '../parser/parser';
 
 const kind = (node: ReturnType<typeof parseDiagram>['nodes'][number]) => {
@@ -29,5 +30,40 @@ describe('type-to-flow adapter', () => {
     expect(() => adaptTypeToFlow(sample)).toThrow(/two labeled/);
     sample.flow.edges[0].to = 'missing';
     expect(() => adaptTypeToFlow(sample)).toThrow(/invalid flow edge/);
+  });
+
+  it('keeps a cleared spike envelope committable when it has no ambiguity list', () => {
+    expect(fixture).not.toHaveProperty('ambiguities');
+    expect(adaptTypeToFlow(fixture).graph.nodes.some(node => node.type === 'flow' && node.properties.nodeType === 'decision')).toBe(true);
+  });
+
+  it('accepts the intentional-ambiguity fixture and blocks an unnamed list', () => {
+    const adapted = adaptTypeToFlow(ambiguous);
+    expect(adapted.graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ from: 'n2', to: 'n4', label: 'no' }),
+    ]));
+    expect(ambiguous.ambiguities).toHaveLength(1);
+    expect(ambiguous.ambiguities[0].sentence.endsWith('.')).toBe(true);
+    expect(ambiguous.ambiguities[0].sentence.split('.').length).toBe(2);
+
+    const unnamed = structuredClone(ambiguous);
+    unnamed.ambiguities[0].id = 'not-a-decision';
+    expect(() => adaptTypeToFlow(unnamed)).toThrow(/invalid ambiguity list/);
+    const stepNamed = structuredClone(ambiguous);
+    stepNamed.ambiguities[0].id = 'n3';
+    expect(() => adaptTypeToFlow(stepNamed)).toThrow(/invalid ambiguity list/);
+  });
+
+  it('retargets only the pending no edge', () => {
+    const edited = retargetAmbiguousNoEdge(ambiguous as TypeToFlowResult, 'n2', 'n3');
+    expect(edited.flow.edges.find(edge => edge.from === 'n2' && edge.label === 'no')?.to).toBe('n3');
+    expect(edited.mermaid).toContain('n2 -->|"no"| n3');
+    expect(edited.mermaid).not.toContain('n2 -->|"no"| n4');
+    expect(edited.ambiguities?.[0].sentence).toBe(ambiguous.ambiguities[0].sentence);
+    const graph = adaptTypeToFlow(edited).graph;
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ from: 'n2', to: 'n3', label: 'no' }),
+    ]));
+    expect(graph.edges.some(edge => edge.from === 'n2' && edge.label === 'no' && edge.to === 'n4')).toBe(false);
   });
 });

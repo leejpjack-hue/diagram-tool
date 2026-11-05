@@ -7,9 +7,11 @@ import {
   type SkillCatalogEntry,
 } from '../../utils/skillsHost';
 
+export type SkillActivationResult = { committed: boolean };
+
 interface SkillCatalogProps {
   disabled?: boolean;
-  onActivate: (skill: SkillCatalogEntry) => Promise<void>;
+  onActivate: (skill: SkillCatalogEntry) => Promise<SkillActivationResult | void>;
 }
 
 export function SkillCatalog({ disabled = false, onActivate }: SkillCatalogProps) {
@@ -68,11 +70,14 @@ export function SkillCatalog({ disabled = false, onActivate }: SkillCatalogProps
     setActivateError(null);
     setActivatedNote(null);
     void onActivate(skill)
-      .then(() => {
+      .then(result => {
+        const waiting = skill.name === 'type-to-flow' && !!result && result.committed === false;
         setActivatedNote(
-          skill.name === 'type-to-flow'
-            ? 'Activated type-to-flow and mapped it onto this board.'
-            : `Activated ${skill.name}. The board was not changed.`,
+          waiting
+            ? 'Activated type-to-flow. Confirm the ambiguous decision branches before they are added. The board was not changed.'
+            : skill.name === 'type-to-flow'
+              ? 'Activated type-to-flow and mapped it onto this board.'
+              : `Activated ${skill.name}. The board was not changed.`,
         );
       })
       .catch(error => {
