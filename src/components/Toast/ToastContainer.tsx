@@ -70,6 +70,8 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
         animate-slide-in-right
       `}
       data-testid="toast-item"
+      role={toast.type === 'error' ? 'alert' : 'status'}
+      aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
       onMouseEnter={holdDismissal}
       onMouseLeave={releaseDismissal}
       onFocusCapture={holdDismissal}

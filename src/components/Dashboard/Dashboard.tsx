@@ -18,6 +18,13 @@ import { WORKSHOP_TEMPLATES } from '../TemplatePicker/workshopTemplates';
 import { TemplateThumb } from '../TemplatePicker/TemplateThumb';
 import { BrandLogo } from '../BrandLogo';
 import { WorkspaceErrorBanner } from '../Workspace/WorkspaceStatus';
+import { StaleWorkspaceEdit } from '../../utils/boardManager';
+import {
+  OPEN_FEEDBACK,
+  readOpenEpoch,
+  sameOpenEpoch,
+  type ProjectIdentity,
+} from '../../utils/openRevision';
 
 export interface DashboardCreateRequest {
   mode: BoardMode;
@@ -44,6 +51,8 @@ interface DashboardProps {
   onCreate: (request: DashboardCreateRequest) => void | Promise<void>;
   onPublish: (board: Board) => void | Promise<void>;
   notify: (type: 'success' | 'error', message: string) => void;
+  readProject?: () => ProjectIdentity;
+  dashboardSelectionRef?: { current: readonly string[] };
 }
 
 type DashboardView = 'home' | 'recent' | 'starred' | 'templates' | 'all' | 'trash' | 'activity' | `space:${string}`;
@@ -143,7 +152,7 @@ function EmptyState({ icon, title, description, action }: { icon: IconName; titl
   return <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center"><div className="mb-3 rounded-lg bg-slate-100 p-3 text-slate-500"><Icon name={icon} className="h-6 w-6" /></div><h3 className="font-semibold text-slate-900">{title}</h3><p className="mt-1 max-w-sm text-sm text-slate-500">{description}</p>{action && <div className="mt-4">{action}</div>}</div>;
 }
 
-export function Dashboard({ onOpen, onCreate, onPublish, notify }: DashboardProps) {
+export function Dashboard({ onOpen, onCreate, onPublish, notify, readProject, dashboardSelectionRef }: DashboardProps) {
   const [boards, setBoards] = useState<Board[]>([]);
   const [trashBoards, setTrashBoards] = useState<Board[]>([]);
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -169,7 +178,12 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify }: DashboardProp
   const [commandOpen, setCommandOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [importReport, setImportReport] = useState<{ title: string; skipped: Array<{ kind: string; reason: string }>; mapped?: number } | null>(null);
+  const [importNotice, setImportNotice] = useState<{ tone: 'status' | 'alert'; message: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importButtonRef = useRef<HTMLButtonElement>(null);
+  const importFocusRef = useRef<HTMLElement | null>(null);
+  const pendingImportGuard = useRef<(() => boolean) | null>(null);
+  const importGesture = useRef(0);
 
   const refresh = useCallback(async () => {
     try {
@@ -221,18 +235,75 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify }: DashboardProp
   const createFrom = async (request: DashboardCreateRequest) => { setCreateOpen(false); await onCreate({ ...request, spaceId: request.spaceId ?? activeSpaceId ?? preferences.defaultSpaceId }); };
   const openBoard = async (board: Board) => { const opened = await boardManager.markOpened(board.id); await onOpen(opened ?? board); };
 
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]; event.target.value = '';
-    if (!file) return;
+  const projectIdentity = (): ProjectIdentity => readProject?.() ?? { view: 'dashboard', boardId: null, lastOpenedAt: null };
+
+  const focusImport = () => {
+    const target = importFocusRef.current;
+    if (target?.isConnected) target.focus();
+    else importButtonRef.current?.focus();
+  };
+
+  const armImportGuard = () => {
+    const token = ++importGesture.current;
+    const epoch = readOpenEpoch(projectIdentity(), dashboardSelectionRef?.current ?? []);
+    return () => token === importGesture.current && sameOpenEpoch(
+      epoch,
+      readOpenEpoch(projectIdentity(), dashboardSelectionRef?.current ?? []),
+    );
+  };
+
+  const beginImport = (focusTarget: HTMLElement | null) => {
+    importFocusRef.current = focusTarget;
+    pendingImportGuard.current = armImportGuard();
+    setImportNotice({ tone: 'status', message: OPEN_FEEDBACK.chooseImport });
+    const input = fileInputRef.current;
+    if (!input) return;
+    // Enter on the button is a user gesture, but a nested input.click() does not
+    // always open the chooser. showPicker() is the same input.
     try {
-      const imported = await boardManager.importFromFile(file);
+      if (typeof input.showPicker === 'function') {
+        input.showPicker();
+        return;
+      }
+    } catch {
+      // No transient activation, or showPicker is unsupported.
+    }
+    input.click();
+  };
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) {
+      pendingImportGuard.current = null;
+      setImportNotice({ tone: 'status', message: OPEN_FEEDBACK.cancelled });
+      focusImport();
+      return;
+    }
+    const guard = pendingImportGuard.current ?? armImportGuard();
+    pendingImportGuard.current = null;
+    setImportNotice({ tone: 'status', message: OPEN_FEEDBACK.checking });
+    try {
+      const imported = await boardManager.importFromFile(file, guard);
       setCreateOpen(false);
       const title = imported.boards.length === 1 ? `Imported “${imported.boards[0].title}”` : `Imported ${imported.boards.length} boards`;
+      setImportNotice(null);
       notify('success', title);
       if (imported.skipped.length > 0 || imported.mapped != null) {
         setImportReport({ title, skipped: imported.skipped, mapped: imported.mapped });
       }
-    } catch (error) { notify('error', error instanceof Error ? error.message : 'That file could not be imported.'); }
+      importButtonRef.current?.focus();
+    } catch (error) {
+      if (error instanceof StaleWorkspaceEdit) {
+        setImportNotice({ tone: 'status', message: error.message });
+        focusImport();
+        return;
+      }
+      const message = error instanceof Error ? error.message : 'That file could not be imported.';
+      setImportNotice(null);
+      notify('error', message);
+      focusImport();
+    }
   };
 
   const toggleStar = async (board: Board) => { await boardManager.update(board.id, { starred: !board.starred }); };
@@ -256,6 +327,8 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify }: DashboardProp
     if (!name) return;
     await boardManager.createVersion(versionBoard.id, name); setVersions(await boardManager.listVersions(versionBoard.id));
   };
+
+  if (dashboardSelectionRef) dashboardSelectionRef.current = [...selected].sort();
 
   const viewTitle = currentSpace?.name ?? ({ home: 'Home', recent: 'Recent boards', starred: 'Starred', templates: 'Templates', all: 'All boards', trash: 'Trash', activity: 'Activity' } as Record<string, string>)[view] ?? 'Boards';
   const viewSubtitle = view === 'trash' ? 'Boards are permanently removed after 30 days.' : currentSpace ? `${filteredBoards.length} board${filteredBoards.length === 1 ? '' : 's'} in this Space` : 'Your diagrams, timelines, and presentations in one place.';
@@ -298,7 +371,8 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify }: DashboardProp
         <header className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-200 px-4 md:px-6">
           <button className="rounded-md p-2 text-slate-600 hover:bg-slate-100 md:hidden" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation"><Icon name="menu" /></button>
           <div className="relative max-w-xl flex-1"><Icon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search titles, descriptions, tags, and DSL" className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-20 text-sm outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"/><button onClick={() => setCommandOpen(true)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">⌘ K</button></div>
-          <button data-testid="dashboard-import" className="hidden h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:flex" onClick={() => fileInputRef.current?.click()}><Icon name="upload" /> Import</button>
+          <button ref={importButtonRef} type="button" data-testid="dashboard-import" className="hidden h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:flex" onClick={event => beginImport(event.currentTarget)}><Icon name="upload" /> Import</button>
+          <p data-testid="dashboard-import-status" role={importNotice?.tone === 'alert' ? 'alert' : 'status'} aria-live={importNotice?.tone === 'alert' ? 'assertive' : 'polite'} className={`${importNotice ? 'max-w-[220px] truncate text-xs font-medium' : 'sr-only'} ${importNotice?.tone === 'alert' ? 'text-red-700' : 'text-slate-600'}`}>{importNotice?.message ?? ''}</p>
           <button className="flex h-10 items-center gap-2 rounded-md bg-indigo-600 px-3.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700" onClick={() => launchCreate()}><Icon name="plus" /> <span className="hidden sm:inline">Create new</span><span className="sm:hidden">Create</span></button>
         </header>
 
@@ -343,14 +417,14 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify }: DashboardProp
 
       {selected.size > 0 && view !== 'trash' && <div className="fixed bottom-5 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-1 rounded-lg border border-slate-200 bg-slate-950 p-1.5 text-white shadow-xl"><span className="px-2 text-xs font-semibold">{selected.size} selected</span><button className="rounded-md px-2.5 py-2 text-xs font-semibold hover:bg-white/10" onClick={() => void bulkStar()}><Icon name="star" className="mr-1 inline h-3.5 w-3.5"/>Star</button><select className="rounded-md bg-slate-800 px-2 py-2 text-xs font-semibold" defaultValue="" onChange={event => { if (event.target.value) void boardManager.bulkUpdate([...selected], { spaceId: event.target.value === 'none' ? undefined : event.target.value }).then(() => setSelected(new Set())); }} aria-label="Move selected boards"><option value="" disabled>Move to…</option><option value="none">No Space</option>{spaces.map(space => <option key={space.id} value={space.id}>{space.name}</option>)}</select><button className="rounded-md p-2 hover:bg-white/10" onClick={() => void bulkExport()} title="Export selected"><Icon name="download" /></button><button className="rounded-md p-2 text-red-300 hover:bg-red-500/20" onClick={() => void bulkTrash()} title="Move selected to Trash"><Icon name="trash" /></button><button className="rounded-md p-2 hover:bg-white/10" onClick={() => setSelected(new Set())} title="Clear selection"><Icon name="close" /></button></div>}
 
-      {createOpen && <CreateDialog tab={createTab} onTab={setCreateTab} spaces={spaces} boards={boards} templates={templates} onClose={() => setCreateOpen(false)} onCreate={request => void createFrom(request)} onImport={() => fileInputRef.current?.click()} />}
+      {createOpen && <CreateDialog tab={createTab} onTab={setCreateTab} spaces={spaces} boards={boards} templates={templates} onClose={() => setCreateOpen(false)} onCreate={request => void createFrom(request)} onImport={() => beginImport(document.activeElement instanceof HTMLElement ? document.activeElement : null)} />}
       {organizeBoard && <OrganizeDialog board={organizeBoard} spaces={spaces} onClose={() => setOrganizeBoard(null)} onSave={async patch => { await boardManager.update(organizeBoard.id, patch, patch.title && patch.title !== organizeBoard.title ? 'renamed' : 'updated'); setOrganizeBoard(null); }} />}
       {versionBoard && <Modal title={`Version history · ${versionBoard.title}`} subtitle="Named checkpoints and the latest 20 automatic saves stay on this device." onClose={() => setVersionBoard(null)}><div className="p-5"><button className="mb-4 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => void createCheckpoint()}>Create checkpoint</button>{versions.length === 0 ? <EmptyState icon="history" title="No versions yet" description="Create a checkpoint before making a major change." /> : <div className="divide-y divide-slate-200">{versions.map(version => <div key={version.id} className="flex items-center gap-3 py-3"><div className="rounded-md bg-slate-100 p-2 text-slate-500"><Icon name="history" /></div><div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold">{version.name}</div><div className="text-xs text-slate-500">{new Date(version.createdAt).toLocaleString()} · {version.automatic ? 'Automatic' : 'Named checkpoint'}</div></div><button className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={async () => { const restored = await boardManager.restoreVersion(version.id); if (restored) { setVersionBoard(null); notify('success', 'Version restored'); } }}>Restore</button></div>)}</div>}</div></Modal>}
       {spaceOpen && <SpaceDialog spaces={spaces} defaultSpaceId={preferences.defaultSpaceId} onDefault={spaceId => void updatePreferences({ defaultSpaceId: spaceId || undefined })} onClose={() => setSpaceOpen(false)} />}
       {storageOpen && <StorageDialog storage={storage} boards={boards} versionsCount={activity.length} onClose={() => setStorageOpen(false)} onExport={() => void boardManager.exportAll()} onClear={async () => { const count = await boardManager.clearOldVersions(); notify('success', count ? `Removed ${count} old automatic versions` : 'No old versions to remove'); }} />}
       {commandOpen && <CommandPalette boards={boards} onClose={() => setCommandOpen(false)} onOpen={board => void openBoard(board)} onCreate={mode => void createFrom({ mode })} />}
       {importReport && <ImportReportDialog report={importReport} onClose={() => setImportReport(null)} />}
-      <input ref={fileInputRef} type="file" accept=".board,.boards,.board.json,.boards.json,.diagram,.json,.mmd,.mermaid,.txt,.drawio,.xml" onChange={handleImport} className="hidden" />
+      <input ref={fileInputRef} data-testid="dashboard-import-file" type="file" accept=".board,.boards,.board.json,.boards.json,.diagram,.json,.mmd,.mermaid,.txt,.drawio,.xml" onChange={event => void handleImport(event)} className="hidden" />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { buildBoardDocument, buildWorkspaceDocument } from './boardFormat';
 import {
   createMemoryBoardManager,
+  StaleWorkspaceEdit,
   type Board,
   type BoardManager,
 } from './boardManager';
@@ -176,6 +177,16 @@ describe('open board file into the workspace', () => {
     const boards = await manager.list();
     expect(boards).toHaveLength(3);
     expect((await manager.get(current.id))?.dslText).toBe(ARCH_DSL);
+    expect((await manager.get(other.id))?.title).toBe('Other Board');
+  });
+
+  it('does not replace a board when the commit guard fails after lookup', async () => {
+    const { current, other } = await seedLibrary();
+    const before = current.dslText;
+    const portable = parseOpenedBoardText(JSON.stringify(boardDoc({ id: current.id, title: 'Stale' })));
+    await expect(upsertOpenedBoard(manager, portable, current.id, async () => false)).rejects.toBeInstanceOf(StaleWorkspaceEdit);
+    expect((await manager.get(current.id))?.dslText).toBe(before);
+    expect((await manager.get(current.id))?.title).not.toBe('Stale');
     expect((await manager.get(other.id))?.title).toBe('Other Board');
   });
 
