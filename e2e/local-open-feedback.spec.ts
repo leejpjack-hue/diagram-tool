@@ -106,6 +106,15 @@ async function chooseFile(page: Page, open: () => Promise<void>, path: string) {
   await chooser.setFiles(path);
 }
 
+/** Headless Chromium aborts showOpenFilePicker. Tests that must select a file use the input fallback. */
+async function useInputOpen(page: Page) {
+  await page.evaluate(() => {
+    const host = window as unknown as { showOpenFilePicker?: unknown; showSaveFilePicker?: unknown };
+    delete host.showOpenFilePicker;
+    delete host.showSaveFilePicker;
+  });
+}
+
 async function openBlankArchitecture(page: Page) {
   await page.getByRole('button', { name: 'Create new' }).click();
   await page.getByRole('button', { name: 'Blank Architecture Open a clean DSL canvas.' }).click();
@@ -209,6 +218,7 @@ test.describe('Local board open and import', () => {
     const saved = await downloadBoard(page);
     expectRoundTrip(saved, 'architecture', 'Local Open Architecture', ARCH_DSL);
 
+    await useInputOpen(page);
     await page.getByRole('button', { name: 'File', exact: true }).click();
     await chooseFile(page, () => page.getByRole('button', { name: 'Open…' }).click(), saved);
     await expect(page.getByTestId('toast-item').filter({ hasText: 'Opened "Local Open Architecture"' })).toHaveAttribute('role', 'status');
@@ -237,21 +247,23 @@ test.describe('Local board open and import', () => {
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await page.getByRole('heading', { name: 'Local Open Flow' }).click();
     await waitForEditor(page);
+    await useInputOpen(page);
     await page.getByRole('button', { name: 'File', exact: true }).click();
     await chooseFile(page, () => page.getByRole('button', { name: 'Open…' }).click(), saved);
     await expect(page.getByTestId('rf__node-review')).toBeVisible();
     await expect(page.getByText('check').first()).toBeVisible();
   });
 
-  test('File Open click opens a chooser while the picker API is still present', async ({ page }) => {
+  test('headless Chromium aborts showOpenFilePicker without a chooser; this is not a native OS dismissal', async ({ page }) => {
+    let sawChooser = false;
+    page.on('filechooser', () => { sawChooser = true; });
     await page.goto('/app/');
     await openBlankArchitecture(page);
-    const path = writeJson('arch-open', boardDocument('architecture', 'Local Open Architecture', ARCH_DSL));
     await page.getByRole('button', { name: 'File', exact: true }).click();
-    await chooseFile(page, () => page.getByRole('button', { name: 'Open…' }).click(), path);
-    await expect(page.getByTestId('toast-item').filter({ hasText: 'Opened "Local Open Architecture"' })).toHaveAttribute('role', 'status');
-    await expect(page.getByTestId('rf__node-api')).toBeVisible();
-    await expect(page.getByText('title: Local Open Architecture')).toBeVisible();
+    await page.getByRole('button', { name: 'Open…' }).click();
+    await expect(page.getByTestId('file-open-status')).toHaveText('File selection cancelled.');
+    expect(sawChooser).toBe(false);
+    await expect(page.getByText('title: Untitled Architecture')).toBeVisible();
   });
 
   test('File Open falls back to the hidden input when the picker API is absent', async ({ page }) => {
@@ -326,6 +338,7 @@ test.describe('Local board open and import', () => {
     await openBlankArchitecture(page);
 
     const reject = async (path: string) => {
+      await useInputOpen(page);
       await page.getByRole('button', { name: 'File', exact: true }).click();
       await chooseFile(page, () => page.getByRole('button', { name: 'Open…' }).click(), path);
       await expect(page.getByTestId('toast-item').last()).toHaveAttribute('role', 'alert');
@@ -384,6 +397,7 @@ test.describe('Local board open and import', () => {
     await page.getByRole('heading', { name: 'Local Open Architecture' }).first().click();
     await waitForEditor(page);
     const fixed = writeJson('same-id', boardDocument('flow', 'Local Open Flow', FLOW_DSL));
+    await useInputOpen(page);
     await page.getByRole('button', { name: 'File', exact: true }).click();
     await chooseFile(page, () => page.getByRole('button', { name: 'Open…' }).click(), fixed);
     await closeToast(page, 'Opened "Local Open Flow"');
@@ -412,10 +426,25 @@ test.describe('Local board open and import', () => {
     await expect(page.getByRole('heading', { name: 'Untitled Architecture' })).toBeVisible();
   });
 
+  test('changing the dashboard type filter does not discard a valid import', async ({ page }) => {
+    await installReadStall(page);
+    await page.goto('/app/');
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await holdFileReads(page);
+    const path = writeJson('filter-import', boardDocument('flow', 'Local Open Flow', FLOW_DSL));
+    await chooseFile(page, () => page.getByTestId('dashboard-import').click(), path);
+    await page.getByLabel('Filter by diagram type').selectOption('flow');
+    await releaseFileReads(page);
+    await expect(page.getByTestId('toast-item').filter({ hasText: 'Imported “Local Open Flow”' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Local Open Flow' })).toBeVisible();
+    await expect(page.getByTestId('dashboard-import-status')).not.toHaveText('The workspace changed, so that file was not applied.');
+  });
+
   test('a stalled File Open does not replace the board after a selection or a round trip away', async ({ page }) => {
     await installReadStall(page);
     await page.goto('/app/');
     await openBlankArchitecture(page);
+    await useInputOpen(page);
     await holdFileReads(page);
     const path = writeJson('stale-open', boardDocument('flow', 'Local Open Flow', FLOW_DSL));
     await page.getByRole('button', { name: 'File', exact: true }).click();

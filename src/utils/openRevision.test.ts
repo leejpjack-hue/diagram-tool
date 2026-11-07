@@ -1,46 +1,24 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useDiagramStore } from '../store/diagramStore';
-import {
-  readEditorStamp,
-  readSyncRevision,
-  revisionsMatch,
-  type OpenRevision,
-  type PersistedStamp,
-} from './openRevision';
+import { readOpenEpoch, sameOpenEpoch, type OpenEpoch, type ProjectIdentity } from './openRevision';
 
-const emptyPersisted = (): PersistedStamp => ({
-  boards: [],
-  versions: [],
-  spaces: [],
-  templates: [],
-});
+const project: ProjectIdentity = { view: 'editor', boardId: 'board-1', lastOpenedAt: '2026-11-07T00:00:00.000Z' };
 
-function revision(patch: Partial<OpenRevision> = {}): OpenRevision {
+function epoch(patch: Partial<OpenEpoch> = {}): OpenEpoch {
   return {
-    project: { view: 'editor', boardId: 'board-1', lastOpenedAt: '2026-11-07T00:00:00.000Z' },
-    editor: {
-      dslText: 'diagram: architecture\ntitle: Keep',
-      diagramMode: 'architecture',
-      iconStyle: 'clean',
-      showStepNumbers: false,
-      selectedNodeId: null,
-      historyIndex: -1,
-      history: [],
-    },
-    dashboard: {
-      selection: [],
-      query: '',
-      modeFilter: 'all',
-      tagFilter: '',
-      menuFor: null,
-      boardView: 'home',
-    },
-    persisted: emptyPersisted(),
+    project,
+    historyIndex: 0,
+    selectedNodeId: null,
+    dslText: 'diagram: architecture\ntitle: Keep',
+    diagramMode: 'architecture',
+    iconStyle: 'clean',
+    showStepNumbers: false,
+    dashboardSelection: [],
     ...patch,
   };
 }
 
-describe('open revision', () => {
+describe('open epoch', () => {
   beforeEach(() => {
     useDiagramStore.setState({
       dslText: 'diagram: architecture\ntitle: Keep',
@@ -49,91 +27,33 @@ describe('open revision', () => {
       showStepNumbers: false,
       selectedNodeId: null,
       history: [],
-      historyIndex: -1,
+      historyIndex: 0,
     });
   });
 
-  it('matches a copied snapshot', () => {
-    const current = revision();
-    expect(revisionsMatch(current, revision())).toBe(true);
+  it('matches project identity, editor scalars, and dashboard selection without reading storage', () => {
+    const current = readOpenEpoch(project, []);
+    expect(sameOpenEpoch(current, readOpenEpoch(project, []))).toBe(true);
+    expect(sameOpenEpoch(epoch(), epoch({ project: { ...project, view: 'dashboard' } }))).toBe(false);
+    expect(sameOpenEpoch(epoch(), epoch({ project: { ...project, boardId: 'board-2' } }))).toBe(false);
+    expect(sameOpenEpoch(epoch(), epoch({
+      project: { ...project, lastOpenedAt: '2026-11-07T00:00:01.000Z' },
+    }))).toBe(false);
+    expect(sameOpenEpoch(epoch(), epoch({ historyIndex: 1 }))).toBe(false);
+    expect(sameOpenEpoch(epoch(), epoch({ selectedNodeId: 'api' }))).toBe(false);
+    expect(sameOpenEpoch(epoch(), epoch({ dslText: 'diagram: architecture\ntitle: Edited' }))).toBe(false);
+    expect(sameOpenEpoch(epoch(), epoch({ dashboardSelection: ['board-1'] }))).toBe(false);
   });
 
-  it('treats selection, undo history, identity, open, and stored metadata as changes', () => {
-    const current = revision();
-    expect(revisionsMatch(current, revision({
-      editor: { ...current.editor, selectedNodeId: 'api' },
-    }))).toBe(false);
-    expect(revisionsMatch(current, revision({
-      editor: { ...current.editor, historyIndex: 1, history: [{ ...current.editor, diagramMode: 'architecture', iconStyle: 'clean', showStepNumbers: false }] },
-    }))).toBe(false);
-    expect(revisionsMatch(current, revision({
-      project: { ...current.project, view: 'dashboard' },
-    }))).toBe(false);
-    expect(revisionsMatch(current, revision({
-      project: { ...current.project, boardId: 'board-2' },
-    }))).toBe(false);
-    expect(revisionsMatch(current, revision({
-      project: { ...current.project, lastOpenedAt: '2026-11-07T00:00:01.000Z' },
-    }))).toBe(false);
-    expect(revisionsMatch(current, revision({
-      dashboard: { ...current.dashboard!, selection: ['board-1'] },
-    }))).toBe(false);
-    expect(revisionsMatch(current, revision({
-      persisted: {
-        ...emptyPersisted(),
-        boards: [{
-          id: 'board-1',
-          title: 'Keep',
-          description: '',
-          mode: 'architecture',
-          dslText: current.editor.dslText,
-          tags: [],
-          starred: true,
-          spaceId: null,
-          deletedAt: null,
-          lastOpenedAt: current.project.lastOpenedAt,
-          iconStyle: null,
-          showStepNumbers: false,
-          templateSourceId: null,
-          presentationUpdatedAt: null,
-          presentationItemIds: [],
-        }],
-      },
-    }))).toBe(false);
-    expect(revisionsMatch(current, revision({
-      persisted: {
-        ...emptyPersisted(),
-        versions: [{
-          id: 'version-1',
-          boardId: 'board-1',
-          name: 'Checkpoint',
-          mode: 'architecture',
-          dslText: current.editor.dslText,
-          createdAt: '2026-11-07T00:00:02.000Z',
-          automatic: false,
-        }],
-      },
-    }))).toBe(false);
-  });
-
-  it('reads selection and undo from the existing editor store', () => {
-    const before = readSyncRevision(
-      { view: 'editor', boardId: 'board-1', lastOpenedAt: null },
-      null,
-    );
+  it('sees undo and selection from the editor store', () => {
+    const before = readOpenEpoch(project, []);
     useDiagramStore.getState().setSelectedNode('api');
-    const selected = readEditorStamp();
-    expect(selected.selectedNodeId).toBe('api');
-    expect(revisionsMatch(
-      { ...before, persisted: emptyPersisted() },
-      { ...readSyncRevision({ view: 'editor', boardId: 'board-1', lastOpenedAt: null }, null), persisted: emptyPersisted() },
-    )).toBe(false);
-
+    expect(sameOpenEpoch(before, readOpenEpoch(project, []))).toBe(false);
+    useDiagramStore.getState().setSelectedNode(null);
     useDiagramStore.getState().setDslText('diagram: architecture\ntitle: Edited');
-    const edited = readEditorStamp();
+    const edited = readOpenEpoch(project, []);
     useDiagramStore.getState().undo();
-    const undone = readEditorStamp();
-    expect(undone.historyIndex).toBeLessThan(edited.historyIndex);
-    expect(undone.dslText).toBe('diagram: architecture\ntitle: Keep');
+    expect(sameOpenEpoch(edited, readOpenEpoch(project, []))).toBe(false);
+    expect(useDiagramStore.getState().dslText).toBe('diagram: architecture\ntitle: Keep');
   });
 });

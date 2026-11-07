@@ -44,7 +44,7 @@ import { Dashboard, type DashboardCreateRequest } from './components/Dashboard/D
 import { PresentationCanvas } from './components/Dashboard/PresentationCanvas';
 import { boardManager, toWorkspaceError, type Board, type BoardMode, type PresentationItem } from './utils/boardManager';
 import { upsertOpenedBoard } from './utils/boardFile';
-import type { DashboardSlice, ProjectIdentity } from './utils/openRevision';
+import type { ProjectIdentity } from './utils/openRevision';
 import { openSharedDiagramFromUrl, parseShareTokenFromUrl } from './lib/supabase';
 import { OfflineBanner, WorkspaceErrorBanner } from './components/Workspace/WorkspaceStatus';
 import { BoardSizeMeter, BoardSizeWarnBanner, useBoardSizeSnapshot } from './components/Workspace/BoardSizeMeter';
@@ -430,7 +430,7 @@ function App() {
     boardId: null,
     lastOpenedAt: null,
   });
-  const dashboardSliceRef = useRef<DashboardSlice | null>(null);
+  const dashboardSelectionRef = useRef<string[]>([]);
   const [fileNotice, setFileNotice] = useState<{ tone: 'status' | 'alert'; message: string } | null>(null);
   useEffect(() => {
     projectRef.current.view = view;
@@ -1303,7 +1303,7 @@ function App() {
             onOpenWorkspaceBoard={openBoard}
             notify={(type, msg) => (type === 'success' ? toast.success(msg) : toast.error(msg))}
             readProject={readProject}
-            dashboardSliceRef={dashboardSliceRef}
+            dashboardSelectionRef={dashboardSelectionRef}
             fileNotice={fileNotice}
             onFileNotice={setFileNotice}
           />
@@ -1361,7 +1361,7 @@ function App() {
           onPublish={openPresentation}
           notify={(type, msg) => (type === 'success' ? toast.success(msg) : toast.error(msg))}
           readProject={readProject}
-          dashboardSliceRef={dashboardSliceRef}
+          dashboardSelectionRef={dashboardSelectionRef}
         />
       )}
 

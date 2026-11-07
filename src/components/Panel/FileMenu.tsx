@@ -10,10 +10,8 @@ import { interpretOpenedFile, serializeBoardFile, upsertOpenedBoard } from '../.
 import { StaleWorkspaceEdit } from '../../utils/boardManager';
 import {
   OPEN_FEEDBACK,
-  captureOpenBaseline,
-  openBaselineStillCurrent,
-  type DashboardSlice,
-  type OpenBaseline,
+  readOpenEpoch,
+  sameOpenEpoch,
   type ProjectIdentity,
 } from '../../utils/openRevision';
 import { assertImportSize } from '../../utils/importSanitizer';
@@ -24,6 +22,7 @@ import {
   downloadBoardJson,
   isAbortError,
   mustSaveBoardJsonAsNewFile,
+  pickBoardFileToOpen,
   pickBoardFileToSave,
   readHandleText,
   suggestedBoardFilename,
@@ -60,7 +59,7 @@ interface FileMenuProps {
   onOpenWorkspaceBoard?: (board: Board) => void;
   notify?: (type: 'success' | 'error', message: string) => void;
   readProject?: () => ProjectIdentity;
-  dashboardSliceRef?: { current: DashboardSlice | null };
+  dashboardSelectionRef?: { current: readonly string[] };
   fileNotice?: { tone: 'status' | 'alert'; message: string } | null;
   onFileNotice?: (notice: { tone: 'status' | 'alert'; message: string } | null) => void;
 }
@@ -75,7 +74,7 @@ export function FileMenu({
   onOpenWorkspaceBoard,
   notify,
   readProject,
-  dashboardSliceRef,
+  dashboardSelectionRef,
   fileNotice: fileNoticeProp,
   onFileNotice,
 }: FileMenuProps) {
@@ -101,7 +100,8 @@ export function FileMenu({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openBoardInputRef = useRef<HTMLInputElement>(null);
   const fileButtonRef = useRef<HTMLButtonElement>(null);
-  const pendingOpenBaseline = useRef<OpenBaseline | null>(null);
+  const pendingOpenGuard = useRef<(() => boolean) | null>(null);
+  const openGesture = useRef(0);
   const [localFileNotice, setLocalFileNotice] = useState<{ tone: 'status' | 'alert'; message: string } | null>(null);
   const fileNotice = onFileNotice ? fileNoticeProp ?? null : localFileNotice;
   const setFileNotice = (notice: { tone: 'status' | 'alert'; message: string } | null) => {
@@ -436,16 +436,14 @@ export function FileMenu({
 
   const applyOpenedText = async (
     text: string,
-    baseline: OpenBaseline,
+    baseline: () => boolean,
     handle?: FileSystemFileHandleLike,
     replaceId?: string,
     filename?: string,
   ) => {
     const opened = await interpretOpenedFile(filename ?? handle?.name ?? 'diagram', text);
     const mappedId = replaceId ?? (handle ? await boardFileHandles.findBoardId(handle) : undefined);
-    const board = await upsertOpenedBoard(boardManager, opened.portable, mappedId, () => (
-      openBaselineStillCurrent(baseline, projectIdentity(), dashboardSliceRef?.current ?? null)
-    ));
+    const board = await upsertOpenedBoard(boardManager, opened.portable, mappedId, baseline);
     if (handle) {
       boardFileHandles.set(board.id, handle, opened.format);
       setLinkedToDisk(true);
@@ -457,37 +455,62 @@ export function FileMenu({
     focusFileButton();
   };
 
-  const openBaseline = () => captureOpenBaseline(projectIdentity(), dashboardSliceRef?.current ?? null);
+  const armOpenGuard = () => {
+    const token = ++openGesture.current;
+    const epoch = readOpenEpoch(projectIdentity(), dashboardSelectionRef?.current ?? []);
+    return () => token === openGesture.current && sameOpenEpoch(
+      epoch,
+      readOpenEpoch(projectIdentity(), dashboardSelectionRef?.current ?? []),
+    );
+  };
 
   const handleOpenBoardFile = () => {
     handleClose();
-    pendingOpenBaseline.current = openBaseline();
+    const guard = armOpenGuard();
+    pendingOpenGuard.current = guard;
     setFileNotice({ tone: 'status', message: OPEN_FEEDBACK.chooseOpen });
-    // showOpenFilePicker aborts in this Chromium without a filechooser event,
-    // so Open uses the existing input that the dashboard Import click already opens.
-    const input = openBoardInputRef.current;
-    if (input && typeof input.showPicker === 'function') {
-      try {
-        input.showPicker();
-        return;
-      } catch {
-        // No transient activation. The click below is the same input path.
-      }
+    if (canUseFileSystemAccess()) {
+      pendingOpenGuard.current = null;
+      void (async () => {
+        try {
+          const picked = await pickBoardFileToOpen();
+          if (!picked) {
+            setFileNotice({ tone: 'status', message: OPEN_FEEDBACK.cancelled });
+            focusFileButton();
+            return;
+          }
+          setFileNotice({ tone: 'status', message: OPEN_FEEDBACK.checking });
+          await applyOpenedText(picked.text, guard, picked.handle);
+        } catch (error) {
+          if (isAbortError(error)) {
+            setFileNotice({ tone: 'status', message: OPEN_FEEDBACK.cancelled });
+            focusFileButton();
+            return;
+          }
+          if (error instanceof StaleWorkspaceEdit) {
+            setFileNotice({ tone: 'status', message: error.message });
+            focusFileButton();
+            return;
+          }
+          showFileError(error);
+        }
+      })();
+      return;
     }
-    input?.click();
+    openBoardInputRef.current?.click();
   };
 
   const handleOpenBoardInput = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) {
-      pendingOpenBaseline.current = null;
+      pendingOpenGuard.current = null;
       setFileNotice({ tone: 'status', message: OPEN_FEEDBACK.cancelled });
       focusFileButton();
       return;
     }
-    const baseline = pendingOpenBaseline.current ?? openBaseline();
-    pendingOpenBaseline.current = null;
+    const baseline = pendingOpenGuard.current ?? armOpenGuard();
+    pendingOpenGuard.current = null;
     setFileNotice({ tone: 'status', message: OPEN_FEEDBACK.checking });
     try {
       assertImportSize(file);

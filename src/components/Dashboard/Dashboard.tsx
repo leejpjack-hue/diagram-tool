@@ -21,10 +21,8 @@ import { WorkspaceErrorBanner } from '../Workspace/WorkspaceStatus';
 import { StaleWorkspaceEdit } from '../../utils/boardManager';
 import {
   OPEN_FEEDBACK,
-  captureOpenBaseline,
-  openBaselineStillCurrent,
-  type DashboardSlice,
-  type OpenBaseline,
+  readOpenEpoch,
+  sameOpenEpoch,
   type ProjectIdentity,
 } from '../../utils/openRevision';
 
@@ -54,7 +52,7 @@ interface DashboardProps {
   onPublish: (board: Board) => void | Promise<void>;
   notify: (type: 'success' | 'error', message: string) => void;
   readProject?: () => ProjectIdentity;
-  dashboardSliceRef?: { current: DashboardSlice | null };
+  dashboardSelectionRef?: { current: readonly string[] };
 }
 
 type DashboardView = 'home' | 'recent' | 'starred' | 'templates' | 'all' | 'trash' | 'activity' | `space:${string}`;
@@ -154,7 +152,7 @@ function EmptyState({ icon, title, description, action }: { icon: IconName; titl
   return <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center"><div className="mb-3 rounded-lg bg-slate-100 p-3 text-slate-500"><Icon name={icon} className="h-6 w-6" /></div><h3 className="font-semibold text-slate-900">{title}</h3><p className="mt-1 max-w-sm text-sm text-slate-500">{description}</p>{action && <div className="mt-4">{action}</div>}</div>;
 }
 
-export function Dashboard({ onOpen, onCreate, onPublish, notify, readProject, dashboardSliceRef }: DashboardProps) {
+export function Dashboard({ onOpen, onCreate, onPublish, notify, readProject, dashboardSelectionRef }: DashboardProps) {
   const [boards, setBoards] = useState<Board[]>([]);
   const [trashBoards, setTrashBoards] = useState<Board[]>([]);
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -184,7 +182,8 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify, readProject, da
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importButtonRef = useRef<HTMLButtonElement>(null);
   const importFocusRef = useRef<HTMLElement | null>(null);
-  const pendingImportBaseline = useRef<OpenBaseline | null>(null);
+  const pendingImportGuard = useRef<(() => boolean) | null>(null);
+  const importGesture = useRef(0);
 
   const refresh = useCallback(async () => {
     try {
@@ -244,38 +243,48 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify, readProject, da
     else importButtonRef.current?.focus();
   };
 
+  const armImportGuard = () => {
+    const token = ++importGesture.current;
+    const epoch = readOpenEpoch(projectIdentity(), dashboardSelectionRef?.current ?? []);
+    return () => token === importGesture.current && sameOpenEpoch(
+      epoch,
+      readOpenEpoch(projectIdentity(), dashboardSelectionRef?.current ?? []),
+    );
+  };
+
   const beginImport = (focusTarget: HTMLElement | null) => {
     importFocusRef.current = focusTarget;
-    pendingImportBaseline.current = captureOpenBaseline(projectIdentity(), dashboardSliceRef?.current ?? null);
+    pendingImportGuard.current = armImportGuard();
     setImportNotice({ tone: 'status', message: OPEN_FEEDBACK.chooseImport });
     const input = fileInputRef.current;
-    if (input && typeof input.showPicker === 'function') {
-      try {
+    if (!input) return;
+    // Enter on the button is a user gesture, but a nested input.click() does not
+    // always open the chooser. showPicker() is the same input.
+    try {
+      if (typeof input.showPicker === 'function') {
         input.showPicker();
         return;
-      } catch {
-        // The click below is the same input when showPicker has no activation.
       }
+    } catch {
+      // No transient activation, or showPicker is unsupported.
     }
-    input?.click();
+    input.click();
   };
 
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) {
-      pendingImportBaseline.current = null;
+      pendingImportGuard.current = null;
       setImportNotice({ tone: 'status', message: OPEN_FEEDBACK.cancelled });
       focusImport();
       return;
     }
-    const baseline = pendingImportBaseline.current ?? captureOpenBaseline(projectIdentity(), dashboardSliceRef?.current ?? null);
-    pendingImportBaseline.current = null;
+    const guard = pendingImportGuard.current ?? armImportGuard();
+    pendingImportGuard.current = null;
     setImportNotice({ tone: 'status', message: OPEN_FEEDBACK.checking });
     try {
-      const imported = await boardManager.importFromFile(file, () => (
-        openBaselineStillCurrent(baseline, projectIdentity(), dashboardSliceRef?.current ?? null)
-      ));
+      const imported = await boardManager.importFromFile(file, guard);
       setCreateOpen(false);
       const title = imported.boards.length === 1 ? `Imported “${imported.boards[0].title}”` : `Imported ${imported.boards.length} boards`;
       setImportNotice(null);
@@ -319,16 +328,7 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify, readProject, da
     await boardManager.createVersion(versionBoard.id, name); setVersions(await boardManager.listVersions(versionBoard.id));
   };
 
-  if (dashboardSliceRef) {
-    dashboardSliceRef.current = {
-      selection: [...selected].sort(),
-      query,
-      modeFilter,
-      tagFilter,
-      menuFor,
-      boardView: view,
-    };
-  }
+  if (dashboardSelectionRef) dashboardSelectionRef.current = [...selected].sort();
 
   const viewTitle = currentSpace?.name ?? ({ home: 'Home', recent: 'Recent boards', starred: 'Starred', templates: 'Templates', all: 'All boards', trash: 'Trash', activity: 'Activity' } as Record<string, string>)[view] ?? 'Boards';
   const viewSubtitle = view === 'trash' ? 'Boards are permanently removed after 30 days.' : currentSpace ? `${filteredBoards.length} board${filteredBoards.length === 1 ? '' : 's'} in this Space` : 'Your diagrams, timelines, and presentations in one place.';
