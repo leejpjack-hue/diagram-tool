@@ -18,6 +18,6 @@ Convert one workflow step per line into the typed flow envelope consumed by Diag
    ```
 
    Pass `{ "text": "<workflow, one step per line>", "title": "<optional title>" }` as `input`.
-3. Return the complete result: `flow`, `mermaid`, and `warnings`. Tell the user that inferred decision branches should be checked.
+3. Return the complete result: `flow`, `mermaid`, `warnings`, and `ambiguities`. `ambiguities` is a named list with one sentence per decision the spike rule inferred. Those yes/no edges are assumptions. Do not commit them until a person confirms or edits that list.
 
 The converter recognizes questions and lines starting with if, when, or whether as decisions. It assumes a yes path to the next step and a no path to the end. These are heuristics, not facts established by the prose. Do not invent additional workflow details. Empty input is an error.

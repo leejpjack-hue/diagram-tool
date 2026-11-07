@@ -9,6 +9,17 @@ const result = await convert(input);
 assert.deepEqual(result.flow, expected.flow);
 assert.match(result.mermaid, /^flowchart TD\n/);
 assert.equal(result.warnings.length, 1);
+assert.equal(result.ambiguities.length, result.flow.nodes.filter(node => node.kind === 'decision').length);
+for (const item of result.ambiguities) {
+  assert.match(item.id, /^n\d+$/);
+  assert.equal(item.sentence.includes('\n'), false);
+  assert.ok(item.sentence.endsWith('.'));
+  assert.equal(item.sentence.split('.').length, 2);
+  assert.ok(result.flow.nodes.some(node => node.id === item.id && node.kind === 'decision'));
+}
+const ambiguousInput = await readFixture('ambiguous-decision-input');
+const ambiguousExpected = await readFixture('ambiguous-decision');
+assert.deepEqual(await convert(ambiguousInput), ambiguousExpected);
 for (const text of ['Start\nIf approved?\nDone', 'If approved?', 'Start\nIf approved?\nSend\nDone']) {
   const { flow } = await convert({ text });
   for (const decision of flow.nodes.filter(node => node.kind === 'decision')) {

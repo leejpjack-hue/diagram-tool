@@ -23,9 +23,10 @@ import { useToast } from '../../utils/useToast';
 import { ToastContainer } from '../Toast/ToastContainer';
 import type { BoardMode } from '../../utils/boardManager';
 import { IconStylePicker } from '../Canvas/IconStylePicker';
-import { adaptTypeToFlow } from '../../utils/typeToFlow';
-import { activateSkill, runTypeToFlow, type SkillCatalogEntry } from '../../utils/skillsHost';
+import { activateSkill, type SkillCatalogEntry } from '../../utils/skillsHost';
 import { SkillCatalog } from './SkillCatalog';
+import { AmbiguityConfirm } from './AmbiguityConfirm';
+import { useTypeToFlowAmbiguity } from './useTypeToFlowAmbiguity';
 
 function asBoardMode(mode: string): BoardMode {
   return mode === 'flow' || mode === 'sequence' || mode === 'gantt' ? mode : 'architecture';
@@ -41,8 +42,7 @@ export function DSLEditor() {
   const [showSteps, setShowSteps] = useState(false);
   const [stepsText, setStepsText] = useState('');
   const [skillBusy, setSkillBusy] = useState(false);
-  const [skillResult, setSkillResult] = useState<{ source: string; mermaid: string; warnings: string[] } | null>(null);
-  // One in-flight host skill at a time. Writes happen only after a run validates.
+  // One in-flight host skill at a time. The hold-gate writes only after confirm.
   const skillLock = useRef(false);
   // DT-AI-27: off until the user ticks it. The board remembers it by the
   // lane blocks in the DSL, so Load steps restores the tick. No new field.
@@ -71,6 +71,20 @@ export function DSLEditor() {
   const applyingConversion = useRef(false);
   // DT-AI-08: textarea ref so role-prefix buttons can read the caret/selection.
   const stepsInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const openTypeSteps = useCallback(() => setShowSteps(true), []);
+  const {
+    pending: pendingAmbiguity,
+    skillResult,
+    applyTypeToFlowRun,
+    confirm: confirmAmbiguity,
+    cancel: cancelAmbiguity,
+    editNoTarget: editAmbiguityNoTarget,
+  } = useTypeToFlowAmbiguity({
+    stepsInputRef,
+    openSteps: openTypeSteps,
+    notifySuccess: toast.success,
+    notifyError: toast.error,
+  });
   // DT-AI-09: one-shot seed from picking the AI workflow template.
   const typeStepsSeed = useDiagramStore(s => s.typeStepsSeed);
   const clearTypeStepsSeed = useDiagramStore(s => s.clearTypeStepsSeed);
@@ -189,28 +203,6 @@ else Flag for review`;
     }
   }, [stepsText, lanesByRole, toast, applySource, diagramMode, enterWalkThrough]);
 
-  // Map a type-to-flow result onto the board only after it validates and the
-  // board still matches the snapshot taken before the run. Failures throw
-  // before any store write.
-  const applyTypeToFlowRun = useCallback(async (text: string) => {
-    const before = useDiagramStore.getState();
-    const sourceAtStart = before.dslText;
-    const title = before.parsedDiagram?.title || 'Untitled workflow';
-    const data = await runTypeToFlow({ text, title });
-    const adapted = adaptTypeToFlow(data);
-    const current = useDiagramStore.getState();
-    const typedNow = stepsInputRef.current?.value.trim() ?? text;
-    if (current.dslText !== sourceAtStart || current.diagramMode !== 'flow' || current.isReadOnlyShared || typedNow !== text) {
-      throw new Error('The board or steps changed while the skill was running. Run it again.');
-    }
-    setDslText(adapted.source);
-    setParsedDiagram(adapted.graph);
-    setError(null);
-    setSourceWarning(null);
-    setSkillResult({ source: adapted.source, mermaid: adapted.result.mermaid, warnings: adapted.result.warnings });
-    return adapted.graph.nodes.length;
-  }, [setDslText, setParsedDiagram, setError, setSourceWarning]);
-
   // This explicitly sends the workflow to the DT skills host. The existing
   // Build board action remains local; a failed/stale run never changes a board.
   const runTypeToFlowSkill = useCallback(async () => {
@@ -223,8 +215,8 @@ else Flag for review`;
     skillLock.current = true;
     setSkillBusy(true);
     try {
-      const count = await applyTypeToFlowRun(text);
-      toast.success(`Built ${count} workflow nodes with type-to-flow.`);
+      const outcome = await applyTypeToFlowRun(text);
+      if (outcome.committed) toast.success(`Built ${outcome.count} workflow nodes with type-to-flow.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'The skill could not run.');
     } finally {
@@ -234,7 +226,7 @@ else Flag for review`;
   }, [stepsText, toast, applyTypeToFlowRun]);
 
   // Catalog Activate calls the host activate path first. type-to-flow then maps.
-  // Any failure leaves the store untouched (applyTypeToFlowRun writes last).
+  // Any failure leaves the store untouched (the hold-gate writes last).
   const activateFromCatalog = useCallback(async (skill: SkillCatalogEntry) => {
     if (skillLock.current) throw new Error('A skill is already activating.');
     skillLock.current = true;
@@ -255,8 +247,9 @@ else Flag for review`;
         throw new Error('Type one workflow step per line in Type steps, then activate type-to-flow again. The board was not changed.');
       }
       setShowSteps(true);
-      const count = await applyTypeToFlowRun(text);
-      toast.success(`Built ${count} workflow nodes with type-to-flow.`);
+      const outcome = await applyTypeToFlowRun(text);
+      if (outcome.committed) toast.success(`Built ${outcome.count} workflow nodes with type-to-flow.`);
+      return outcome;
     } finally {
       skillLock.current = false;
       setSkillBusy(false);
@@ -739,6 +732,15 @@ Go live — milestone after Review`;
             <p className="mt-1 text-[11px] text-slate-500">Run type-to-flow sends these steps to the DiagramTool skills host.</p>
           </div>
           {/* DT-AI-28: live reading of the same converter Build uses. Read-only. */}
+          {pendingAmbiguity && (
+            <AmbiguityConfirm
+              result={pendingAmbiguity.result}
+              disabled={skillBusy}
+              onConfirm={confirmAmbiguity}
+              onCancel={cancelAmbiguity}
+              onEditNoTarget={editAmbiguityNoTarget}
+            />
+          )}
           <TypeStepsPreview text={stepsText} onFocusLine={focusStepsLine} />
           {/* DT-AI-08: role prefix inserts (#37) — plain buttons, tab-reachable, no shortcuts. */}
           <div className="mt-1 flex flex-wrap items-center gap-1">
