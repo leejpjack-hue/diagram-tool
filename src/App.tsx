@@ -44,6 +44,7 @@ import { Dashboard, type DashboardCreateRequest } from './components/Dashboard/D
 import { PresentationCanvas } from './components/Dashboard/PresentationCanvas';
 import { boardManager, toWorkspaceError, type Board, type BoardMode, type PresentationItem } from './utils/boardManager';
 import { upsertOpenedBoard } from './utils/boardFile';
+import type { DashboardSlice, ProjectIdentity } from './utils/openRevision';
 import { openSharedDiagramFromUrl, parseShareTokenFromUrl } from './lib/supabase';
 import { OfflineBanner, WorkspaceErrorBanner } from './components/Workspace/WorkspaceStatus';
 import { BoardSizeMeter, BoardSizeWarnBanner, useBoardSizeSnapshot } from './components/Workspace/BoardSizeMeter';
@@ -424,6 +425,18 @@ function App() {
     typeof window !== 'undefined' && parseShareTokenFromUrl(window.location.search) ? 'editor' : 'dashboard',
   );
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(null);
+  const projectRef = useRef<ProjectIdentity>({
+    view: typeof window !== 'undefined' && parseShareTokenFromUrl(window.location.search) ? 'editor' : 'dashboard',
+    boardId: null,
+    lastOpenedAt: null,
+  });
+  const dashboardSliceRef = useRef<DashboardSlice | null>(null);
+  const [fileNotice, setFileNotice] = useState<{ tone: 'status' | 'alert'; message: string } | null>(null);
+  useEffect(() => {
+    projectRef.current.view = view;
+    projectRef.current.boardId = currentBoardId;
+  }, [view, currentBoardId]);
+  const readProject = useCallback(() => ({ ...projectRef.current }), []);
   // Board being presented and the freshly-rendered image of its diagram.
   const [presentationFor, setPresentationFor] = useState<Board | null>(null);
   const [deckItems, setDeckItems] = useState<PresentationItem[]>([]);
@@ -834,6 +847,11 @@ function App() {
   // ---- Board dashboard (Miro-style home) ----
 
   const openBoard = (board: Board) => {
+    projectRef.current = {
+      view: 'editor',
+      boardId: board.id,
+      lastOpenedAt: board.lastOpenedAt ?? null,
+    };
     setReadOnlyShared(false);
     setCurrentBoardId(board.id);
     setIconStyle(board.iconStyle, false);
@@ -854,6 +872,7 @@ function App() {
     }
     setDeckItems(board.presentation?.items ?? []);
     if (board.presentation?.items.length && isWorkshopTemplateId(board.templateSourceId)) {
+      projectRef.current.view = 'presentation';
       setPresentationFor(board);
       setView('presentation');
       return;
@@ -883,6 +902,7 @@ function App() {
   };
 
   const backToDashboard = async () => {
+    projectRef.current = { ...projectRef.current, view: 'dashboard' };
     // Flush the latest text into the board before leaving the editor.
     if (currentBoardId) {
       const thumbnail = await captureDiagramThumbnail(activeTab);
@@ -944,6 +964,7 @@ function App() {
   };
 
   const closePresentation = () => {
+    projectRef.current = { ...projectRef.current, view: currentBoardId ? 'editor' : 'dashboard' };
     setPresentationFor(null);
     setCurrentDiagramImage(null);
     setView(currentBoardId ? 'editor' : 'dashboard');
@@ -1281,6 +1302,10 @@ function App() {
             onNew={handleNewDiagram}
             onOpenWorkspaceBoard={openBoard}
             notify={(type, msg) => (type === 'success' ? toast.success(msg) : toast.error(msg))}
+            readProject={readProject}
+            dashboardSliceRef={dashboardSliceRef}
+            fileNotice={fileNotice}
+            onFileNotice={setFileNotice}
           />
           
           {/* Save Status */}
@@ -1335,6 +1360,8 @@ function App() {
           onCreate={createBoard}
           onPublish={openPresentation}
           notify={(type, msg) => (type === 'success' ? toast.success(msg) : toast.error(msg))}
+          readProject={readProject}
+          dashboardSliceRef={dashboardSliceRef}
         />
       )}
 

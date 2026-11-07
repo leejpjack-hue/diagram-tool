@@ -14,10 +14,11 @@ import {
 } from '../../lib/supabase';
 
 const downloadBoardJson = vi.hoisted(() => vi.fn());
+const canUseFileSystemAccess = vi.hoisted(() => vi.fn(() => false));
 
 vi.mock('../../utils/fileSystemAccess', async () => {
   const actual = await vi.importActual<typeof import('../../utils/fileSystemAccess')>('../../utils/fileSystemAccess');
-  return { ...actual, downloadBoardJson, canUseFileSystemAccess: () => false };
+  return { ...actual, downloadBoardJson, canUseFileSystemAccess };
 });
 
 vi.mock('../../utils/saveManager', () => ({
@@ -34,6 +35,9 @@ vi.mock('../../utils/saveManager', () => ({
 afterEach(() => {
   boardFileHandles.clear();
   downloadBoardJson.mockReset();
+  canUseFileSystemAccess.mockReset();
+  canUseFileSystemAccess.mockReturnValue(false);
+  vi.unstubAllGlobals();
   setSupabaseClientForTests(undefined);
   cloudBoardLinks.clear();
 });
@@ -136,6 +140,80 @@ describe('FileMenu', () => {
       expect(notify).toHaveBeenCalledWith('error', expect.stringMatching(/workspace backup/i));
     });
     expect(onOpenWorkspaceBoard).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'File' })).toHaveFocus();
+  });
+
+  it('labels an empty file selection as cancelled and keeps the current board', async () => {
+    const onOpenWorkspaceBoard = vi.fn();
+    const notify = vi.fn();
+    render(
+      <FileMenu
+        currentDsl={'diagram: architecture\ntitle: Keep Me\nservice API {}'}
+        mode="architecture"
+        currentBoardId="board-keep"
+        onLoad={vi.fn()}
+        onNew={vi.fn()}
+        onOpenWorkspaceBoard={onOpenWorkspaceBoard}
+        notify={notify}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open…' }));
+    fireEvent.change(screen.getByTestId('open-board-file'), { target: { files: [] } });
+
+    expect(screen.getByTestId('file-open-status')).toHaveTextContent('File selection cancelled.');
+    expect(screen.getByTestId('file-open-status')).toHaveAttribute('role', 'status');
+    expect(notify).not.toHaveBeenCalledWith('success', expect.anything());
+    expect(onOpenWorkspaceBoard).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'File' })).toHaveFocus();
+  });
+
+  it('Open asks for a file through the input and does not call showOpenFilePicker', () => {
+    const picker = vi.fn();
+    Object.assign(window, { showOpenFilePicker: picker });
+    render(
+      <FileMenu
+        currentDsl={'diagram: architecture\ntitle: Keep Me\nservice API {}'}
+        mode="architecture"
+        onLoad={vi.fn()}
+        onNew={vi.fn()}
+        notify={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'File' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open…' }));
+
+    expect(picker).not.toHaveBeenCalled();
+    expect(screen.getByTestId('file-open-status')).toHaveTextContent('Choose a local file to open.');
+    expect(screen.getByTestId('file-open-status')).toHaveAttribute('role', 'status');
+  });
+
+  it('shows a read failure without opening a board', async () => {
+    const onOpenWorkspaceBoard = vi.fn();
+    const notify = vi.fn();
+    render(
+      <FileMenu
+        currentDsl={'diagram: architecture\ntitle: Keep Me\nservice API {}'}
+        mode="architecture"
+        currentBoardId="board-keep"
+        onLoad={vi.fn()}
+        onNew={vi.fn()}
+        onOpenWorkspaceBoard={onOpenWorkspaceBoard}
+        notify={notify}
+      />,
+    );
+    const file = new File(['{}'], 'broken.json', { type: 'application/json' });
+    vi.spyOn(file, 'text').mockRejectedValue(new Error('The file could not be read.'));
+    fireEvent.change(screen.getByTestId('open-board-file'), { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(notify).toHaveBeenCalledWith('error', 'The file could not be read.');
+    });
+    expect(screen.getByTestId('file-open-status')).not.toHaveTextContent('could not be read');
+    expect(onOpenWorkspaceBoard).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'File' })).toHaveFocus();
   });
 
   it('unsupported Mermaid Open does not clobber the current board', async () => {

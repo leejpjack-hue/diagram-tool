@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createMemoryBoardManager,
   createMemoryWorkspace,
   filterAndSortBoards,
   MAX_AUTO_VERSIONS,
   normalizeBoard,
+  StaleWorkspaceEdit,
   toWorkspaceError,
   WORKSPACE_DB_NAME,
   WORKSPACE_STORES,
@@ -281,6 +282,68 @@ describe('migration and import compatibility', () => {
 
   it('rejects invalid files', async () => {
     await expect(manager.importFromFile(asFile({ nope: true }, 'bad.json'))).rejects.toThrow('valid board file');
+  });
+
+  it('checks the commit guard after the file is read and before any write', async () => {
+    const existing = await manager.create({ title: 'Keep', mode: 'architecture', dslText: 'diagram: architecture\nservice Keep' });
+    let read = false;
+    const file = {
+      name: 'next.json',
+      size: 32,
+      text: async () => {
+        read = true;
+        await manager.update(existing.id, { title: 'Edited during read', description: 'metadata' });
+        return JSON.stringify({
+          version: '3.0',
+          kind: 'board',
+          board: { title: 'Incoming', mode: 'flow', dslText: 'diagram: flow\nstart A' },
+        });
+      },
+    } as unknown as File;
+    await expect(manager.importFromFile(file, async () => {
+      expect(read).toBe(true);
+      return (await manager.get(existing.id))?.title === 'Keep';
+    })).rejects.toBeInstanceOf(StaleWorkspaceEdit);
+    expect((await manager.get(existing.id))?.title).toBe('Edited during read');
+    expect(await manager.list()).toHaveLength(1);
+    expect((await manager.list())[0].dslText).toContain('service Keep');
+  });
+
+  it('still imports when the commit guard sees an unchanged workspace', async () => {
+    const report = await manager.importFromFile(
+      asFile({ version: '3.0', kind: 'board', board: { title: 'Allowed', mode: 'flow', dslText: 'diagram: flow\nstart A' } }, 'ok.json'),
+      async () => true,
+    );
+    expect(report.boards[0].title).toBe('Allowed');
+  });
+
+  it('does not store a board when the file cannot be read', async () => {
+    const file = {
+      name: 'missing.json',
+      size: 4,
+      text: async () => { throw new Error('The file could not be read.'); },
+    } as unknown as File;
+    await expect(manager.importFromFile(file)).rejects.toThrow(/could not be read/);
+    expect(await manager.list()).toHaveLength(0);
+  });
+
+  it('keeps a remote URL as text and does not fetch it', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network'));
+    const report = await manager.importFromFile(asFile({
+      version: '3.0',
+      kind: 'board',
+      board: {
+        title: 'Remote bait',
+        description: 'https://remote-bait.example/board',
+        mode: 'architecture',
+        dslText: 'diagram: architecture\nservice API',
+        thumbnail: 'https://remote-bait.example/thumb.png',
+      },
+    }, 'bait.json'));
+    expect(report.boards[0].description).toBe('https://remote-bait.example/board');
+    expect(report.boards[0].thumbnail).toBeUndefined();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 
   it('imports a raw sequenceDiagram mermaid file', async () => {

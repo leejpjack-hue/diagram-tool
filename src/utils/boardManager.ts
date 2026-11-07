@@ -127,6 +127,17 @@ export interface BoardVersion {
 
 export type ActivityType = 'created' | 'opened' | 'updated' | 'renamed' | 'duplicated' | 'exported' | 'trashed' | 'restored' | 'deleted' | 'templated';
 
+/** Returned when a file finished reading after the workspace moved on. */
+export class StaleWorkspaceEdit extends Error {
+  constructor() {
+    super('The workspace changed, so that file was not applied.');
+    this.name = 'StaleWorkspaceEdit';
+  }
+}
+
+/** Called after async validation and immediately before the first stored write. */
+export type CommitGuard = () => boolean | Promise<boolean>;
+
 export interface ActivityEntry {
   id: string;
   boardId?: string;
@@ -487,6 +498,7 @@ export class BoardManager {
     id: string,
     patch: Partial<Omit<Board, 'id' | 'createdAt' | 'schemaVersion'>>,
     activity?: ActivityType,
+    confirmCommit?: CommitGuard,
   ): Promise<Board | undefined> {
     const board = await this.get(id);
     if (!board) return undefined;
@@ -500,7 +512,9 @@ export class BoardManager {
       ...fields,
       updatedAt: incomingClock && incomingClock > board.updatedAt ? incomingClock : new Date().toISOString(),
     });
-    await this.repository.put('boards', await storeBoard(updated));
+    const stored = await storeBoard(updated);
+    if (confirmCommit && !(await confirmCommit())) throw new StaleWorkspaceEdit();
+    await this.repository.put('boards', stored);
     if (typeof patch.dslText === 'string') clearPendingBoardWrite(id, patch.dslText);
     if (activity) await this.addActivity(updated, activity);
     this.emit();
@@ -595,6 +609,7 @@ export class BoardManager {
   async create(
     input: { id?: string; title: string; description?: string; mode: BoardMode; dslText: string; thumbnail?: string; spaceId?: string; tags?: string[]; templateSourceId?: string; presentation?: PresentationItem[]; iconStyle?: IconStyleId; showStepNumbers?: boolean },
     recordActivity = true,
+    confirmCommit?: CommitGuard,
   ): Promise<Board> {
     if (recordActivity) await this.initialize();
     const now = new Date().toISOString();
@@ -620,17 +635,19 @@ export class BoardManager {
     const storedStyle = iconStyleForStorage(input.iconStyle);
     if (storedStyle) board.iconStyle = storedStyle;
     if (showStepNumbersForStorage(input.showStepNumbers)) board.showStepNumbers = true;
+    const stored = await storeBoard(board);
     return this.enqueueBoardWrite(board.id, async () => {
-      await this.repository.put('boards', await storeBoard(board));
+      if (confirmCommit && !(await confirmCommit())) throw new StaleWorkspaceEdit();
+      await this.repository.put('boards', stored);
       if (recordActivity) await this.addActivity(board, 'created');
       this.emit();
       return board;
     });
   }
 
-  async update(id: string, patch: Partial<Omit<Board, 'id' | 'createdAt' | 'schemaVersion'>>, activity?: ActivityType): Promise<Board | undefined> {
+  async update(id: string, patch: Partial<Omit<Board, 'id' | 'createdAt' | 'schemaVersion'>>, activity?: ActivityType, confirmCommit?: CommitGuard): Promise<Board | undefined> {
     await this.initialize();
-    return this.enqueueBoardWrite(id, () => this.applyBoardPatch(id, patch, activity));
+    return this.enqueueBoardWrite(id, () => this.applyBoardPatch(id, patch, activity, confirmCommit));
   }
 
   async markOpened(id: string): Promise<Board | undefined> {
@@ -731,11 +748,12 @@ export class BoardManager {
     return (await this.repository.getAll<Space>('spaces')).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
   }
 
-  async createSpace(name: string, color = '#6366f1'): Promise<Space> {
+  async createSpace(name: string, color = '#6366f1', confirmCommit?: CommitGuard): Promise<Space> {
     await this.initialize();
     const now = new Date().toISOString();
     const spaces = await this.listSpaces();
     const space: Space = { id: generateId('space'), name: name.trim() || 'Untitled space', color, order: spaces.length, createdAt: now, updatedAt: now };
+    if (confirmCommit && !(await confirmCommit())) throw new StaleWorkspaceEdit();
     await this.repository.put('spaces', space);
     this.emit();
     return space;
@@ -933,18 +951,27 @@ export class BoardManager {
     downloadJson(await this.buildCompleteBackup(), `boards-backup-${new Date().toISOString().split('T')[0]}.boards.json`);
   }
 
-  async importFromFile(file: File): Promise<ImportReport> {
+  async importFromFile(file: File, confirmCommit?: CommitGuard): Promise<ImportReport> {
     await this.initialize();
     assertImportSize(file);
     const text = await file.text();
     assertImportSize(file, text);
+    // One check after read/parse, immediately before whichever write runs first.
+    // Later writes in this same call are the rest of that commit, not a new one.
+    let gateOpen = false;
+    const gate: CommitGuard = async () => {
+      if (gateOpen) return true;
+      gateOpen = true;
+      if (confirmCommit && !(await confirmCommit())) throw new StaleWorkspaceEdit();
+      return true;
+    };
     const mermaid = detectRawDiagramImport(file.name, text);
     if (mermaid) {
       const board = await this.create({
         title: sanitizeImportPlainText(mermaid.title, 'Imported diagram'),
         mode: mermaid.mode,
         dslText: mermaid.dslText,
-      });
+      }, true, gate);
       return { boards: [board], spaces: 0, templates: 0, versions: 0, skipped: [] };
     }
 
@@ -957,7 +984,7 @@ export class BoardManager {
         title: sanitizeImportPlainText(drawio.title, 'Imported diagram'),
         mode: drawio.mode,
         dslText: drawio.dslText,
-      });
+      }, true, gate);
       return {
         boards: [board],
         spaces: 0,
@@ -978,7 +1005,7 @@ export class BoardManager {
     const plan = parsePortableImport(data);
     const spaceMap = new Map<string, string>();
     for (const candidate of plan.spaces) {
-      const space = await this.createSpace(candidate.name, candidate.color);
+      const space = await this.createSpace(candidate.name, candidate.color, gate);
       if (candidate.id) spaceMap.set(candidate.id, space.id);
     }
 
@@ -995,7 +1022,7 @@ export class BoardManager {
         spaceId: candidate.spaceId ? spaceMap.get(candidate.spaceId) : undefined,
         iconStyle: candidate.iconStyle,
         showStepNumbers: candidate.showStepNumbers,
-      });
+      }, true, gate);
       if (candidate.id) boardIdMap.set(candidate.id, board.id);
       if (candidate.presentation?.items.length) await this.setPresentation(board.id, candidate.presentation.items);
       const restored = await this.update(board.id, {
@@ -1010,7 +1037,7 @@ export class BoardManager {
     let templates = 0;
     for (const candidate of plan.templates) {
       const now = new Date().toISOString();
-      await this.repository.put('templates', await storeTemplate({
+      const stored = await storeTemplate({
         id: generateId('template'),
         name: candidate.name,
         description: candidate.description ?? '',
@@ -1020,7 +1047,9 @@ export class BoardManager {
         createdAt: now,
         updatedAt: now,
         useCount: 0,
-      }));
+      });
+      await gate();
+      await this.repository.put('templates', stored);
       templates += 1;
     }
 
@@ -1032,7 +1061,7 @@ export class BoardManager {
         skipped.push({ kind: 'version', id: candidate.id, reason: 'Checkpoint board was not imported.' });
         continue;
       }
-      await this.repository.put('versions', {
+      const version = {
         id: generateId('version'),
         boardId,
         name: candidate.name,
@@ -1040,7 +1069,9 @@ export class BoardManager {
         mode: candidate.mode,
         createdAt: candidate.createdAt,
         automatic: Boolean(candidate.automatic),
-      });
+      };
+      await gate();
+      await this.repository.put('versions', version);
       versions += 1;
     }
 
