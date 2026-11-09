@@ -12,7 +12,7 @@ import {
   sourceKindFor,
   type PortableBoard,
 } from './boardFormat';
-import type { Board, BoardManager, BoardMode } from './boardManager';
+import type { Board, BoardManager, BoardMode, CommitGuard } from './boardManager';
 import { importDrawio, looksLikeDrawio } from './drawioImport';
 import { type LinkedFileFormat } from './fileSystemAccess';
 import { applyBoardSource, extractBoardTitle } from './sourceText';
@@ -187,6 +187,7 @@ export async function upsertOpenedBoard(
   manager: BoardManager,
   portable: PortableBoard,
   replaceId?: string,
+  confirmCommit?: CommitGuard,
 ): Promise<Board> {
   const targetId = replaceId || portable.id;
   const existing = targetId ? await manager.get(targetId) : undefined;
@@ -200,7 +201,7 @@ export async function upsertOpenedBoard(
       presentation: portable.presentation,
       iconStyle: portable.iconStyle,
       showStepNumbers: portable.showStepNumbers,
-    }, 'updated');
+    }, 'updated', confirmCommit);
     if (!updated) throw new Error(OPEN_BOARD_FILE_ERRORS.invalid);
     await manager.markOpened(updated.id);
     return (await manager.get(updated.id)) ?? updated;
@@ -216,7 +217,7 @@ export async function upsertOpenedBoard(
     tags: portable.tags,
     presentation: portable.presentation?.items,
     iconStyle: portable.iconStyle,
-    showStepNumbers: portable.showStepNumbers,
-  });
+      showStepNumbers: portable.showStepNumbers,
+  }, true, confirmCommit);
   return created;
 }

@@ -7,6 +7,13 @@ import {
 } from '../../utils/cursorMcpSnippet';
 import { extractBoardTitle } from '../../utils/sourceText';
 import { interpretOpenedFile, serializeBoardFile, upsertOpenedBoard } from '../../utils/boardFile';
+import { StaleWorkspaceEdit } from '../../utils/boardManager';
+import {
+  OPEN_FEEDBACK,
+  readOpenEpoch,
+  sameOpenEpoch,
+  type ProjectIdentity,
+} from '../../utils/openRevision';
 import { assertImportSize } from '../../utils/importSanitizer';
 import {
   OPEN_FILE_ACCEPT,
@@ -51,6 +58,10 @@ interface FileMenuProps {
   onNew: () => void;
   onOpenWorkspaceBoard?: (board: Board) => void;
   notify?: (type: 'success' | 'error', message: string) => void;
+  readProject?: () => ProjectIdentity;
+  dashboardSelectionRef?: { current: readonly string[] };
+  fileNotice?: { tone: 'status' | 'alert'; message: string } | null;
+  onFileNotice?: (notice: { tone: 'status' | 'alert'; message: string } | null) => void;
 }
 
 export function FileMenu({
@@ -62,6 +73,10 @@ export function FileMenu({
   onNew,
   onOpenWorkspaceBoard,
   notify,
+  readProject,
+  dashboardSelectionRef,
+  fileNotice: fileNoticeProp,
+  onFileNotice,
 }: FileMenuProps) {
   const activeMode: BoardMode = boardMode ?? mode;
   const [isOpen, setIsOpen] = useState(false);
@@ -84,6 +99,15 @@ export function FileMenu({
   const [shareBusy, setShareBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openBoardInputRef = useRef<HTMLInputElement>(null);
+  const fileButtonRef = useRef<HTMLButtonElement>(null);
+  const pendingOpenGuard = useRef<(() => boolean) | null>(null);
+  const openGesture = useRef(0);
+  const [localFileNotice, setLocalFileNotice] = useState<{ tone: 'status' | 'alert'; message: string } | null>(null);
+  const fileNotice = onFileNotice ? fileNoticeProp ?? null : localFileNotice;
+  const setFileNotice = (notice: { tone: 'status' | 'alert'; message: string } | null) => {
+    if (onFileNotice) onFileNotice(notice);
+    else setLocalFileNotice(notice);
+  };
   const menuRef = useRef<HTMLDivElement>(null);
   const snippet = cursorMcpJsonSnippet();
   const canReload = Boolean(currentBoardId && linkedToDisk && boardFileHandles.has(currentBoardId));
@@ -368,9 +392,26 @@ export function FileMenu({
     queueMicrotask(() => setLinkedToDisk(linked));
   }, [currentBoardId]);
 
+  const focusFileButton = () => {
+    fileButtonRef.current?.focus();
+  };
+
+  const projectIdentity = (): ProjectIdentity => readProject?.() ?? {
+    view: 'editor',
+    boardId: currentBoardId,
+    lastOpenedAt: null,
+  };
+
+  const showFileError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : "That file couldn't be opened.";
+    setFileNotice(null);
+    notify?.('error', message);
+    focusFileButton();
+  };
+
   const notifyFileError = (error: unknown) => {
     if (isAbortError(error)) return;
-    notify?.('error', error instanceof Error ? error.message : "That file couldn't be opened.");
+    showFileError(error);
   };
 
   const snapshotCurrentBoard = async (): Promise<Pick<Board, 'title' | 'mode' | 'dslText'> & Partial<Board>> => {
@@ -395,31 +436,63 @@ export function FileMenu({
 
   const applyOpenedText = async (
     text: string,
+    baseline: () => boolean,
     handle?: FileSystemFileHandleLike,
     replaceId?: string,
     filename?: string,
   ) => {
     const opened = await interpretOpenedFile(filename ?? handle?.name ?? 'diagram', text);
     const mappedId = replaceId ?? (handle ? await boardFileHandles.findBoardId(handle) : undefined);
-    const board = await upsertOpenedBoard(boardManager, opened.portable, mappedId);
+    const board = await upsertOpenedBoard(boardManager, opened.portable, mappedId, baseline);
     if (handle) {
       boardFileHandles.set(board.id, handle, opened.format);
       setLinkedToDisk(true);
     }
+    const message = `Opened "${board.title}"`;
+    setFileNotice(null);
+    notify?.('success', message);
     onOpenWorkspaceBoard?.(board);
-    notify?.('success', `Opened "${board.title}"`);
+    focusFileButton();
+  };
+
+  const armOpenGuard = () => {
+    const token = ++openGesture.current;
+    const epoch = readOpenEpoch(projectIdentity(), dashboardSelectionRef?.current ?? []);
+    return () => token === openGesture.current && sameOpenEpoch(
+      epoch,
+      readOpenEpoch(projectIdentity(), dashboardSelectionRef?.current ?? []),
+    );
   };
 
   const handleOpenBoardFile = () => {
     handleClose();
+    const guard = armOpenGuard();
+    pendingOpenGuard.current = guard;
+    setFileNotice({ tone: 'status', message: OPEN_FEEDBACK.chooseOpen });
     if (canUseFileSystemAccess()) {
+      pendingOpenGuard.current = null;
       void (async () => {
         try {
           const picked = await pickBoardFileToOpen();
-          if (!picked) return;
-          await applyOpenedText(picked.text, picked.handle);
+          if (!picked) {
+            setFileNotice({ tone: 'status', message: OPEN_FEEDBACK.cancelled });
+            focusFileButton();
+            return;
+          }
+          setFileNotice({ tone: 'status', message: OPEN_FEEDBACK.checking });
+          await applyOpenedText(picked.text, guard, picked.handle);
         } catch (error) {
-          notifyFileError(error);
+          if (isAbortError(error)) {
+            setFileNotice({ tone: 'status', message: OPEN_FEEDBACK.cancelled });
+            focusFileButton();
+            return;
+          }
+          if (error instanceof StaleWorkspaceEdit) {
+            setFileNotice({ tone: 'status', message: error.message });
+            focusFileButton();
+            return;
+          }
+          showFileError(error);
         }
       })();
       return;
@@ -430,14 +503,27 @@ export function FileMenu({
   const handleOpenBoardInput = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file) return;
+    if (!file) {
+      pendingOpenGuard.current = null;
+      setFileNotice({ tone: 'status', message: OPEN_FEEDBACK.cancelled });
+      focusFileButton();
+      return;
+    }
+    const baseline = pendingOpenGuard.current ?? armOpenGuard();
+    pendingOpenGuard.current = null;
+    setFileNotice({ tone: 'status', message: OPEN_FEEDBACK.checking });
     try {
       assertImportSize(file);
       const text = await file.text();
       assertImportSize(file, text);
-      await applyOpenedText(text, undefined, undefined, file.name);
+      await applyOpenedText(text, baseline, undefined, undefined, file.name);
     } catch (error) {
-      notifyFileError(error);
+      if (error instanceof StaleWorkspaceEdit) {
+        setFileNotice({ tone: 'status', message: error.message });
+        focusFileButton();
+        return;
+      }
+      showFileError(error);
     }
   };
 
@@ -575,6 +661,7 @@ export function FileMenu({
       {/* Menu Button + Header Account/Sign-in Chrome */}
       <div className="flex items-center gap-2">
         <button
+          ref={fileButtonRef}
           type="button"
           onClick={handleOpen}
           className="btn btn-secondary"
@@ -609,6 +696,14 @@ export function FileMenu({
           </button>
         )}
       </div>
+      <p
+        data-testid="file-open-status"
+        role={fileNotice?.tone === 'alert' ? 'alert' : 'status'}
+        aria-live={fileNotice?.tone === 'alert' ? 'assertive' : 'polite'}
+        className={`${fileNotice ? 'max-w-xs text-xs font-medium' : 'sr-only'} ${fileNotice?.tone === 'alert' ? 'text-red-700' : 'text-slate-600'}`}
+      >
+        {fileNotice?.message ?? ''}
+      </p>
 
       {/* Dropdown Menu */}
       {isOpen && (
