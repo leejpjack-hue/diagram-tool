@@ -138,6 +138,9 @@ export function SkillCatalog({ disabled = false, onActivate }: SkillCatalogProps
                 <p id={`skill-desc-${skill.name}`} data-testid={`skill-description-${skill.name}`} className="mt-0.5 text-[11px] leading-snug text-slate-600">
                   {skill.description}
                 </p>
+                <p data-testid={`skill-location-${skill.name}`} className="mt-0.5 font-mono text-[10px] text-slate-500">
+                  {skill.location}
+                </p>
                 <button
                   type="button"
                   data-testid={`skill-activate-${skill.name}`}

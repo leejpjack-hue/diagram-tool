@@ -1,10 +1,13 @@
 import { DiagramSkillsAgent } from './skills-agent';
+import type { R2BucketLike } from './skill-sources';
 export { DiagramSkillsAgent };
 
 export interface Env {
   ASSETS?: { fetch: typeof fetch };
   DIAGRAM_SKILLS: DurableObjectNamespace<DiagramSkillsAgent>;
   SKILLS_ADMIN_TOKEN?: string;
+  SKILLS_BUCKET?: R2BucketLike;
+  SKILLS_SKIP_WORKSPACE_SEED?: string;
 }
 
 const GOOGLE_SITE_VERIFICATION_PATH = '/google64b6c4e267d551f7.html';

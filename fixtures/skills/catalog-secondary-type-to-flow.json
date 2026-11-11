@@ -1,0 +1,12 @@
+{
+  "skills": [
+    {
+      "name": "type-to-flow",
+      "description": "Convert a plain-text workflow into a typed flow and Mermaid flowchart for DiagramTool. Use for process steps, workflow outlines, and flowcharts from prose.",
+      "location": "agents:skills/type-to-flow",
+      "sourceId": "bundle:agents:skills",
+      "version": "1.0.0",
+      "checksum": "sha256:7428641807547064a1231e45393301e73d86f27180f1894af8a12e3969cc47ac"
+    }
+  ]
+}
