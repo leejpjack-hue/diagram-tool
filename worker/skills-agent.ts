@@ -1,7 +1,12 @@
 import { Workspace } from '@cloudflare/computer';
-import { Think, skills } from '@cloudflare/think';
+import { Think } from '@cloudflare/think';
 import { loadSkillCatalog } from 'agents/skills';
 import { STARTER_SKILLS } from './generated-skill-seed';
+import {
+  SECONDARY_SKILLS_PREFIX,
+  buildDiagramSkillSources,
+  type R2BucketLike,
+} from './skill-sources';
 // Free-plan deploy: no Dynamic Workers / worker_loaders. Run the checked-in converter
 // via static import instead of WorkerJavaScriptBackend + LOADER.
 import typeToFlow from '../skills/type-to-flow/scripts/type-to-flow.js';
@@ -10,9 +15,16 @@ const ROOT = '/workspace/.agents/skills';
 const SEEDED = 'dt-skills-seeded-v1';
 const MAX_INPUT_BYTES = 64 * 1024;
 
-type Env = Cloudflare.Env;
+type Env = Cloudflare.Env & {
+  SKILLS_BUCKET?: R2BucketLike;
+  SKILLS_SKIP_WORKSPACE_SEED?: string;
+};
 
-/** Durable skills host: Workspace files stay authoritative for catalog/activation. */
+/**
+ * Durable skills host: Workspace files stay primary and authoritative;
+ * verified R2 (`agents:skills`) and checked-in bundle (`bundle:agents:skills`)
+ * provide the secondary load path when Workspace is empty or unseeded.
+ */
 export class DiagramSkillsAgent extends Think<Env> {
   // File storage only — no JS Worker Loader backend (paid Dynamic Workers).
   override workspace = new Workspace({
@@ -20,10 +32,13 @@ export class DiagramSkillsAgent extends Think<Env> {
   });
 
   override getSkills() {
-    return [skills.workspace(this.workspace)];
+    return buildDiagramSkillSources(this.workspace, {
+      r2Bucket: this.env?.SKILLS_BUCKET,
+    });
   }
 
   override async onStart() {
+    if (this.env?.SKILLS_SKIP_WORKSPACE_SEED === '1') return;
     if (await this.ctx.storage.get(SEEDED)) return;
     for (const [relative, content] of Object.entries(STARTER_SKILLS)) {
       const file = `${ROOT}/${relative}`;
@@ -47,7 +62,16 @@ export class DiagramSkillsAgent extends Think<Env> {
     try {
       if (path === '/api/skills' && request.method === 'GET') {
         const catalog = await loadSkillCatalog(await this.getSkills());
-        return Response.json({ skills: catalog.skills.map(({ skill, location }) => ({ name: skill.name, description: skill.description, location })) });
+        return Response.json({
+          skills: catalog.skills.map(({ skill, location, sourceId }) => ({
+            name: skill.name,
+            description: skill.description,
+            location: location ?? `${SECONDARY_SKILLS_PREFIX}/${skill.name}`,
+            sourceId,
+            ...(typeof skill.metadata.version === 'string' ? { version: skill.metadata.version } : {}),
+            ...(typeof skill.metadata.checksum === 'string' ? { checksum: skill.metadata.checksum } : {}),
+          })),
+        });
       }
       if (path === '/api/skills/files' && request.method === 'PUT') {
         // Only the outer Worker can forward an authorized administration request.

@@ -4,6 +4,7 @@
 // type-to-flow execution stays on the statically imported converter (#127).
 
 export const SKILLS_WORKSPACE_ROOT = '/workspace/.agents/skills';
+export const SKILLS_SECONDARY_PREFIX = 'agents:skills';
 
 export const SKILL_CATALOG_RELOAD_NOTE =
   'Reload skills reads the Workspace again, so a new skill folder under /workspace/.agents/skills appears without a Worker redeploy. type-to-flow still runs the converter shipped with this Worker. Editing scripts/type-to-flow.js in the Workspace does not change that runner until a Worker redeploy.';
@@ -17,6 +18,14 @@ export interface SkillCatalogEntry {
   name: string;
   description: string;
   location: string;
+  sourceId?: string;
+  version?: string;
+  checksum?: string;
+}
+
+export function isWorkspaceSkillEntry(entry: Pick<SkillCatalogEntry, 'location' | 'sourceId'>): boolean {
+  if (typeof entry.sourceId === 'string' && entry.sourceId.startsWith('workspace:')) return true;
+  return entry.location === SKILLS_WORKSPACE_ROOT || entry.location.startsWith(`${SKILLS_WORKSPACE_ROOT}/`);
 }
 
 export function isAbortError(error: unknown): boolean {
@@ -53,19 +62,38 @@ export async function getSkillCatalog(options?: { reload?: boolean; signal?: Abo
   if (!data || typeof data !== 'object' || !('skills' in data) || !Array.isArray(data.skills)) {
     throw new Error('The skills catalog could not be loaded.');
   }
-  const entries: SkillCatalogEntry[] = [];
+  const byName = new Map<string, SkillCatalogEntry>();
   for (const item of data.skills) {
     if (!item || typeof item !== 'object') continue;
-    const { name, description, location } = item as { name?: unknown; description?: unknown; location?: unknown };
+    const { name, description, location, sourceId, version, checksum } = item as {
+      name?: unknown;
+      description?: unknown;
+      location?: unknown;
+      sourceId?: unknown;
+      version?: unknown;
+      checksum?: unknown;
+    };
     if (typeof name !== 'string' || !SKILL_NAME.test(name)) continue;
     if (typeof description !== 'string' || !description.trim()) continue;
-    entries.push({
+    const resolvedLocation = typeof location === 'string' && location.trim() ? location.trim() : `${SKILLS_WORKSPACE_ROOT}/${name}`;
+    const resolvedSourceId = typeof sourceId === 'string' && sourceId.trim() ? sourceId.trim() : undefined;
+    const nextEntry: SkillCatalogEntry = {
       name,
       description: description.trim(),
-      location: typeof location === 'string' && location.trim() ? location : `${SKILLS_WORKSPACE_ROOT}/${name}`,
-    });
+      location: resolvedLocation,
+      ...(resolvedSourceId ? { sourceId: resolvedSourceId } : {}),
+      ...(typeof version === 'string' && version.trim() ? { version: version.trim() } : {}),
+      ...(typeof checksum === 'string' && checksum.trim() ? { checksum: checksum.trim() } : {}),
+    };
+    const existing = byName.get(name);
+    if (!existing) {
+      byName.set(name, nextEntry);
+    } else if (!isWorkspaceSkillEntry(existing) && isWorkspaceSkillEntry(nextEntry)) {
+      // Fail-closed precedence: Workspace always wins over secondary sources.
+      byName.set(name, nextEntry);
+    }
   }
-  return entries;
+  return [...byName.values()];
 }
 
 export async function activateSkill(name: string, signal?: AbortSignal): Promise<string> {

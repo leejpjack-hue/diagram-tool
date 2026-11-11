@@ -1,0 +1,17 @@
+{
+  "id": "bundle:agents:skills",
+  "prefix": "agents:skills",
+  "packages": [
+    {
+      "name": "type-to-flow",
+      "version": "1.0.0",
+      "checksum": "sha256:7428641807547064a1231e45393301e73d86f27180f1894af8a12e3969cc47ac",
+      "location": "agents:skills/type-to-flow",
+      "files": [
+        "SKILL.md",
+        "references/flow-schema.md",
+        "scripts/type-to-flow.js"
+      ]
+    }
+  ]
+}

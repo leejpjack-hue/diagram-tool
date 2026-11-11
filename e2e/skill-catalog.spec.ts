@@ -8,6 +8,16 @@ const output = JSON.parse(readFileSync(new URL('../fixtures/type-to-flow/spike-o
 const catalog = JSON.parse(readFileSync(new URL('../fixtures/skills/catalog-type-to-flow.json', import.meta.url), 'utf8')) as {
   skills: { name: string; description: string; location: string }[];
 };
+const secondaryCatalog = JSON.parse(
+  readFileSync(new URL('../fixtures/skills/catalog-secondary-type-to-flow.json', import.meta.url), 'utf8'),
+) as {
+  skills: { name: string; description: string; location: string; sourceId: string; version: string; checksum: string }[];
+};
+const skillBundle = JSON.parse(readFileSync(new URL('../skills/skills-bundle.json', import.meta.url), 'utf8')) as {
+  id: string;
+  prefix: string;
+  packages: { name: string; version: string; checksum: string; location: string }[];
+};
 const emptyCatalog = JSON.parse(readFileSync(new URL('../fixtures/skills/catalog-empty.json', import.meta.url), 'utf8')) as { skills: unknown[] };
 const reloadedCatalog = JSON.parse(readFileSync(new URL('../fixtures/skills/catalog-after-reload.json', import.meta.url), 'utf8')) as {
   skills: { name: string; description: string }[];
@@ -138,4 +148,49 @@ test('reload shows a skill folder added without a worker redeploy', async ({ pag
   await expect(page.getByTestId('skill-name-review-notes')).toHaveText('review-notes');
   await expect(page.getByTestId('skill-description-review-notes')).toHaveText('Summarise a board in plain language.');
   await expect(page.getByTestId('skill-catalog-reload-note')).toContainText('does not change that runner until a Worker redeploy');
+});
+
+test('secondary agents:skills catalog loads type-to-flow on an unseeded Workspace and yields to Workspace precedence', async ({ page }) => {
+  expect(secondaryCatalog.skills[0]?.checksum).toBe(skillBundle.packages[0]?.checksum);
+  expect(secondaryCatalog.skills[0]?.version).toBe(skillBundle.packages[0]?.version);
+
+  const dualSourceCatalog = {
+    skills: [
+      ...secondaryCatalog.skills,
+      {
+        name: 'type-to-flow',
+        description: 'Workspace override wins over secondary bundle.',
+        location: '/workspace/.agents/skills/type-to-flow',
+        sourceId: 'workspace:/workspace/.agents/skills',
+        version: '1.0.0-workspace',
+      },
+    ],
+  };
+
+  await page.route(/\/api\/skills(?:\?|$)/, route => {
+    const reload = new URL(route.request().url()).searchParams.get('reload') === '1';
+    return fulfillJson(route, reload ? dualSourceCatalog : secondaryCatalog);
+  });
+  await page.route(/\/api\/skills\/type-to-flow\/activate$/, route =>
+    fulfillJson(route, { content: '<skill_content name="type-to-flow" location="agents:skills/type-to-flow">\n# type-to-flow\n</skill_content>' }),
+  );
+  await page.route(/\/api\/skills\/type-to-flow\/run$/, route => fulfillJson(route, output));
+
+  await openBlankWorkflow(page);
+  await expect(page.getByTestId('skill-name-type-to-flow')).toHaveText('type-to-flow');
+  await expect(page.getByTestId('skill-location-type-to-flow')).toHaveText('agents:skills/type-to-flow');
+  await expect(page.getByTestId('skill-description-type-to-flow')).toHaveText(secondaryCatalog.skills[0].description);
+
+  await page.getByTestId('toggle-type-steps').click();
+  await page.getByTestId('type-steps-input').fill(input.text);
+  await page.getByRole('button', { name: 'Activate type-to-flow' }).click();
+  await expect(page.locator('.react-flow__node')).toHaveCount(7, { timeout: 20_000 });
+  await expect(page.getByTestId('skill-activate-note')).toContainText('mapped it onto this board');
+
+  const reloaded = page.waitForRequest(request => request.url().includes('/api/skills?reload=1'));
+  await page.getByTestId('skill-catalog-reload').click();
+  await reloaded;
+  await expect(page.locator('[data-testid="skill-catalog-item-type-to-flow"]')).toHaveCount(1);
+  await expect(page.getByTestId('skill-location-type-to-flow')).toHaveText('/workspace/.agents/skills/type-to-flow');
+  await expect(page.getByTestId('skill-description-type-to-flow')).toHaveText('Workspace override wins over secondary bundle.');
 });
