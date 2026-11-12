@@ -893,6 +893,18 @@ function App() {
       });
       setWorkspaceError('');
       openBoard(board);
+      if (request.templateSourceId) {
+        try {
+          const seedPayload = seedTypeStepsForTemplate(request.templateSourceId, dslText);
+          if (seedPayload) queueTypeStepsSeed(seedPayload);
+        } catch (err) {
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : 'This template has no steps to pre-fill Type steps yet.',
+          );
+        }
+      }
       toast.success('Board created');
     } catch (error) {
       const message = toWorkspaceError(error).message;

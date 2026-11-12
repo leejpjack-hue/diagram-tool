@@ -27,6 +27,50 @@ export function templateMatchesQuery(template: Pick<DiagramTemplate, 'name' | 'd
 
 const CATALOG_TEMPLATES: DiagramTemplate[] = [
   {
+    id: 'flow-ai-workflow',
+    name: 'AI workflow',
+    description: 'Plain-words AI pipeline — Human ask, Model, Tool, Check, Reply — with a retry loop for wrong answers.',
+    category: 'Flow',
+    mode: 'flow',
+    tags: ['ai', 'workflow', '工作流'],
+    dsl: `diagram: flow
+title: AI workflow
+direction: LR
+
+Ask -> Model
+Model -> Tool
+Tool -> Check
+
+Check ->|retry| Model
+Check ->|ok| Reply
+
+node Ask {
+  label: Human ask
+  role: human
+}
+
+node Model {
+  label: Model
+  role: model
+}
+
+node Tool {
+  label: Tool
+  role: tool
+}
+
+node Check {
+  type: decision
+  label: Check
+  role: check
+}
+
+node Reply {
+  label: Reply
+  role: human
+}`,
+  },
+  {
     id: 'aws-three-tier',
     name: 'AWS 3-Tier Web Application',
     description: 'Classic web/app/DB layout on AWS with CloudFront, API Gateway, Lambda, RDS, and S3.',
@@ -997,50 +1041,6 @@ group BackOffice {
   label: Core Platform
   color: "#10b981"
   contains: Platform, Intelligence, DataLake, Operations
-}`,
-  },
-  {
-    id: 'flow-ai-workflow',
-    name: 'AI workflow',
-    description: 'Plain-words AI pipeline — Human ask, Model, Tool, Check, Reply — with a retry loop for wrong answers.',
-    category: 'Flow',
-    mode: 'flow',
-    tags: ['ai', 'workflow', '工作流'],
-    dsl: `diagram: flow
-title: AI workflow
-direction: LR
-
-Ask -> Model
-Model -> Tool
-Tool -> Check
-
-Check ->|retry| Model
-Check ->|ok| Reply
-
-node Ask {
-  label: Human ask
-  role: human
-}
-
-node Model {
-  label: Model
-  role: model
-}
-
-node Tool {
-  label: Tool
-  role: tool
-}
-
-node Check {
-  type: decision
-  label: Check
-  role: check
-}
-
-node Reply {
-  label: Reply
-  role: human
 }`,
   },
   {

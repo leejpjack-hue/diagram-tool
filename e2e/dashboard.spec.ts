@@ -47,4 +47,52 @@ test.describe('Miro-style personal dashboard', () => {
     await expect(page.getByRole('button', { name: 'Close navigation', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Templates', exact: true })).toBeVisible();
   });
+
+  test('starts from the typed AI workflow on Home, edits text to update canvas, and persists locally without an account (#137)', async ({ page }) => {
+    await page.goto('/app/');
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+
+    // Home offers the typed AI-workflow starter alongside existing blanks and templates.
+    const aiStarter = page.getByTestId('template-card-flow-ai-workflow');
+    await expect(aiStarter).toBeVisible();
+    await expect(aiStarter).toContainText('AI workflow');
+    await expect(page.getByRole('button', { name: /Blank Workflow/i })).toBeVisible();
+    await expect(page.getByTestId('template-card-aws-three-tier')).toBeVisible();
+    await expect(page.getByTestId('template-card-workshop-retro')).toBeVisible();
+
+    await aiStarter.click();
+
+    // Canvas renders the human / model / tool / check flow and Type steps is pre-filled.
+    await expect(page.getByRole('button', { name: '⌂ Boards' })).toBeVisible();
+    await expect(page.locator('.react-flow__node', { hasText: 'Human ask' })).toBeVisible();
+    await expect(page.locator('.react-flow__node', { hasText: 'Model' })).toBeVisible();
+    await expect(page.locator('.react-flow__node', { hasText: 'Tool' })).toBeVisible();
+    await expect(page.locator('.react-flow__node', { hasText: 'Check' })).toBeVisible();
+    await expect(page.locator('.react-flow__node', { hasText: 'Reply' })).toBeVisible();
+
+    const stepsInput = page.getByTestId('type-steps-input');
+    await expect(stepsInput).toBeVisible();
+    await expect(stepsInput).toHaveValue(
+      ['Human: Human ask', 'Model: Model', 'Tool: Tool', 'If Check: Check', 'then Human: Reply', 'else go back to Model'].join('\n'),
+    );
+
+    // Edit the typed starter steps and watch the canvas update.
+    await stepsInput.fill(
+      ['Human: Human ask', 'Model: Draft plan', 'Tool: Search docs', 'If Check: Verified?', 'then Human: Reply', 'else go back to Draft plan'].join('\n'),
+    );
+    await page.getByTestId('build-steps').click();
+    await expect(page.locator('.react-flow__node', { hasText: 'Draft plan' })).toBeVisible();
+    await expect(page.locator('.react-flow__node', { hasText: 'Search docs' })).toBeVisible();
+
+    // Local-first: board stays on the device across reload with no account required.
+    await page.getByRole('button', { name: '⌂ Boards' }).click();
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'AI workflow' }).first()).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await page.getByRole('heading', { name: 'AI workflow' }).first().click();
+    await expect(page.locator('.react-flow__node', { hasText: 'Draft plan' })).toBeVisible();
+    await expect(page.locator('.react-flow__node', { hasText: 'Search docs' })).toBeVisible();
+  });
 });
