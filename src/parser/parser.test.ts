@@ -575,3 +575,32 @@ lane AI agent { contains: ask, draft }
     expect(named.lanes?.[0].contains).toEqual(['ask', 'draft']);
   });
 });
+
+describe('Native diagram: flow helpful errors', () => {
+  it('names the line and fix when a flow arrow is missing its target', () => {
+    expect(() => parseDiagram('diagram: flow\ntitle: Intake\nReview ->\n')).toThrow(
+      /missing a target step after "->" at line 3.*Review -> NextStep/i,
+    );
+  });
+
+  it('names the line and fix when a flow arrow is missing its source', () => {
+    expect(() => parseDiagram('diagram: flow\n-> Review\n')).toThrow(
+      /Unexpected -> at line 2.*Start -> NextStep/i,
+    );
+  });
+
+  it('names the line and fix when a flow branch label pipe is unclosed', () => {
+    expect(() => parseDiagram('diagram: flow\nCheck ->|Approved Done\n')).toThrow(
+      /Unclosed branch label "\|Approved Done" at line 2\. Close the label with "\|"/,
+    );
+  });
+
+  it('names the line and fix when a node block is missing the node keyword or closing brace', () => {
+    expect(() => parseDiagram('diagram: flow\nIntake {\n  label: "Intake"\n}\n')).toThrow(
+      /Missing "node" keyword before "Intake \{" at line 2/,
+    );
+    expect(() => parseDiagram('diagram: flow\nIntake -> Done\nnode Intake {\n  label: "Intake"\n')).toThrow(
+      /Unexpected end of input \(expected RBRACE\) at line 5\. Add "\}" to close the open block/,
+    );
+  });
+});

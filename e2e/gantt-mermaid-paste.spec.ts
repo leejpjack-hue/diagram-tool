@@ -223,11 +223,67 @@ test.describe('Paste Mermaid gantt into the source editor', () => {
     await pasteIntoSourceEditor(page, ARCH_BETA_MMD);
 
     await expect(page.getByTestId('dsl-parse-error')).toContainText("Mermaid architecture-beta isn't supported yet.");
+    await expect(page.getByTestId('dsl-parse-error')).toContainText('Line 1 starts with "architecture-beta"');
+    await expect(page.getByTestId('dsl-parse-error')).toContainText('flowchart TD');
     await expect(page.getByTestId('dsl-parse-warning')).toHaveCount(0);
     await expect(page.getByTestId('board-mode-status')).toHaveText(/flow mode/i);
     await expect(page.getByRole('button', { name: 'Flow', exact: true })).toHaveClass(/active/);
     await expect(nodes).toHaveCount(nodeCount);
     await expect(nodes.filter({ hasText: 'NextStep' })).toBeVisible();
     await expect(nodes.filter({ hasText: 'Done' })).toBeVisible();
+  });
+
+  test('pasting a broken Mermaid flowchart, unsupported Mermaid types, or broken native diagram: flow names the line/construct and fix and keeps the last good canvas locally', async ({ page }) => {
+    await page.goto('/app/');
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await page.getByRole('button', { name: 'Create new' }).click();
+    await page.getByRole('button', { name: 'Blank Workflow Open a clean DSL canvas.' }).click();
+    await waitForEditor(page);
+    await dismissToastIfPresent(page, 'Board created');
+
+    const nodes = page.locator('.react-flow__node');
+    await expect(nodes.filter({ hasText: 'NextStep' })).toBeVisible();
+    await expect(nodes.filter({ hasText: 'Done' })).toBeVisible();
+    const nodeCount = await nodes.count();
+
+    const pasteRequests: string[] = [];
+    page.on('request', req => {
+      pasteRequests.push(req.url());
+    });
+
+    // 1. Broken Mermaid flowchart (including remote URL bait in node label)
+    await pasteIntoSourceEditor(page, 'flowchart TD\n  Intake["https://remote-paste-bait.example/flow.mmd"] -->\n');
+    await expect(page.getByTestId('dsl-parse-error')).toContainText('Missing target node after arrow at line 2');
+    await expect(page.getByTestId('dsl-parse-error')).toContainText('Intake --> NextStep');
+    await expect(nodes).toHaveCount(nodeCount);
+    await expect(nodes.filter({ hasText: 'NextStep' })).toBeVisible();
+    await expect(nodes.filter({ hasText: 'Done' })).toBeVisible();
+
+    // 2. Unsupported Mermaid types documented as unopened (erDiagram / classDiagram / mindmap / C4 Mermaid)
+    for (const [source, kind, fixSnippet] of [
+      ['erDiagram\n  CUSTOMER ||--o{ ORDER : places\n', 'erDiagram', 'use flowchart TD, sequenceDiagram, or gantt'],
+      ['classDiagram\n  class Order\n', 'classDiagram', 'use flowchart TD, sequenceDiagram, or gantt'],
+      ['mindmap\n  root((Flow))\n', 'mindmap', 'use flowchart TD, sequenceDiagram, or gantt'],
+      ['C4Context\n  Person(user, "User")\n', 'C4Context', 'use native diagram: architecture with level: and parent:'],
+    ] as const) {
+      await pasteIntoSourceEditor(page, source);
+      await expect(page.getByTestId('dsl-parse-error')).toContainText(`Mermaid ${kind} isn't supported yet.`);
+      await expect(page.getByTestId('dsl-parse-error')).toContainText(`Line 1 starts with "${kind}"`);
+      await expect(page.getByTestId('dsl-parse-error')).toContainText(fixSnippet);
+      await expect(nodes).toHaveCount(nodeCount);
+      await expect(nodes.filter({ hasText: 'NextStep' })).toBeVisible();
+      await expect(nodes.filter({ hasText: 'Done' })).toBeVisible();
+    }
+
+    // 3. Broken native diagram: flow
+    await pasteIntoSourceEditor(page, 'diagram: flow\ntitle: Broken Native Flow\nIntake ->\n');
+    await expect(page.getByTestId('dsl-parse-error')).toContainText('Flow connection is missing a target step after "->" at line 3');
+    await expect(page.getByTestId('dsl-parse-error')).toContainText('Intake -> NextStep');
+    await expect(nodes).toHaveCount(nodeCount);
+    await expect(nodes.filter({ hasText: 'NextStep' })).toBeVisible();
+    await expect(nodes.filter({ hasText: 'Done' })).toBeVisible();
+
+    expect(pasteRequests.some(url => url.includes('remote-paste-bait.example'))).toBe(false);
+    expect(pasteRequests).toEqual([]);
   });
 });
