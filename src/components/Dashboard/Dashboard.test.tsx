@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Dashboard } from './Dashboard';
 import { WORKSPACE_UNAVAILABLE_TITLE } from '../Workspace/WorkspaceStatus';
@@ -77,5 +77,31 @@ describe('Dashboard workspace recovery', () => {
     });
     expect(screen.getByText('Unable to open local workspace storage.')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /Untitled/ })).not.toBeInTheDocument();
+  });
+
+  it('offers the typed AI workflow starter on Home alongside blank and workshop cards (#137)', async () => {
+    mocks.list.mockResolvedValue([]);
+    const onCreate = vi.fn();
+    render(
+      <Dashboard onOpen={vi.fn()} onCreate={onCreate} onPublish={vi.fn()} notify={vi.fn()} />,
+    );
+
+    const starterCard = await screen.findByTestId('template-card-flow-ai-workflow');
+    expect(starterCard).toHaveTextContent('AI workflow');
+    expect(starterCard).toHaveTextContent('Plain-words AI pipeline — Human ask, Model, Tool, Check, Reply');
+    expect(screen.getByRole('button', { name: /Blank Workflow/i })).toBeInTheDocument();
+    expect(screen.getByTestId('template-card-workshop-retro')).toBeInTheDocument();
+
+    fireEvent.click(starterCard);
+    await waitFor(() => {
+      expect(onCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: 'flow',
+          title: 'AI workflow',
+          templateSourceId: 'flow-ai-workflow',
+          dslText: expect.stringContaining('diagram: flow'),
+        }),
+      );
+    });
   });
 });

@@ -452,9 +452,17 @@ function HomeStart({ templates, recent, onQuickCreate, onUseTemplate, onOpen, on
             </button>
           ))}
           {templates.map(template => (
-            <button key={template.id} className="hidden min-h-28 overflow-hidden rounded-lg border border-slate-200 bg-white text-left hover:border-indigo-300 hover:shadow-sm xl:block" onClick={() => onUseTemplate(template)}>
+            <button
+              key={template.id}
+              data-testid={`template-card-${template.id}`}
+              className="min-h-28 overflow-hidden rounded-lg border border-slate-200 bg-white text-left hover:border-indigo-300 hover:shadow-sm"
+              onClick={() => onUseTemplate(template)}
+            >
               <div className="h-16 overflow-hidden"><TemplateThumb template={template} /></div>
-              <div className="truncate px-2.5 py-2 text-xs font-semibold">{template.name}</div>
+              <div className="px-2.5 py-2">
+                <div className="truncate text-xs font-semibold">{template.name}</div>
+                <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-500">{template.description}</div>
+              </div>
             </button>
           ))}
         </div>
@@ -584,7 +592,7 @@ function TemplatesView({ templates, onUseBuiltIn, onUsePersonal, onDeletePersona
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {builtIn.map(template => (
-              <button key={template.id} onClick={() => onUseBuiltIn(template)} className="rounded-lg border border-slate-200 p-3 text-left hover:border-indigo-400 hover:shadow-sm">
+              <button key={template.id} data-testid={`template-card-${template.id}`} onClick={() => onUseBuiltIn(template)} className="rounded-lg border border-slate-200 p-3 text-left hover:border-indigo-400 hover:shadow-sm">
                 <TemplateThumb template={template} />
                 <div className="mt-3 text-sm font-semibold">{template.name}</div>
                 <div className="mt-1 line-clamp-2 text-xs text-slate-500">{template.description}</div>
