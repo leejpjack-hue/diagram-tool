@@ -116,3 +116,35 @@ describe('mermaid reverse comments', () => {
     expect(c && c.type === 'flow' && c.properties.reversed).toBeFalsy();
   });
 });
+
+describe('Mermaid flowchart helpful errors', () => {
+  it('names the line and fix for an unclosed node shape', () => {
+    expect(() => parseDiagram('flowchart TD\n  A[Start\n  A --> B')).toThrow(
+      /Unclosed Mermaid node shape "A\[\.\.\." at line 2\. Close it with "\]"/,
+    );
+  });
+
+  it('names the line and fix for a dangling arrow', () => {
+    expect(() => parseDiagram('flowchart TD\n  A[Start] -->\n')).toThrow(
+      /Missing target node after arrow at line 2.*\bA --> NextStep/,
+    );
+  });
+
+  it('names the line and fix for an unclosed pipe label', () => {
+    expect(() => parseDiagram('flowchart TD\n  A -->|Yes B\n')).toThrow(
+      /Unclosed edge label at line 2.*Close the label with "\|"/,
+    );
+  });
+
+  it('names the line and fix for an unclosed subgraph', () => {
+    expect(() => parseDiagram('flowchart TD\n  subgraph Team\n    A --> B\n')).toThrow(
+      /Unclosed Mermaid subgraph "Team" from line 2\. Add "end"/,
+    );
+  });
+
+  it('names the line and fix for an invalid flowchart header', () => {
+    expect(() => parseDiagram('flowchart SIDEWAYS\n  A --> B')).toThrow(
+      /Invalid Mermaid flowchart header "flowchart SIDEWAYS" at line 1\. Use "flowchart TD" or "flowchart LR"/,
+    );
+  });
+});

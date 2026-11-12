@@ -47,10 +47,18 @@ export class Parser {
   private expect(type: TokenType): Token {
     const token = this.advance();
     if (token.type !== type) {
+      const hint =
+        type === TokenType.RBRACE
+          ? 'Add "}" to close the open block.'
+          : type === TokenType.LBRACE
+            ? 'Add "{" to open the block (for example, node Step { label: "Step" }).'
+            : type === TokenType.COLON
+              ? 'Add ":" after the property name (for example, label: "Step").'
+              : `Add ${type} to complete the statement.`;
       throw new Error(
         token.type === TokenType.EOF
-          ? `Unexpected end of input (expected ${type})`
-          : `Expected ${type} but got ${token.type} at line ${token.line}, column ${token.column}`
+          ? `Unexpected end of input (expected ${type}) at line ${token.line}. ${hint}`
+          : `Expected ${type} but got ${token.type} at line ${token.line}, column ${token.column}. ${hint}`
       );
     }
     return token;
@@ -68,8 +76,8 @@ export class Parser {
     ) {
       throw new Error(
         token.type === TokenType.EOF
-          ? 'Unexpected end of input (expected name)'
-          : `Expected name but got ${token.type} at line ${token.line}, column ${token.column}`
+          ? `Unexpected end of input (expected name) at line ${token.line}. Add a name before "{".`
+          : `Expected name but got ${token.type} at line ${token.line}, column ${token.column}. Add a name before "{".`
       );
     }
     return token;
@@ -296,6 +304,14 @@ export class Parser {
       } else if (this.mode === 'flow' && token.type === TokenType.IDENTIFIER) {
         // Flow mode: parse connections like "A -> B -> C"
         this.parseFlowConnection();
+      } else if (this.mode === 'flow' && token.type === TokenType.ARROW) {
+        throw new Error(
+          `Unexpected -> at line ${token.line}, column ${token.column}. Flow connections must start with a step name before -> (for example, Start -> NextStep).`,
+        );
+      } else if (this.mode === 'flow' && token.type === TokenType.RBRACE) {
+        throw new Error(
+          `Unexpected "}" at line ${token.line}, column ${token.column} with no matching "{". Remove "}" or add "node StepName {" above it.`,
+        );
       } else if (this.mode === 'architecture' && token.type === TokenType.ARROW) {
         throw new Error(
           `Unexpected -> at line ${token.line}, column ${token.column}. Architecture edges use connects: or A -> B.`,
@@ -402,11 +418,28 @@ export class Parser {
   }
 
   private parseDiagramDeclaration(): void {
+    const declLine = this.peek().line;
     this.advance(); // consume 'diagram'
     this.expect(TokenType.COLON);
-    const modeToken = this.advance();
-    if (modeToken.type === TokenType.IDENTIFIER || modeToken.type === TokenType.STRING) {
-      this.mode = (modeToken.value as string) as DiagramMode;
+    const modeToken = this.peek();
+    if (modeToken.type === TokenType.NEWLINE || modeToken.type === TokenType.EOF) {
+      throw new Error(
+        `Missing diagram mode after "diagram:" at line ${declLine}. Use "diagram: flow", "diagram: architecture", or "diagram: gantt".`,
+      );
+    }
+    this.advance();
+    if (modeToken.type === TokenType.IDENTIFIER || modeToken.type === TokenType.STRING || modeToken.type === TokenType.KEYWORD) {
+      const rawMode = String(modeToken.value).trim().toLowerCase();
+      if (rawMode !== 'architecture' && rawMode !== 'flow' && rawMode !== 'gantt' && rawMode !== 'sequence') {
+        throw new Error(
+          `Unknown diagram mode "${modeToken.value}" at line ${modeToken.line}. Use "diagram: flow", "diagram: architecture", or "diagram: gantt".`,
+        );
+      }
+      this.mode = rawMode as DiagramMode;
+    } else {
+      throw new Error(
+        `Invalid diagram mode at line ${modeToken.line}. Use "diagram: flow", "diagram: architecture", or "diagram: gantt".`,
+      );
     }
   }
 
@@ -1213,53 +1246,70 @@ export class Parser {
   // Flow Mode Parsing
   
   private parseFlowStart(): void {
-    this.advance(); // consume 'start'
+    const startTok = this.advance(); // consume 'start'
     const nodeToken = this.peek();
-    if (nodeToken.type === TokenType.IDENTIFIER) {
-      this.startNode = nodeToken.value as string;
-      this.advance();
-      
-      // Create start node
-      const id = this.startNode.toLowerCase().replace(/[^a-z0-9]/g, '_');
-      if (!this.flowNodes.has(id)) {
-        this.flowNodes.set(id, {
-          type: 'flow',
-          id,
-          name: this.startNode,
-          properties: {},
-          isStart: true,
-        });
-      }
+    if (
+      (nodeToken.type !== TokenType.IDENTIFIER && nodeToken.type !== TokenType.KEYWORD && nodeToken.type !== TokenType.STRING) ||
+      nodeToken.line !== startTok.line
+    ) {
+      throw new Error(
+        `Missing step name after "start" at line ${startTok.line}. Use "start StepName" (for example, start Begin).`,
+      );
+    }
+    this.startNode = String(nodeToken.value);
+    this.advance();
+    
+    // Create start node
+    const id = this.startNode.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    if (!this.flowNodes.has(id)) {
+      this.flowNodes.set(id, {
+        type: 'flow',
+        id,
+        name: this.startNode,
+        properties: {},
+        isStart: true,
+      });
     }
   }
 
   private parseFlowEnd(): void {
-    this.advance(); // consume 'end'
+    const endTok = this.advance(); // consume 'end'
     const nodeToken = this.peek();
-    if (nodeToken.type === TokenType.IDENTIFIER) {
-      this.endNode = nodeToken.value as string;
-      this.advance();
-      
-      // Create end node
-      const id = this.endNode.toLowerCase().replace(/[^a-z0-9]/g, '_');
-      if (!this.flowNodes.has(id)) {
-        this.flowNodes.set(id, {
-          type: 'flow',
-          id,
-          name: this.endNode,
-          properties: {},
-          isEnd: true,
-        });
-      }
+    if (
+      (nodeToken.type !== TokenType.IDENTIFIER && nodeToken.type !== TokenType.KEYWORD && nodeToken.type !== TokenType.STRING) ||
+      nodeToken.line !== endTok.line
+    ) {
+      throw new Error(
+        `Missing step name after "end" at line ${endTok.line}. Use "end StepName" (for example, end Done).`,
+      );
+    }
+    this.endNode = String(nodeToken.value);
+    this.advance();
+    
+    // Create end node
+    const id = this.endNode.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    if (!this.flowNodes.has(id)) {
+      this.flowNodes.set(id, {
+        type: 'flow',
+        id,
+        name: this.endNode,
+        properties: {},
+        isEnd: true,
+      });
     }
   }
 
   private parseFlowConnection(): void {
     // Parse flow connections: A -> B -> C or A ->|Label| B
     // Optional `{ from: right, to: left }` on the line records manual sides.
+    const startTok = this.peek();
+    const line = startTok.line;
     const nodeNames: string[] = [];
     let currentLabel: string | undefined;
     let edgeSettings: { sourceSide?: ConnectionSide; targetSide?: ConnectionSide; label?: string } = {};
+    let sawArrow = false;
+    let expectingNode = true;
+    let lastArrowLine = line;
     
     while (this.peek().type !== TokenType.NEWLINE && 
            this.peek().type !== TokenType.EOF &&
@@ -1267,12 +1317,37 @@ export class Parser {
       const token = this.peek();
 
       if (token.type === TokenType.LBRACE) {
+        if (!sawArrow) {
+          const subject = nodeNames[0] || String(startTok.value);
+          throw new Error(
+            `Missing "node" keyword before "${subject} {" at line ${token.line}. Use "node ${subject} { label: \\"${subject}\\" }" to declare a node, or "${subject} -> NextStep" to connect steps.`,
+          );
+        }
+        if (expectingNode) {
+          throw new Error(
+            `Flow connection is missing a target step after "->" at line ${lastArrowLine}. Add a target step name before "{" (for example, ${nodeNames[nodeNames.length - 1] || 'Start'} -> NextStep).`,
+          );
+        }
         edgeSettings = this.readOptionalArchitectureEdgeSettings();
         break;
       }
+
+      if (token.type === TokenType.COLON && !sawArrow) {
+        const subject = nodeNames[0] || String(startTok.value);
+        throw new Error(
+          `Unexpected "${subject}:" at line ${token.line} outside a node block. Wrap properties in "node StepName { ${subject}: ... }" or connect steps with "StepA -> StepB".`,
+        );
+      }
       
       if (token.type === TokenType.IDENTIFIER || token.type === TokenType.KEYWORD) {
+        if (!expectingNode) {
+          const prev = nodeNames[nodeNames.length - 1] || String(startTok.value);
+          throw new Error(
+            `Missing "->" before "${token.value}" at line ${token.line}. Connect flow steps with "->" (for example, ${prev} -> ${token.value}).`,
+          );
+        }
         nodeNames.push(token.value as string);
+        expectingNode = false;
         this.advance();
         
         // Register node
@@ -1286,10 +1361,23 @@ export class Parser {
           });
         }
       } else if (token.type === TokenType.ARROW) {
+        if (expectingNode) {
+          throw new Error(
+            `Missing step name before "->" at line ${token.line}. Write a flow connection like "${nodeNames[nodeNames.length - 1] || 'Start'} -> NextStep".`,
+          );
+        }
+        sawArrow = true;
+        expectingNode = true;
+        lastArrowLine = token.line;
         this.advance();
       } else if (token.type === TokenType.PIPE) {
+        if (!sawArrow || !expectingNode) {
+          throw new Error(
+            `Unexpected "|" at line ${token.line}. Put branch labels after "->" like "${nodeNames[nodeNames.length - 1] || 'StepA'} ->|Yes| StepB".`,
+          );
+        }
         // Label follows: |Label| — accept multi-word labels until the closing pipe.
-        this.advance();
+        const pipeTok = this.advance();
         const labelParts: string[] = [];
         while (
           this.peek().type !== TokenType.PIPE &&
@@ -1307,9 +1395,13 @@ export class Parser {
             labelParts.push(String(lt.value));
           }
         }
-        if (this.peek().type === TokenType.PIPE) {
-          this.advance(); // consume closing pipe
+        if (this.peek().type !== TokenType.PIPE) {
+          const rawLabel = labelParts.join(' ') || 'Yes';
+          throw new Error(
+            `Unclosed branch label "|${rawLabel}" at line ${pipeTok.line}. Close the label with "|" before the target step (for example, ${nodeNames[nodeNames.length - 1] || 'StepA'} ->|${rawLabel}| NextStep).`,
+          );
         }
+        this.advance(); // consume closing pipe
         if (labelParts.length > 0) currentLabel = labelParts.join(' ');
       } else if (token.type === TokenType.STRING) {
         // Could be a label
@@ -1318,6 +1410,19 @@ export class Parser {
       } else {
         this.advance();
       }
+    }
+
+    if (!sawArrow) {
+      const subject = nodeNames[0] || String(startTok.value);
+      throw new Error(
+        `Flow line ${line} ("${subject}") is missing "->". Connect steps with "${subject} -> NextStep", or declare a node with "node ${subject} { label: \\"${subject}\\" }".`,
+      );
+    }
+
+    if (expectingNode) {
+      throw new Error(
+        `Flow connection is missing a target step after "->" at line ${lastArrowLine}. Add a target step name (for example, ${nodeNames[nodeNames.length - 1] || 'Start'} -> NextStep).`,
+      );
     }
     
     // Create edges between consecutive nodes. Brace sides apply to the last
@@ -1347,13 +1452,18 @@ export class Parser {
   }
 
   private parseFlowNodeMetadata(): void {
-    this.advance(); // consume 'node'
+    const nodeTok = this.advance(); // consume 'node'
     const nameToken = this.peek();
-    if (nameToken.type !== TokenType.IDENTIFIER && nameToken.type !== TokenType.KEYWORD) {
-      return;
+    if (
+      (nameToken.type !== TokenType.IDENTIFIER && nameToken.type !== TokenType.KEYWORD && nameToken.type !== TokenType.STRING) ||
+      nameToken.line !== nodeTok.line
+    ) {
+      throw new Error(
+        `Missing step name after "node" at line ${nodeTok.line}. Use "node StepName { label: \\"Step\\" }".`,
+      );
     }
     
-    const name = nameToken.value as string;
+    const name = String(nameToken.value);
     const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
     this.advance();
     
@@ -1372,7 +1482,18 @@ export class Parser {
       if (this.peek().type === TokenType.RBRACE) break;
       
       const propToken = this.peek();
+      if (this.looksLikeArchitectureArrow()) {
+        throw new Error(
+          `Unclosed "node ${name} {" block (started at line ${nodeTok.line}) before "${propToken.value} ->" at line ${propToken.line}. Add "}" to close "node ${name}" first.`,
+        );
+      }
       if (propToken.type === TokenType.KEYWORD) {
+        const lowerKey = String(propToken.value).toLowerCase();
+        if ((lowerKey === 'node' || lowerKey === 'lane' || lowerKey === 'start' || lowerKey === 'end') && this.peekAt(1).type !== TokenType.COLON) {
+          throw new Error(
+            `Unclosed "node ${name} {" block (started at line ${nodeTok.line}) before "${propToken.value}" at line ${propToken.line}. Add "}" to close "node ${name}" first.`,
+          );
+        }
         this.advance();
         this.expect(TokenType.COLON);
 

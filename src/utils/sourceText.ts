@@ -102,9 +102,12 @@ export function detectRawDiagramImport(filename: string, text: string): { mode: 
 
   const base = filename.replace(/\.(mmd|mermaid|txt|md)$/i, '').trim() || 'Imported diagram';
   if (isMermaidSequence(trimmed)) {
+    const parsed = parseSequenceSource(trimmed);
+    if (parsed.error) throw new Error(parsed.error);
     return { mode: 'sequence', title: extractSourceTitle(trimmed, base), dslText: text };
   }
   if (isMermaidFlow(trimmed)) {
+    parseDiagram(trimmed);
     return { mode: 'flow', title: extractSourceTitle(trimmed, base), dslText: text };
   }
   if (isMermaidGantt(trimmed)) {
@@ -118,9 +121,12 @@ export function detectRawDiagramImport(filename: string, text: string): { mode: 
 
   const mermaidName = /\.(mmd|mermaid)$/i.test(filename);
   if (mermaidName && /sequenceDiagram\b/i.test(trimmed)) {
+    const parsed = parseSequenceSource(trimmed);
+    if (parsed.error) throw new Error(parsed.error);
     return { mode: 'sequence', title: extractSourceTitle(trimmed, base), dslText: text };
   }
   if (mermaidName && /^(?:flowchart|graph)\b/im.test(trimmed)) {
+    parseDiagram(trimmed);
     return { mode: 'flow', title: extractSourceTitle(trimmed, base), dslText: text };
   }
   return null;
@@ -236,7 +242,13 @@ export function toMermaidSource(text: string, mode: BoardMode | 'c4'): string {
 
 export function toDslSource(text: string, mode: BoardMode | 'c4'): string {
   if (mode === 'sequence' || isMermaidSequence(text)) return text;
-  if (isMermaidFlow(text)) return mermaidFlowToDSL(text);
+  if (isMermaidFlow(text)) {
+    try {
+      return mermaidFlowToDSL(text);
+    } catch {
+      return text;
+    }
+  }
   return text;
 }
 

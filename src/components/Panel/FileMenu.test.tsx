@@ -376,7 +376,10 @@ describe('FileMenu', () => {
     });
 
     await waitFor(() => {
-      expect(notify).toHaveBeenCalledWith('error', "Mermaid erDiagram isn't supported yet.");
+      expect(notify).toHaveBeenCalledWith(
+        'error',
+        'Mermaid erDiagram isn\'t supported yet. Line 1 starts with "erDiagram"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.',
+      );
     });
     expect(onOpenWorkspaceBoard).not.toHaveBeenCalled();
   });

@@ -124,7 +124,9 @@ describe('Type tasks panel', () => {
       target: { value: 'erDiagram\n  CUSTOMER ||--o{ ORDER : places\n' },
     });
     expect(useDiagramStore.getState().diagramMode).toBe('flow');
-    expect(useDiagramStore.getState().error).toBe("Mermaid erDiagram isn't supported yet.");
+    expect(useDiagramStore.getState().error).toBe(
+      'Mermaid erDiagram isn\'t supported yet. Line 1 starts with "erDiagram"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.',
+    );
     expect(useDiagramStore.getState().parsedDiagram?.nodes.map(n => n.name)).toEqual(
       expect.arrayContaining(['Intake', 'Done']),
     );
@@ -133,7 +135,28 @@ describe('Type tasks panel', () => {
       target: { value: 'architecture-beta\n  group api(cloud)[API]\n  service db(database)[Database] in api\n' },
     });
     expect(useDiagramStore.getState().diagramMode).toBe('flow');
-    expect(useDiagramStore.getState().error).toBe("Mermaid architecture-beta isn't supported yet.");
+    expect(useDiagramStore.getState().error).toBe(
+      'Mermaid architecture-beta isn\'t supported yet. Line 1 starts with "architecture-beta"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.',
+    );
+    expect(useDiagramStore.getState().parsedDiagram?.nodes.map(n => n.name)).toEqual(
+      expect.arrayContaining(['Intake', 'Done']),
+    );
+
+    // 1b. Broken Mermaid flowchart and broken native diagram: flow keep existing parsedDiagram
+    fireEvent.change(screen.getByTestId('monaco-stub'), {
+      target: { value: 'flowchart TD\n  Broken[Unclosed\n' },
+    });
+    expect(useDiagramStore.getState().diagramMode).toBe('flow');
+    expect(useDiagramStore.getState().error).toMatch(/Unclosed Mermaid node shape "Broken\[\.\.\." at line 2/);
+    expect(useDiagramStore.getState().parsedDiagram?.nodes.map(n => n.name)).toEqual(
+      expect.arrayContaining(['Intake', 'Done']),
+    );
+
+    fireEvent.change(screen.getByTestId('monaco-stub'), {
+      target: { value: 'diagram: flow\ntitle: Broken\nOnlyOne ->\n' },
+    });
+    expect(useDiagramStore.getState().diagramMode).toBe('flow');
+    expect(useDiagramStore.getState().error).toMatch(/missing a target step after "->" at line 3/);
     expect(useDiagramStore.getState().parsedDiagram?.nodes.map(n => n.name)).toEqual(
       expect.arrayContaining(['Intake', 'Done']),
     );

@@ -290,20 +290,22 @@ task Design {
     expect(detectMermaidMode('architecture-beta\n  service api(server)[API]')).toBeNull();
   });
 
-  it('rejects unknown/unsupported Mermaid types with clear copy naming the type on every board', () => {
+  it('rejects unknown/unsupported Mermaid types with clear copy naming the type, line, and likely fix on every board', () => {
     const unsupportedCases: Array<[string, string]> = [
-      ['architecture-beta\n  group api(cloud)[API]\n  service db(database)[Database] in api\n  db:L -- R:server\n', "Mermaid architecture-beta isn't supported yet."],
-      ['%% leading comment\n\n# heading\narchitecture-beta\n  service api(server)[API]\n', "Mermaid architecture-beta isn't supported yet."],
-      ['erDiagram\n  CUSTOMER ||--o{ ORDER : places\n', "Mermaid erDiagram isn't supported yet."],
-      ['classDiagram\n  class Animal\n', "Mermaid classDiagram isn't supported yet."],
-      ['mindmap\n  root((ideas))\n', "Mermaid mindmap isn't supported yet."],
-      ['stateDiagram-v2\n  [*] --> Still\n', "Mermaid stateDiagram-v2 isn't supported yet."],
-      ['pie title Pets\n  "Dogs" : 386\n', "Mermaid pie isn't supported yet."],
-      ['gitGraph\n  commit\n', "Mermaid gitGraph isn't supported yet."],
-      ['journey\n  title Working day\n', "Mermaid journey isn't supported yet."],
-      ['quadrantChart\n  title Reach\n', "Mermaid quadrantChart isn't supported yet."],
-      ['timeline\n  title History\n', "Mermaid timeline isn't supported yet."],
-      ['unknownDiagram\n  A --> B\n', "Mermaid unknownDiagram isn't supported yet."],
+      ['architecture-beta\n  group api(cloud)[API]\n  service db(database)[Database] in api\n  db:L -- R:server\n', 'Mermaid architecture-beta isn\'t supported yet. Line 1 starts with "architecture-beta"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.'],
+      ['%% leading comment\n\n# heading\narchitecture-beta\n  service api(server)[API]\n', 'Mermaid architecture-beta isn\'t supported yet. Line 4 starts with "architecture-beta"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.'],
+      ['erDiagram\n  CUSTOMER ||--o{ ORDER : places\n', 'Mermaid erDiagram isn\'t supported yet. Line 1 starts with "erDiagram"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.'],
+      ['classDiagram\n  class Animal\n', 'Mermaid classDiagram isn\'t supported yet. Line 1 starts with "classDiagram"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.'],
+      ['mindmap\n  root((ideas))\n', 'Mermaid mindmap isn\'t supported yet. Line 1 starts with "mindmap"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.'],
+      ['C4Context\n  Person(user, "User")\n', 'Mermaid C4Context isn\'t supported yet. Line 1 starts with "C4Context"; for C4, use native diagram: architecture with level: and parent:, or use flowchart TD, sequenceDiagram, or gantt.'],
+      ['C4Container\n  Container(api, "API")\n', 'Mermaid C4Container isn\'t supported yet. Line 1 starts with "C4Container"; for C4, use native diagram: architecture with level: and parent:, or use flowchart TD, sequenceDiagram, or gantt.'],
+      ['stateDiagram-v2\n  [*] --> Still\n', 'Mermaid stateDiagram-v2 isn\'t supported yet. Line 1 starts with "stateDiagram-v2"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.'],
+      ['pie title Pets\n  "Dogs" : 386\n', 'Mermaid pie isn\'t supported yet. Line 1 starts with "pie"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.'],
+      ['gitGraph\n  commit\n', 'Mermaid gitGraph isn\'t supported yet. Line 1 starts with "gitGraph"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.'],
+      ['journey\n  title Working day\n', 'Mermaid journey isn\'t supported yet. Line 1 starts with "journey"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.'],
+      ['quadrantChart\n  title Reach\n', 'Mermaid quadrantChart isn\'t supported yet. Line 1 starts with "quadrantChart"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.'],
+      ['timeline\n  title History\n', 'Mermaid timeline isn\'t supported yet. Line 1 starts with "timeline"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.'],
+      ['unknownDiagram\n  A --> B\n', 'Mermaid unknownDiagram isn\'t supported yet. Line 1 starts with "unknownDiagram"; use flowchart TD, sequenceDiagram, or gantt, or native diagram: flow / diagram: architecture.'],
     ];
 
     for (const [source, expectedError] of unsupportedCases) {
@@ -314,6 +316,24 @@ task Design {
           expect(result.error).toBe(expectedError);
         }
       }
+    }
+  });
+
+  it('rejects broken Mermaid flowcharts and broken native diagram: flow with line/construct and likely fix', () => {
+    const brokenMermaid = applyBoardSource('flowchart TD\n  Intake[Intake] -->\n', 'flow');
+    expect(brokenMermaid.ok).toBe(false);
+    if (!brokenMermaid.ok) {
+      expect(brokenMermaid.error).toMatch(/line 2/i);
+      expect(brokenMermaid.error).toMatch(/target node after arrow/i);
+      expect(brokenMermaid.error).toMatch(/Intake --> NextStep/);
+    }
+
+    const brokenNativeFlow = applyBoardSource('diagram: flow\ntitle: Broken\nIntake ->\n', 'flow');
+    expect(brokenNativeFlow.ok).toBe(false);
+    if (!brokenNativeFlow.ok) {
+      expect(brokenNativeFlow.error).toMatch(/line 3/i);
+      expect(brokenNativeFlow.error).toMatch(/missing a target step after "->"/i);
+      expect(brokenNativeFlow.error).toMatch(/Intake -> NextStep/);
     }
   });
 
