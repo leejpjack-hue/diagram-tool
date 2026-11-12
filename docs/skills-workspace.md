@@ -45,6 +45,8 @@ The skill and its deterministic converter descend from the `02-cf-skills` spike 
 
 The editor requests `GET /api/skills` when a board opens and again when the operator chooses **Reload skills**. Reload uses `cache: no-store` and `GET /api/skills?reload=1`. The query is only a browser cache-buster: the Worker routes on the pathname and calls `loadSkillCatalog` on `getSkills()` every time, so the Workspace stays authoritative. A skill folder added under `/workspace/.agents/skills/` appears after Reload without a Worker redeploy and without reattaching the Durable Object. The in-app list is not kept across Reload.
 
+The **Skills** catalog in `/app` states the fail-closed source precedence (`Workspace` first, then verified `R2` and `bundle`), summarizes the loaded skills with their active source (`Workspace`, `R2`, or `bundle`), and renders each skill's source badge alongside its location (`/workspace/.agents/skills/<name>` or `agents:skills/<name>`).
+
 That refresh does not change the type-to-flow runner. Activation can see an edited `SKILL.md` immediately. Running or mapping type-to-flow still executes the converter statically imported in the Worker build. Editing `scripts/type-to-flow.js` in the Workspace does not change the runner until a Worker redeploy (free-plan static import, #127). The catalog states this in the editor.
 
 ## Add or edit a skill without a Worker redeploy

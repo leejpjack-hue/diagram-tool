@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadSkillCatalog, type SkillWorkspace } from 'agents/skills';
 import {
   activateSkill,
+  formatSkillCatalogStatus,
   getSkillCatalog,
+  getSkillSourceKind,
+  getSkillSourceLabel,
   runTypeToFlow,
   SKILLS_SECONDARY_PREFIX,
   SKILLS_WORKSPACE_ROOT,
@@ -160,6 +163,61 @@ describe('skills host client', () => {
       location: `${SKILLS_WORKSPACE_ROOT}/type-to-flow`,
       sourceId: `workspace:${SKILLS_WORKSPACE_ROOT}`,
       version: '1.0.0-workspace',
+    }]);
+  });
+
+  it('classifies Workspace, R2, and bundle sources and formats catalog status', async () => {
+    const workspaceEntry = {
+      name: 'type-to-flow',
+      location: `${SKILLS_WORKSPACE_ROOT}/type-to-flow`,
+      sourceId: `workspace:${SKILLS_WORKSPACE_ROOT}`,
+    };
+    const r2Entry = {
+      name: 'type-to-flow',
+      location: `${SKILLS_SECONDARY_PREFIX}/type-to-flow`,
+      sourceId: SECONDARY_R2_SOURCE_ID,
+    };
+    const bundleEntry = {
+      name: 'review-notes',
+      location: `${SKILLS_SECONDARY_PREFIX}/review-notes`,
+      sourceId: SECONDARY_BUNDLE_SOURCE_ID,
+    };
+
+    expect(getSkillSourceKind(workspaceEntry)).toBe('workspace');
+    expect(getSkillSourceLabel(workspaceEntry)).toBe('Workspace');
+    expect(getSkillSourceKind(r2Entry)).toBe('r2');
+    expect(getSkillSourceLabel(r2Entry)).toBe('R2');
+    expect(getSkillSourceKind(bundleEntry)).toBe('bundle');
+    expect(getSkillSourceLabel(bundleEntry)).toBe('bundle');
+    expect(formatSkillCatalogStatus([])).toBe('Loaded skills: none.');
+    expect(formatSkillCatalogStatus([workspaceEntry, bundleEntry])).toBe(
+      'Loaded 2 skills: type-to-flow (Workspace), review-notes (bundle).',
+    );
+
+    vi.stubGlobal('fetch', async () => jsonResponse({
+      skills: [
+        {
+          name: 'type-to-flow',
+          description: 'Bundle secondary description.',
+          location: `${SKILLS_SECONDARY_PREFIX}/type-to-flow`,
+          sourceId: SECONDARY_BUNDLE_SOURCE_ID,
+          version: '1.0.0',
+        },
+        {
+          name: 'type-to-flow',
+          description: 'R2 secondary description.',
+          sourceId: SECONDARY_R2_SOURCE_ID,
+          version: '1.0.0-r2',
+        },
+      ],
+    }));
+
+    await expect(getSkillCatalog()).resolves.toEqual([{
+      name: 'type-to-flow',
+      description: 'R2 secondary description.',
+      location: `${SKILLS_SECONDARY_PREFIX}/type-to-flow`,
+      sourceId: SECONDARY_R2_SOURCE_ID,
+      version: '1.0.0-r2',
     }]);
   });
 });
