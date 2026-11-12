@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   SKILL_CATALOG_EMPTY_HINT,
   SKILL_CATALOG_RELOAD_NOTE,
+  SKILL_CATALOG_SOURCE_NOTE,
+  formatSkillCatalogStatus,
   getSkillCatalog,
+  getSkillSourceLabel,
   isAbortError,
   type SkillCatalogEntry,
 } from '../../utils/skillsHost';
@@ -111,6 +114,9 @@ export function SkillCatalog({ disabled = false, onActivate }: SkillCatalogProps
       <p data-testid="skill-catalog-reload-note" className="mt-1 text-[11px] leading-snug text-slate-500">
         {SKILL_CATALOG_RELOAD_NOTE}
       </p>
+      <p data-testid="skill-catalog-source-note" className="mt-1 text-[11px] leading-snug text-slate-500">
+        {SKILL_CATALOG_SOURCE_NOTE}
+      </p>
       {loading && (
         <p role="status" data-testid="skill-catalog-loading" className="mt-2 text-[11px] font-medium text-slate-600">
           {skills ? 'Reloading skills…' : 'Loading skills…'}
@@ -127,36 +133,50 @@ export function SkillCatalog({ disabled = false, onActivate }: SkillCatalogProps
         </p>
       )}
       {skills && skills.length > 0 && (
-        <ul className="mt-2 space-y-2" aria-label="Workspace skills">
-          {skills.map(skill => {
-            const busy = activating === skill.name;
-            return (
-              <li key={skill.name} data-testid={`skill-catalog-item-${skill.name}`} className="rounded border border-slate-100 bg-slate-50 px-2 py-2">
-                <h3 data-testid={`skill-name-${skill.name}`} className="text-xs font-semibold text-slate-800">
-                  {skill.name}
-                </h3>
-                <p id={`skill-desc-${skill.name}`} data-testid={`skill-description-${skill.name}`} className="mt-0.5 text-[11px] leading-snug text-slate-600">
-                  {skill.description}
-                </p>
-                <p data-testid={`skill-location-${skill.name}`} className="mt-0.5 font-mono text-[10px] text-slate-500">
-                  {skill.location}
-                </p>
-                <button
-                  type="button"
-                  data-testid={`skill-activate-${skill.name}`}
-                  aria-label={busy ? `Activating ${skill.name}` : `Activate ${skill.name}`}
-                  aria-describedby={`skill-desc-${skill.name}`}
-                  aria-busy={busy}
-                  disabled={disabled || activating !== null}
-                  onClick={() => activate(skill)}
-                  className="mt-1 rounded-md border border-indigo-200 bg-white px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400 disabled:opacity-50"
-                >
-                  {busy ? 'Activating…' : 'Activate'}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <p data-testid="skill-catalog-status" className="mt-2 text-[11px] font-medium text-slate-700">
+            {formatSkillCatalogStatus(skills)}
+          </p>
+          <ul className="mt-2 space-y-2" aria-label="Workspace skills">
+            {skills.map(skill => {
+              const busy = activating === skill.name;
+              const sourceLabel = getSkillSourceLabel(skill);
+              return (
+                <li key={skill.name} data-testid={`skill-catalog-item-${skill.name}`} className="rounded border border-slate-100 bg-slate-50 px-2 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 data-testid={`skill-name-${skill.name}`} className="text-xs font-semibold text-slate-800">
+                      {skill.name}
+                    </h3>
+                    <span
+                      data-testid={`skill-source-${skill.name}`}
+                      className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700"
+                    >
+                      Source: {sourceLabel}
+                    </span>
+                  </div>
+                  <p id={`skill-desc-${skill.name}`} data-testid={`skill-description-${skill.name}`} className="mt-0.5 text-[11px] leading-snug text-slate-600">
+                    {skill.description}
+                  </p>
+                  <p data-testid={`skill-location-${skill.name}`} className="mt-0.5 font-mono text-[10px] text-slate-500">
+                    {skill.location}
+                  </p>
+                  <button
+                    type="button"
+                    data-testid={`skill-activate-${skill.name}`}
+                    aria-label={busy ? `Activating ${skill.name}` : `Activate ${skill.name}`}
+                    aria-describedby={`skill-desc-${skill.name}`}
+                    aria-busy={busy}
+                    disabled={disabled || activating !== null}
+                    onClick={() => activate(skill)}
+                    className="mt-1 rounded-md border border-indigo-200 bg-white px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:border-indigo-400 disabled:opacity-50"
+                  >
+                    {busy ? 'Activating…' : 'Activate'}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
       {activating && (
         <p role="status" aria-live="polite" data-testid="skill-activate-progress" className="mt-2 text-[11px] font-medium text-indigo-700">

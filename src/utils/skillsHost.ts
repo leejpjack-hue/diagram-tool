@@ -9,10 +9,16 @@ export const SKILLS_SECONDARY_PREFIX = 'agents:skills';
 export const SKILL_CATALOG_RELOAD_NOTE =
   'Reload skills reads the Workspace again, so a new skill folder under /workspace/.agents/skills appears without a Worker redeploy. type-to-flow still runs the converter shipped with this Worker. Editing scripts/type-to-flow.js in the Workspace does not change that runner until a Worker redeploy.';
 
+export const SKILL_CATALOG_SOURCE_NOTE =
+  'Source order: Workspace (/workspace/.agents/skills) first, then verified R2 (r2:agents:skills) and bundle (bundle:agents:skills). Workspace wins when both exist; invalid checksums do not merge.';
+
 export const SKILL_CATALOG_EMPTY_HINT =
   'No skills yet. Add a folder under /workspace/.agents/skills/ with a SKILL.md whose frontmatter includes name and description, then choose Reload skills.';
 
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export type SkillCatalogSourceKind = 'workspace' | 'r2' | 'bundle';
+export type SkillCatalogSourceLabel = 'Workspace' | 'R2' | 'bundle';
 
 export interface SkillCatalogEntry {
   name: string;
@@ -23,9 +29,39 @@ export interface SkillCatalogEntry {
   checksum?: string;
 }
 
+export function getSkillSourceKind(entry: Pick<SkillCatalogEntry, 'location' | 'sourceId'>): SkillCatalogSourceKind {
+  const sourceId = typeof entry.sourceId === 'string' ? entry.sourceId.trim() : '';
+  if (sourceId.startsWith('workspace:')) return 'workspace';
+  if (sourceId.startsWith('r2:')) return 'r2';
+  if (sourceId.startsWith('bundle:')) return 'bundle';
+  if (entry.location === SKILLS_WORKSPACE_ROOT || entry.location.startsWith(`${SKILLS_WORKSPACE_ROOT}/`)) {
+    return 'workspace';
+  }
+  return 'bundle';
+}
+
+export function getSkillSourceLabel(entry: Pick<SkillCatalogEntry, 'location' | 'sourceId'>): SkillCatalogSourceLabel {
+  const kind = getSkillSourceKind(entry);
+  if (kind === 'workspace') return 'Workspace';
+  if (kind === 'r2') return 'R2';
+  return 'bundle';
+}
+
+export function formatSkillCatalogStatus(skills: readonly Pick<SkillCatalogEntry, 'name' | 'location' | 'sourceId'>[]): string {
+  if (skills.length === 0) return 'Loaded skills: none.';
+  const items = skills.map(skill => `${skill.name} (${getSkillSourceLabel(skill)})`).join(', ');
+  return `Loaded ${skills.length} ${skills.length === 1 ? 'skill' : 'skills'}: ${items}.`;
+}
+
 export function isWorkspaceSkillEntry(entry: Pick<SkillCatalogEntry, 'location' | 'sourceId'>): boolean {
-  if (typeof entry.sourceId === 'string' && entry.sourceId.startsWith('workspace:')) return true;
-  return entry.location === SKILLS_WORKSPACE_ROOT || entry.location.startsWith(`${SKILLS_WORKSPACE_ROOT}/`);
+  return getSkillSourceKind(entry) === 'workspace';
+}
+
+function skillSourcePrecedenceRank(entry: Pick<SkillCatalogEntry, 'location' | 'sourceId'>): number {
+  const kind = getSkillSourceKind(entry);
+  if (kind === 'workspace') return 0;
+  if (kind === 'r2') return 1;
+  return 2;
 }
 
 export function isAbortError(error: unknown): boolean {
@@ -75,8 +111,12 @@ export async function getSkillCatalog(options?: { reload?: boolean; signal?: Abo
     };
     if (typeof name !== 'string' || !SKILL_NAME.test(name)) continue;
     if (typeof description !== 'string' || !description.trim()) continue;
-    const resolvedLocation = typeof location === 'string' && location.trim() ? location.trim() : `${SKILLS_WORKSPACE_ROOT}/${name}`;
     const resolvedSourceId = typeof sourceId === 'string' && sourceId.trim() ? sourceId.trim() : undefined;
+    const isSecondarySource = resolvedSourceId?.startsWith('r2:') || resolvedSourceId?.startsWith('bundle:');
+    const defaultLocation = isSecondarySource
+      ? `${SKILLS_SECONDARY_PREFIX}/${name}`
+      : `${SKILLS_WORKSPACE_ROOT}/${name}`;
+    const resolvedLocation = typeof location === 'string' && location.trim() ? location.trim() : defaultLocation;
     const nextEntry: SkillCatalogEntry = {
       name,
       description: description.trim(),
@@ -88,8 +128,8 @@ export async function getSkillCatalog(options?: { reload?: boolean; signal?: Abo
     const existing = byName.get(name);
     if (!existing) {
       byName.set(name, nextEntry);
-    } else if (!isWorkspaceSkillEntry(existing) && isWorkspaceSkillEntry(nextEntry)) {
-      // Fail-closed precedence: Workspace always wins over secondary sources.
+    } else if (skillSourcePrecedenceRank(nextEntry) < skillSourcePrecedenceRank(existing)) {
+      // Fail-closed precedence: Workspace always wins over secondary sources, and R2 wins over bundle.
       byName.set(name, nextEntry);
     }
   }

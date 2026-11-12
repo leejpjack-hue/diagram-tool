@@ -71,9 +71,12 @@ test('catalog lists frontmatter and keyboard Activate maps the fixture graph', a
 
   await openBlankWorkflow(page);
   await expect(page.getByTestId('skill-name-type-to-flow')).toHaveText('type-to-flow');
+  await expect(page.getByTestId('skill-source-type-to-flow')).toHaveText('Source: Workspace');
+  await expect(page.getByTestId('skill-catalog-status')).toHaveText('Loaded 1 skill: type-to-flow (Workspace).');
   await expect(page.getByTestId('skill-description-type-to-flow')).toHaveText(catalog.skills[0].description);
   await expect(page.getByTestId('skill-catalog-reload-note')).toContainText('/workspace/.agents/skills');
   await expect(page.getByTestId('skill-catalog-reload-note')).toContainText('Worker redeploy');
+  await expect(page.getByTestId('skill-catalog-source-note')).toContainText('Workspace wins when both exist; invalid checksums do not merge.');
 
   await page.getByTestId('toggle-type-steps').click();
   await page.getByTestId('type-steps-input').fill(input.text);
@@ -164,6 +167,13 @@ test('secondary agents:skills catalog loads type-to-flow on an unseeded Workspac
         sourceId: 'workspace:/workspace/.agents/skills',
         version: '1.0.0-workspace',
       },
+      {
+        name: 'review-notes',
+        description: 'Summarise a board from verified R2.',
+        location: 'agents:skills/review-notes',
+        sourceId: 'r2:agents:skills',
+        version: '1.0.0',
+      },
     ],
   };
 
@@ -178,6 +188,8 @@ test('secondary agents:skills catalog loads type-to-flow on an unseeded Workspac
 
   await openBlankWorkflow(page);
   await expect(page.getByTestId('skill-name-type-to-flow')).toHaveText('type-to-flow');
+  await expect(page.getByTestId('skill-source-type-to-flow')).toHaveText('Source: bundle');
+  await expect(page.getByTestId('skill-catalog-status')).toHaveText('Loaded 1 skill: type-to-flow (bundle).');
   await expect(page.getByTestId('skill-location-type-to-flow')).toHaveText('agents:skills/type-to-flow');
   await expect(page.getByTestId('skill-description-type-to-flow')).toHaveText(secondaryCatalog.skills[0].description);
 
@@ -191,6 +203,12 @@ test('secondary agents:skills catalog loads type-to-flow on an unseeded Workspac
   await page.getByTestId('skill-catalog-reload').click();
   await reloaded;
   await expect(page.locator('[data-testid="skill-catalog-item-type-to-flow"]')).toHaveCount(1);
+  await expect(page.getByTestId('skill-source-type-to-flow')).toHaveText('Source: Workspace');
   await expect(page.getByTestId('skill-location-type-to-flow')).toHaveText('/workspace/.agents/skills/type-to-flow');
   await expect(page.getByTestId('skill-description-type-to-flow')).toHaveText('Workspace override wins over secondary bundle.');
+  await expect(page.getByTestId('skill-source-review-notes')).toHaveText('Source: R2');
+  await expect(page.getByTestId('skill-location-review-notes')).toHaveText('agents:skills/review-notes');
+  await expect(page.getByTestId('skill-catalog-status')).toHaveText(
+    'Loaded 2 skills: type-to-flow (Workspace), review-notes (R2).',
+  );
 });
