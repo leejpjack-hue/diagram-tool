@@ -66,6 +66,47 @@ service API {
     expect(out).not.toBe(DSL);
   });
 
+  it('pins only the moved flow node so the others stay on automatic layout', () => {
+    const flow = `diagram: flow
+title: Canvas
+direction: TB
+Ask -> Send
+node Ask {
+  label: "Human ask"
+}
+node Send {
+  label: Send
+}`;
+    const parsed = parseDiagram(flow);
+    const out = applyCanvasPins(
+      flow,
+      parsed.nodes,
+      new Map([['ask', { x: 140, y: 260 }]]),
+      { mode: 'flow' },
+    );
+    expect(out).toMatch(/node Ask \{[^}]*at: 140, 260/);
+    expect(out).not.toMatch(/node Send \{[^}]*at:/);
+    expect(parseDiagram(out).pins?.ask).toEqual({ x: 140, y: 260 });
+    expect(parseDiagram(out).pins?.send).toBeUndefined();
+  });
+
+  it('stores a Mermaid flow move as a %% at comment, not a native node block', () => {
+    const mermaid = `flowchart TD
+  Ask[Human ask] --> Send[Send]`;
+    const parsed = parseDiagram(mermaid);
+    const ask = parsed.nodes.find(node => node.name === 'Ask');
+    expect(ask).toBeTruthy();
+    const out = applyCanvasPins(
+      mermaid,
+      parsed.nodes,
+      new Map([[ask!.id, { x: 80, y: 160 }]]),
+      { mode: 'flow', mermaidFlow: true },
+    );
+    expect(out).toContain('%% at Ask 80 160');
+    expect(out).not.toMatch(/^node /m);
+    expect(out).toMatch(/^flowchart TD/m);
+  });
+
   it('is a no-op when rounded coordinates already match', () => {
     const parsed = parseDiagram(DSL);
     const out = applyCanvasPins(

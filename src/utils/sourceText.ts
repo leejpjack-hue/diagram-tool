@@ -10,6 +10,7 @@ import { parseDiagram } from '../parser/parser';
 import { parseGanttSource } from '../components/Gantt/ganttParser';
 import { parseSequenceSource } from '../components/Sequence/sequenceParser';
 import { renameParticipant } from '../components/Sequence/sequenceEdit';
+import { setFlowNodeLabel } from './flowDSL';
 import type { GanttProject } from '../components/Gantt/types';
 import type { BoardMode } from './boardManager';
 import type { ParsedDiagram } from '../store/types';
@@ -273,19 +274,34 @@ function renameMermaidFlowNode(text: string, id: string, newName: string): strin
   return joined.replace(idRe, `${id}[${name}]`);
 }
 
+function flowCaption(node: { type?: string; properties?: object }): string | undefined {
+  if (node.type !== 'flow' || !node.properties) return undefined;
+  const label = (node.properties as { label?: unknown }).label;
+  return typeof label === 'string' && label.trim() ? label.trim() : undefined;
+}
+
+/** Words drawn on the shape. Flow uses `label:` when it differs from the step id. */
+export function visibleNodeLabel(node: { name: string; type?: string; properties?: object }): string {
+  return flowCaption(node) || node.name;
+}
+
 export function renameNodeInSource(
   text: string,
-  node: { id: string; name: string },
+  node: { id: string; name: string; type?: string; properties?: object },
   newName: string,
 ): string {
   const name = newName.trim();
-  if (!name || name === node.name) return text;
+  if (!name || name === visibleNodeLabel(node)) return text;
 
   if (isMermaidSequence(text)) {
     return renameParticipant(text, node.id, name);
   }
   if (isMermaidFlow(text)) {
     return renameMermaidFlowNode(text, node.name, name);
+  }
+  // Native flow: the step id stays the arrow target. The canvas caption is `label:`.
+  if (/^\s*diagram:\s*flow\b/im.test(text)) {
+    return setFlowNodeLabel(text, node.name, name);
   }
 
   const oldName = node.name;

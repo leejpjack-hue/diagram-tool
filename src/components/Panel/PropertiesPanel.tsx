@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { useDiagramStore } from '../../store/diagramStore';
-import { applyBoardSource, renameNodeInSource } from '../../utils/sourceText';
+import { applyBoardSource, renameNodeInSource, visibleNodeLabel } from '../../utils/sourceText';
 import type { BoardMode } from '../../utils/boardManager';
 
 export function PropertiesPanel() {
   const { parsedDiagram, selectedNodeId, dslText, setDslText, setParsedDiagram, setError, diagramMode } = useDiagramStore();
   const selectedNode = parsedDiagram?.nodes.find(n => n.id === selectedNodeId);
-  const [nameDraft, setNameDraft] = useState(selectedNode?.name ?? '');
-  const [draftForId, setDraftForId] = useState(selectedNode?.id ?? '');
-  if ((selectedNode?.id ?? '') !== draftForId) {
-    setDraftForId(selectedNode?.id ?? '');
-    setNameDraft(selectedNode?.name ?? '');
+  const shownLabel = selectedNode ? visibleNodeLabel(selectedNode) : '';
+  const draftKey = `${selectedNode?.id ?? ''}:${shownLabel}`;
+  const [nameDraft, setNameDraft] = useState(shownLabel);
+  const [draftForId, setDraftForId] = useState(draftKey);
+  if (draftKey !== draftForId) {
+    setDraftForId(draftKey);
+    setNameDraft(shownLabel);
   }
 
   const commitRename = () => {
@@ -50,7 +52,7 @@ export function PropertiesPanel() {
                   onBlur={commitRename}
                   onKeyDown={e => {
                     if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                    if (e.key === 'Escape') setNameDraft(selectedNode.name);
+                    if (e.key === 'Escape') setNameDraft(visibleNodeLabel(selectedNode));
                   }}
                   className="card-title w-full bg-transparent outline-none"
                 />

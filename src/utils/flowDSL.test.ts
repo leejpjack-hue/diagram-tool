@@ -1,5 +1,55 @@
 import { describe, it, expect } from 'vitest';
-import { setReverseDSL, setReverseMermaidDSL } from './flowDSL';
+import { parseDiagram } from '../parser/parser';
+import { setFlowNodeLabel, setReverseDSL, setReverseMermaidDSL } from './flowDSL';
+
+describe('setFlowNodeLabel', () => {
+  const dsl = `diagram: flow
+title: Canvas
+Ask -> Send
+node Ask {
+  label: "Human ask"
+  role: human
+}
+node Send {
+  label: Send
+}
+`;
+
+  it('writes a phrase into label: and leaves the step id on the arrow', () => {
+    const next = setFlowNodeLabel(dsl, 'Ask', 'Person asks');
+    expect(next).toContain('label: "Person asks"');
+    expect(next).toContain('Ask -> Send');
+    expect(next).not.toContain('node Person');
+    expect(next.match(/label:/g)).toHaveLength(2);
+    const ask = parseDiagram(next).nodes.find(node => node.id === 'ask');
+    expect(ask?.type === 'flow' && ask.properties.label).toBe('Person asks');
+    expect(parseDiagram(next).edges.some(edge => edge.from === 'ask' && edge.to === 'send')).toBe(true);
+  });
+
+  it('keeps a single-word label unquoted and updates an existing line once', () => {
+    const once = setFlowNodeLabel(dsl, 'Send', 'Deliver');
+    const twice = setFlowNodeLabel(once, 'Send', 'Ship');
+    const block = twice.match(/node Send \{[^}]*\}/)![0];
+    expect(block.match(/label:/g)).toHaveLength(1);
+    expect(block).toContain('label: Ship');
+    expect(block).not.toContain('Deliver');
+  });
+
+  it('appends a node block when the step is only an arrow', () => {
+    const bare = `diagram: flow\nAsk -> Send\n`;
+    const next = setFlowNodeLabel(bare, 'Ask', 'Human ask');
+    expect(next).toMatch(/node Ask \{\n {2}label: "Human ask"\n\}/);
+    expect(next).toContain('Ask -> Send');
+    const ask = parseDiagram(next).nodes.find(node => node.id === 'ask');
+    expect(ask?.type).toBe('flow');
+    if (ask?.type === 'flow') expect(ask.properties.label).toBe('Human ask');
+  });
+
+  it('is a no-op when the formatted label is already in the block', () => {
+    const once = setFlowNodeLabel(dsl, 'Send', 'Send');
+    expect(once).toBe(dsl);
+  });
+});
 
 describe('setReverseDSL', () => {
   it('adds a reverse line into an existing node block', () => {

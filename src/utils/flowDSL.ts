@@ -1,3 +1,37 @@
+// Canvas relabel writes the words on the shape into `label:` and leaves the
+// step id alone. Arrows keep using that id, so a phrase such as "Human ask"
+// round-trips without becoming a second identifier.
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function formatFlowLabel(label: string): string {
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(label)) return label;
+  return `"${label.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+export function setFlowNodeLabel(dsl: string, nodeName: string, label: string): string {
+  const line = `label: ${formatFlowLabel(label)}`;
+  const n = escapeRegex(nodeName);
+  const blockRe = new RegExp(`(node\\s+(?:"${n}"|${n})\\s*\\{)([^}]*)(\\})`);
+  const match = dsl.match(blockRe);
+  if (match) {
+    const [, header, body, closer] = match;
+    const labelRe = /^([ \t]*)label:[ \t]*[^\n]*/m;
+    const nextBody = labelRe.test(body)
+      ? body.replace(labelRe, indent => `${indent.match(/^[ \t]*/)?.[0] ?? ''}${line}`)
+      : `\n  ${line}${body}`;
+    const next = dsl.replace(blockRe, () => `${header}${nextBody}${closer}`);
+    return next === dsl ? dsl : next;
+  }
+
+  const headerName = /^[A-Za-z_][A-Za-z0-9_]*$/.test(nodeName)
+    ? nodeName
+    : `"${nodeName.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  return `${dsl.replace(/\s+$/, '')}\n\nnode ${headerName} {\n  ${line}\n}\n`;
+}
+
 // Toggle the `reverse:` flag on a flow node in the DSL text.
 // Returns the updated DSL, or null if the node can't be found or has no
 // metadata block (i.e. was declared only via a `start X` / `end X` line or
@@ -11,10 +45,6 @@
 //
 // This is the source-of-truth update that the canvas double-click handler
 // calls before re-parsing the diagram.
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 export function setReverseDSL(dsl: string, nodeName: string, reversed: boolean): string | null {
   const blockPattern = new RegExp(

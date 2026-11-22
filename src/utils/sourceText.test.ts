@@ -9,7 +9,9 @@ import {
   renameNodeInSource,
   toDslSource,
   toMermaidSource,
+  visibleNodeLabel,
 } from './sourceText';
+import { setNodePin } from './pinUtils';
 
 const FLOW_DSL = `diagram: flow
 title: Checkout
@@ -382,8 +384,40 @@ service API {}`;
     expect(out).toContain('connects: API');
   });
 
-  it('renames a sequence participant display name', () => {
+  it('renames a sequence participant display name and stays Mermaid', () => {
     const out = renameNodeInSource(SEQUENCE, { id: 'U', name: 'User' }, 'Customer');
+    expect(out).toContain('sequenceDiagram');
     expect(out).toContain('participant U as Customer');
+    expect(out).toContain('U->>A: GET /orders');
+    expect(out).not.toMatch(/^\s*diagram:/m);
+    expect(out).not.toMatch(/\bat:/);
+  });
+
+  it('writes a native flow canvas caption into label: without renaming the step', () => {
+    const dsl = `diagram: flow
+title: Canvas
+Ask -> Send
+node Ask {
+  label: "Human ask"
+}
+node Send {
+  label: Send
+}`;
+    const node = { id: 'ask', name: 'Ask', type: 'flow' as const, properties: { label: 'Human ask' } };
+    expect(visibleNodeLabel(node)).toBe('Human ask');
+    expect(renameNodeInSource(dsl, node, 'Human ask')).toBe(dsl);
+
+    const out = renameNodeInSource(dsl, node, 'Person asks');
+    expect(out).toContain('label: "Person asks"');
+    expect(out).toContain('Ask -> Send');
+    expect(out).not.toContain('node Person');
+
+    const pinned = setNodePin(out, 'Ask', 180, 220);
+    const parsed = parseDiagram(pinned);
+    const ask = parsed.nodes.find(item => item.id === 'ask');
+    expect(parsed.pins?.ask).toEqual({ x: 180, y: 220 });
+    expect(ask?.type).toBe('flow');
+    if (ask?.type === 'flow') expect(ask.properties.label).toBe('Person asks');
+    expect(pinned).not.toMatch(/node Send \{[^}]*\bat:/);
   });
 });
