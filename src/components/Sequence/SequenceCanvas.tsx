@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ICON_STYLES, type IconStyleId } from '../Canvas/iconStyles';
 import { StyleIcon } from '../Canvas/icons/styles/StyleIcon';
-import { WalkThroughOverlay } from '../Canvas/WalkThroughOverlay';
+import { WalkThroughOverlay, type WalkStepExportFormat } from '../Canvas/WalkThroughOverlay';
 import { useDiagramStore } from '../../store/diagramStore';
 import { activationSpans, parseSequenceSource } from './sequenceParser';
 import type { SequenceArrow, SequenceItem, SequenceParticipant } from './sequenceParser';
@@ -18,6 +18,7 @@ import {
   sequenceTitlePaint,
 } from './sequenceStyle';
 import { SEQUENCE_WALK_DIM, sequenceCanWalk, sequenceWalkSessionText, sequenceWalkSteps } from './sequenceWalk';
+import { useExport } from '../../utils/useExport';
 
 // Presentation-style sequence diagram renderer (SVG). Participants are
 // colour-coded cards repeated top and bottom (slide-deck style), with
@@ -165,6 +166,12 @@ export function SequenceCanvas() {
   const popWalkThroughStep = useDiagramStore(s => s.popWalkThroughStep);
   const exitWalkThrough = useDiagramStore(s => s.exitWalkThrough);
   const setWalkThroughStep = useDiagramStore(s => s.setWalkThroughStep);
+  const { exportPNG, exportSVG, exportPDF } = useExport();
+  const exportCurrentStep = (format: WalkStepExportFormat) => {
+    if (format === 'png') void exportPNG();
+    else if (format === 'svg') void exportSVG();
+    else void exportPDF();
+  };
   const scrollRef = useRef<HTMLDivElement>(null);
   const currentRowRef = useRef<SVGGElement | null>(null);
 
@@ -945,6 +952,7 @@ A-->>U: 200 OK`}
             pushWalkThroughStep(walkIndex + 1);
           }}
           onExit={exitWalkThrough}
+          onExportStep={exportCurrentStep}
         />
       )}
 

@@ -6,6 +6,19 @@ import { buildBoardDocument, EXPORT_WATERMARK, showStepNumbersForStorage } from 
 import type { BoardMode } from './boardManager';
 import { ICON_STYLES, iconStyleForStorage } from '../components/Canvas/iconStyles';
 
+/** Local download name. A walk step is appended only while step-through is on. */
+export function exportFileName(
+  title: string,
+  mode: string,
+  format: string,
+  walkStep: number | null,
+  date: string,
+): string {
+  const cleanTitle = (title || 'diagram').toLowerCase().replace(/[^a-z0-9]/g, '-');
+  const stepPart = walkStep === null ? '' : `-step-${walkStep + 1}`;
+  return `${cleanTitle}-${mode}${stepPart}-${date}.${format}`;
+}
+
 export const useExport = () => {
   const { parsedDiagram, diagramMode, iconStyle } = useDiagramStore();
   // Clean architecture keeps today's export fill. Other architecture styles,
@@ -17,11 +30,11 @@ export const useExport = () => {
 
   const getFileName = (format: string) => {
     const title = parsedDiagram?.title || 'diagram';
-    const mode = diagramMode;
     const date = new Date().toISOString().split('T')[0];
-    const cleanTitle = title.toLowerCase().replace(/[^a-z0-9]/g, '-');
-    return `${cleanTitle}-${mode}-${date}.${format}`;
+    return exportFileName(title, diagramMode, format, useDiagramStore.getState().walkThroughStep, date);
   };
+
+  const walkChrome = () => document.querySelectorAll<HTMLElement>('.walk-through-chrome');
 
   const hideControls = () => {
     const minimap = document.querySelector('.react-flow__minimap') as HTMLElement;
@@ -31,6 +44,9 @@ export const useExport = () => {
     if (minimap) minimap.style.display = 'none';
     if (controls) controls.style.display = 'none';
     if (attribution) attribution.style.display = 'none';
+    // Step-through chrome sits inside the flow capture target. Hide it so the
+    // file is the current stepped diagram, then restore it with the controls.
+    walkChrome().forEach(el => { el.style.display = 'none'; });
   };
 
   const showControls = () => {
@@ -41,6 +57,7 @@ export const useExport = () => {
     if (minimap) minimap.style.display = 'block';
     if (controls) controls.style.display = 'flex';
     if (attribution) attribution.style.display = 'block';
+    walkChrome().forEach(el => { el.style.display = ''; });
   };
 
   const getCanvas = () =>
@@ -124,8 +141,20 @@ export const useExport = () => {
 
       // Size the PDF page to the canvas (in CSS px → pt) and embed the
       // high-resolution capture at full page size so it stays crisp.
-      const pageWidth = canvas.offsetWidth;
-      const pageHeight = canvas.offsetHeight;
+      // Sequence capture targets an <svg>, which has no HTMLElement offset box,
+      // so fall through to the rendered box and the width/height attributes.
+      const pageWidth = positiveLength(
+        canvas.offsetWidth,
+        canvas.getBoundingClientRect().width,
+        canvas.scrollWidth,
+        Number(canvas.getAttribute('width')),
+      );
+      const pageHeight = positiveLength(
+        canvas.offsetHeight,
+        canvas.getBoundingClientRect().height,
+        canvas.scrollHeight,
+        Number(canvas.getAttribute('height')),
+      );
 
       const { default: jsPDF } = await import('jspdf');
       const pdf = new jsPDF({
@@ -293,4 +322,11 @@ export const useExport = () => {
 function assertUnwatermarked(payload: string): string {
   if (EXPORT_WATERMARK) throw new Error('Export watermark is not allowed on the free path.');
   return payload;
+}
+
+function positiveLength(...candidates: number[]): number {
+  for (const value of candidates) {
+    if (Number.isFinite(value) && value > 0) return Math.round(value);
+  }
+  return 1;
 }
