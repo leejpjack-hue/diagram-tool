@@ -1,7 +1,8 @@
 // Persist canvas drag/resize back into the DSL (the source of truth) by
-// writing `at: x, y` on nodes and `at:`/`size:` on group blocks. The renderer
-// then honours those pins on every parse, so manual placement survives reload
-// and is captured in the exported diagram.
+// writing `at: x, y` on nodes and `at:`/`size:` on group blocks. The canvas
+// snaps a move to the 10px grid and to alignment guides first; these pins are
+// the layout constraint the next parse honours, so the typed source is what
+// reopens. Sequence diagrams do not use this writer.
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

@@ -30,7 +30,7 @@ import type { FlowNode, C4Level, ServiceNode as ServiceNodeType, CloudNode as Cl
 import { calculateAutoLayout, resolveGroupOverlaps } from '../../utils/autoLayout';
 import { setReverseDSL, setReverseMermaidDSL } from '../../utils/flowDSL';
 import { applyCanvasPins, setGroupPin } from '../../utils/pinUtils';
-import { applyBoardSource, renameNodeInSource } from '../../utils/sourceText';
+import { applyBoardSource, renameNodeInSource, visibleNodeLabel } from '../../utils/sourceText';
 import { isMermaidFlow } from '../../parser/mermaidFlow';
 import { parseDiagram } from '../../parser/parser';
 import { flowStepList, flowStepNumbers, type FlowStep } from '../../parser/flowToPlainSteps';
@@ -1279,7 +1279,7 @@ function DiagramCanvasInternal() {
     if (diagramMode !== 'flow' && parsedDiagram) {
       const meta = parsedDiagram.nodes.find(n => n.id === node.id);
       if (meta && meta.type !== 'annotation') {
-        setRenameDraft(meta.name);
+        setRenameDraft(visibleNodeLabel(meta));
         setSelectedNode(node.id);
         return;
       }
@@ -1359,17 +1359,19 @@ function DiagramCanvasInternal() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'F2' || !selectedNodeId || !parsedDiagram) return;
+      if (event.key !== 'F2') return;
+      const { selectedNodeId: selectedId, parsedDiagram: diagram } = useDiagramStore.getState();
+      if (!selectedId || !diagram) return;
       const target = event.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
-      const meta = parsedDiagram.nodes.find(n => n.id === selectedNodeId);
+      const meta = diagram.nodes.find(n => n.id === selectedId);
       if (!meta || meta.type === 'annotation') return;
       event.preventDefault();
-      setRenameDraft(meta.name);
+      setRenameDraft(visibleNodeLabel(meta));
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selectedNodeId, parsedDiagram]);
+  }, []);
 
   // Handle node selection for copy/paste
   const onSelectionChange = useCallback(({ nodes: selectedNodes }: { nodes: Node[] }) => {
@@ -1506,7 +1508,7 @@ function DiagramCanvasInternal() {
             onChange={e => setRenameDraft(e.target.value)}
             onBlur={() => commitRename(selectedNodeId, renameDraft)}
             onKeyDown={e => {
-              if (e.key === 'Enter') commitRename(selectedNodeId, renameDraft);
+              if (e.key === 'Enter') commitRename(selectedNodeId, (e.target as HTMLInputElement).value);
               if (e.key === 'Escape') setRenameDraft(null);
             }}
             className="w-56 rounded-md border border-slate-200 px-2 py-1 text-sm outline-none focus:border-indigo-400"
