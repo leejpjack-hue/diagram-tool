@@ -35,7 +35,7 @@ import { isMermaidFlow } from '../../parser/mermaidFlow';
 import { parseDiagram } from '../../parser/parser';
 import { flowStepList, flowStepNumbers, type FlowStep } from '../../parser/flowToPlainSteps';
 import { architectureHopCaption, architectureWalkSequence } from '../../parser/architectureWalk';
-import { WalkThroughOverlay } from './WalkThroughOverlay';
+import { WalkThroughOverlay, type WalkStepExportFormat } from './WalkThroughOverlay';
 import { ArchitectureStepEdge } from './ArchitectureStepEdge';
 import { NO_STEP_NUMBERS, StepNumberContext } from './stepNumberContext';
 import { withStepNumber } from './stepNumberSlot';
@@ -45,6 +45,7 @@ import { getHelperLines, type HelperLineResult } from './helperLines';
 import { LayoutDirectionContext } from './layoutDirection';
 import { Position } from '@xyflow/react';
 import { addConnectionDSL, updateFlowEdgeDSL } from '../../utils/connectDSL';
+import { useExport } from '../../utils/useExport';
 import { computeConnectionRouting, flowRoutingBox, sidesForConnection } from './connectionRouting';
 import { sideFromHandleId } from './architectureHandleIds';
 
@@ -764,6 +765,12 @@ function DiagramCanvasInternal() {
   const pushWalkThroughStep = useDiagramStore(s => s.pushWalkThroughStep);
   const popWalkThroughStep = useDiagramStore(s => s.popWalkThroughStep);
   const exitWalkThrough = useDiagramStore(s => s.exitWalkThrough);
+  const { exportPNG, exportSVG, exportPDF } = useExport();
+  const exportCurrentStep = (format: WalkStepExportFormat) => {
+    if (format === 'png') void exportPNG();
+    else if (format === 'svg') void exportSVG();
+    else void exportPDF();
+  };
 
   const walkSteps = useMemo((): FlowStep[] => {
     if (diagramMode !== 'flow' || !parsedDiagram) return [];
@@ -1597,6 +1604,7 @@ function DiagramCanvasInternal() {
             onPrev={popWalkThroughStep}
             onNext={() => pushWalkThroughStep(Math.min(walkSteps.length - 1, walkIndex + 1))}
             onExit={exitWalkThrough}
+            onExportStep={exportCurrentStep}
           />
         )}
         {archWalkActive && currentArchHop && (

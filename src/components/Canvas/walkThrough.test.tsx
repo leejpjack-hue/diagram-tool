@@ -125,6 +125,20 @@ describe('Walk through control (DT-AI-14)', () => {
     expect(screen.queryByTestId('walk-through')).toBeNull();
     expect(screen.queryByTestId('walk-through-unavailable')).toBeNull();
   });
+
+  it('walks a numbered architecture board without step export buttons', () => {
+    setup(`diagram: architecture
+title: Request path
+service User {}
+service App {}
+edge User -> App { label: "asks" step: 1 }
+`);
+    fireEvent.click(screen.getByTestId('walk-through'));
+    expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('1 · User → App: asks');
+    expect(screen.queryByRole('button', { name: 'Export step as PNG' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Export step as SVG' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Export step as PDF' })).toBeNull();
+  });
 });
 
 describe('walk-through session (enter, next, prev, exit)', () => {
@@ -135,6 +149,9 @@ describe('walk-through session (enter, next, prev, exit)', () => {
     expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Step 1 of 6');
     expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('Human ask');
     expect(screen.getByTestId('walk-through-role')).toHaveTextContent('Human');
+    expect(screen.getByRole('button', { name: 'Export step as PNG' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Export step as SVG' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Export step as PDF' })).toBeEnabled();
 
     const askNode = container.querySelector('[data-id="Ask"]') as HTMLElement;
     const modelNode = container.querySelector('[data-id="Model"]') as HTMLElement;

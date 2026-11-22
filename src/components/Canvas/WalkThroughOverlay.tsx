@@ -9,6 +9,8 @@ const ROLE_WORD: Record<FlowNodeRole, string> = {
   check: 'Check',
 };
 
+export type WalkStepExportFormat = 'png' | 'svg' | 'pdf';
+
 interface WalkThroughOverlayProps {
   step: number; // 1-based
   total: number;
@@ -24,6 +26,8 @@ interface WalkThroughOverlayProps {
   onPrev: () => void;
   onNext: () => void;
   onExit: () => void;
+  /** Local PNG/SVG/PDF of the stepped canvas. Omitted on boards that do not export a step. */
+  onExportStep?: (format: WalkStepExportFormat) => void;
   /**
    * DT-SEQ-03: `panel` sits in a React Flow panel (Flow and Architecture).
    * `anchor` is the same controls, positioned by the parent, for a canvas
@@ -32,13 +36,17 @@ interface WalkThroughOverlayProps {
   placement?: 'panel' | 'anchor';
 }
 
+const STEP_EXPORTS: WalkStepExportFormat[] = ['png', 'svg', 'pdf'];
+
 /**
  * DT-AI-14 — read-only walk-through caption and controls, rendered as a React
  * Flow panel over the board. Prev/Next move one step; Esc exits. Left/Right
  * arrow keys are handled here while walk-through is active (same input-guard
  * pattern as the canvas F2 handler). Purely view state — nothing is edited.
+ * Flow and sequence pass `onExportStep` to save the current view with the
+ * existing PNG/SVG/PDF exporters.
  */
-export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, paths, choices, onChoose, pathText, captionText, onPrev, onNext, onExit, placement = 'panel' }: WalkThroughOverlayProps) {
+export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, paths, choices, onChoose, pathText, captionText, onPrev, onNext, onExit, onExportStep, placement = 'panel' }: WalkThroughOverlayProps) {
   // DT-AI-22 — Copy path: writes the session path text to the clipboard and
   // briefly flips the label to "Copied". Failures are swallowed (silent), and
   // any pending reset timer is cleared on unmount.
@@ -67,7 +75,7 @@ export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, 
   // Caption kept as one span so steps without a note render exactly as
   // DT-AI-14 did; the note only wraps it in a column when present.
   const flowCaption = (
-    <span data-testid="walk-through-caption" className="text-xs font-semibold text-slate-800">
+    <span data-testid="walk-through-caption" className="whitespace-nowrap text-xs font-semibold text-slate-800">
       Step {step} of {total}
       {role && ROLE_WORD[role] ? (
         <span data-testid="walk-through-role" className="ml-1 text-indigo-600">· {ROLE_WORD[role]}</span>
@@ -77,7 +85,7 @@ export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, 
   );
   const caption = captionText
     ? (
-      <span data-testid="walk-through-caption" className="text-xs font-semibold text-slate-800">
+      <span data-testid="walk-through-caption" className="whitespace-nowrap text-xs font-semibold text-slate-800">
         {captionText}
       </span>
     )
@@ -102,11 +110,30 @@ export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, 
     return () => window.removeEventListener('keydown', onKey);
   }, [onNext, onPrev, onExit]);
 
+  const exportRow = onExportStep ? (
+    <div className="flex items-center gap-1 border-t border-slate-100 pt-1">
+      <span className="text-[10px] font-semibold text-slate-400">Export this step</span>
+      {STEP_EXPORTS.map(format => (
+        <button
+          key={format}
+          type="button"
+          data-testid={`walk-through-export-${format}`}
+          aria-label={`Export step as ${format.toUpperCase()}`}
+          onClick={() => onExportStep(format)}
+          className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase text-slate-600 hover:border-indigo-300 hover:text-indigo-700"
+        >
+          {format}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
   const card = (
       <div
         data-testid="walk-through-overlay"
-        className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur"
+        className="walk-through-chrome flex flex-col items-stretch gap-1 rounded-lg border border-indigo-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur"
       >
+        <div className="flex items-center gap-2">
         {note || arrivedBy || paths ? (
           <span className="flex flex-col items-start">
             {caption}
@@ -187,7 +214,9 @@ export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, 
         >
           Exit
         </button>
-        <span className="text-[10px] text-slate-400">←/→ keys · Esc to exit</span>
+        <span className="whitespace-nowrap text-[10px] text-slate-400">←/→ keys · Esc to exit</span>
+        </div>
+        {exportRow}
       </div>
   );
 
@@ -200,7 +229,7 @@ export function WalkThroughOverlay({ step, total, label, role, note, arrivedBy, 
   }
 
   return (
-    <Panel position="top-center" className="!m-3">
+    <Panel position="top-center" className="!m-3 !mt-20">
       {card}
     </Panel>
   );

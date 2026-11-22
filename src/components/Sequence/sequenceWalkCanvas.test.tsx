@@ -28,6 +28,9 @@ describe('Sequence walk highlight', () => {
   it('highlights the current row, both headers, and the active bar, and dims the rest', () => {
     const { container } = renderWalk(0);
     expect(screen.getByTestId('walk-through-caption')).toHaveTextContent('1 · Agent → Tool: call');
+    expect(screen.getByRole('button', { name: 'Export step as PNG' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Export step as SVG' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Export step as PDF' })).toBeEnabled();
     const current = container.querySelector('[data-walk-current="true"]');
     expect(current).not.toBeNull();
     expect(current).toHaveAttribute('data-walk-index', '0');
