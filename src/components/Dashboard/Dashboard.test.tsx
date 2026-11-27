@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Dashboard } from './Dashboard';
 import { WORKSPACE_UNAVAILABLE_TITLE } from '../Workspace/WorkspaceStatus';
@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getPreferences: vi.fn(),
   getStorageUsage: vi.fn(),
   subscribe: vi.fn(() => () => {}),
+  markOpened: vi.fn(),
 }));
 
 vi.mock('../../utils/boardManager', async importOriginal => {
@@ -26,6 +27,7 @@ vi.mock('../../utils/boardManager', async importOriginal => {
       getPreferences: mocks.getPreferences,
       getStorageUsage: mocks.getStorageUsage,
       subscribe: mocks.subscribe,
+      markOpened: mocks.markOpened,
     },
   };
 });
@@ -50,6 +52,11 @@ beforeEach(() => {
   });
   mocks.getStorageUsage.mockResolvedValue({ usage: 0, quota: 0 });
   mocks.subscribe.mockReturnValue(() => {});
+  mocks.markOpened.mockReset();
+  mocks.markOpened.mockImplementation(async (id: string) => {
+    const boards = await mocks.list() as Board[];
+    return boards.find(board => board.id === id) ?? null;
+  });
 });
 
 describe('Dashboard workspace recovery', () => {
@@ -93,8 +100,50 @@ describe('Dashboard workspace recovery', () => {
     expect(screen.getAllByTestId('skill-authored-mark').length).toBeGreaterThan(0);
     expect(screen.getAllByTestId('skill-authored-mark')[0]).toHaveTextContent('Written by a skill, editable as text');
     const notes = screen.getByRole('heading', { name: 'Notes' }).closest('article');
+    const intake = screen.getByRole('heading', { name: 'Intake' }).closest('article');
     expect(notes).toBeTruthy();
+    expect(intake).toBeTruthy();
     expect(notes).not.toHaveTextContent('Written by a skill, editable as text');
+    expect(within(notes as HTMLElement).getByTestId('human-authored-mark')).toHaveTextContent('Written by a human');
+    expect(within(intake as HTMLElement).queryByTestId('human-authored-mark')).not.toBeInTheDocument();
+    expect(within(notes as HTMLElement).getByTestId('board-last-edited')).toHaveTextContent(/^Edited /);
+    expect(within(notes as HTMLElement).getByTestId('board-last-edited')).toHaveAttribute('datetime', authored.updatedAt);
+    expect(within(intake as HTMLElement).getByTestId('board-last-edited')).toHaveAttribute('datetime', authored.updatedAt);
+    expect(within(notes as HTMLElement).getByRole('button', { name: 'Open as text' })).toBeInTheDocument();
+    expect(within(intake as HTMLElement).getByRole('button', { name: 'Open as text' })).toBeInTheDocument();
+  });
+
+  it('opens a human-typed board and a skill board as text from Home', async () => {
+    const authored: Board = {
+      id: 'skill-intake',
+      title: 'Intake',
+      description: '',
+      mode: 'flow',
+      dslText: 'diagram: flow\ntitle: Intake\nstart FNOL\n',
+      createdAt: '2026-11-27T00:00:00.000Z',
+      updatedAt: '2026-11-26T12:00:00.000Z',
+      lastOpenedAt: '2026-11-27T00:00:00.000Z',
+      tags: [],
+      starred: false,
+      schemaVersion: 2,
+      skillAuthored: true,
+    };
+    const plain: Board = { ...authored, id: 'plain', title: 'Notes', skillAuthored: undefined, updatedAt: '2026-11-25T08:00:00.000Z' };
+    mocks.list.mockResolvedValue([authored, plain]);
+    const onOpenAsText = vi.fn();
+    render(
+      <Dashboard onOpen={vi.fn()} onOpenAsText={onOpenAsText} onCreate={vi.fn()} onPublish={vi.fn()} notify={vi.fn()} />,
+    );
+
+    const notes = (await screen.findByRole('heading', { name: 'Notes' })).closest('article') as HTMLElement;
+    const intake = screen.getByRole('heading', { name: 'Intake' }).closest('article') as HTMLElement;
+    fireEvent.click(within(notes).getByRole('button', { name: 'Open as text' }));
+    fireEvent.click(within(intake).getByRole('button', { name: 'Open as text' }));
+
+    await waitFor(() => {
+      expect(onOpenAsText).toHaveBeenCalledWith(expect.objectContaining({ id: 'plain', title: 'Notes', skillAuthored: undefined }));
+      expect(onOpenAsText).toHaveBeenCalledWith(expect.objectContaining({ id: 'skill-intake', title: 'Intake', skillAuthored: true }));
+    });
   });
 
   it('shows Local workspace unavailable when IndexedDB cannot be opened', async () => {

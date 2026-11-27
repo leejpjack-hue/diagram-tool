@@ -62,7 +62,7 @@ Missing or non-boolean values load as off. Older readers ignore the field. A dia
 
 ### Skill-authored boards
 
-`board.skillAuthored` is optional and additive. `version` stays **3.0**. No database migration. The local type-to-flow skill and the local MCP `create_board` tool set it to `true`. Other writers omit it. Missing, `false`, or any non-boolean loads as unmarked. Older readers ignore the field. A marked board stays a local file: nothing is sent to a DiagramTool cloud. Home shows “Written by a skill, editable as text”, and opening a marked flow board fills the existing Type steps editor so the text and the canvas stay editable.
+`board.skillAuthored` is optional and additive. `version` stays **3.0**. No database migration. The local type-to-flow skill and the local MCP `create_board` tool set it to `true`. Other writers omit it. Missing, `false`, or any non-boolean loads as unmarked. Older readers ignore the field. A marked board stays a local file: nothing is sent to a DiagramTool cloud. Home shows “Written by a skill, editable as text” on a marked board and “Written by a human” on an unmarked board, plus when the board was last edited. Open as text opens that board in the existing text editor beside the canvas. On a flow board it fills Type steps, so a skill-written board and a human-typed board both stay editable as text. This does not add pin chrome.
 
 ### Typed data steps
 

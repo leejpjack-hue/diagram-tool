@@ -25,7 +25,7 @@ import { showStepNumbersForStorage, skillAuthoredForStorage } from './utils/boar
 import { useGanttStore } from './components/Gantt/ganttStore';
 import { generateGanttDSL } from './components/Gantt/ganttGenerator';
 import { retainTypeTasksBlock } from './parser/plainGantt';
-import { seedTypeStepsForSkillBoard, seedTypeStepsForTemplate } from './parser/boardToPlainSteps';
+import { seedTypeStepsForOpenAsText, seedTypeStepsForSkillBoard, seedTypeStepsForTemplate } from './parser/boardToPlainSteps';
 import { flowStepList } from './parser/flowToPlainSteps';
 import { architectureWalkSequence } from './parser/architectureWalk';
 import { sequenceSourceCanWalk } from './components/Sequence/sequenceWalk';
@@ -847,7 +847,8 @@ function App() {
 
   // ---- Board dashboard (Miro-style home) ----
 
-  const openBoard = (board: Board) => {
+  const openBoard = (board: Board, options?: { asText?: boolean }) => {
+    const asText = options?.asText === true;
     projectRef.current = {
       view: 'editor',
       boardId: board.id,
@@ -873,13 +874,18 @@ function App() {
       setParsedDiagram(null);
     }
     setDeckItems(board.presentation?.items ?? []);
-    if (board.skillAuthored === true) {
+    if (asText || board.skillAuthored === true) {
       setShowEditor(true);
       setMobileView('editor');
+    }
+    if (asText && board.mode === 'flow') {
+      // Open as text fills Type steps for a skill board and a human-typed board.
+      queueTypeStepsSeed(seedTypeStepsForOpenAsText(board.mode, board.dslText) ?? '');
+    } else if (board.skillAuthored === true) {
       const seed = seedTypeStepsForSkillBoard(board.mode, board.dslText, true);
       if (seed) queueTypeStepsSeed(seed);
     }
-    if (board.skillAuthored !== true && board.presentation?.items.length && isWorkshopTemplateId(board.templateSourceId)) {
+    if (!asText && board.skillAuthored !== true && board.presentation?.items.length && isWorkshopTemplateId(board.templateSourceId)) {
       projectRef.current.view = 'presentation';
       setPresentationFor(board);
       setView('presentation');
@@ -1379,6 +1385,7 @@ function App() {
       {view === 'dashboard' && (
         <Dashboard
           onOpen={openBoard}
+          onOpenAsText={board => openBoard(board, { asText: true })}
           onCreate={createBoard}
           onPublish={openPresentation}
           notify={(type, msg) => (type === 'success' ? toast.success(msg) : toast.error(msg))}

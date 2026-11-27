@@ -48,6 +48,16 @@ export function seedTypeStepsForSkillBoard(
   skillAuthored?: boolean,
 ): string | null {
   if (skillAuthored !== true || mode !== 'flow') return null;
+  return seedTypeStepsForOpenAsText(mode, dslText);
+}
+
+/**
+ * Home "Open as text" fills Type steps for any flow board, skill-written or
+ * human-typed. Other modes return null; the caller still opens the text editor.
+ * Unreadable or empty source returns null.
+ */
+export function seedTypeStepsForOpenAsText(mode: string, dslText: string): string | null {
+  if (mode !== 'flow') return null;
   try {
     const text = plainStepsFromBoardSource(dslText);
     return text.trim() ? text : null;

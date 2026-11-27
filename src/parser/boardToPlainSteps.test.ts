@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { plainStepsFromBoardSource, applyLoadedPlainSteps, seedTypeStepsForSkillBoard, seedTypeStepsForTemplate, sourceMatchesRoleLanes } from './boardToPlainSteps';
+import { plainStepsFromBoardSource, applyLoadedPlainSteps, seedTypeStepsForOpenAsText, seedTypeStepsForSkillBoard, seedTypeStepsForTemplate, sourceMatchesRoleLanes } from './boardToPlainSteps';
 import { plainStepsToDSL } from './plainSteps';
 import { TEMPLATES } from '../components/TemplatePicker/templates';
 import { flowToPlainSteps } from './flowToPlainSteps';
@@ -73,6 +73,19 @@ end Review
     expect(seedTypeStepsForSkillBoard('flow', dsl)).toBeNull();
     expect(seedTypeStepsForSkillBoard('architecture', dsl, true)).toBeNull();
     expect(seedTypeStepsForSkillBoard('flow', 'diagram: flow\ntitle: Empty\n', true)).toBeNull();
+  });
+
+  it('fills Type steps for a human-typed flow when Home opens it as text', () => {
+    const dsl = `diagram: flow
+title: Handoff
+start Draft
+Draft -> Send
+end Send
+`;
+    expect(seedTypeStepsForOpenAsText('flow', dsl)).toBe(plainStepsFromBoardSource(dsl));
+    expect(seedTypeStepsForSkillBoard('flow', dsl, false)).toBeNull();
+    expect(seedTypeStepsForOpenAsText('architecture', dsl)).toBeNull();
+    expect(seedTypeStepsForOpenAsText('flow', 'diagram: flow\ntitle: Empty\n')).toBeNull();
   });
 
   it('other template ids return null (no mass auto-seed)', () => {
