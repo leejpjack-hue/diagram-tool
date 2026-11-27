@@ -48,6 +48,7 @@ function requestFromBuiltIn(template: DiagramTemplate, spaceId?: string): Dashbo
 
 interface DashboardProps {
   onOpen: (board: Board) => void | Promise<void>;
+  onOpenAsText?: (board: Board) => void | Promise<void>;
   onCreate: (request: DashboardCreateRequest) => void | Promise<void>;
   onPublish: (board: Board) => void | Promise<void>;
   notify: (type: 'success' | 'error', message: string) => void;
@@ -124,12 +125,42 @@ function boardAsTemplate(board: Board): DiagramTemplate {
   return { id: board.id, name: board.title, description: board.description, category: MODE_META[board.mode].category, mode: board.mode, tags: board.tags, dsl: board.dslText };
 }
 
-function SkillAuthoredMark({ board }: { board: Board }) {
-  if (board.skillAuthored !== true) return null;
+function AuthorMark({ board }: { board: Board }) {
+  if (board.skillAuthored === true) {
+    return (
+      <p data-testid="skill-authored-mark" data-author="skill" className="mt-1 w-fit rounded bg-indigo-50 px-1.5 py-0.5 text-[11px] font-medium leading-snug text-indigo-700">
+        Written by a skill, editable as text
+      </p>
+    );
+  }
   return (
-    <p data-testid="skill-authored-mark" className="mt-1 text-[11px] font-medium leading-snug text-indigo-700">
-      Written by a skill, editable as text
+    <p data-testid="human-authored-mark" data-author="human" className="mt-1 w-fit rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium leading-snug text-emerald-800">
+      Written by a human
     </p>
+  );
+}
+
+function LastEdited({ board, className }: { board: Board; className: string }) {
+  return (
+    <time data-testid="board-last-edited" dateTime={board.updatedAt} className={className}>
+      Edited {timeAgo(board.updatedAt)}
+    </time>
+  );
+}
+
+function OpenAsTextButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      data-testid="open-as-text"
+      className="mt-1 block text-left text-[11px] font-semibold text-indigo-700 hover:underline"
+      onClick={event => {
+        event.stopPropagation();
+        onClick();
+      }}
+    >
+      Open as text
+    </button>
   );
 }
 
@@ -161,7 +192,7 @@ function EmptyState({ icon, title, description, action }: { icon: IconName; titl
   return <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center"><div className="mb-3 rounded-lg bg-slate-100 p-3 text-slate-500"><Icon name={icon} className="h-6 w-6" /></div><h3 className="font-semibold text-slate-900">{title}</h3><p className="mt-1 max-w-sm text-sm text-slate-500">{description}</p>{action && <div className="mt-4">{action}</div>}</div>;
 }
 
-export function Dashboard({ onOpen, onCreate, onPublish, notify, readProject, dashboardSelectionRef }: DashboardProps) {
+export function Dashboard({ onOpen, onOpenAsText, onCreate, onPublish, notify, readProject, dashboardSelectionRef }: DashboardProps) {
   const [boards, setBoards] = useState<Board[]>([]);
   const [trashBoards, setTrashBoards] = useState<Board[]>([]);
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -243,6 +274,7 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify, readProject, da
   const launchCreate = (tab: CreateTab = 'blank') => { setCreateTab(tab); setCreateOpen(true); setMenuFor(null); };
   const createFrom = async (request: DashboardCreateRequest) => { setCreateOpen(false); await onCreate({ ...request, spaceId: request.spaceId ?? activeSpaceId ?? preferences.defaultSpaceId }); };
   const openBoard = async (board: Board) => { const opened = await boardManager.markOpened(board.id); await onOpen(opened ?? board); };
+  const openBoardAsText = async (board: Board) => { const opened = await boardManager.markOpened(board.id); await (onOpenAsText ?? onOpen)(opened ?? board); };
 
   const projectIdentity = (): ProjectIdentity => readProject?.() ?? { view: 'dashboard', boardId: null, lastOpenedAt: null };
 
@@ -401,7 +433,7 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify, readProject, da
               <TemplatesView templates={templates} onUseBuiltIn={template => void createFrom(requestFromBuiltIn(template))} onUsePersonal={async template => { const used = await boardManager.useTemplate(template.id); if (used) await createFrom({ mode: used.mode, title: used.name, dslText: used.dslText, templateSourceId: used.id }); }} onDeletePersonal={template => void boardManager.removeTemplate(template.id)} />
             ) : view === 'activity' ? <ActivityView activity={activity} onOpen={async entry => { if (!entry.boardId) return; const board = await boardManager.get(entry.boardId); if (board && !board.deletedAt) await openBoard(board); }} /> : (
               <>
-                {view === 'home' && <HomeStart templates={TEMPLATES.slice(0, 4)} recent={recent} onQuickCreate={mode => void createFrom({ mode })} onUseTemplate={template => void createFrom(requestFromBuiltIn(template))} onOpen={board => void openBoard(board)} onBrowseTemplates={() => selectView('templates')} />}
+                {view === 'home' && <HomeStart templates={TEMPLATES.slice(0, 4)} recent={recent} onQuickCreate={mode => void createFrom({ mode })} onUseTemplate={template => void createFrom(requestFromBuiltIn(template))} onOpen={board => void openBoard(board)} onOpenAsText={board => void openBoardAsText(board)} onBrowseTemplates={() => selectView('templates')} />}
                 <section className={view === 'home' ? 'mt-10' : ''}>
                   <div className="mb-4 flex flex-wrap items-center gap-2">
                     <h2 className="mr-auto text-base font-bold text-slate-900">{view === 'home' ? 'All boards' : viewTitle}<span className="ml-2 text-sm font-medium text-slate-400">{filteredBoards.length}</span></h2>
@@ -414,7 +446,7 @@ export function Dashboard({ onOpen, onCreate, onPublish, notify, readProject, da
                   {(modeFilter !== 'all' || tagFilter || query) && <div className="mb-4 flex flex-wrap gap-2">{query && <FilterChip label={`Search: ${query}`} onClear={() => setQuery('')} />}{modeFilter !== 'all' && <FilterChip label={MODE_META[modeFilter].label} onClear={() => setModeFilter('all')} />}{tagFilter && <FilterChip label={`#${tagFilter}`} onClear={() => setTagFilter('')} />}</div>}
                   {filteredBoards.length === 0 ? <EmptyState icon={view === 'trash' ? 'trash' : 'boards'} title={view === 'trash' ? 'Trash is empty' : query || modeFilter !== 'all' || tagFilter ? 'No matching boards' : 'No boards here yet'} description={view === 'trash' ? 'Deleted boards stay here for 30 days before permanent removal.' : 'Create a blank diagram, start from a template, or adjust the active filters.'} action={view !== 'trash' && <button className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => launchCreate()}>Create a board</button>} /> : (
                     <div className={preferences.layout === 'grid' ? `grid gap-4 ${preferences.density === 'compact' ? 'grid-cols-[repeat(auto-fill,minmax(210px,1fr))]' : 'grid-cols-[repeat(auto-fill,minmax(260px,1fr))]'}` : 'space-y-2'}>
-                      {filteredBoards.map(board => <BoardCard key={board.id} board={board} space={spaces.find(space => space.id === board.spaceId)} layout={preferences.layout} selected={selected.has(board.id)} menuOpen={menuFor === board.id} trashView={view === 'trash'} onOpen={() => void openBoard(board)} onSelect={() => toggleSelected(board.id)} onToggleStar={() => void toggleStar(board)} onMenu={event => { event.stopPropagation(); setMenuFor(current => current === board.id ? null : board.id); }} onEdit={() => { setOrganizeBoard(board); setMenuFor(null); }} onPresent={() => void onPublish(board)} onDuplicate={() => void duplicateBoard(board)} onTemplate={() => void saveTemplate(board)} onVersions={() => void openVersions(board)} onExport={() => void boardManager.exportBoard(board)} onTrash={() => void trashBoard(board)} onRestore={() => void boardManager.restore(board.id)} onDelete={() => void permanentlyDelete(board)} />)}
+                      {filteredBoards.map(board => <BoardCard key={board.id} board={board} space={spaces.find(space => space.id === board.spaceId)} layout={preferences.layout} selected={selected.has(board.id)} menuOpen={menuFor === board.id} trashView={view === 'trash'} onOpen={() => void openBoard(board)} onOpenAsText={() => void openBoardAsText(board)} onSelect={() => toggleSelected(board.id)} onToggleStar={() => void toggleStar(board)} onMenu={event => { event.stopPropagation(); setMenuFor(current => current === board.id ? null : board.id); }} onEdit={() => { setOrganizeBoard(board); setMenuFor(null); }} onPresent={() => void onPublish(board)} onDuplicate={() => void duplicateBoard(board)} onTemplate={() => void saveTemplate(board)} onVersions={() => void openVersions(board)} onExport={() => void boardManager.exportBoard(board)} onTrash={() => void trashBoard(board)} onRestore={() => void boardManager.restore(board.id)} onDelete={() => void permanentlyDelete(board)} />)}
                     </div>
                   )}
                 </section>
@@ -442,7 +474,7 @@ function NavButton({ item, active, collapsed, onClick, color }: { item: { label:
   return <button onClick={onClick} title={collapsed ? item.label : undefined} className={`flex h-9 w-full items-center gap-3 rounded-md px-2.5 text-sm font-medium transition ${active ? 'bg-indigo-100 text-indigo-700' : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-950'}`}><span style={color ? { color } : undefined}><Icon name={item.icon} /></span>{!collapsed && <><span className="min-w-0 flex-1 truncate text-left">{item.label}</span>{Boolean(item.count) && <span className="text-[10px] font-semibold text-slate-400">{item.count}</span>}</>}</button>;
 }
 
-function HomeStart({ templates, recent, onQuickCreate, onUseTemplate, onOpen, onBrowseTemplates }: { templates: DiagramTemplate[]; recent: Board[]; onQuickCreate: (mode: BoardMode) => void; onUseTemplate: (template: DiagramTemplate) => void; onOpen: (board: Board) => void; onBrowseTemplates: () => void }) {
+function HomeStart({ templates, recent, onQuickCreate, onUseTemplate, onOpen, onOpenAsText, onBrowseTemplates }: { templates: DiagramTemplate[]; recent: Board[]; onQuickCreate: (mode: BoardMode) => void; onUseTemplate: (template: DiagramTemplate) => void; onOpen: (board: Board) => void; onOpenAsText: (board: Board) => void; onBrowseTemplates: () => void }) {
   return (
     <>
       <section>
@@ -504,14 +536,20 @@ function HomeStart({ templates, recent, onQuickCreate, onUseTemplate, onOpen, on
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {recent.map(board => (
-              <button key={board.id} onClick={() => onOpen(board)} className="group overflow-hidden rounded-lg border border-slate-200 bg-white text-left hover:border-indigo-300 hover:shadow-sm">
-                <div className="aspect-[16/10] overflow-hidden bg-slate-100"><BoardThumbnail board={board}/></div>
-                <div className="p-2.5">
-                  <div className="truncate text-xs font-semibold group-hover:text-indigo-700">{board.title}</div>
-                  <SkillAuthoredMark board={board} />
-                  <div className="mt-1 text-[10px] text-slate-400">Opened {timeAgo(board.lastOpenedAt)}</div>
+              <div key={board.id} className="group overflow-hidden rounded-lg border border-slate-200 bg-white text-left hover:border-indigo-300 hover:shadow-sm">
+                <button type="button" onClick={() => onOpen(board)} className="block w-full text-left">
+                  <div className="aspect-[16/10] overflow-hidden bg-slate-100"><BoardThumbnail board={board}/></div>
+                  <div className="px-2.5 pt-2.5">
+                    <div className="truncate text-xs font-semibold group-hover:text-indigo-700">{board.title}</div>
+                    <AuthorMark board={board} />
+                    <LastEdited board={board} className="mt-1 block text-[10px] text-slate-500" />
+                    <div className="mt-1 text-[10px] text-slate-400">Opened {timeAgo(board.lastOpenedAt)}</div>
+                  </div>
+                </button>
+                <div className="px-2.5 pb-2.5">
+                  <OpenAsTextButton onClick={() => onOpenAsText(board)} />
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </section>
@@ -520,10 +558,10 @@ function HomeStart({ templates, recent, onQuickCreate, onUseTemplate, onOpen, on
   );
 }
 
-function BoardCard(props: { board: Board; space?: Space; layout: 'grid' | 'list'; selected: boolean; menuOpen: boolean; trashView: boolean; onOpen: () => void; onSelect: () => void; onToggleStar: () => void; onMenu: (event: React.MouseEvent) => void; onEdit: () => void; onPresent: () => void; onDuplicate: () => void; onTemplate: () => void; onVersions: () => void; onExport: () => void; onTrash: () => void; onRestore: () => void; onDelete: () => void }) {
+function BoardCard(props: { board: Board; space?: Space; layout: 'grid' | 'list'; selected: boolean; menuOpen: boolean; trashView: boolean; onOpen: () => void; onOpenAsText: () => void; onSelect: () => void; onToggleStar: () => void; onMenu: (event: React.MouseEvent) => void; onEdit: () => void; onPresent: () => void; onDuplicate: () => void; onTemplate: () => void; onVersions: () => void; onExport: () => void; onTrash: () => void; onRestore: () => void; onDelete: () => void }) {
   const { board, space, layout, selected } = props;
-  if (layout === 'list') return <div className={`group relative flex items-center gap-3 rounded-lg border p-2 transition ${selected ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50'}`}><input type="checkbox" checked={selected} onChange={props.onSelect} onClick={event => event.stopPropagation()} className="h-4 w-4 accent-indigo-600" aria-label={`Select ${board.title}`}/><button onClick={props.onOpen} className="h-14 w-24 shrink-0 overflow-hidden rounded-md bg-slate-100"><BoardThumbnail board={board}/></button><button onClick={props.onOpen} className="min-w-0 flex-1 text-left"><div className="truncate text-sm font-semibold">{board.title}</div><SkillAuthoredMark board={board} /><div className="mt-1 flex items-center gap-2 text-xs text-slate-500"><span data-testid="board-mode-tag" className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${MODE_META[board.mode].badge}`}>{MODE_META[board.mode].label}</span>{space && <span>{space.name}</span>}<span>Opened {timeAgo(board.lastOpenedAt)}</span></div></button><button onClick={props.onToggleStar} className={`rounded p-2 ${board.starred ? 'text-amber-500' : 'text-slate-300 hover:text-amber-500'}`} aria-label={board.starred ? 'Unstar board' : 'Star board'}><Icon name="star" /></button><BoardMenu {...props} /></div>;
-  return <article className={`group relative overflow-visible rounded-lg border bg-white transition ${selected ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200 hover:border-indigo-200 hover:shadow-md'}`}><div className="relative aspect-[16/10] rounded-t-lg bg-slate-100"><button className="h-full w-full overflow-hidden rounded-t-lg" onClick={props.onOpen}><BoardThumbnail board={board}/></button><label className={`absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded bg-white shadow-sm transition ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}`} onClick={event => event.stopPropagation()}><input type="checkbox" checked={selected} onChange={props.onSelect} className="h-4 w-4 accent-indigo-600" aria-label={`Select ${board.title}`}/></label><div className="absolute right-2 top-2 flex gap-1"><button onClick={props.onToggleStar} className={`rounded-md bg-white/95 p-1.5 shadow-sm transition ${board.starred ? 'text-amber-500' : 'text-slate-400 opacity-0 hover:text-amber-500 group-hover:opacity-100 group-focus-within:opacity-100'}`} aria-label={board.starred ? 'Unstar board' : 'Star board'}><Icon name="star" /></button><BoardMenu {...props} /></div>{board.presentation?.items.length ? <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded bg-slate-950/75 px-1.5 py-1 text-[10px] font-semibold text-white"><Icon name="present" className="h-3 w-3"/>{board.presentation.items.length}</span> : null}</div><div className="p-3"><button className="block w-full text-left" onClick={props.onOpen}><h3 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-slate-950 group-hover:text-indigo-700">{board.title}</h3></button><SkillAuthoredMark board={board} /><div className="mt-2 flex items-center gap-2"><span data-testid="board-mode-tag" className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${MODE_META[board.mode].badge}`}>{MODE_META[board.mode].label}</span>{space && <span className="min-w-0 truncate text-[10px] font-medium text-slate-500" style={{ color: space.color }}>● {space.name}</span>}</div>{board.tags.length > 0 && <div className="mt-2 flex gap-1 overflow-hidden">{board.tags.slice(0, 3).map(tag => <span key={tag} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">#{tag}</span>)}</div>}<div className="mt-2 text-[11px] text-slate-400">Opened {timeAgo(board.lastOpenedAt)}</div></div></article>;
+  if (layout === 'list') return <div className={`group relative flex items-center gap-3 rounded-lg border p-2 transition ${selected ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50'}`}><input type="checkbox" checked={selected} onChange={props.onSelect} onClick={event => event.stopPropagation()} className="h-4 w-4 accent-indigo-600" aria-label={`Select ${board.title}`}/><button onClick={props.onOpen} className="h-14 w-24 shrink-0 overflow-hidden rounded-md bg-slate-100"><BoardThumbnail board={board}/></button><div className="min-w-0 flex-1"><button type="button" onClick={props.onOpen} className="block w-full text-left"><div className="truncate text-sm font-semibold">{board.title}</div><AuthorMark board={board} /><div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span data-testid="board-mode-tag" className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${MODE_META[board.mode].badge}`}>{MODE_META[board.mode].label}</span>{space && <span>{space.name}</span>}<LastEdited board={board} className="text-[11px] text-slate-500" /><span>Opened {timeAgo(board.lastOpenedAt)}</span></div></button><OpenAsTextButton onClick={props.onOpenAsText} /></div><button onClick={props.onToggleStar} className={`rounded p-2 ${board.starred ? 'text-amber-500' : 'text-slate-300 hover:text-amber-500'}`} aria-label={board.starred ? 'Unstar board' : 'Star board'}><Icon name="star" /></button><BoardMenu {...props} /></div>;
+  return <article className={`group relative overflow-visible rounded-lg border bg-white transition ${selected ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200 hover:border-indigo-200 hover:shadow-md'}`}><div className="relative aspect-[16/10] rounded-t-lg bg-slate-100"><button className="h-full w-full overflow-hidden rounded-t-lg" onClick={props.onOpen}><BoardThumbnail board={board}/></button><label className={`absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded bg-white shadow-sm transition ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}`} onClick={event => event.stopPropagation()}><input type="checkbox" checked={selected} onChange={props.onSelect} className="h-4 w-4 accent-indigo-600" aria-label={`Select ${board.title}`}/></label><div className="absolute right-2 top-2 flex gap-1"><button onClick={props.onToggleStar} className={`rounded-md bg-white/95 p-1.5 shadow-sm transition ${board.starred ? 'text-amber-500' : 'text-slate-400 opacity-0 hover:text-amber-500 group-hover:opacity-100 group-focus-within:opacity-100'}`} aria-label={board.starred ? 'Unstar board' : 'Star board'}><Icon name="star" /></button><BoardMenu {...props} /></div>{board.presentation?.items.length ? <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded bg-slate-950/75 px-1.5 py-1 text-[10px] font-semibold text-white"><Icon name="present" className="h-3 w-3"/>{board.presentation.items.length}</span> : null}</div><div className="p-3"><button type="button" className="block w-full text-left" onClick={props.onOpen}><h3 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-slate-950 group-hover:text-indigo-700">{board.title}</h3></button><AuthorMark board={board} /><div className="mt-2 flex items-center gap-2"><span data-testid="board-mode-tag" className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${MODE_META[board.mode].badge}`}>{MODE_META[board.mode].label}</span>{space && <span className="min-w-0 truncate text-[10px] font-medium text-slate-500" style={{ color: space.color }}>● {space.name}</span>}</div>{board.tags.length > 0 && <div className="mt-2 flex gap-1 overflow-hidden">{board.tags.slice(0, 3).map(tag => <span key={tag} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">#{tag}</span>)}</div>}<LastEdited board={board} className="mt-2 block text-[11px] text-slate-500" /><div className="mt-1 text-[11px] text-slate-400">Opened {timeAgo(board.lastOpenedAt)}</div><OpenAsTextButton onClick={props.onOpenAsText} /></div></article>;
 }
 
 function BoardMenu(props: Parameters<typeof BoardCard>[0]) {
