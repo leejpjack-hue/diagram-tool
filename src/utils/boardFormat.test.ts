@@ -15,6 +15,7 @@ import {
   parsePortableImport,
   projectBoardGraph,
   showStepNumbersForStorage,
+  skillAuthoredForStorage,
   validatePortableDocument,
 } from './boardFormat';
 import type { Board, BoardVersion, PersonalTemplate, Space } from './boardManager';
@@ -538,6 +539,41 @@ edge App -> User { label: "back" }
     expect(plain.board.edges.every(edge => edge.step === undefined)).toBe(true);
     expect(JSON.stringify(plain.board.edges)).not.toContain('"step"');
     expect(validatePortableDocument(doc).ok).toBe(true);
+  });
+
+  it('round-trips skillAuthored and omits it unless a local skill or MCP set it', () => {
+    const schemaBoard = schema.$defs.portableBoard as {
+      required: string[];
+      properties: { skillAuthored: { type: string; default: boolean; description?: string } };
+    };
+    expect(schemaBoard.required).not.toContain('skillAuthored');
+    expect(schemaBoard.properties.skillAuthored.type).toBe('boolean');
+    expect(schemaBoard.properties.skillAuthored.default).toBe(false);
+    expect(schemaBoard.properties.skillAuthored.description).toMatch(/create_board/);
+    expect(skillAuthoredForStorage(true)).toBe(true);
+    expect(skillAuthoredForStorage(false)).toBeUndefined();
+    expect(skillAuthoredForStorage('yes')).toBeUndefined();
+
+    const plain = buildBoardDocument(board({ mode: 'flow', dslText: FLOW_DSL }));
+    expect(plain.board).not.toHaveProperty('skillAuthored');
+    expect(plain.version).toBe('3.0');
+
+    const marked = buildBoardDocument(board({ mode: 'flow', dslText: FLOW_DSL, skillAuthored: true }));
+    expect(marked.board.skillAuthored).toBe(true);
+    expect(parsePortableImport(marked).boards[0].skillAuthored).toBe(true);
+
+    for (const value of [false, 'yes', 1, null]) {
+      const odd = parsePortableImport({
+        version: '3.0',
+        board: {
+          title: 'Odd',
+          mode: 'flow',
+          skillAuthored: value,
+          source: { kind: 'dsl', text: FLOW_DSL },
+        },
+      });
+      expect(odd.boards[0]).not.toHaveProperty('skillAuthored');
+    }
   });
 
   it('PNG/SVG/PDF export stays free and unwatermarked', () => {

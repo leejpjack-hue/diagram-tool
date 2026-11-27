@@ -147,6 +147,7 @@ export function createBoard(
       frames: [],
       comments: [],
       layout: { pins: {} },
+      skillAuthored: true,
     },
   };
   writeJsonAtomic(join(dir, filename), document);

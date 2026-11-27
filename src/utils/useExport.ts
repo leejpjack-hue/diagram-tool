@@ -170,7 +170,7 @@ export const useExport = () => {
   };
 
   const exportJSON = () => {
-    const { dslText, iconStyle: liveStyle, showStepNumbers } = useDiagramStore.getState();
+    const { dslText, iconStyle: liveStyle, showStepNumbers, skillAuthored } = useDiagramStore.getState();
     const mode = (diagramMode === 'c4' ? 'architecture' : diagramMode) as BoardMode;
     if (!dslText.trim() && diagramMode !== 'gantt') return;
     const title = parsedDiagram?.title || 'diagram';
@@ -182,6 +182,7 @@ export const useExport = () => {
         ? { iconStyle: iconStyleForStorage(liveStyle) }
         : {}),
       ...(showStepNumbersForStorage(showStepNumbers) ? { showStepNumbers: true } : {}),
+      ...(skillAuthored ? { skillAuthored: true as const } : {}),
     }), null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

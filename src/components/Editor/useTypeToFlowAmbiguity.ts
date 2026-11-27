@@ -43,6 +43,7 @@ export function useTypeToFlowAmbiguity({
     setParsedDiagram(adapted.graph);
     setError(null);
     setSourceWarning(null);
+    useDiagramStore.getState().setSkillAuthored(true);
     setSkillResult({ source: adapted.source, mermaid: adapted.result.mermaid, warnings: adapted.result.warnings });
     setPending(null);
     return adapted.graph.nodes.length;

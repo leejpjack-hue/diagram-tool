@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { plainStepsFromBoardSource, applyLoadedPlainSteps, seedTypeStepsForTemplate, sourceMatchesRoleLanes } from './boardToPlainSteps';
+import { plainStepsFromBoardSource, applyLoadedPlainSteps, seedTypeStepsForSkillBoard, seedTypeStepsForTemplate, sourceMatchesRoleLanes } from './boardToPlainSteps';
 import { plainStepsToDSL } from './plainSteps';
 import { TEMPLATES } from '../components/TemplatePicker/templates';
 import { flowToPlainSteps } from './flowToPlainSteps';
@@ -58,6 +58,21 @@ describe('seedTypeStepsForTemplate (DT-AI-09 template seeds Type steps)', () => 
     expect(sourceMatchesRoleLanes(plainStepsToDSL(steps, { lanesByRole: true }))).toBe(true);
     expect(sourceMatchesRoleLanes(plainStepsToDSL(steps))).toBe(false);
     expect(sourceMatchesRoleLanes('not a diagram')).toBe(false);
+  });
+
+  it('seeds Type steps only for a skill-authored flow', () => {
+    const dsl = `diagram: flow
+title: Intake
+start FNOL
+FNOL -> Review
+end Review
+`;
+    const seeded = seedTypeStepsForSkillBoard('flow', dsl, true);
+    expect(seeded).toBe(plainStepsFromBoardSource(dsl));
+    expect(seedTypeStepsForSkillBoard('flow', dsl, false)).toBeNull();
+    expect(seedTypeStepsForSkillBoard('flow', dsl)).toBeNull();
+    expect(seedTypeStepsForSkillBoard('architecture', dsl, true)).toBeNull();
+    expect(seedTypeStepsForSkillBoard('flow', 'diagram: flow\ntitle: Empty\n', true)).toBeNull();
   });
 
   it('other template ids return null (no mass auto-seed)', () => {

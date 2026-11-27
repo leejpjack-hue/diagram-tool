@@ -21,11 +21,11 @@ import { parseDiagram } from './parser/parser';
 import { ToastContainer } from './components/Toast/ToastContainer';
 import { useDiagramStore } from './store/diagramStore';
 import { iconStyleForStorage } from './components/Canvas/iconStyles';
-import { showStepNumbersForStorage } from './utils/boardFormat';
+import { showStepNumbersForStorage, skillAuthoredForStorage } from './utils/boardFormat';
 import { useGanttStore } from './components/Gantt/ganttStore';
 import { generateGanttDSL } from './components/Gantt/ganttGenerator';
 import { retainTypeTasksBlock } from './parser/plainGantt';
-import { seedTypeStepsForTemplate } from './parser/boardToPlainSteps';
+import { seedTypeStepsForSkillBoard, seedTypeStepsForTemplate } from './parser/boardToPlainSteps';
 import { flowStepList } from './parser/flowToPlainSteps';
 import { architectureWalkSequence } from './parser/architectureWalk';
 import { sequenceSourceCanWalk } from './components/Sequence/sequenceWalk';
@@ -409,6 +409,7 @@ function App() {
   const setIconStyle = useDiagramStore(s => s.setIconStyle);
   const showStepNumbers = useDiagramStore(s => s.showStepNumbers);
   const setShowStepNumbers = useDiagramStore(s => s.setShowStepNumbers);
+  const setSkillAuthored = useDiagramStore(s => s.setSkillAuthored);
   
   const { addTask, updateTask, setProject, tasks, dependencies } = useGanttStore();
   
@@ -856,6 +857,7 @@ function App() {
     setCurrentBoardId(board.id);
     setIconStyle(board.iconStyle, false);
     setShowStepNumbers(board.showStepNumbers === true, false);
+    setSkillAuthored(board.skillAuthored === true);
     setDslText(board.dslText);
     setDiagramMode(board.mode);
     // Gantt parses via its own effect; sequence parses inside SequenceCanvas;
@@ -871,7 +873,13 @@ function App() {
       setParsedDiagram(null);
     }
     setDeckItems(board.presentation?.items ?? []);
-    if (board.presentation?.items.length && isWorkshopTemplateId(board.templateSourceId)) {
+    if (board.skillAuthored === true) {
+      setShowEditor(true);
+      setMobileView('editor');
+      const seed = seedTypeStepsForSkillBoard(board.mode, board.dslText, true);
+      if (seed) queueTypeStepsSeed(seed);
+    }
+    if (board.skillAuthored !== true && board.presentation?.items.length && isWorkshopTemplateId(board.templateSourceId)) {
       projectRef.current.view = 'presentation';
       setPresentationFor(board);
       setView('presentation');
@@ -1003,6 +1011,7 @@ function App() {
 
   const handleLoadDiagram = (diagram: SavedDiagram) => {
     setReadOnlyShared(false);
+    setSkillAuthored(false);
     // Legacy recent diagrams have no iconStyle or showStepNumbers.
     setIconStyle('clean', false);
     setShowStepNumbers(false, false);
@@ -1023,6 +1032,7 @@ function App() {
 
   const handleNewDiagram = () => {
     setReadOnlyShared(false);
+    setSkillAuthored(false);
     setIconStyle('clean', false);
     setShowStepNumbers(false, false);
     setDslText(ARCHITECTURE_DSL);
@@ -1657,6 +1667,7 @@ function boardPatchFromSource(dslText: string, mode: BoardMode) {
     ...(title ? { title } : {}),
     iconStyle: iconStyleForStorage(useDiagramStore.getState().iconStyle),
     showStepNumbers: showStepNumbersForStorage(useDiagramStore.getState().showStepNumbers),
+    ...(skillAuthoredForStorage(useDiagramStore.getState().skillAuthored) ? { skillAuthored: true as const } : {}),
   };
 }
 

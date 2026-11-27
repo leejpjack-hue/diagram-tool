@@ -90,6 +90,11 @@ export interface Board {
    * Only `true` is stored, so a default save does not grow the file.
    */
   showStepNumbers?: boolean;
+  /**
+   * Local skill or local MCP `create_board` wrote this board.
+   * Only `true` is stored. Opening it shows editable text and the canvas.
+   */
+  skillAuthored?: true;
   schemaVersion: 2;
 }
 
@@ -338,6 +343,7 @@ function blobToDataUrl(value: Blob): Promise<string> {
 export function normalizeBoard(input: Partial<Board> & Pick<Board, 'id' | 'title' | 'mode' | 'dslText' | 'createdAt' | 'updatedAt'>): Board {
   const iconStyle = iconStyleForStorage(input.iconStyle);
   const showStepNumbers = showStepNumbersForStorage(input.showStepNumbers);
+  const skillAuthored = input.skillAuthored === true;
   const board: Board = {
     ...input,
     description: input.description ?? '',
@@ -349,6 +355,8 @@ export function normalizeBoard(input: Partial<Board> & Pick<Board, 'id' | 'title
   else delete board.iconStyle;
   if (showStepNumbers) board.showStepNumbers = true;
   else delete board.showStepNumbers;
+  if (skillAuthored) board.skillAuthored = true;
+  else delete board.skillAuthored;
   return board;
 }
 
@@ -607,7 +615,7 @@ export class BoardManager {
   }
 
   async create(
-    input: { id?: string; title: string; description?: string; mode: BoardMode; dslText: string; thumbnail?: string; spaceId?: string; tags?: string[]; templateSourceId?: string; presentation?: PresentationItem[]; iconStyle?: IconStyleId; showStepNumbers?: boolean },
+    input: { id?: string; title: string; description?: string; mode: BoardMode; dslText: string; thumbnail?: string; spaceId?: string; tags?: string[]; templateSourceId?: string; presentation?: PresentationItem[]; iconStyle?: IconStyleId; showStepNumbers?: boolean; skillAuthored?: boolean },
     recordActivity = true,
     confirmCommit?: CommitGuard,
   ): Promise<Board> {
@@ -635,6 +643,7 @@ export class BoardManager {
     const storedStyle = iconStyleForStorage(input.iconStyle);
     if (storedStyle) board.iconStyle = storedStyle;
     if (showStepNumbersForStorage(input.showStepNumbers)) board.showStepNumbers = true;
+    if (input.skillAuthored === true) board.skillAuthored = true;
     const stored = await storeBoard(board);
     return this.enqueueBoardWrite(board.id, async () => {
       if (confirmCommit && !(await confirmCommit())) throw new StaleWorkspaceEdit();
@@ -714,6 +723,7 @@ export class BoardManager {
       tags: source.tags,
       iconStyle: source.iconStyle,
       showStepNumbers: source.showStepNumbers,
+      skillAuthored: source.skillAuthored,
     });
     await this.addActivity(copy, 'duplicated', `Copied from ${source.title}`);
     return copy;
@@ -1022,6 +1032,7 @@ export class BoardManager {
         spaceId: candidate.spaceId ? spaceMap.get(candidate.spaceId) : undefined,
         iconStyle: candidate.iconStyle,
         showStepNumbers: candidate.showStepNumbers,
+        skillAuthored: candidate.skillAuthored,
       }, true, gate);
       if (candidate.id) boardIdMap.set(candidate.id, board.id);
       if (candidate.presentation?.items.length) await this.setPresentation(board.id, candidate.presentation.items);

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Dashboard } from './Dashboard';
 import { WORKSPACE_UNAVAILABLE_TITLE } from '../Workspace/WorkspaceStatus';
+import type { Board } from '../../utils/boardManager';
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -65,6 +66,35 @@ describe('Dashboard workspace recovery', () => {
     expect(screen.getByText('Your boards could not be loaded')).toBeInTheDocument();
     expect(screen.queryByText('No boards here yet')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Try again' }).length).toBeGreaterThan(0);
+  });
+
+  it('lists a skill-authored board on Home with an editable-text mark', async () => {
+    const authored: Board = {
+      id: 'skill-intake',
+      title: 'Intake',
+      description: '',
+      mode: 'flow',
+      dslText: 'diagram: flow\ntitle: Intake\nstart FNOL\n',
+      createdAt: '2026-11-27T00:00:00.000Z',
+      updatedAt: '2026-11-27T00:00:00.000Z',
+      lastOpenedAt: '2026-11-27T00:00:00.000Z',
+      tags: [],
+      starred: false,
+      schemaVersion: 2,
+      skillAuthored: true,
+    };
+    const plain: Board = { ...authored, id: 'plain', title: 'Notes', skillAuthored: undefined };
+    mocks.list.mockResolvedValue([authored, plain]);
+
+    renderDashboard();
+
+    expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Intake' })).toBeInTheDocument();
+    expect(screen.getAllByTestId('skill-authored-mark').length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId('skill-authored-mark')[0]).toHaveTextContent('Written by a skill, editable as text');
+    const notes = screen.getByRole('heading', { name: 'Notes' }).closest('article');
+    expect(notes).toBeTruthy();
+    expect(notes).not.toHaveTextContent('Written by a skill, editable as text');
   });
 
   it('shows Local workspace unavailable when IndexedDB cannot be opened', async () => {

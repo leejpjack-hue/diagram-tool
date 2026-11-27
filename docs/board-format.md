@@ -60,6 +60,10 @@ An explicit node `color:` in the DSL wins over the style colour. An explicit edg
 
 Missing or non-boolean values load as off. Older readers ignore the field. A diagram saved before this field — no `showStepNumbers` and no `iconStyle` — still loads with step numbers off and Clean style. Saving that board while both settings are at their defaults omits both fields.
 
+### Skill-authored boards
+
+`board.skillAuthored` is optional and additive. `version` stays **3.0**. No database migration. The local type-to-flow skill and the local MCP `create_board` tool set it to `true`. Other writers omit it. Missing, `false`, or any non-boolean loads as unmarked. Older readers ignore the field. A marked board stays a local file: nothing is sent to a DiagramTool cloud. Home shows “Written by a skill, editable as text”, and opening a marked flow board fills the existing Type steps editor so the text and the canvas stay editable.
+
 ### Typed data steps
 
 Type steps may emit the existing flow kinds `type: data` (`Data:`, `Memory:`, `DB:`) and `type: document` (`File:`) inside `source.text` / `dslText`. These kinds already exist. They are not a new board field. `version` stays **3.0**. No database migration.

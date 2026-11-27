@@ -88,10 +88,20 @@ export interface PortableBoard {
   iconStyle?: IconStyleId;
   /** DT-AI-29. Omitted when off. Only `true` is stored. */
   showStepNumbers?: boolean;
+  /**
+   * Set by the local type-to-flow skill or local MCP `create_board`.
+   * Omitted otherwise. Home uses it to mark the board as editable text.
+   */
+  skillAuthored?: true;
 }
 
 /** True is stored. False, missing, and non-booleans are omitted so old files stay unchanged. */
 export function showStepNumbersForStorage(value: unknown): true | undefined {
+  return value === true ? true : undefined;
+}
+
+/** True is stored. False, missing, and non-booleans are omitted so old files stay unchanged. */
+export function skillAuthoredForStorage(value: unknown): true | undefined {
   return value === true ? true : undefined;
 }
 
@@ -297,6 +307,7 @@ export function toPortableBoard(board: Pick<Board, 'title' | 'mode' | 'dslText'>
     schemaVersion: board.schemaVersion,
     ...(iconStyleForStorage(board.iconStyle) ? { iconStyle: iconStyleForStorage(board.iconStyle) } : {}),
     ...(showStepNumbersForStorage(board.showStepNumbers) ? { showStepNumbers: true as const } : {}),
+    ...(skillAuthoredForStorage(board.skillAuthored) ? { skillAuthored: true as const } : {}),
   };
 }
 
@@ -438,6 +449,7 @@ export function parsePortableImport(data: unknown): PortableImportPlan {
       templateSourceId: typeof record.templateSourceId === 'string' ? record.templateSourceId : undefined,
       ...(iconStyleForStorage(record.iconStyle) ? { iconStyle: iconStyleForStorage(record.iconStyle) } : {}),
       ...(showStepNumbersForStorage(record.showStepNumbers) ? { showStepNumbers: true as const } : {}),
+      ...(skillAuthoredForStorage(record.skillAuthored) ? { skillAuthored: true as const } : {}),
     });
   };
 

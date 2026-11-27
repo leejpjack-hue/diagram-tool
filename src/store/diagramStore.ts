@@ -61,6 +61,10 @@ interface DiagramStore {
   showStepNumbers: boolean;
   setShowStepNumbers: (on: boolean, trackHistory?: boolean) => void;
 
+  // Local skill or MCP authorship. Not an undo step and not a second diagram.
+  skillAuthored: boolean;
+  setSkillAuthored: (on: boolean) => void;
+
   // DT-AI-14: transient walk-through state — current step index, or null = off.
   // Pure view state: never persisted, never written to undo history.
   // DT-AI-19: session stack of visited step indices for Prev — pushed on every
@@ -229,6 +233,7 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   typeStepsSeed: null,
   iconStyle: 'clean',
   showStepNumbers: false,
+  skillAuthored: false,
   history: [],
   historyIndex: -1,
 
@@ -262,6 +267,12 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
     }
     if (get().isReadOnlyShared) return;
     commitHistory(set, get, { showStepNumbers: next });
+  },
+
+  setSkillAuthored: (on) => {
+    const next = on === true;
+    if (next === get().skillAuthored) return;
+    set({ skillAuthored: next });
   },
   
   setParsedDiagram: (diagram) => set(state => ({
