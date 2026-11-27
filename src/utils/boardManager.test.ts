@@ -128,8 +128,21 @@ describe('board repository workflows', () => {
     expect(buildBoardDocument(stored!).board.skillAuthored).toBe(true);
 
     const copy = await manager.duplicate(authored.id);
-    expect(copy?.skillAuthored).toBe(true);
     expect(copy?.title).toBe('Intake (copy)');
+    expect(copy?.id).not.toBe(authored.id);
+    expect(copy?.dslText).toBe(authored.dslText);
+    expect(copy).not.toHaveProperty('skillAuthored');
+    expect(JSON.stringify(buildBoardDocument(copy!))).not.toContain('skillAuthored');
+
+    const edited = `${authored.dslText}node Receipt { label: "Send receipt" }\n`;
+    await manager.update(copy!.id, { dslText: edited });
+    const original = await manager.get(authored.id);
+    const savedCopy = await manager.get(copy!.id);
+    expect(original?.skillAuthored).toBe(true);
+    expect(original?.dslText).toBe(authored.dslText);
+    expect(buildBoardDocument(original!).board.skillAuthored).toBe(true);
+    expect(savedCopy?.dslText).toBe(edited);
+    expect(savedCopy).not.toHaveProperty('skillAuthored');
   });
 
   it('creates, updates, lists, duplicates, and permanently removes boards', async () => {
