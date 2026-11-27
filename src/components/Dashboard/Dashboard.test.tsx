@@ -183,4 +183,29 @@ describe('Dashboard workspace recovery', () => {
       );
     });
   });
+
+  it('starts a blank Home workflow as typed steps (#151)', async () => {
+    mocks.list.mockResolvedValue([]);
+    const onCreate = vi.fn();
+    render(
+      <Dashboard onOpen={vi.fn()} onCreate={onCreate} onPublish={vi.fn()} notify={vi.fn()} />,
+    );
+
+    const blankFlow = await screen.findByTestId('home-blank-flow');
+    expect(blankFlow).toHaveTextContent('Type the steps');
+    fireEvent.click(blankFlow);
+    await waitFor(() => {
+      expect(onCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: 'flow', asText: true }),
+      );
+    });
+    expect(onCreate.mock.calls[0][0].dslText).toBeUndefined();
+
+    fireEvent.click(screen.getByRole('button', { name: /Blank Architecture/i }));
+    await waitFor(() => {
+      expect(onCreate).toHaveBeenCalledTimes(2);
+    });
+    expect(onCreate.mock.calls[1][0]).toEqual(expect.objectContaining({ mode: 'architecture' }));
+    expect(onCreate.mock.calls[1][0].asText).toBeUndefined();
+  });
 });

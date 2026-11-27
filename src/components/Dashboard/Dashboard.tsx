@@ -33,6 +33,8 @@ export interface DashboardCreateRequest {
   templateSourceId?: string;
   spaceId?: string;
   presentation?: PresentationItem[];
+  /** Blank flow from Home opens as typed steps. The canvas follows that text. */
+  asText?: boolean;
 }
 
 function requestFromBuiltIn(template: DiagramTemplate, spaceId?: string): DashboardCreateRequest {
@@ -433,7 +435,7 @@ export function Dashboard({ onOpen, onOpenAsText, onCreate, onPublish, notify, r
               <TemplatesView templates={templates} onUseBuiltIn={template => void createFrom(requestFromBuiltIn(template))} onUsePersonal={async template => { const used = await boardManager.useTemplate(template.id); if (used) await createFrom({ mode: used.mode, title: used.name, dslText: used.dslText, templateSourceId: used.id }); }} onDeletePersonal={template => void boardManager.removeTemplate(template.id)} />
             ) : view === 'activity' ? <ActivityView activity={activity} onOpen={async entry => { if (!entry.boardId) return; const board = await boardManager.get(entry.boardId); if (board && !board.deletedAt) await openBoard(board); }} /> : (
               <>
-                {view === 'home' && <HomeStart templates={TEMPLATES.slice(0, 4)} recent={recent} onQuickCreate={mode => void createFrom({ mode })} onUseTemplate={template => void createFrom(requestFromBuiltIn(template))} onOpen={board => void openBoard(board)} onOpenAsText={board => void openBoardAsText(board)} onBrowseTemplates={() => selectView('templates')} />}
+                {view === 'home' && <HomeStart templates={TEMPLATES.slice(0, 4)} recent={recent} onQuickCreate={(mode, asText) => void createFrom(asText ? { mode, asText: true } : { mode })} onUseTemplate={template => void createFrom(requestFromBuiltIn(template))} onOpen={board => void openBoard(board)} onOpenAsText={board => void openBoardAsText(board)} onBrowseTemplates={() => selectView('templates')} />}
                 <section className={view === 'home' ? 'mt-10' : ''}>
                   <div className="mb-4 flex flex-wrap items-center gap-2">
                     <h2 className="mr-auto text-base font-bold text-slate-900">{view === 'home' ? 'All boards' : viewTitle}<span className="ml-2 text-sm font-medium text-slate-400">{filteredBoards.length}</span></h2>
@@ -463,7 +465,7 @@ export function Dashboard({ onOpen, onOpenAsText, onCreate, onPublish, notify, r
       {versionBoard && <Modal title={`Version history · ${versionBoard.title}`} subtitle="Named checkpoints and the latest 20 automatic saves stay on this device." onClose={() => setVersionBoard(null)}><div className="p-5"><button className="mb-4 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => void createCheckpoint()}>Create checkpoint</button>{versions.length === 0 ? <EmptyState icon="history" title="No versions yet" description="Create a checkpoint before making a major change." /> : <div className="divide-y divide-slate-200">{versions.map(version => <div key={version.id} className="flex items-center gap-3 py-3"><div className="rounded-md bg-slate-100 p-2 text-slate-500"><Icon name="history" /></div><div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold">{version.name}</div><div className="text-xs text-slate-500">{new Date(version.createdAt).toLocaleString()} · {version.automatic ? 'Automatic' : 'Named checkpoint'}</div></div><button className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-50" onClick={async () => { const restored = await boardManager.restoreVersion(version.id); if (restored) { setVersionBoard(null); notify('success', 'Version restored'); } }}>Restore</button></div>)}</div>}</div></Modal>}
       {spaceOpen && <SpaceDialog spaces={spaces} defaultSpaceId={preferences.defaultSpaceId} onDefault={spaceId => void updatePreferences({ defaultSpaceId: spaceId || undefined })} onClose={() => setSpaceOpen(false)} />}
       {storageOpen && <StorageDialog storage={storage} boards={boards} versionsCount={activity.length} onClose={() => setStorageOpen(false)} onExport={() => void boardManager.exportAll()} onClear={async () => { const count = await boardManager.clearOldVersions(); notify('success', count ? `Removed ${count} old automatic versions` : 'No old versions to remove'); }} />}
-      {commandOpen && <CommandPalette boards={boards} onClose={() => setCommandOpen(false)} onOpen={board => void openBoard(board)} onCreate={mode => void createFrom({ mode })} />}
+      {commandOpen && <CommandPalette boards={boards} onClose={() => setCommandOpen(false)} onOpen={board => void openBoard(board)} onCreate={mode => void createFrom(mode === 'flow' ? { mode, asText: true } : { mode })} />}
       {importReport && <ImportReportDialog report={importReport} onClose={() => setImportReport(null)} />}
       <input ref={fileInputRef} data-testid="dashboard-import-file" type="file" accept=".board,.boards,.board.json,.boards.json,.diagram,.json,.mmd,.mermaid,.txt,.drawio,.xml" onChange={event => void handleImport(event)} className="hidden" />
     </div>
@@ -474,7 +476,7 @@ function NavButton({ item, active, collapsed, onClick, color }: { item: { label:
   return <button onClick={onClick} title={collapsed ? item.label : undefined} className={`flex h-9 w-full items-center gap-3 rounded-md px-2.5 text-sm font-medium transition ${active ? 'bg-indigo-100 text-indigo-700' : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-950'}`}><span style={color ? { color } : undefined}><Icon name={item.icon} /></span>{!collapsed && <><span className="min-w-0 flex-1 truncate text-left">{item.label}</span>{Boolean(item.count) && <span className="text-[10px] font-semibold text-slate-400">{item.count}</span>}</>}</button>;
 }
 
-function HomeStart({ templates, recent, onQuickCreate, onUseTemplate, onOpen, onOpenAsText, onBrowseTemplates }: { templates: DiagramTemplate[]; recent: Board[]; onQuickCreate: (mode: BoardMode) => void; onUseTemplate: (template: DiagramTemplate) => void; onOpen: (board: Board) => void; onOpenAsText: (board: Board) => void; onBrowseTemplates: () => void }) {
+function HomeStart({ templates, recent, onQuickCreate, onUseTemplate, onOpen, onOpenAsText, onBrowseTemplates }: { templates: DiagramTemplate[]; recent: Board[]; onQuickCreate: (mode: BoardMode, asText?: boolean) => void; onUseTemplate: (template: DiagramTemplate) => void; onOpen: (board: Board) => void; onOpenAsText: (board: Board) => void; onBrowseTemplates: () => void }) {
   return (
     <>
       <section>
@@ -484,11 +486,11 @@ function HomeStart({ templates, recent, onQuickCreate, onUseTemplate, onOpen, on
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
           {(Object.keys(MODE_META) as BoardMode[]).map(mode => (
-            <button key={mode} className="group flex min-h-28 flex-col justify-between rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-indigo-300 hover:shadow-sm" onClick={() => onQuickCreate(mode)}>
+            <button key={mode} data-testid={mode === 'flow' ? 'home-blank-flow' : undefined} className="group flex min-h-28 flex-col justify-between rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-indigo-300 hover:shadow-sm" onClick={() => onQuickCreate(mode, mode === 'flow')}>
               <div className={`flex h-9 w-9 items-center justify-center rounded-md text-white ${MODE_META[mode].dot}`}><Icon name="plus" /></div>
               <div>
                 <div className="text-sm font-semibold group-hover:text-indigo-700">Blank {MODE_META[mode].label}</div>
-                <div className="mt-0.5 text-[11px] text-slate-400">Start clean</div>
+                <div className="mt-0.5 text-[11px] text-slate-400">{mode === 'flow' ? 'Type the steps' : 'Start clean'}</div>
               </div>
             </button>
           ))}

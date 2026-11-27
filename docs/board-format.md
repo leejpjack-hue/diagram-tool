@@ -90,7 +90,7 @@ A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `s
 
 ### Understood as preview
 
-Type steps shows a live, read-only "Understood as" list while the user types. It uses the same local converter as Build board and is not written into `source.text`, `dslText`, or any other board field. The board changes only when the user presses Build board. `version` stays **3.0**. No database migration.
+Type steps shows a live, read-only "Understood as" list while the user types. It uses the same local converter as Build board and is not itself a board field. On an existing board, that list is not written into `source.text` or `dslText`; the board changes when the user presses Build board. A new blank flow started from Home is different: the typed steps are the source, and the same local converter writes them into `source.text` / `dslText` as they change, so the canvas follows. That write does not call a skill and does not leave the device. `version` stays **3.0**. No database migration.
 
 A diagram that omits `iconStyle` still loads as `clean`. A diagram that omits `showStepNumbers` still loads with step numbers off.
 

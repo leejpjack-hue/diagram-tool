@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { plainStepsFromBoardSource, applyLoadedPlainSteps, seedTypeStepsForOpenAsText, seedTypeStepsForSkillBoard, seedTypeStepsForTemplate, sourceMatchesRoleLanes } from './boardToPlainSteps';
+import { plainStepsFromBoardSource, applyLoadedPlainSteps, blankTypableFlowSource, flowSourceFromTypedSteps, seedTypeStepsForOpenAsText, seedTypeStepsForSkillBoard, seedTypeStepsForTemplate, sourceMatchesRoleLanes, typedFlowTitle } from './boardToPlainSteps';
 import { plainStepsToDSL } from './plainSteps';
 import { TEMPLATES } from '../components/TemplatePicker/templates';
 import { flowToPlainSteps } from './flowToPlainSteps';
@@ -86,6 +86,23 @@ end Send
     expect(seedTypeStepsForSkillBoard('flow', dsl, false)).toBeNull();
     expect(seedTypeStepsForOpenAsText('architecture', dsl)).toBeNull();
     expect(seedTypeStepsForOpenAsText('flow', 'diagram: flow\ntitle: Empty\n')).toBeNull();
+  });
+
+  it('a blank Home flow follows three typed steps and round-trips as the same text', () => {
+    const blank = blankTypableFlowSource();
+    expect(blank).toBe('diagram: flow\ntitle: Untitled Workflow\ndirection: LR\n');
+    expect(parseDiagram(blank).nodes).toHaveLength(0);
+    expect(flowSourceFromTypedSteps('  \n')).toBe(blank);
+    expect(typedFlowTitle('diagram: flow\ntitle: "Untitled Workflow"\n')).toBe('Untitled Workflow');
+
+    const steps = 'Collect request\nReview request\nSend reply';
+    const dsl = flowSourceFromTypedSteps(steps, { title: 'Untitled Workflow' });
+    expect(dsl).not.toBeNull();
+    expect(dsl).toContain('label: "Collect request"');
+    expect(dsl).toContain('label: "Review request"');
+    expect(dsl).toContain('label: "Send reply"');
+    expect(flowToPlainSteps(parseDiagram(dsl!))).toBe(steps);
+    expect(flowSourceFromTypedSteps(steps, { title: typedFlowTitle(dsl!) })).toBe(dsl);
   });
 
   it('other template ids return null (no mass auto-seed)', () => {

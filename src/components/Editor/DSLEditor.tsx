@@ -15,7 +15,7 @@ import { TypeTasksPreview } from './TypeTasksPreview';
 import { flowStepList, type FlowStep } from '../../parser/flowToPlainSteps';
 import { architectureWalkSequence } from '../../parser/architectureWalk';
 import { sequenceSourceCanWalk } from '../Sequence/sequenceWalk';
-import { plainStepsFromBoardSource, applyLoadedPlainSteps, sourceMatchesRoleLanes } from '../../parser/boardToPlainSteps';
+import { plainStepsFromBoardSource, applyLoadedPlainSteps, flowSourceFromTypedSteps, sourceMatchesRoleLanes, typedFlowTitle } from '../../parser/boardToPlainSteps';
 import { insertRolePrefix, type RolePrefixRole } from '../../parser/insertRolePrefix';
 import { nextShowStepsAfterBuild, statsFromPlainStepsDsl, buildFromStepsSuccessMessage } from './buildFromStepsPanel';
 import { AI_PROMPT_TEXT } from './aiPrompt';
@@ -88,6 +88,8 @@ export function DSLEditor() {
   // DT-AI-09: one-shot seed from picking the AI workflow template.
   const typeStepsSeed = useDiagramStore(s => s.typeStepsSeed);
   const clearTypeStepsSeed = useDiagramStore(s => s.clearTypeStepsSeed);
+  const typeStepsFollowsCanvas = useDiagramStore(s => s.typeStepsFollowsCanvas);
+  const didFocusTypedBlank = useRef(false);
 
   // Apply a template seed like Load steps: writes the payload via
   // applyLoadedPlainSteps (opens the panel) and clears the one-shot signal.
@@ -106,6 +108,50 @@ export function DSLEditor() {
     // stepsText intentionally omitted: applyLoadedPlainSteps overwrites it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeStepsSeed, clearTypeStepsSeed]);
+
+  // A new blank flow from Home: the typed sentences are the source. The same
+  // local converter Build board uses writes them into the board, so the canvas
+  // follows. No skill run, and no undo step per keystroke — the textarea is the edit.
+  useEffect(() => {
+    if (!typeStepsFollowsCanvas || isReadOnlyShared) return;
+    const handle = window.setTimeout(() => {
+      const current = useDiagramStore.getState().dslText;
+      const next = flowSourceFromTypedSteps(stepsText, {
+        title: typedFlowTitle(current),
+        lanesByRole,
+      });
+      if (!next || next === current) return;
+      const result = applyBoardSource(next, 'flow');
+      if (!result.ok || result.kind !== 'diagram') return;
+      setDslText(next, false);
+      setParsedDiagram(result.parsed);
+      setDiagramMode(result.mode);
+      setError(null);
+      setSourceWarning(result.warnings.length > 0 ? result.warnings.join('\n') : null);
+    }, 120);
+    return () => window.clearTimeout(handle);
+  }, [
+    typeStepsFollowsCanvas,
+    stepsText,
+    lanesByRole,
+    isReadOnlyShared,
+    setDslText,
+    setParsedDiagram,
+    setDiagramMode,
+    setError,
+    setSourceWarning,
+  ]);
+
+  useEffect(() => {
+    if (!typeStepsFollowsCanvas || !showSteps || didFocusTypedBlank.current) return;
+    const id = window.requestAnimationFrame(() => {
+      const input = stepsInputRef.current;
+      if (!input) return;
+      didFocusTypedBlank.current = true;
+      input.focus();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [typeStepsFollowsCanvas, showSteps]);
 
   const STEPS_PLACEHOLDER = `Model: draft reply
 then Send reply

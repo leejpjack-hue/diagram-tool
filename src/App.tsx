@@ -25,7 +25,7 @@ import { showStepNumbersForStorage, skillAuthoredForStorage } from './utils/boar
 import { useGanttStore } from './components/Gantt/ganttStore';
 import { generateGanttDSL } from './components/Gantt/ganttGenerator';
 import { retainTypeTasksBlock } from './parser/plainGantt';
-import { seedTypeStepsForOpenAsText, seedTypeStepsForSkillBoard, seedTypeStepsForTemplate } from './parser/boardToPlainSteps';
+import { blankTypableFlowSource, seedTypeStepsForOpenAsText, seedTypeStepsForSkillBoard, seedTypeStepsForTemplate } from './parser/boardToPlainSteps';
 import { flowStepList } from './parser/flowToPlainSteps';
 import { architectureWalkSequence } from './parser/architectureWalk';
 import { sequenceSourceCanWalk } from './components/Sequence/sequenceWalk';
@@ -410,6 +410,7 @@ function App() {
   const showStepNumbers = useDiagramStore(s => s.showStepNumbers);
   const setShowStepNumbers = useDiagramStore(s => s.setShowStepNumbers);
   const setSkillAuthored = useDiagramStore(s => s.setSkillAuthored);
+  const setTypeStepsFollowsCanvas = useDiagramStore(s => s.setTypeStepsFollowsCanvas);
   
   const { addTask, updateTask, setProject, tasks, dependencies } = useGanttStore();
   
@@ -847,8 +848,9 @@ function App() {
 
   // ---- Board dashboard (Miro-style home) ----
 
-  const openBoard = (board: Board, options?: { asText?: boolean }) => {
+  const openBoard = (board: Board, options?: { asText?: boolean; followSteps?: boolean }) => {
     const asText = options?.asText === true;
+    const followSteps = options?.followSteps === true;
     projectRef.current = {
       view: 'editor',
       boardId: board.id,
@@ -859,6 +861,7 @@ function App() {
     setIconStyle(board.iconStyle, false);
     setShowStepNumbers(board.showStepNumbers === true, false);
     setSkillAuthored(board.skillAuthored === true);
+    setTypeStepsFollowsCanvas(followSteps);
     setDslText(board.dslText);
     setDiagramMode(board.mode);
     // Gantt parses via its own effect; sequence parses inside SequenceCanvas;
@@ -896,7 +899,11 @@ function App() {
 
   const createBoard = async (request: DashboardCreateRequest) => {
     try {
-      const dslText = request.dslText ?? blankBoardDsl(request.mode);
+      const typableBlank = request.asText === true
+        && request.mode === 'flow'
+        && request.dslText == null
+        && !request.templateSourceId;
+      const dslText = request.dslText ?? (typableBlank ? blankTypableFlowSource() : blankBoardDsl(request.mode));
       const board = await boardManager.create({
         title: request.title?.trim() || extractBoardTitle(dslText, request.mode) || `Untitled ${request.mode}`,
         mode: request.mode,
@@ -906,7 +913,7 @@ function App() {
         presentation: request.presentation,
       });
       setWorkspaceError('');
-      openBoard(board);
+      openBoard(board, typableBlank ? { asText: true, followSteps: true } : undefined);
       if (request.templateSourceId) {
         try {
           const seedPayload = seedTypeStepsForTemplate(request.templateSourceId, dslText);
@@ -1018,6 +1025,7 @@ function App() {
   const handleLoadDiagram = (diagram: SavedDiagram) => {
     setReadOnlyShared(false);
     setSkillAuthored(false);
+    setTypeStepsFollowsCanvas(false);
     // Legacy recent diagrams have no iconStyle or showStepNumbers.
     setIconStyle('clean', false);
     setShowStepNumbers(false, false);
@@ -1039,6 +1047,7 @@ function App() {
   const handleNewDiagram = () => {
     setReadOnlyShared(false);
     setSkillAuthored(false);
+    setTypeStepsFollowsCanvas(false);
     setIconStyle('clean', false);
     setShowStepNumbers(false, false);
     setDslText(ARCHITECTURE_DSL);

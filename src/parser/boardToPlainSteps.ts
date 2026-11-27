@@ -4,7 +4,7 @@
 import { toDslSource } from '../utils/sourceText';
 import { parseDiagram } from './parser';
 import { flowToPlainSteps } from './flowToPlainSteps';
-import { diagramMatchesRoleLanes } from './plainSteps';
+import { diagramMatchesRoleLanes, plainStepsToDSL } from './plainSteps';
 
 /**
  * DT-AI-27: Load steps ticks Lanes by role only when the board's lanes are
@@ -72,4 +72,35 @@ export function applyLoadedPlainSteps(
   payload: string,
 ): { stepsText: string; showSteps: true } {
   return { stepsText: payload, showSteps: true };
+}
+
+/** Empty flow source for a new blank board started by typing. No starter nodes. */
+export function blankTypableFlowSource(title = 'Untitled Workflow'): string {
+  const name = title.trim() || 'Untitled Workflow';
+  return `diagram: flow\ntitle: ${name}\ndirection: LR\n`;
+}
+
+/** Title line from flow source, without surrounding quotes. */
+export function typedFlowTitle(dslText: string): string {
+  const raw = dslText.match(/^\s*title\s*:\s*(.+)\s*$/im)?.[1]?.trim() ?? '';
+  return raw.replace(/^["']|["']$/g, '').trim() || 'Untitled Workflow';
+}
+
+/**
+ * Typed steps are the source for a new blank Home flow.
+ * Empty text restores the blank flow. Unreadable text returns null so the
+ * canvas stays on the last readable source. Uses the same local converter as
+ * Build board — no skill run.
+ */
+export function flowSourceFromTypedSteps(
+  text: string,
+  opts: { title?: string; lanesByRole?: boolean } = {},
+): string | null {
+  const title = opts.title?.trim() || 'Untitled Workflow';
+  if (!text.trim()) return blankTypableFlowSource(title);
+  try {
+    return plainStepsToDSL(text, { title, lanesByRole: opts.lanesByRole });
+  } catch {
+    return null;
+  }
 }
