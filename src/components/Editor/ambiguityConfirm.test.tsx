@@ -33,6 +33,7 @@ function setup() {
     diagramMode: 'flow',
     error: null,
     isReadOnlyShared: false,
+    skillAuthored: false,
   });
   return render(<DSLEditor />);
 }
@@ -63,6 +64,7 @@ describe('ambiguous decision edges wait for confirm', () => {
     fireEvent.click(screen.getByTestId('ambiguity-cancel'));
     expect(screen.queryByTestId('ambiguity-list')).not.toBeInTheDocument();
     expect(useDiagramStore.getState().dslText).toBe(ORIGINAL);
+    expect(useDiagramStore.getState().skillAuthored).toBe(false);
   });
 
   it('confirm writes the inferred no edge and edit writes a different no edge', async () => {
@@ -80,6 +82,7 @@ describe('ambiguous decision edges wait for confirm', () => {
     expect(committed).not.toBe(ORIGINAL);
     expect(committed).toContain('n2 ->|"no"| n3');
     expect(committed).not.toContain('n2 ->|"no"| n4');
+    expect(useDiagramStore.getState().skillAuthored).toBe(true);
     expect(await screen.findByTestId('skill-mermaid-pane')).toHaveTextContent('n2 -->|"no"| n3');
   });
 

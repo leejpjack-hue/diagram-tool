@@ -37,6 +37,25 @@ export function seedTypeStepsForTemplate(templateId: string, templateDsl: string
   return plainStepsFromBoardSource(templateDsl);
 }
 
+/**
+ * Opening a skill- or MCP-authored flow board fills Type steps from the source.
+ * Other modes and unmarked boards return null so their editors stay as they are.
+ * Unreadable source returns null; the caller still opens the text editor.
+ */
+export function seedTypeStepsForSkillBoard(
+  mode: string,
+  dslText: string,
+  skillAuthored?: boolean,
+): string | null {
+  if (skillAuthored !== true || mode !== 'flow') return null;
+  try {
+    const text = plainStepsFromBoardSource(dslText);
+    return text.trim() ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Apply serializer output into Type steps panel state (opens panel). */
 export function applyLoadedPlainSteps(
   _prevStepsText: string,

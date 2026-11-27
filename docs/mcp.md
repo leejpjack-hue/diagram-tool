@@ -67,6 +67,8 @@ Nothing is uploaded — Cursor talks to a local stdio process that only reads th
 
 `set_source` and `create_board` write **source only**. They do not hand-edit `nodes` / `edges`. Opening the file in DiagramTool rebuilds the graph through the existing import path.
 
+`create_board` also sets `skillAuthored: true`. After the file is imported on this device, Home lists it as written by a skill and editable as text. Opening a flow board fills the existing Type steps editor. The file is not uploaded.
+
 ## Non-goals
 
 - No remote MCP, HTTP listener, OAuth, or VPS copy

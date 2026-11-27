@@ -50,6 +50,9 @@ describe('board normalization and queries', () => {
     expect(board.starred).toBe(false);
     expect(board).not.toHaveProperty('iconStyle');
     expect(board).not.toHaveProperty('showStepNumbers');
+    expect(board).not.toHaveProperty('skillAuthored');
+    expect(normalizeBoard({ ...board, skillAuthored: true }).skillAuthored).toBe(true);
+    expect(normalizeBoard({ ...board, skillAuthored: false as unknown as true })).not.toHaveProperty('skillAuthored');
     expect(normalizeBoard({ ...board, showStepNumbers: false, iconStyle: 'clean' })).not.toHaveProperty('showStepNumbers');
     expect(normalizeBoard({ ...board, showStepNumbers: false, iconStyle: 'clean' })).not.toHaveProperty('iconStyle');
     expect(normalizeBoard({ ...board, showStepNumbers: true }).showStepNumbers).toBe(true);
@@ -106,6 +109,27 @@ describe('board repository workflows', () => {
     const off = await manager.get(created.id);
     expect(off).not.toHaveProperty('showStepNumbers');
     expect(JSON.stringify(buildBoardDocument(off!))).not.toContain('showStepNumbers');
+  });
+
+  it('keeps a local skill mark on the board and omits it otherwise', async () => {
+    const plain = await manager.create({ title: 'Hand typed', mode: 'flow', dslText: 'diagram: flow\nstart A' });
+    expect(plain).not.toHaveProperty('skillAuthored');
+    expect(JSON.stringify(buildBoardDocument(plain))).not.toContain('skillAuthored');
+
+    const authored = await manager.create({
+      title: 'Intake',
+      mode: 'flow',
+      dslText: 'diagram: flow\ntitle: Intake\nstart FNOL\nFNOL -> Review\nend Review\n',
+      skillAuthored: true,
+    });
+    expect(authored.skillAuthored).toBe(true);
+    const stored = await manager.get(authored.id);
+    expect(stored?.skillAuthored).toBe(true);
+    expect(buildBoardDocument(stored!).board.skillAuthored).toBe(true);
+
+    const copy = await manager.duplicate(authored.id);
+    expect(copy?.skillAuthored).toBe(true);
+    expect(copy?.title).toBe('Intake (copy)');
   });
 
   it('creates, updates, lists, duplicates, and permanently removes boards', async () => {

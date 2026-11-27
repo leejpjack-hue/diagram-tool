@@ -201,6 +201,7 @@ export async function upsertOpenedBoard(
       presentation: portable.presentation,
       iconStyle: portable.iconStyle,
       showStepNumbers: portable.showStepNumbers,
+      skillAuthored: portable.skillAuthored,
     }, 'updated', confirmCommit);
     if (!updated) throw new Error(OPEN_BOARD_FILE_ERRORS.invalid);
     await manager.markOpened(updated.id);
@@ -217,7 +218,8 @@ export async function upsertOpenedBoard(
     tags: portable.tags,
     presentation: portable.presentation?.items,
     iconStyle: portable.iconStyle,
-      showStepNumbers: portable.showStepNumbers,
+    showStepNumbers: portable.showStepNumbers,
+    skillAuthored: portable.skillAuthored,
   }, true, confirmCommit);
   return created;
 }

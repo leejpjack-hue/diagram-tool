@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import { parseOpenedBoardText } from './boardFile';
+import { seedTypeStepsForSkillBoard } from '../parser/boardToPlainSteps';
 import {
   LocalMcpError,
   createBoard,
@@ -164,7 +166,33 @@ describe('create_board', () => {
     expect(document.board.dslText).toBe(VALID_FLOW);
     expect(document.board.nodes).toEqual([]);
     expect(document.board.edges).toEqual([]);
+    expect(document.board).toMatchObject({ skillAuthored: true });
     expect(listBoards(dir).map(item => item.filename)).toEqual(['intake.json']);
+
+    const portable = parseOpenedBoardText(readFileSync(join(dir, 'intake.json'), 'utf8'));
+    expect(portable.skillAuthored).toBe(true);
+    const steps = seedTypeStepsForSkillBoard(portable.mode, portable.dslText, portable.skillAuthored);
+    expect(steps).toContain('FNOL');
+    expect(steps).toContain('Review');
+    expect(JSON.stringify(portable)).not.toMatch(/https?:\/\//);
+  });
+
+  it('keeps the skill mark when set_source replaces the text', () => {
+    const dir = tempDir();
+    createBoard({ title: 'Intake', mode: 'flow', source: VALID_FLOW }, dir);
+    const next = `diagram: flow
+title: Intake
+start FNOL
+FNOL -> Review
+Review -> Pay
+end Pay
+`;
+    setSource('intake.json', next, dir);
+    const document = JSON.parse(readFileSync(join(dir, 'intake.json'), 'utf8')) as {
+      board: { skillAuthored?: boolean; source: { text: string } };
+    };
+    expect(document.board.skillAuthored).toBe(true);
+    expect(document.board.source.text).toBe(next);
   });
 
   it('rejects invalid source and does not write a file', () => {
