@@ -112,6 +112,7 @@ function isEndedDragChange(change: NodeChange<Node>): change is NodeChange<Node>
 
 function DiagramCanvasInternal() {
   const { parsedDiagram, diagramMode, setZoomLevel, setSelectedNode, dslText, setDslText, setParsedDiagram, setError, selectedNodeId, isReadOnlyShared } = useDiagramStore();
+  const typeStepsFollowsCanvas = useDiagramStore(s => s.typeStepsFollowsCanvas);
   const iconStyle = useDiagramStore(s => s.iconStyle);
   const showStepNumbers = useDiagramStore(s => s.showStepNumbers);
   const flowTokens = ICON_STYLES[iconStyle];
@@ -1003,6 +1004,17 @@ function DiagramCanvasInternal() {
     if (total === 0) exitWalkThrough();
     else if (walkThroughStep >= total) setWalkThroughStep(total - 1);
   }, [walkThroughStep, walkSteps, archHops, diagramMode, exitWalkThrough, setWalkThroughStep]);
+
+  // A new blank flow from Home: keep the typed steps in frame. Cap the zoom so
+  // a short flow is not enlarged to the canvas maximum before nodes are measured.
+  useEffect(() => {
+    if (!typeStepsFollowsCanvas || diagramMode !== 'flow') return;
+    if (!parsedDiagram || parsedDiagram.nodes.length === 0) return;
+    const id = window.requestAnimationFrame(() => {
+      fitView({ padding: 0.25, duration: 0, maxZoom: 1 });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [typeStepsFollowsCanvas, parsedDiagram, diagramMode, fitView]);
 
   // Keep the current step in view (pan/fit) on large boards.
   useEffect(() => {

@@ -44,6 +44,9 @@ interface DiagramStore {
   typeStepsSeed: { payload: string; nonce: number } | null;
   queueTypeStepsSeed: (payload: string) => void;
   clearTypeStepsSeed: () => void;
+  // A new blank flow from Home: typed steps write the board, and the canvas follows.
+  typeStepsFollowsCanvas: boolean;
+  setTypeStepsFollowsCanvas: (on: boolean) => void;
 
   // DT-SAVE-01: transient read-only mode when viewing a shared diagram link (?share=<token>).
   isReadOnlyShared: boolean;
@@ -231,6 +234,7 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   zoomLevel: 100,
   clipboard: [],
   typeStepsSeed: null,
+  typeStepsFollowsCanvas: false,
   iconStyle: 'clean',
   showStepNumbers: false,
   skillAuthored: false,
@@ -310,6 +314,7 @@ edge Events -> Worker { label: "consume" colour: #f59e0b from: bottom to: top }`
   queueTypeStepsSeed: (payload) =>
     set(state => ({ typeStepsSeed: { payload, nonce: (state.typeStepsSeed?.nonce ?? 0) + 1 } })),
   clearTypeStepsSeed: () => set({ typeStepsSeed: null }),
+  setTypeStepsFollowsCanvas: (on) => set({ typeStepsFollowsCanvas: on === true }),
 
   isReadOnlyShared: false,
   sharedBoardTitle: null,
