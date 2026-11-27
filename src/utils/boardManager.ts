@@ -92,7 +92,8 @@ export interface Board {
   showStepNumbers?: boolean;
   /**
    * Local skill or local MCP `create_board` wrote this board.
-   * Only `true` is stored. Opening it shows editable text and the canvas.
+   * Only `true` is stored. Home marks it as written by a skill, and opening
+   * it shows editable text beside the canvas. A Home duplicate omits this field.
    */
   skillAuthored?: true;
   schemaVersion: 2;
@@ -713,6 +714,8 @@ export class BoardManager {
   async duplicate(id: string): Promise<Board | undefined> {
     const source = await this.get(id);
     if (!source) return undefined;
+    // A new local board. The original keeps skillAuthored. The copy omits it,
+    // so Home marks the copy human-owned and later edits stay on the copy.
     const copy = await this.create({
       title: `${source.title} (copy)`,
       description: source.description,
@@ -720,10 +723,9 @@ export class BoardManager {
       dslText: source.dslText,
       thumbnail: source.thumbnail,
       spaceId: source.spaceId,
-      tags: source.tags,
+      tags: [...source.tags],
       iconStyle: source.iconStyle,
       showStepNumbers: source.showStepNumbers,
-      skillAuthored: source.skillAuthored,
     });
     await this.addActivity(copy, 'duplicated', `Copied from ${source.title}`);
     return copy;

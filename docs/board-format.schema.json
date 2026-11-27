@@ -177,7 +177,7 @@
         "skillAuthored": {
           "type": "boolean",
           "default": false,
-          "description": "Optional. True when the local type-to-flow skill or the local MCP create_board path wrote the board. Omitted otherwise. Home shows it as written by a skill and editable as text. Format version stays 3.0. Nothing is uploaded."
+          "description": "Optional. True when the local type-to-flow skill or the local MCP create_board path wrote the board. A Home duplicate omits this field so the copy is human-owned. Omitted otherwise. Home shows a marked board as written by a skill and an unmarked board as written by a human. Format version stays 3.0. Nothing is uploaded."
         }
       }
     },
